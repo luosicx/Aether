@@ -1,0 +1,269 @@
+import SwiftUI
+import SwiftData
+
+struct KnowledgeBaseView: View {
+    @Environment(\.modelContext) private var modelContext
+    @State private var vm = KnowledgeBaseVM()
+    @State private var showPicker = false
+    @Environment(\.dismiss) private var dismiss
+    // iPad/macOS 双栏:size class 判断
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    // 双栏:当前选中的文档(用于右侧分块预览)
+    @State private var selectedDocument: KnowledgeBaseVM.DocumentRow?
+
+    var body: some View {
+        Group {
+            if horizontalSizeClass == .regular {
+                regularLayout
+            } else {
+                compactLayout
+            }
+        }
+        .sheet(isPresented: $showPicker) {
+            DocumentPickerView { url in
+                Task { await vm.importDocument(url: url, modelContext: modelContext) }
+            }
+        }
+        .alert("导入失败", isPresented: Binding(
+            get: { vm.errorMessage != nil },
+            set: { if !$0 { vm.errorMessage = nil } }
+        )) {
+            Button("好") { vm.errorMessage = nil }
+        } message: {
+            Text(vm.errorMessage ?? "")
+        }
+        .overlay {
+            if vm.isImporting {
+                ProgressView("索引中…")
+                    .padding(20)
+                    .background(.regularMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+            }
+        }
+        .onAppear { vm.load(modelContext: modelContext) }
+    }
+
+    // MARK: - Compact (iPhone)
+
+    @ViewBuilder
+    private var compactLayout: some View {
+        NavigationStack {
+            Group {
+                if vm.documents.isEmpty {
+                    emptyState
+                } else {
+                    documentList
+                }
+            }
+            .navigationTitle("知识库")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { showPicker = true } label: {
+                        Image(systemName: "plus").fontWeight(.medium)
+                    }
+                }
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("完成") { dismiss() }
+                }
+            }
+            #endif
+        }
+    }
+
+    // MARK: - Regular (iPad / macOS)
+
+    @ViewBuilder
+    private var regularLayout: some View {
+        NavigationSplitView {
+            Group {
+                if vm.documents.isEmpty {
+                    emptyState
+                } else {
+                    documentListForSplit
+                }
+            }
+            .navigationTitle("知识库")
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button { showPicker = true } label: {
+                        Image(systemName: "plus").fontWeight(.medium)
+                    }
+                }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("完成") { dismiss() }
+                }
+            }
+        } detail: {
+            if let doc = selectedDocument, vm.documents.contains(doc) {
+                chunkPreview(for: doc)
+            } else {
+                ContentUnavailableView("选择一个文档", systemImage: "doc.text")
+            }
+        }
+    }
+
+    // MARK: - 空状态
+
+    private var emptyState: some View {
+        VStack(spacing: 20) {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.accentColor.opacity(0.12), Color.accentColor.opacity(0.04)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .frame(width: 88, height: 88)
+                Image(systemName: "book.closed")
+                    .font(.system(size: 34, weight: .light))
+                    .foregroundStyle(Color.accentColor.opacity(0.7))
+            }
+
+            VStack(spacing: 6) {
+                Text("知识库为空")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.primary)
+                Text("导入 PDF 或文本文档，让 AI 基于你的资料回答")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // MARK: - 文档列表 (Compact)
+
+    private var documentList: some View {
+        List {
+            ForEach(vm.documents) { doc in
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(doc.source)
+                        .font(.body.weight(.medium))
+                        .lineLimit(1)
+                    HStack(spacing: 8) {
+                        Text("\(doc.chunkCount) 个片段")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(doc.createdAt, style: .relative)
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .padding(.vertical, 4)
+                .swipeActions(edge: .trailing) {
+                    Button(role: .destructive) {
+                        vm.deleteDocument(source: doc.source, modelContext: modelContext)
+                    } label: {
+                        Label("删除", systemImage: "trash")
+                    }
+                }
+            }
+        }
+        #if os(iOS)
+        .listStyle(.insetGrouped)
+        #endif
+    }
+
+    // MARK: - 文档列表 (Regular / Split)
+
+    private var documentListForSplit: some View {
+        List(selection: $selectedDocument) {
+            ForEach(vm.documents) { doc in
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(doc.source)
+                        .font(.body.weight(.medium))
+                        .lineLimit(1)
+                    HStack(spacing: 8) {
+                        Text("\(doc.chunkCount) 个片段")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(doc.createdAt, style: .relative)
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .tag(doc)
+                .padding(.vertical, 4)
+                .swipeActions(edge: .trailing) {
+                    Button(role: .destructive) {
+                        if selectedDocument == doc {
+                            selectedDocument = nil
+                        }
+                        vm.deleteDocument(source: doc.source, modelContext: modelContext)
+                    } label: {
+                        Label("删除", systemImage: "trash")
+                    }
+                }
+            }
+        }
+        .listStyle(.sidebar)
+    }
+
+    // MARK: - 分块预览 (Regular / Detail)
+
+    private func chunkPreview(for doc: KnowledgeBaseVM.DocumentRow) -> some View {
+        let chunks = chunksForSource(doc.source)
+        return ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(doc.source)
+                        .font(.title2.bold())
+                    HStack(spacing: 8) {
+                        Text("\(doc.chunkCount) 个片段")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Text("·")
+                            .foregroundStyle(.secondary)
+                        Text(doc.createdAt, style: .relative)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                ForEach(chunks) { chunk in
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text("片段 \(chunk.chunkIndex + 1)")
+                                .font(.headline)
+                            Spacer()
+                            Text(chunk.weight < 1.0 ? "权重 \(String(format: "%.1f", chunk.weight))" : "")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
+                        Text(chunk.content)
+                            .font(.body)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .textSelection(.enabled)
+                    }
+                    .padding()
+                    .background(.regularMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+            }
+            .padding()
+        }
+        .navigationTitle(doc.source)
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+    }
+
+    // MARK: - 查询指定 source 的全部分块
+
+    private func chunksForSource(_ source: String) -> [DocumentChunk] {
+        let descriptor = FetchDescriptor<DocumentChunk>(
+            predicate: #Predicate { $0.source == source },
+            sortBy: [SortDescriptor(\.chunkIndex)]
+        )
+        return (try? modelContext.fetch(descriptor)) ?? []
+    }
+}

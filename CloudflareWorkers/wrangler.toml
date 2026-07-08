@@ -1,0 +1,15 @@
+name = "aibuilder-bff"
+main = "worker.js"
+compatibility_date = "2026-07-01"
+
+# BFF Token KV namespace：键为 token 字符串，值为用户元数据（存在即合法）
+# 部署后用 `wrangler kv:namespace create bff_tokens` 创建并替换下方 id
+[[kv_namespaces]]
+binding = "bff_tokens"
+id = "your-kv-namespace-id"
+
+# 上游 endpoint（非敏感，明文配置）
+# Secrets（DEEPSEEK_API_KEY / QWEN_API_KEY）通过 `wrangler secret put` 配置，不在此明文存储
+[vars]
+DEEPSEEK_BASE_URL = "https://api.deepseek.com"
+QWEN_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"

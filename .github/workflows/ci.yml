@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        run: |
+          xcodebuild build \
+            -project AIBuilder.xcodeproj \
+            -scheme AIBuilder \
+            -destination 'platform=iOS Simulator,name=iPhone 17' \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Test (UT + UIT)
+        run: |
+          xcodebuild test \
+            -project AIBuilder.xcodeproj \
+            -scheme AIBuilder \
+            -destination 'platform=iOS Simulator,name=iPhone 17' \
+            -configuration Debug \
+            -resultBundlePath TestResults.xcresult \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Upload test results artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-xcresult
+          path: TestResults.xcresult
+          if-no-files-found: warn
