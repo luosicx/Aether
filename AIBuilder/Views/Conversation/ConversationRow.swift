@@ -42,5 +42,9 @@ struct ConversationRow: View {
             }
         }
         .padding(.vertical, 6)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(conversation.title)，最后消息：\(lastMessage?.content ?? "无")")
+        .accessibilityHint("打开此会话")
+        .accessibilityAddTraits(.isButton)
     }
 }

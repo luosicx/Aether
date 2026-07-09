@@ -16,6 +16,9 @@ struct HeadingView: View {
             }
         }
         .padding(.vertical, 2)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(level) 级标题")
+        .accessibilityAddTraits(.isHeader)
     }
 
     // MARK: - 样式

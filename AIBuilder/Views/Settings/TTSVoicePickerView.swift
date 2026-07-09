@@ -5,6 +5,9 @@ struct TTSVoicePickerView: View {
     @Bindable var settingsVM: SettingsViewModel
     @Bindable var chatViewModel: ChatViewModel
 
+    /// 按语言分组的音色列表(在 onAppear 中加载,避免每次 body 重算都触发查询)。
+    @State private var groupedVoices: [(language: String, voices: [TTSVoice])] = []
+
     var body: some View {
         List {
             // 系统默认选项(空 identifier,使用 zh-CN 默认音色)
@@ -41,13 +44,9 @@ struct TTSVoicePickerView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
-    }
-
-    // MARK: - 数据
-
-    /// 按语言分组的音色列表(缓存在视图内,生命周期跟随视图)
-    private var groupedVoices: [(language: String, voices: [TTSVoice])] {
-        TTSVoiceCatalog.groupedByLanguage()
+        .onAppear {
+            groupedVoices = TTSVoiceCatalog.groupedByLanguage()
+        }
     }
 
     // MARK: - 行视图

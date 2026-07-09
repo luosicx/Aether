@@ -92,6 +92,107 @@
 - [ ] 18 个工具文件有文件级 `///` 注释
 - [ ] ToolRegistry.swift 有注册逻辑注释
 
+## 4.8 多平台构建验证
+
+### iOS 构建
+- [ ] 执行命令构建 iOS Simulator 版本：
+  ```bash
+  xcodebuild build \
+    -project AIBuilder.xcodeproj \
+    -scheme AIBuilder \
+    -destination 'platform=iOS Simulator,name=iPhone 17' \
+    -configuration Debug \
+    CODE_SIGNING_ALLOWED=NO
+  ```
+- [ ] 预期输出：`** BUILD SUCCEEDED **`
+- [ ] 无 warning（特别注意 unused import / deprecated API）
+
+### macOS 构建
+- [ ] 执行命令构建 macOS 版本：
+  ```bash
+  xcodebuild build \
+    -project AIBuilder.xcodeproj \
+    -scheme AIBuilder \
+    -destination 'platform=macOS' \
+    -configuration Debug \
+    CODE_SIGNING_ALLOWED=NO
+  ```
+- [ ] 预期输出：`** BUILD SUCCEEDED **`
+- [ ] macOS 独有工具用 `#if os(macOS)` 守卫，iOS 构建不报错
+- [ ] iOS-only 框架（BGTaskScheduler / ActivityKit / HealthKit / WatchConnectivity）用 `#if os(iOS)` 守卫，macOS 构建不报错
+
+## 4.9 工具数量审计
+
+- [ ] iOS 工具数 = 13（DateTimeTool / CalculatorTool / AlarmTool / ReminderTool + 6 跨平台 + 3 快捷指令）
+- [ ] macOS 工具数 = 24（上述 13 + 11 macOS 独有）
+- [ ] 验证命令：
+  ```bash
+  # 在 Xcode 中运行 Debug Playground 或在 ChatViewModel 加日志：
+  # print("Tools count: \(ToolRegistry.shared.allToolDefs.count)")
+  ```
+- [ ] 预期：iOS 13，macOS 24
+- [ ] ToolRegistry 注册逻辑：14 个跨平台工具无条件注册 + 11 个 macOS 工具用 `#if os(macOS)` 条件注册
+
+## 4.10 测试规模审计
+
+### 单元测试（UT）
+- [ ] UT 用例数 = 249（246 pass / 3 skip / 0 failures）
+- [ ] UT 文件数 = 69
+- [ ] 验证命令：
+  ```bash
+  xcodebuild test \
+    -project AIBuilder.xcodeproj \
+    -scheme AIBuilder \
+    -destination 'platform=iOS Simulator,name=iPhone 17' \
+    -only-testing:AIBuilderTests \
+    CODE_SIGNING_ALLOWED=NO 2>&1 | tail -5
+  ```
+- [ ] 预期输出包含：`Executed 249 tests, with 0 failures, 3 skipped`
+
+### UI 测试（UIT）
+- [ ] UIT 用例数 = 13（11 pass / 2 skip / 0 failures）
+- [ ] UIT 文件数 = 2
+- [ ] 验证命令：
+  ```bash
+  xcodebuild test \
+    -project AIBuilder.xcodeproj \
+    -scheme AIBuilder \
+    -destination 'platform=iOS Simulator,name=iPhone 17' \
+    -only-testing:AIBuilderUITests \
+    CODE_SIGNING_ALLOWED=NO 2>&1 | tail -5
+  ```
+- [ ] 预期输出包含：`Executed 13 tests, with 0 failures, 2 skipped`
+
+## 4.11 文档完整性审计
+
+- [ ] `doc/ARCHITECTURE.md` 存在且章节完整（1-8）
+- [ ] `doc/USAGE.md` 存在且章节完整（1-10）
+- [ ] `doc/MANUAL_TEST_CHECKLIST.md` 存在且手测项完整
+- [ ] `doc/ReleaseChecklist.md` 存在且 4.1-4.7 审计项完整
+- [ ] `doc/BFF_DEPLOYMENT.md` 存在且部署步骤完整
+- [ ] `doc/CONTRIBUTING.md` 存在（贡献指南）
+- [ ] `doc/CHANGELOG.md` 存在（变更日志）
+- [ ] `doc/API.md` 存在（API 契约文档）
+- [ ] `README.md` 详细文档章节含 8 个文档链接
+- [ ] 文档间交叉引用链接全部有效（点击不报 404）
+
+## 4.12 国际化与无障碍审计
+
+### 国际化
+- [ ] `Localizable.xcstrings` 存在且已注册到 Resources build phase
+- [ ] `developmentRegion = zh-Hans`，`knownRegions` 含 `zh-Hans` / `en` / `Base`
+- [ ] SwiftUI `Text`/`Button`/`TextField` 字面量在构建后自动提取到 String Catalog
+- [ ] 验证命令：
+  ```bash
+  # 构建后检查 .xcstrings 是否被编译为 .loctable
+  ls ~/Library/Developer/Xcode/DerivedData/AIBuilder-*/Build/Products/Debug-iphonesimulator/AIBuilder.app/*.lproj/
+  ```
+
+### 无障碍
+- [ ] 13 个视图含 `accessibilityLabel`（MarkdownText / CodeBlockView / MarkdownTableView / HeadingView / ErrorOverlay / CitationCard / ConversationRow / OnDeviceModelView / KnowledgeBaseView / HealthSettingsView / PrivacyPolicyView / DocumentPickerView / PresetPrompts）
+- [ ] 13 个关键交互元素含 `accessibilityIdentifier`（sendButton / messageInputField / voiceInputButton / knowledgeBaseButton / settingsButton / conversationListButton / newConversationButton / importDocumentButton / downloadModelButton / deleteModelButton / requestHealthAuthButton / thumbsUpButton / thumbsDownButton）
+- [ ] VoiceOver 开启后能正确朗读各视图标签与提示
+
 ## 5. 提交审核前最终检查
 
 ### 5.1 功能验证

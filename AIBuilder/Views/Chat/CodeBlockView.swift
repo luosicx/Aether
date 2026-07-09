@@ -37,5 +37,8 @@ struct CodeBlockView: View {
         }
         .background(Color(red: 0.12, green: 0.13, blue: 0.15))
         .clipShape(RoundedRectangle(cornerRadius: 10))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(language.map { "\($0.capitalized) 代码块" } ?? "代码块")
+        .accessibilityValue(code)
     }
 }

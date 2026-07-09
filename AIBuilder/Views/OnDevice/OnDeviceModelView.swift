@@ -76,6 +76,9 @@ struct OnDeviceModelView: View {
                     Button("下载模型") {
                         Task { await startDownload() }
                     }
+                    .accessibilityLabel("下载模型")
+                    .accessibilityHint("开始下载端侧推理模型文件")
+                    .accessibilityIdentifier("downloadModelButton")
                     if isModelDownloaded {
                         Text("模型已就绪，约 700MB")
                             .font(.caption)
@@ -99,6 +102,9 @@ struct OnDeviceModelView: View {
                     Task { await deleteModel() }
                 }
                 .disabled(!isModelDownloaded)
+                .accessibilityLabel("删除模型")
+                .accessibilityHint("删除本地模型文件以释放空间")
+                .accessibilityIdentifier("deleteModelButton")
             }
 
             // 切换模型
@@ -114,6 +120,7 @@ struct OnDeviceModelView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
+        .accessibilityIdentifier("OnDeviceModelView")
         .onAppear {
             refreshDownloadedStatus()
         }

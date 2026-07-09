@@ -63,6 +63,9 @@ struct KnowledgeBaseView: View {
                     Button { showPicker = true } label: {
                         Image(systemName: "plus").fontWeight(.medium)
                     }
+                    .accessibilityLabel("导入文档")
+                    .accessibilityHint("从文件选择 PDF 或文本文档导入知识库")
+                    .accessibilityIdentifier("importDocumentButton")
                 }
                 ToolbarItem(placement: .topBarLeading) {
                     Button("完成") { dismiss() }
@@ -93,6 +96,9 @@ struct KnowledgeBaseView: View {
                     Button { showPicker = true } label: {
                         Image(systemName: "plus").fontWeight(.medium)
                     }
+                    .accessibilityLabel("导入文档")
+                    .accessibilityHint("从文件选择 PDF 或文本文档导入知识库")
+                    .accessibilityIdentifier("importDocumentButton")
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("完成") { dismiss() }

@@ -7,7 +7,9 @@ import Foundation
 /// 提供按语言分组、根据 identifier 查询可读名称、查找原始 `AVSpeechSynthesisVoice`,
 /// 并预置中文常用音色 fallback 列表(用于设备无 zh-CN 增强音色时的兜底)。
 ///
-/// 所有方法均为只读查询、无状态,可在任意线程调用。
+/// `allVoices()` 与 `groupedByLanguage()` 内置静态缓存,首次调用后不再重复触发
+/// `AVSpeechSynthesisVoice.speechVoices()`(避免 macOS 上每次访问都阻塞主线程)。
+/// 如需强制刷新(如用户下载了新音色),调用 `reloadVoices()` 清空缓存。
 
 // MARK: - TTSVoice
 
@@ -38,11 +40,22 @@ struct TTSVoice: Identifiable, Hashable {
 /// TTS 音色查询目录,提供静态方法访问系统音色。
 enum TTSVoiceCatalog {
 
+    /// 缓存的全部音色列表,首次调用 `allVoices()` 后填充。
+    /// 避免 macOS 上每次访问都同步调用 `AVSpeechSynthesisVoice.speechVoices()` 阻塞主线程。
+    private static var cachedVoices: [TTSVoice]?
+
+    /// 缓存的按语言分组结果,首次调用 `groupedByLanguage()` 后填充。
+    private static var cachedGrouped: [(language: String, voices: [TTSVoice])]?
+
     /// 获取所有可用音色,从 `AVSpeechSynthesisVoice.speechVoices()` 转换。
     /// 过滤掉 identifier 为空的项。
     /// 注:speechVoices() 返回的列表本身即为设备已安装的音色,isDownloaded 默认 true。
+    /// 结果会被静态缓存,如需刷新调用 `reloadVoices()`。
     static func allVoices() -> [TTSVoice] {
-        AVSpeechSynthesisVoice.speechVoices()
+        if let cached = cachedVoices {
+            return cached
+        }
+        let voices = AVSpeechSynthesisVoice.speechVoices()
             .filter { !$0.identifier.isEmpty }
             .map { voice in
                 TTSVoice(
@@ -53,6 +66,8 @@ enum TTSVoiceCatalog {
                     isDownloaded: true
                 )
             }
+        cachedVoices = voices
+        return voices
     }
 
     /// 按 language 分组返回音色列表。
@@ -62,9 +77,14 @@ enum TTSVoiceCatalog {
     /// 2. "zh-TW"、"zh-HK" 第二组(组内按字母序)
     /// 3. "en-US" 第三
     /// 4. 其他按字母序
+    ///
+    /// 结果会被静态缓存,如需刷新调用 `reloadVoices()`。
     static func groupedByLanguage() -> [(language: String, voices: [TTSVoice])] {
+        if let cached = cachedGrouped {
+            return cached
+        }
         let groups = Dictionary(grouping: allVoices(), by: { $0.language })
-        return groups.keys.sorted { lhs, rhs in
+        let grouped = groups.keys.sorted { lhs, rhs in
             let lhsTier = languageSortTier(lhs)
             let rhsTier = languageSortTier(rhs)
             if lhsTier != rhsTier {
@@ -74,6 +94,15 @@ enum TTSVoiceCatalog {
         }.map { language in
             (language: language, voices: groups[language] ?? [])
         }
+        cachedGrouped = grouped
+        return grouped
+    }
+
+    /// 清空 `allVoices()` 与 `groupedByLanguage()` 的静态缓存。
+    /// 适用于用户下载/删除系统音色后需要重新加载的场景。
+    static func reloadVoices() {
+        cachedVoices = nil
+        cachedGrouped = nil
     }
 
     /// 根据 identifier 返回可读名称(如 "Tingting(zh-CN)")。

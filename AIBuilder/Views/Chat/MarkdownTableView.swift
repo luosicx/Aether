@@ -35,6 +35,8 @@ struct MarkdownTableView: View {
                     .stroke(Color(.separator).opacity(0.3), lineWidth: 0.5)
             )
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("表格，\(table.headers.count) 列 \(table.rows.count) 行")
     }
 
     /// 渲染单个单元格

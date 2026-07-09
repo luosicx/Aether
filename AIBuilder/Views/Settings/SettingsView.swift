@@ -45,7 +45,9 @@ struct SettingsView: View {
     @Bindable var chatViewModel: ChatViewModel
     let conversation: Conversation?
     @Environment(\.modelContext) private var modelContext
-    @Environment(\.dismiss) private var dismiss
+    // macOS 下 NavigationSplitView + NavigationStack + sheet 三层嵌套会截断 dismiss，
+    // 改用 @Binding 直达 sheet 的 isPresented
+    @Binding var isPresented: Bool
     // Day 20: 打开 mailto: URL
     @Environment(\.openURL) private var openURL
     // iPad/macOS 双栏:size class 判断
@@ -65,8 +67,6 @@ struct SettingsView: View {
     #endif
     // Day 20: 邮件 composer sheet 开关
     @State private var showMailComposer: Bool = false
-    // TTS 试听服务（独立于 ChatViewModel.voiceService，避免污染主朗读状态）
-    @State private var ttsPreviewService = VoiceService()
     // iPad/macOS 双栏:当前选中的设置分类
     @State private var selectedSection: SettingsSection? = .provider
 
@@ -147,11 +147,6 @@ struct SettingsView: View {
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    doneButton
-                }
-            }
         } detail: {
             NavigationStack {
                 if let section = selectedSection {
@@ -165,6 +160,11 @@ struct SettingsView: View {
                     #endif
                 } else {
                     ContentUnavailableView("选择一个分类", systemImage: "sidebar.left")
+                }
+            }
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    doneButton
                 }
             }
         }
@@ -216,7 +216,7 @@ struct SettingsView: View {
     private var doneButton: some View {
         Button("完成") {
             settingsVM.updateSystemPrompt(in: conversation, modelContext: modelContext)
-            dismiss()
+            isPresented = false
         }
         .fontWeight(.medium)
     }
@@ -403,21 +403,21 @@ struct SettingsView: View {
             .accessibilityLabel("音量")
 
             Button {
-                if ttsPreviewService.isPreviewing {
-                    ttsPreviewService.stopPreview()
+                if chatViewModel.voiceService.isPreviewing {
+                    chatViewModel.voiceService.stopPreview()
                 } else {
-                    ttsPreviewService.previewVoice(
+                    chatViewModel.voiceService.previewVoice(
                         "你好,我是 AI Builder,很高兴为你服务。",
                         config: settingsVM.ttsConfig
                     )
                 }
             } label: {
                 Label(
-                    ttsPreviewService.isPreviewing ? "停止试听" : "试听示例",
-                    systemImage: ttsPreviewService.isPreviewing ? "stop.fill" : "play.fill"
+                    chatViewModel.voiceService.isPreviewing ? "停止试听" : "试听示例",
+                    systemImage: chatViewModel.voiceService.isPreviewing ? "stop.fill" : "play.fill"
                 )
             }
-            .accessibilityHint(ttsPreviewService.isPreviewing ? "停止试听" : "用当前音色朗读示例句")
+            .accessibilityHint(chatViewModel.voiceService.isPreviewing ? "停止试听" : "用当前音色朗读示例句")
         } header: {
             Text("语音朗读")
         } footer: {

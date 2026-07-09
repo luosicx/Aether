@@ -53,6 +53,7 @@ struct PrivacyPolicyView: View {
             .padding()
         }
         .navigationTitle("隐私政策")
+        .accessibilityIdentifier("PrivacyPolicyView")
     }
 
     /// 单个政策段落

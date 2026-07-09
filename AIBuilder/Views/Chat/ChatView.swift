@@ -58,6 +58,7 @@ struct ChatView: View {
                         .fontWeight(.medium)
                 }
                 .accessibilityLabel("新建对话")
+                .accessibilityIdentifier("newConversationButton")
             }
         }
     }
@@ -120,6 +121,7 @@ struct ChatView: View {
                                 .foregroundStyle(.secondary)
                         }
                         .accessibilityLabel("会话列表")
+                        .accessibilityIdentifier("conversationListButton")
                     }
                 }
                 ToolbarItemGroup(placement: .topBarTrailingCompat) {
@@ -131,12 +133,14 @@ struct ChatView: View {
                             .foregroundStyle(.secondary)
                     }
                     .accessibilityLabel("知识库")
+                    .accessibilityIdentifier("knowledgeBaseToolbarButton")
                     Button { showSettings = true } label: {
                         Image(systemName: "gearshape")
                             .font(.title2)
                             .foregroundStyle(.secondary)
                     }
                     .accessibilityLabel("设置")
+                    .accessibilityIdentifier("settingsButton")
                 }
             }
             .sheet(isPresented: $showConversationList) {
@@ -151,7 +155,7 @@ struct ChatView: View {
                 })
             }
             .sheet(isPresented: $showSettings) {
-                SettingsView(settingsVM: settingsVM, chatViewModel: viewModel, conversation: currentConversation)
+                SettingsView(settingsVM: settingsVM, chatViewModel: viewModel, conversation: currentConversation, isPresented: $showSettings)
                     .onAppear {
                         settingsVM.loadSystemPrompt(from: currentConversation)
                     }

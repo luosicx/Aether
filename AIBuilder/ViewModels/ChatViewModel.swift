@@ -89,8 +89,8 @@ final class ChatViewModel {
     private let ragService = RAGService()
     /// 语义缓存（支持注入便于测试）
     let cache: SemanticCache
-    /// 语音服务（录音识别 + 朗读）
-    private let voiceService = VoiceService()
+    /// 语音服务（录音识别 + 朗读）。SettingsView 复用此实例试听音色，避免独立 synthesizer 争用音频 daemon
+    let voiceService = VoiceService()
     /// 当前流式输出 Task（可取消）
     private var streamingTask: Task<Void, Never>?
     /// ReAct 循环最大轮次

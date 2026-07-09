@@ -38,5 +38,8 @@ struct CitationCard: View {
                 .stroke(Color(.separator).opacity(0.3), lineWidth: 0.5)
         )
         .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("引用 \(index + 1)，来源 \(citation.source)")
+        .accessibilityHint("查看引用的文档片段")
     }
 }

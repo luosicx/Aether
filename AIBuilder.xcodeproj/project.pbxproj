@@ -128,6 +128,7 @@
 		A3033DCB4F3FCA20DD2B7F87 /* CrashReportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B856664315F8EE667D0C4F6A /* CrashReportService.swift */; };
 		A31BB2BCBA40DC4CA046B587 /* NetworkMonitorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 981ECB76C29A8669E33E5E43 /* NetworkMonitorTests.swift */; };
 		A42A49D820293BABA6B84B0E /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 932EDF6C3BAF37E458955B1D /* PrivacyInfo.xcprivacy */; };
+		A1B2C3D4E5F6A7B8C9D0E1F2 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F6A7B8C9D0E1F2A3 /* Localizable.xcstrings */; };
 		A63F75D23B626B53BB203DF3 /* TypingIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2337973A34C704DC3EB55D83 /* TypingIndicator.swift */; };
 		A702872D2BC37EE0CA3B5CD0 /* PDFExtractorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FC5616BC7791E8765C816F2 /* PDFExtractorTests.swift */; };
 		A782AE6C523DF2A4CB75F054 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CA001A96C96D5997BD2BBD57 /* Security.framework */; };
@@ -320,6 +321,7 @@
 		90FF0213B386AE34D13AEC4E /* String+TokenCount.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "String+TokenCount.swift"; sourceTree = "<group>"; };
 		9281F23957878BA0D9E8BB51 /* TTSVoiceCatalog.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TTSVoiceCatalog.swift; sourceTree = "<group>"; };
 		932EDF6C3BAF37E458955B1D /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		B2C3D4E5F6A7B8C9D0E1F2A3 /* Localizable.xcstrings */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		952D9E0A4EA04301E9214147 /* TTSVoicePickerView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TTSVoicePickerView.swift; sourceTree = "<group>"; };
 		9709389506726B84400839BF /* PresetPrompts.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PresetPrompts.swift; sourceTree = "<group>"; };
 		97B5B48EFB2E00FFB61C72AA /* SettingsViewModelTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SettingsViewModelTests.swift; sourceTree = "<group>"; };
@@ -922,6 +924,7 @@
 			children = (
 				8DEC7FB7EDCBF9E610EA1C1D /* Assets.xcassets */,
 				0724C7D7F16CF6D4E26B31C8 /* Info.plist */,
+				B2C3D4E5F6A7B8C9D0E1F2A3 /* Localizable.xcstrings */,
 				932EDF6C3BAF37E458955B1D /* PrivacyInfo.xcprivacy */,
 			);
 			name = Resources;
@@ -1115,9 +1118,10 @@
 			};
 			buildConfigurationList = 71FBA09C0546F01C73A17485 /* Build configuration list for PBXProject "AIBuilder" */;
 			compatibilityVersion = "Xcode 3.2";
-			developmentRegion = en;
+			developmentRegion = "zh-Hans";
 			hasScannedForEncodings = 0;
 			knownRegions = (
+				"zh-Hans",
 				en,
 				Base,
 			);
@@ -1142,6 +1146,7 @@
 			files = (
 				8E0A8D02691CD0919E930FA2 /* Assets.xcassets in Resources */,
 				A42A49D820293BABA6B84B0E /* PrivacyInfo.xcprivacy in Resources */,
+				A1B2C3D4E5F6A7B8C9D0E1F2 /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -37,6 +37,9 @@ struct HealthSettingsView: View {
                         await requestAuthorization()
                     }
                 }
+                .accessibilityLabel("请求 HealthKit 授权")
+                .accessibilityHint("授权后可读取心率、睡眠、步数等健康数据")
+                .accessibilityIdentifier("requestHealthAuthButton")
                 #if os(iOS)
                 Button("跳转系统设置") {
                     if let url = URL(string: UIApplication.openSettingsURLString) {
@@ -107,6 +110,7 @@ struct HealthSettingsView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
+        .accessibilityIdentifier("HealthSettingsView")
         .onAppear {
             refreshAuthorizationStatus()
         }

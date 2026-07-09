@@ -1,6 +1,6 @@
 # AIBuilder 使用文档
 
-> AI Native App，基于 SwiftUI + DeepSeek API 构建，支持 iOS / iPad / macOS 三端原生。本文件描述环境要求、安装运行、API Key 配置、Day 1-20 全部用户可见功能（19 项核心能力）、多平台支持、工具能力清单、开发与测试工作流、CI、权限与常见问题。
+> AI Native 多平台 App（iOS / iPad / macOS 原生），基于 SwiftUI + 多 LLM Provider（DeepSeek / Qwen / 端侧 MLX）构建。本文件描述环境要求、安装运行、API Key 配置、Day 1-20 全部用户可见功能（21 项核心能力）、多平台支持、工具能力清单、开发与测试工作流、CI、权限与常见问题。
 
 ## 目录
 
@@ -27,6 +27,8 @@
    - 4.17 [端侧推理 MLX](#417-端侧推理-mlx)
    - 4.18 [隐私政策与投诉反馈](#418-隐私政策与投诉反馈)
    - 4.19 [预设系统提示词](#419-预设系统提示词)
+   - 4.20 [macOS 系统集成](#420-macos-系统集成)
+   - 4.21 [性能监控与调试](#421-性能监控与调试)
 5. [多平台支持](#5-多平台支持)
 6. [工具能力清单](#6-工具能力清单)
 7. [开发工作流](#7-开发工作流)
@@ -97,7 +99,7 @@ open AIBuilder.xcodeproj
 
 ## 4. 核心功能使用流程
 
-共 19 项核心功能，每项给出「触发路径」「操作步骤」「预期行为」与「对应代码路径」。
+共 21 项核心功能，每项给出「触发路径」「操作步骤」「预期行为」与「对应代码路径」。
 
 ### 4.1 流式对话
 
@@ -107,6 +109,9 @@ open AIBuilder.xcodeproj
   - 真实流式按 SSE chunk 到达速度更新
   - **缓存命中时**走「假打字」模式：按 `4 字符 / 8ms` 速率从 `SemanticCache` 命中的完整回复逐段推送，保持 UI 状态机一致
 - **对应代码**：`AIBuilder/Services/LLM/SSEParser.swift`、`AIBuilder/ViewModels/ChatViewModel.swift`（`streamingText` + `Task.sleep(nanoseconds: 8_000_000)` 即 8ms/4chars）
+
+> **对应代码文件**：`AIBuilder/Services/LLM/DeepSeekClient.swift`、`AIBuilder/Services/LLM/SSEParser.swift`、`AIBuilder/ViewModels/ChatViewModel.swift`
+> **常见问题**：流式卡顿或无响应时，先到「设置 → API 配置」确认 API Key 已保存且供应商可达，再检查网络；若返回非 SSE 流（如 BFF 代理直返完整 JSON）会退化为一次性显示，请确认 BFF 网关已正确转发 `stream=true`。
 
 ### 4.2 多轮对话与会话管理
 
@@ -120,6 +125,9 @@ open AIBuilder.xcodeproj
   - 会话列表按 **置顶 + 创建时间** 排序
   - 搜索实时过滤
 - **对应代码**：`AIBuilder/Views/Conversation/ConversationList.swift`、`AIBuilder/ViewModels/ConversationListVM.swift`、`AIBuilder/Views/Conversation/ConversationRow.swift`
+
+> **对应代码文件**：`AIBuilder/Models/Conversation.swift`、`AIBuilder/Services/Storage/ChatStorage.swift`、`AIBuilder/Views/Conversation/ConversationList.swift`、`AIBuilder/ViewModels/ConversationListVM.swift`
+> **常见问题**：会话列表为空或会话丢失时，检查 SwiftData `ModelContainer` 迁移是否成功（schema 变更后需保证 `versionedSchema` 一致）；列表不刷新多为 `@Bindable` / `@Query` 未触发，确认 `fetch` 在 `viewModel.loadConversations()` 中已调用。
 
 ### 4.3 RAG 知识库
 
@@ -136,6 +144,9 @@ open AIBuilder.xcodeproj
   3. 通过 `buildAugmentedContext` 拼接 `[1] [2]` 编号的参考 prompt
   4. 回复中包含 `CitationCard` 引用卡片
 - **对应代码**：`AIBuilder/Services/RAG/*`、`AIBuilder/Views/RAG/*`、`AIBuilder/Views/Chat/CitationCard.swift`
+
+> **对应代码文件**：`AIBuilder/Services/RAG/RAGService.swift`、`AIBuilder/Services/RAG/EmbeddingService.swift`、`AIBuilder/Services/RAG/DocumentChunker.swift`、`AIBuilder/Services/RAG/PDFExtractor.swift`
+> **常见问题**：检索不准或无结果时，优先检查 `DocumentChunker` 分块大小（`maxTokens = 512`、`overlap = 128`，重复英文文本可能不分句导致只产生 1 块）；`RAGService.retrieve` 默认 `topK = 5`，要求 `queryEmbedding` 非空，否则返回空数组。
 
 ### 4.4 工具调用 ReAct
 
@@ -154,6 +165,9 @@ open AIBuilder.xcodeproj
 
 > 全部 24 个工具（按 macOS 计；iOS 13 个）的能力清单见 [§6 工具能力清单](#6-工具能力清单)。
 
+> **对应代码文件**：`AIBuilder/Services/Tools/ToolRegistry.swift`、`AIBuilder/ViewModels/ChatViewModel.swift`、`AIBuilder/Views/Chat/StepCardView.swift`
+> **常见问题**：工具执行失败时查看 `StepCardView` 的 Observation 字段定位错误；若循环达到 `maxReActLoops = 5` 仍无最终回复会提示「工具调用循环超过 5 轮，已中止」；单工具超时（默认 15 秒）会标记 `status = failed` 后继续下一轮，不中断循环。
+
 ### 4.5 语音输入
 
 - **触发路径**：点击底部输入框左侧的麦克风按钮（图标在 `isRecording` 时切换为 `stop.fill`，否则 `mic.fill`）
@@ -165,6 +179,9 @@ open AIBuilder.xcodeproj
 - **技术栈**：`SFSpeechRecognizer` 中文识别
 - **对应代码**：`AIBuilder/Services/Voice/VoiceService.swift`、`AIBuilder/Views/Chat/ChatInputBar.swift`
 
+> **对应代码文件**：`AIBuilder/Services/Voice/VoiceService.swift`、`AIBuilder/Views/Chat/ChatInputBar.swift`
+> **常见问题**：麦克风无响应时检查 Info.plist 的 `NSMicrophoneUsageDescription` / `NSSpeechRecognitionUsageDescription` 是否声明，并确认用户已同时授权两个权限；模拟器对 `SFSpeechRecognizer` 支持有限，建议真机测试。
+
 ### 4.6 语音朗读 TTS
 
 - **触发路径**：点击**助手消息气泡右下角**的扬声器按钮
@@ -174,6 +191,9 @@ open AIBuilder.xcodeproj
   - 点击其他消息的扬声器按钮会**中断当前朗读**并切换到新消息
 - **对应代码**：`AIBuilder/Services/Voice/VoiceService.swift`、`AIBuilder/Views/Chat/MessageBubble.swift`
 
+> **对应代码文件**：`AIBuilder/Services/Voice/VoiceService.swift`、`AIBuilder/Services/Voice/TTSConfig.swift`、`AIBuilder/Services/Voice/TTSVoiceCatalog.swift`、`AIBuilder/Views/Chat/MessageBubble.swift`
+> **常见问题**：音色不切换时重启 App 后再试，确认 `ttsConfig` 已写入 UserDefaults（key=`ttsConfig`）并同步到 `chatViewModel.ttsConfig`；朗读无声检查 `AVAudioSession` 类别是否被其他 App 抢占。
+
 ### 4.7 视觉多模态
 
 - **触发路径**：点击输入框左侧的附件按钮 → `PhotosPicker` 选择图片（`.images` 类型）
@@ -182,6 +202,9 @@ open AIBuilder.xcodeproj
   - 发送时图片以 base64 编码
   - 请求 `content` 字段改为数组结构 `[text, image_url]`（多模态消息格式）
 - **对应代码**：`AIBuilder/Views/Chat/ChatInputBar.swift`（`PhotosPicker(selection:matching:.images)`）、`AIBuilder/ViewModels/ChatViewModel.swift`
+
+> **对应代码文件**：`AIBuilder/Views/Chat/ChatInputBar.swift`、`AIBuilder/ViewModels/ChatViewModel.swift`
+> **常见问题**：图片不发送或返回报错时检查图片 base64 编码是否完整、是否超出供应商 `image_url` 体积限制；`PhotosPicker` 选中后需确认 `selectedItem` 已 load 为 `Data` 再发起请求。
 
 ### 4.8 用户偏好
 
@@ -194,6 +217,9 @@ open AIBuilder.xcodeproj
   - 点击「完成」→ `onDisappear` 时写入 SwiftData `UserPreference` 实体
   - 用户偏好内容注入到 systemPrompt
 - **对应代码**：`AIBuilder/Views/Settings/SettingsView.swift`、`AIBuilder/ViewModels/SettingsViewModel.swift`
+
+> **对应代码文件**：`AIBuilder/Models/Conversation.swift`（`UserPreference`）、`AIBuilder/Views/Settings/SettingsView.swift`、`AIBuilder/ViewModels/SettingsViewModel.swift`
+> **常见问题**：偏好不生效时重启 App，确认 `onDisappear` 已写入 SwiftData `UserPreference` 实体并已注入 system prompt；偏好工具列表显示英文函数名而非中文描述时，检查 `ToolRegistry.allToolDefs` 的 `description` 字段是否本地化。
 
 ### 4.9 调试面板
 
@@ -208,6 +234,9 @@ open AIBuilder.xcodeproj
   7. **工具调用**：列出每次工具调用的 toolName / arguments / result
 - **对应代码**：`AIBuilder/Views/Settings/SettingsView.swift`（`DebugPanelView`）
 
+> **对应代码文件**：`AIBuilder/Views/Settings/SettingsView.swift`（`DebugPanelView`）、`AIBuilder/Services/Performance/PerformanceMonitor.swift`
+> **常见问题**：调试字段为空（如 promptJSON / apiResponse 显示「无」）时，确认已发起过一次对话请求并检查 `chatViewModel.lastDebugInfo` 是否被赋值；性能指标为空说明尚未触发 `PerformanceMonitor.measure` 记录。
+
 ### 4.10 Markdown 渲染
 
 - **触发路径**：助手消息回复中包含 Markdown 标记时自动渲染（无需手动触发）
@@ -220,6 +249,9 @@ open AIBuilder.xcodeproj
   - **标题分级**：`#` ~ `######`（H1-H6）通过 `HeadingView` 渲染，H1 用 `.title` 加粗、H2 用 `.title2` 加粗并附带分割线、H3 用 `.title3` 半粗、H4-H6 统一 `.body` 半粗
   - **普通文本**：通过 `AttributedString(markdown:options:.full)` 解析行内 Markdown（粗体 / 斜体 / 链接 / 行内代码），支持文本选中复制
 - **对应代码**：`AIBuilder/Views/Chat/MarkdownText.swift`、`AIBuilder/Views/Chat/CodeBlockView.swift`、`AIBuilder/Views/Chat/CodeSyntaxHighlighter.swift`、`AIBuilder/Views/Chat/HeadingView.swift`、`AIBuilder/Views/Chat/MarkdownTableParser.swift`、`AIBuilder/Views/Chat/MarkdownTableView.swift`、`AIBuilder/Views/Chat/TaskListView.swift`
+
+> **对应代码文件**：`AIBuilder/Views/Chat/MarkdownText.swift`、`AIBuilder/Views/Chat/CodeBlockView.swift`、`AIBuilder/Views/Chat/CodeSyntaxHighlighter.swift`、`AIBuilder/Views/Chat/MarkdownTableParser.swift`、`AIBuilder/Views/Chat/MarkdownTableView.swift`、`AIBuilder/Views/Chat/HeadingView.swift`、`AIBuilder/Views/Chat/TaskListView.swift`
+> **常见问题**：渲染错位或代码块不高亮时检查 parser 是否正确识别代码块首行语言标签（如 \`\`\`swift，不含空格）；\`\`\` 必须配对包裹，奇数个会导致解析异常；流式过程中只显示纯文本，流式结束后才完整渲染 Markdown。
 
 ### 4.11 TTS 音色可调节
 
@@ -241,6 +273,9 @@ open AIBuilder.xcodeproj
 - **持久化**：`TTSConfig`（含 `voiceIdentifier` / `rate` / `pitchMultiplier` / `volume`）通过 `JSONEncoder` 序列化为 Data 写入 UserDefaults；读取失败时回退 `defaultValue`（系统默认 zh-CN、rate=0.5、pitch=1.0、volume=1.0）
 - **对应代码**：`AIBuilder/Services/Voice/TTSConfig.swift`、`AIBuilder/Services/Voice/TTSVoiceCatalog.swift`、`AIBuilder/Views/Settings/TTSVoicePickerView.swift`、`AIBuilder/Services/Voice/VoiceService.swift`、`AIBuilder/Views/Settings/SettingsView.swift`
 
+> **对应代码文件**：`AIBuilder/Views/Settings/TTSVoicePickerView.swift`、`AIBuilder/Services/Voice/TTSConfig.swift`、`AIBuilder/Services/Voice/TTSVoiceCatalog.swift`、`AIBuilder/Services/Voice/VoiceService.swift`
+> **常见问题**：试听无声时检查 `AVAudioSession` 类别与激活状态；音色列表为空多为模拟器音色资源不全，建议真机测试；增强 / 优质音色未下载时行尾显示「需下载」橙色标签，首次选中会回退系统默认 zh-CN。
+
 ### 4.12 消息复制与重新提问
 
 - **触发路径**：在消息列表中 **长按任意消息气泡** 触发 `contextMenu`（仅在非流式状态可用）
@@ -251,6 +286,9 @@ open AIBuilder.xcodeproj
   - **复制**：调用 `UIPasteboard.general.string = message.content`，将消息内容写入系统剪贴板；同时在消息列表底部 overlay 显示 **toast「已复制」**，2 秒后自动消失（通过 `Task.sleep(for: .seconds(2))` 清空 `feedbackToast`）
   - **重新提问**：调用 `ChatViewModel.resendMessage(content:in:modelContext:)`，将原消息内容回填到 `inputText` 并立即触发 `sendMessage`，相当于以同样内容重新发起一次请求
 - **对应代码**：`AIBuilder/Views/Chat/MessageBubble.swift`（`contextMenu` + `onCopy` / `onResend` 回调）、`AIBuilder/ViewModels/ChatViewModel.swift`（`resendMessage`）、`AIBuilder/Views/Chat/MessageListView.swift`（toast overlay 与剪贴板写入）
+
+> **对应代码文件**：`AIBuilder/Views/Chat/MessageBubble.swift`、`AIBuilder/Views/Chat/MessageListView.swift`、`AIBuilder/ViewModels/ChatViewModel.swift`
+> **常见问题**：复制无反应时检查 `UIPasteboard.general.string` 是否在主线程赋值；toast「已复制」未消失多为 `Task.sleep(for: .seconds(2))` 被取消，确认流式状态未在期间切换；重新提问无效时检查 `resendMessage` 是否成功回填 `inputText`。
 
 ### 4.13 批量多选删除会话
 
@@ -269,6 +307,9 @@ open AIBuilder.xcodeproj
   - 删除后 alert 文案为「确定删除选中的 N 个对话？删除后无法恢复。」
 - **对应代码**：`AIBuilder/Views/Conversation/ConversationList.swift`（`isEditMode` / `selectedConversations` / `showBatchDeleteConfirm` 状态与底部 `safeAreaInset` 工具栏）、`AIBuilder/ViewModels/ConversationListVM.swift`（`deleteConversations`）、`AIBuilder/Views/Conversation/ConversationRow.swift`（`showsCheckbox` + `isSelected`）
 
+> **对应代码文件**：`AIBuilder/Views/Conversation/ConversationList.swift`、`AIBuilder/ViewModels/ConversationListVM.swift`、`AIBuilder/Views/Conversation/ConversationRow.swift`
+> **常见问题**：列表不刷新时检查 `fetch` 是否在删除后重新触发，确认 `viewModel.conversations` 是 `@Published` 且视图已订阅；编辑模式下点击行不切换会话属正常行为，此时仅切换选中状态。
+
 ### 4.14 HealthKit 健康洞察
 
 - **触发路径**：设置页 → **「健康」Section** → 点击「健康管理」NavigationLink 进入 `HealthSettingsView`
@@ -285,6 +326,9 @@ open AIBuilder.xcodeproj
   - 每天 09:00 由后台任务自动生成一次（见 `BGTaskScheduler` 标识 `com.aibuilder.daily-refresh`）
   - 未授权或设备不支持 HealthKit 时所有查询返回空数据（不抛错），洞察生成会写入「无数据」提示
 - **对应代码**：`AIBuilder/Services/Health/HealthKitService.swift`、`AIBuilder/Services/Health/HealthInsightGenerator.swift`、`AIBuilder/Models/HealthInsight.swift`、`AIBuilder/Views/Settings/HealthSettingsView.swift`
+
+> **对应代码文件**：`AIBuilder/Services/Health/HealthKitService.swift`、`AIBuilder/Services/Health/HealthInsightGenerator.swift`、`AIBuilder/Views/Settings/HealthSettingsView.swift`、`AIBuilder/Models/HealthInsight.swift`
+> **常见问题**：授权失败时检查 Info.plist 的 `NSHealthShareUsageDescription` 是否声明，并确认 `HKHealthStore.isHealthDataAvailable()` 为 true（iPad / macOS 不支持）；洞察为空多为模拟器无真实数据，所有查询返回空字典，建议真机测试。
 
 ### 4.15 App Intents / Shortcuts 集成
 
@@ -305,6 +349,9 @@ open AIBuilder.xcodeproj
      - 未匹配时返回「未找到匹配会话」
 - **对应代码**：`AIBuilder/AppIntents/AskAIBuilderIntent.swift`、`AIBuilder/AppIntents/NewConversationIntent.swift`、`AIBuilder/AppIntents/SwitchConversationIntent.swift`、`AIBuilder/Services/Intents/IntentChatService.swift`
 
+> **对应代码文件**：`AIBuilder/AppIntents/AskAIBuilderIntent.swift`、`AIBuilder/AppIntents/NewConversationIntent.swift`、`AIBuilder/AppIntents/SwitchConversationIntent.swift`、`AIBuilder/Services/Intents/IntentChatService.swift`
+> **常见问题**：Siri 不识别时检查「系统设置 → Siri 与搜索」中 AI Builder 是否启用，并使用注册的标准短语；Intent 不响应多为 App 未在前台或最近使用过，需先打开 App 一次；API Key 未配置时 `AskAIBuilderIntent` 会返回「AI Builder 暂时无法回复：{错误描述}」不抛错打断 Siri。
+
 ### 4.16 BFF 代理层配置
 
 - **触发路径**：设置页 → **「BFF 代理」Section**
@@ -322,6 +369,9 @@ open AIBuilder.xcodeproj
   - 客户端令牌桶限流：`RateLimiter` actor 隔离，请求前先 `acquireChat` / `acquireEmbed`，耗尽抛 `rateLimited(retryAfter:60)`，每 60 秒补充至上限
   - 离开设置页时通过 `settingsVM.saveBFFConfig()` 持久化到 UserDefaults（key=`bff_config_cache`，JSON 编码）
 - **对应代码**：`AIBuilder/Services/LLM/BFFProxyClient.swift`、`AIBuilder/Core/Models/BFFConfig.swift`、`AIBuilder/Services/LLM/RateLimiter.swift`、`AIBuilder/Views/Settings/SettingsView.swift`
+
+> **对应代码文件**：`AIBuilder/Services/LLM/BFFProxyClient.swift`、`AIBuilder/Core/Models/BFFConfig.swift`、`AIBuilder/Services/LLM/RateLimiter.swift`
+> **常见问题**：返回 401 时检查 `userToken`（BFF Token）是否与服务端签发一致；429 解析 `Retry-After` Header（缺省 60 秒）触发 `rateLimited`，可在「chat 限流」Stepper 调低每分钟请求数；endpoint URL 需替换真实部署的 Cloudflare Workers 域名。
 
 ### 4.17 端侧推理 MLX
 
@@ -345,6 +395,9 @@ open AIBuilder.xcodeproj
   - 错误类型 `OnDeviceError`：`insufficientMemory` / `modelNotFound` / `sha256Mismatch` / `loadFailed`
 - **对应代码**：`AIBuilder/Services/OnDevice/MLXInferenceEngine.swift`、`AIBuilder/Services/OnDevice/OfflineLLMProvider.swift`、`AIBuilder/Services/OnDevice/OnDeviceModelDownloader.swift`、`AIBuilder/Views/OnDevice/OnDeviceModelView.swift`、`AIBuilder/Core/Models/OnDeviceConfig.swift`、`AIBuilder/Core/Models/OnDeviceError.swift`、`AIBuilder/Services/Network/NetworkMonitor.swift`
 
+> **对应代码文件**：`AIBuilder/Services/OnDevice/MLXInferenceEngine.swift`、`AIBuilder/Services/OnDevice/OfflineLLMProvider.swift`、`AIBuilder/Services/OnDevice/OnDeviceModelDownloader.swift`、`AIBuilder/Core/Models/OnDeviceConfig.swift`
+> **常见问题**：模型加载失败时检查 `expectedSHA256` 与下载文件 SHA256 是否一致（分块 4MB 读取校验），不匹配会抛 `OnDeviceError.sha256Mismatch`；模拟器无 mlx-swift 会走占位实现返回「端侧推理不可用：mlx-swift 未集成」，仅在真机集成 mlx-swift SPM 后可用；内存不足（< 4GB）抛 `OnDeviceError.insufficientMemory`。
+
 ### 4.18 隐私政策与投诉反馈
 
 - **触发路径**：设置页 → **「关于」Section**
@@ -359,6 +412,9 @@ open AIBuilder.xcodeproj
     - 设备不支持邮件时降级为 `FeedbackService.shared.mailtoURL()` 构造 `mailto:` URL（subject 与 body 已 URL 编码），通过 `Environment(\.openURL)` 打开系统邮件 App
   - **版本号**：Section 末尾展示 `CFBundleShortVersionString (CFBundleVersion)` 等宽字体
 - **对应代码**：`AIBuilder/Views/Settings/PrivacyPolicyView.swift`、`AIBuilder/Services/Feedback/FeedbackService.swift`（`MailComposerView` UIViewControllerRepresentable 桥接 `MFMailComposeViewController`）、`AIBuilder/Views/Settings/SettingsView.swift`
+
+> **对应代码文件**：`AIBuilder/Views/Settings/PrivacyPolicyView.swift`、`AIBuilder/Services/Feedback/FeedbackService.swift`
+> **常见问题**：投诉反馈失败时检查 `MessageFeedback` model 与 `MFMailComposeViewController.canSendMail()` 返回值，设备不支持邮件时会降级为 `mailto:` URL 通过 `openURL` 打开；邮件正文末尾自动追加设备信息（型号 / OS 版本 / App 版本与构建号）。
 
 ### 4.19 预设系统提示词
 
@@ -391,6 +447,56 @@ open AIBuilder.xcodeproj
   - 保存后该 system prompt 会注入到每次对话的 system message 中
   - 与「用户偏好」其他配置（语气 / 偏好工具 / 自定义事实）共同拼接到最终 system prompt
 - **对应代码**：`AIBuilder/Views/Settings/SettingsView.swift`、`AIBuilder/ViewModels/SettingsViewModel.swift`
+
+> **对应代码文件**：`AIBuilder/Views/Settings/PresetPrompts.swift`、`AIBuilder/Views/Settings/SettingsView.swift`、`AIBuilder/ViewModels/SettingsViewModel.swift`
+> **常见问题**：预设角色无法选中时检查 `Menu` 的 `label` 是否被覆盖、`Picker` selection 绑定是否生效；选中后 `TextEditor` 未自动填入多为 state 未触发刷新，确认点击事件已回写 system prompt 字符串并保存。
+
+### 4.20 macOS 系统集成
+
+- **触发路径**：macOS 平台运行 App（Scheme 选择 `AIBuilder (macOS)` 后 `Cmd + R`）
+- **操作步骤**：
+  - 启动 App 后查看窗口默认尺寸 **1000×700**（由 `frame(minWidth:1000, minHeight:700)` 约束，可缩放但不可小于该值）
+  - 菜单栏 **「文件 → 新建会话」**（快捷键 ⌘N）创建新会话，等价于点击工具栏「+」
+  - 菜单栏 **「编辑 → 搜索」**（快捷键 ⌘K）打开会话搜索 sheet，按会话标题过滤
+  - 菜单栏 **「App → 设置」**（快捷键 ⌘,）打开设置页
+  - 在底部输入框按 **⌘Enter** 发送消息（Enter 为换行，与 iOS 单击发送按钮行为一致）
+  - 设置页使用 `NavigationSplitView` 双栏布局，左侧 sidebar 选择分类（API 配置 / 用户偏好 / 语音朗读 / 端侧推理 / 关于 等），右侧 detail 显示对应内容
+- **预期行为**：
+  - macOS 原生窗口体验，非 Mac Catalyst，窗口由 SwiftUI 原生渲染
+  - 快捷键符合 macOS 规范（⌘N / ⌘K / ⌘, / ⌘Enter）
+  - 设置二级页面（TTS 音色选择 / 隐私政策 / 端侧模型管理）顶部显示返回按钮 `<`，点击可返回当前分类根 Form；切换 sidebar 分类时 detail 自动回到该分类根
+  - macOS 不支持 HealthKit，「健康」Section 隐藏；`BGTaskScheduler` / `ActivityKit` / `WatchConnectivity` 相关代码用 `#if os(iOS)` 包裹优雅降级
+- **对应代码**：`AIBuilder/App/AIBuilderApp.swift`（`.commands` 注册 ⌘N / ⌘K / ⌘, 与窗口尺寸）、`AIBuilder/Views/Settings/SettingsView.swift`（`NavigationSplitView` 双栏布局）
+
+> **对应代码文件**：`AIBuilder/App/AIBuilderApp.swift`、`AIBuilder/Views/Settings/SettingsView.swift`
+> **常见问题**：快捷键不生效时检查 `CommandGroup` / `CommandMenu` 是否被其他菜单覆盖；窗口尺寸异常多为 `frame(minWidth:minHeight:)` 未生效，确认 `.windowStyle` 与 `WindowGroup` 配置正确；设置二级页面无法返回时确认 macOS 分支下 `NavigationLink` 已注入返回按钮逻辑。
+
+### 4.21 性能监控与调试
+
+- **触发路径**：设置 → 调试面板（详见 [4.9](#49-调试面板)）
+- **操作步骤**：
+  - 进入设置页，滚动到 **「调试面板」Section**，点击「查看调试信息」打开 `DebugPanelView` sheet
+  - 查看 `DebugPanelView` 各字段：
+    1. **性能指标**：从 `PerformanceMonitor.shared.getMetrics()` 异步读取各操作耗时（ms），可点「清除」清空
+    2. **远程配置 / 遥测**：展示 `RemoteConfigService` 当前配置版本 / 拉取时间 / 默认供应商 / 维护模式 / 缓冲事件数 / 上次上报时间与状态
+    3. **供应商与降级**：当前供应商 / 选中模型 / 上一次请求是否触发降级
+    4. **promptJSON**：展示 `lastDebugInfo.promptJSON`（等宽字体，可选中复制）
+    5. **apiResponse**：展示 `lastDebugInfo.apiResponse` 原始返回
+    6. **embeddingDimension**：展示 `lastDebugInfo.embeddingDimension`（如「1024 维」）
+    7. **toolCalls**：列出每次工具调用的 toolName / arguments / result
+    8. **cacheHit**：缓存命中标记与命中来源
+    9. **routing**：请求路由信息（直连 / BFF / 端侧降级路径）
+    10. **performance**：性能指标聚合（首屏渲染 / 流式首字 / 工具执行 / RAG 检索耗时）
+  - `PerformanceMonitor` 通过 `measure(_:block:)` 包装异步操作自动计时，记录关键节点：
+    - **首屏渲染**：从会话切换到 UI 完成渲染的耗时
+    - **流式首字**：从发起请求到收到首个 SSE chunk 的耗时
+    - **工具执行**：单个工具从调用到返回结果的耗时（含超时）
+    - **RAG 检索**：`RAGService.retrieve` 检索 topK 分块的耗时
+- **预期行为**：调试面板实时展示请求 / 响应 / 工具 / 性能数据，开发者可据此定位慢请求、工具超时、RAG 检索低效等问题；指标为空时表示尚未触发对应操作。
+- **对应代码**：`AIBuilder/Views/Settings/SettingsView.swift`（`DebugPanelView`）、`AIBuilder/Services/Performance/PerformanceMonitor.swift`（`measure(_:block:)` / `getMetrics()` / `clear()`）
+
+> **对应代码文件**：`AIBuilder/Views/Settings/SettingsView.swift`、`AIBuilder/Services/Performance/PerformanceMonitor.swift`
+> **常见问题**：性能指标为空时说明尚未触发 `PerformanceMonitor.measure` 记录，先发起一次对话 / 工具调用 / RAG 检索再查看；指标不更新确认 `DebugPanelView` 的「刷新」按钮已调用 `await PerformanceMonitor.shared.getMetrics()`；`promptJSON` / `apiResponse` 显示「无」时检查 `chatViewModel.lastDebugInfo` 是否在请求完成后被赋值。
 
 ---
 
@@ -517,7 +623,7 @@ xcodebuild build \
   -configuration Debug \
   CODE_SIGNING_ALLOWED=NO
 
-# 2. 运行 UT（217 用例，8 skipped）
+# 2. 运行 UT（249 用例，3 skipped）
 xcodebuild test \
   -project AIBuilder.xcodeproj \
   -scheme AIBuilder \
@@ -525,7 +631,7 @@ xcodebuild test \
   -only-testing:AIBuilderTests \
   CODE_SIGNING_ALLOWED=NO
 
-# 3. 运行 UIT（12 用例，8 skipped）
+# 3. 运行 UIT（13 用例，2 skipped）
 xcodebuild test \
   -project AIBuilder.xcodeproj \
   -scheme AIBuilder \
@@ -545,8 +651,8 @@ xcodebuild test \
 
 | 测试套件 | 用例总数 | skipped | failures |
 |---|---|---|---|
-| UT（`AIBuilderTests`） | 217 | 8 | 0 |
-| UIT（`AIBuilderUITests`） | 12 | 8 | 0 |
+| UT（`AIBuilderTests`） | 249 | 3 | 0 |
+| UIT（`AIBuilderUITests`） | 13 | 2 | 0 |
 
 ### skipped 原因
 
@@ -649,7 +755,7 @@ GitHub Actions 配置文件：`.github/workflows/ci.yml`
 
 ### Q10: UIT 测试不稳定？
 
-**A**：`contextMenu` 长按触发、Picker 导航式选项、邮件 composer 在模拟器上行为有差异，已用 `throw XCTSkip` 兜底跳过不稳定用例。**底层逻辑已由 UT 覆盖**（`ChatStorageTests` / `ConversationListVMTests` / `TTSConfigTests` / `TTSVoiceCatalogTests` 等）。当前 UIT 规模 12 用例（8 skipped，0 failures），UT 规模 217 用例（8 skipped，0 failures）。
+**A**：`contextMenu` 长按触发、Picker 导航式选项、邮件 composer 在模拟器上行为有差异，已用 `throw XCTSkip` 兜底跳过不稳定用例。**底层逻辑已由 UT 覆盖**（`ChatStorageTests` / `ConversationListVMTests` / `TTSConfigTests` / `TTSVoiceCatalogTests` 等）。当前 UIT 规模 13 用例（2 skipped，0 failures），UT 规模 249 用例（3 skipped，0 failures）。
 
 ### Q11: App Intents / Siri 调用无响应？
 
