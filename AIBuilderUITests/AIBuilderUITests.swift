@@ -196,24 +196,28 @@ final class AIBuilderUITests: XCTestCase {
 
         // Day 13: RAG tap 后 Form 可能自动滚动导致 Tools Toggle 位置漂移，
         // 先滚动 Form 让 Tools Toggle 完全可见，再读取 frame 后用 coordinate.tap() 命中把手
-        let toolsToggle = app.switches["启用工具调用"]
+        let toolsToggle = app.switches["toolsToggle"]
         XCTAssertTrue(toolsToggle.waitForExistence(timeout: 3), "应存在工具调用开关")
         scrollToElement(toolsToggle, in: app)
-        // 等 Form 滚动完成，避免读到旧 frame
         Thread.sleep(forTimeInterval: 0.5)
         let toolsBefore = toolsToggle.value as? String
-        // Day 18: Form 滚动后 coordinate.tap() 偶发落空（坐标偏移），失败时重试确保开关翻转
         var toolsAfter = toolsBefore
         var tapAttempts = 0
         while toolsAfter == toolsBefore && tapAttempts < 5 {
-            if tapAttempts == 0 {
-                toolsToggle.tap()
-            } else {
-                toolsToggle.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+            // 交替使用直接 tap 和不同坐标点 tap
+            switch tapAttempts {
+            case 0: toolsToggle.tap()
+            case 1: toolsToggle.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+            case 2: toolsToggle.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5)).tap()
+            default: toolsToggle.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
             }
             Thread.sleep(forTimeInterval: 0.5)
             toolsAfter = toolsToggle.value as? String
             tapAttempts += 1
+            if toolsAfter == toolsBefore {
+                scrollToElement(toolsToggle, in: app)
+                Thread.sleep(forTimeInterval: 0.3)
+            }
         }
         XCTAssertNotEqual(toolsBefore, toolsAfter, "工具调用开关值应翻转")
     }
