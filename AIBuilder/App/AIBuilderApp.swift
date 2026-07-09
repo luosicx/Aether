@@ -11,7 +11,7 @@ import ActivityKit
 struct AIBuilderApp: App {
     var body: some Scene {
         WindowGroup {
-            ChatView()
+            RootView()
                 #if os(macOS)
                 .frame(minWidth: 800, minHeight: 500)
                 #endif
@@ -271,4 +271,20 @@ extension Notification.Name {
     static let searchRequested = Notification.Name("searchRequested")
     /// 菜单「设置」(Cmd+,) 触发
     static let settingsRequested = Notification.Name("settingsRequested")
+}
+
+// MARK: - RootView
+
+/// 根视图：在 ChatView 之上叠加品牌 Splash，开屏展示后淡出。
+struct RootView: View {
+    @State private var showSplash = true
+
+    var body: some View {
+        ChatView()
+            .overlay {
+                if showSplash {
+                    BrandSplash(isVisible: $showSplash)
+                }
+            }
+    }
 }

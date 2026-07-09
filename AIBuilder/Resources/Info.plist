@@ -58,6 +58,9 @@
 		<false/>
 	</dict>
 	<key>UILaunchScreen</key>
-	<dict/>
+	<dict>
+		<key>UIColorName</key>
+		<string>RicePaper</string>
+	</dict>
 </dict>
 </plist>

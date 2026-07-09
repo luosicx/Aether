@@ -85,6 +85,7 @@
 		5A4C1F4FBAF4BE0C041AE047 /* RemoteConfigServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FAF2B17E25952B326EA81B8 /* RemoteConfigServiceTests.swift */; };
 		5B8EC03649D2964330656F02 /* ChatMessageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 867DB7023461324048A8BCD1 /* ChatMessageTests.swift */; };
 		5D54D3F6BCBC2D84DB95ABFD /* TaskListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F97334550988F39508D64025 /* TaskListView.swift */; };
+		5DF0711F48BBFF120DDE7765 /* BrandSplash.swift in Sources */ = {isa = PBXBuildFile; fileRef = 236916723758663383A30C03 /* BrandSplash.swift */; };
 		5E4B54718D730FB6B95A9108 /* TTSVoicePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 952D9E0A4EA04301E9214147 /* TTSVoicePickerView.swift */; };
 		5F2F600936D0BABAB0059B4A /* HealthKitServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B1E31D59E0D831DD494350E /* HealthKitServiceTests.swift */; };
 		607362BB319CB60B8CA4C557 /* ColorTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8EFEF1D661C35FC318E27BA /* ColorTokens.swift */; };
@@ -198,6 +199,7 @@
 		EAB87D44BEC44A2F3F6954F8 /* CardStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1222C063DBBE4FB784B1240 /* CardStyle.swift */; };
 		EDB2E1399F6C832427EC3DC3 /* NetworkMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16C4FE76CE229070845476F7 /* NetworkMonitor.swift */; };
 		EE000000000000000000E002 /* ChatInputBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000E001 /* ChatInputBar.swift */; };
+		EF8F6CED79CD3CD894CB665B /* LaunchScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06338EAB3D44F558619E23D1 /* LaunchScreen.swift */; };
 		F0F246B22366C61D222BE835 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4793E58E7B8E0482175F372A /* Foundation.framework */; };
 		F2714354198A19F1E7742BD7 /* ToolProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7968844D2C435C17D9287AE /* ToolProtocol.swift */; };
 		F321621C8828CBDBBF5BB142 /* SwiftData.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B2095A1ED03408007FEFDBEB /* SwiftData.framework */; };
@@ -234,6 +236,7 @@
 		047BEBEE5AAFC1C10EFEADBD /* OpenURLTool.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OpenURLTool.swift; sourceTree = "<group>"; };
 		05219D01EA46579E5C0F8054 /* TerminalCommandTool.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TerminalCommandTool.swift; sourceTree = "<group>"; };
 		05901B8A22C088927620C3AE /* IntentChatServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = IntentChatServiceTests.swift; sourceTree = "<group>"; };
+		06338EAB3D44F558619E23D1 /* LaunchScreen.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LaunchScreen.swift; sourceTree = "<group>"; };
 		0724C7D7F16CF6D4E26B31C8 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		08C042865F8B84CA2740C947 /* ChatView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatView.swift; sourceTree = "<group>"; };
 		0A53D759B12CCF9A30101BEB /* SwitchConversationIntent.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SwitchConversationIntent.swift; sourceTree = "<group>"; };
@@ -257,6 +260,7 @@
 		20B22D10ECFBB76EED3D2065 /* AIBuilder.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AIBuilder.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		210364CA10804B835A7D96DF /* BFFConfig.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BFFConfig.swift; sourceTree = "<group>"; };
 		2337973A34C704DC3EB55D83 /* TypingIndicator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TypingIndicator.swift; sourceTree = "<group>"; };
+		236916723758663383A30C03 /* BrandSplash.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BrandSplash.swift; sourceTree = "<group>"; };
 		2708B76B8DCC7657E4F27959 /* FileOperationToolTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FileOperationToolTests.swift; sourceTree = "<group>"; };
 		286D0E0E7454F821CC4B205A /* HealthKitService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = HealthKitService.swift; path = HealthKitService.swift; sourceTree = "<group>"; };
 		287C61AD5BC2260804ECDFB0 /* OpenURLToolTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OpenURLToolTests.swift; sourceTree = "<group>"; };
@@ -519,6 +523,8 @@
 				678503C99B6F041C1B30952D /* EmptyStateView.swift */,
 				C1222C063DBBE4FB784B1240 /* CardStyle.swift */,
 				9CE113344D50D981745BB070 /* AvatarView.swift */,
+				06338EAB3D44F558619E23D1 /* LaunchScreen.swift */,
+				236916723758663383A30C03 /* BrandSplash.swift */,
 			);
 			name = Components;
 			path = Components;
@@ -1424,6 +1430,8 @@
 				0B4ED2DD7945AA5456D55134 /* EmptyStateView.swift in Sources */,
 				EAB87D44BEC44A2F3F6954F8 /* CardStyle.swift in Sources */,
 				4288DE9B39A97F4DBB6530E5 /* AvatarView.swift in Sources */,
+				EF8F6CED79CD3CD894CB665B /* LaunchScreen.swift in Sources */,
+				5DF0711F48BBFF120DDE7765 /* BrandSplash.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1529,6 +1537,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AIBuilder/Resources/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "灵枢";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
@@ -1543,7 +1552,6 @@
 				OTHER_SWIFT_FLAGS = "$(inherited) -Xfrontend -disable-sandbox";
 				PRODUCT_BUNDLE_IDENTIFIER = com.aibuilder.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				INFOPLIST_KEY_CFBundleDisplayName = "灵枢";
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SWIFT_ENABLE_EXPLICIT_MODULES = YES;
@@ -1643,6 +1651,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AIBuilder/Resources/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "灵枢";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
@@ -1657,7 +1666,6 @@
 				OTHER_SWIFT_FLAGS = "$(inherited) -Xfrontend -disable-sandbox";
 				PRODUCT_BUNDLE_IDENTIFIER = com.aibuilder.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				INFOPLIST_KEY_CFBundleDisplayName = "灵枢";
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SWIFT_ENABLE_EXPLICIT_MODULES = YES;
