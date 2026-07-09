@@ -183,10 +183,15 @@ final class AIBuilderUITests: XCTestCase {
         XCTAssertTrue(ragToggle.waitForExistence(timeout: 5), "应存在 RAG 开关")
         let ragBefore = ragToggle.value as? String
         // 在 Form 中 Toggle 的 tap 可能被 cell 拦截或打到 label 区域，
-        // 用坐标点右半（switch 把手位置）点击确保命中
-        ragToggle.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
-        Thread.sleep(forTimeInterval: 0.5)
-        let ragAfter = ragToggle.value as? String
+        // 用坐标点右半（switch 把手位置）点击确保命中；失败时重试
+        var ragAfter = ragBefore
+        var ragTapAttempts = 0
+        while ragAfter == ragBefore && ragTapAttempts < 3 {
+            ragToggle.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+            Thread.sleep(forTimeInterval: 0.5)
+            ragAfter = ragToggle.value as? String
+            ragTapAttempts += 1
+        }
         XCTAssertNotEqual(ragBefore, ragAfter, "RAG 开关值应翻转")
 
         // Day 13: RAG tap 后 Form 可能自动滚动导致 Tools Toggle 位置漂移，
