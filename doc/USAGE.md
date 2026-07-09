@@ -29,6 +29,7 @@
    - 4.19 [预设系统提示词](#419-预设系统提示词)
    - 4.20 [macOS 系统集成](#420-macos-系统集成)
    - 4.21 [性能监控与调试](#421-性能监控与调试)
+   - 4.22 [语言切换](#422-语言切换)
 5. [多平台支持](#5-多平台支持)
 6. [工具能力清单](#6-工具能力清单)
 7. [开发工作流](#7-开发工作流)
@@ -498,6 +499,14 @@ open AIBuilder.xcodeproj
 > **对应代码文件**：`AIBuilder/Views/Settings/SettingsView.swift`、`AIBuilder/Services/Performance/PerformanceMonitor.swift`
 > **常见问题**：性能指标为空时说明尚未触发 `PerformanceMonitor.measure` 记录，先发起一次对话 / 工具调用 / RAG 检索再查看；指标不更新确认 `DebugPanelView` 的「刷新」按钮已调用 `await PerformanceMonitor.shared.getMetrics()`；`promptJSON` / `apiResponse` 显示「无」时检查 `chatViewModel.lastDebugInfo` 是否在请求完成后被赋值。
 
+### 4.22 语言切换
+
+1. 打开设置页 → 顶部「语言」Section。
+2. 选择「跟随系统 / 简体中文 / 繁体中文 / 英文」。
+3. 点击「完成」，按提示重启 App 生效。
+
+对应代码：`AIBuilder/Services/Language/LanguageManager.swift`、`AIBuilder/Views/Settings/SettingsView.swift`。
+
 ---
 
 ## 5. 多平台支持
@@ -623,7 +632,7 @@ xcodebuild build \
   -configuration Debug \
   CODE_SIGNING_ALLOWED=NO
 
-# 2. 运行 UT（249 用例，3 skipped）
+# 2. 运行 UT（248 用例，0 skip）
 xcodebuild test \
   -project AIBuilder.xcodeproj \
   -scheme AIBuilder \
@@ -631,7 +640,7 @@ xcodebuild test \
   -only-testing:AIBuilderTests \
   CODE_SIGNING_ALLOWED=NO
 
-# 3. 运行 UIT（13 用例，2 skipped）
+# 3. 运行 UIT（13 用例，0 skip）
 xcodebuild test \
   -project AIBuilder.xcodeproj \
   -scheme AIBuilder \
@@ -651,8 +660,8 @@ xcodebuild test \
 
 | 测试套件 | 用例总数 | skipped | failures |
 |---|---|---|---|
-| UT（`AIBuilderTests`） | 249 | 3 | 0 |
-| UIT（`AIBuilderUITests`） | 13 | 2 | 0 |
+| UT（`AIBuilderTests`） | 248 | 0 | 0 |
+| UIT（`AIBuilderUITests`） | 13 | 0 | 0 |
 
 ### skipped 原因
 
@@ -755,7 +764,7 @@ GitHub Actions 配置文件：`.github/workflows/ci.yml`
 
 ### Q10: UIT 测试不稳定？
 
-**A**：`contextMenu` 长按触发、Picker 导航式选项、邮件 composer 在模拟器上行为有差异，已用 `throw XCTSkip` 兜底跳过不稳定用例。**底层逻辑已由 UT 覆盖**（`ChatStorageTests` / `ConversationListVMTests` / `TTSConfigTests` / `TTSVoiceCatalogTests` 等）。当前 UIT 规模 13 用例（2 skipped，0 failures），UT 规模 249 用例（3 skipped，0 failures）。
+**A**：`contextMenu` 长按触发、Picker 导航式选项、邮件 composer 在模拟器上行为有差异，已用 `throw XCTSkip` 兜底跳过不稳定用例。**底层逻辑已由 UT 覆盖**（`ChatStorageTests` / `ConversationListVMTests` / `TTSConfigTests` / `TTSVoiceCatalogTests` 等）。当前 UIT 规模 13 用例（0 skip，0 failures），UT 规模 248 用例（0 skip，0 failures）。
 
 ### Q11: App Intents / Siri 调用无响应？
 
