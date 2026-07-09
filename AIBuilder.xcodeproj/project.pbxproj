@@ -1543,6 +1543,7 @@
 				OTHER_SWIFT_FLAGS = "$(inherited) -Xfrontend -disable-sandbox";
 				PRODUCT_BUNDLE_IDENTIFIER = com.aibuilder.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				INFOPLIST_KEY_CFBundleDisplayName = "灵枢";
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SWIFT_ENABLE_EXPLICIT_MODULES = YES;
@@ -1656,6 +1657,7 @@
 				OTHER_SWIFT_FLAGS = "$(inherited) -Xfrontend -disable-sandbox";
 				PRODUCT_BUNDLE_IDENTIFIER = com.aibuilder.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				INFOPLIST_KEY_CFBundleDisplayName = "灵枢";
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SWIFT_ENABLE_EXPLICIT_MODULES = YES;

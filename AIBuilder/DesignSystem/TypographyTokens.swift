@@ -18,4 +18,10 @@ extension Font {
     static let monoAI = Font.callout.monospaced()
     /// 工具标签（caption2 medium）
     static let toolLabel = Font.caption2.weight(.medium)
+    /// 灵枢品牌标题（宋体）
+    static let brandTitle = Font.custom("Songti SC", size: 28, relativeTo: .title2)
+    /// 灵枢开屏 Logo 字体（楷体）
+    static let brandLogo = Font.custom("Kaiti SC", size: 48, relativeTo: .largeTitle)
+    /// 灵枢装饰文字
+    static let brandDecorative = Font.custom("Songti SC", size: 16, relativeTo: .subheadline)
 }
