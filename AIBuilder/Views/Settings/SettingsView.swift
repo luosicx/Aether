@@ -322,10 +322,10 @@ struct SettingsView: View {
             .autocorrectionDisabled()
             SecureField("BFF Token", text: $settingsVM.bffConfig.userToken)
                 .textContentType(.password)
-            Stepper("chat 限流（每分钟）：\(settingsVM.bffConfig.chatRateLimitPerMin)",
+            Stepper(String(format: NSLocalizedString("chat 限流（每分钟）：%d", comment: ""), settingsVM.bffConfig.chatRateLimitPerMin),
                     value: $settingsVM.bffConfig.chatRateLimitPerMin,
                     in: 5...60)
-            Stepper("embed 限流（每分钟）：\(settingsVM.bffConfig.embedRateLimitPerMin)",
+            Stepper(String(format: NSLocalizedString("embed 限流（每分钟）：%d", comment: ""), settingsVM.bffConfig.embedRateLimitPerMin),
                     value: $settingsVM.bffConfig.embedRateLimitPerMin,
                     in: 5...30)
         } header: {
@@ -349,11 +349,11 @@ struct SettingsView: View {
             }
             Toggle("断网自动切换", isOn: $settingsVM.onDeviceConfig.autoSwitchOnNetworkLoss)
                 .accessibilityHint("断网时自动切换到端侧推理，联网后切回")
-            Stepper("maxTokens：\(settingsVM.onDeviceConfig.maxTokens)",
+            Stepper(String(format: NSLocalizedString("maxTokens：%d", comment: ""), settingsVM.onDeviceConfig.maxTokens),
                     value: $settingsVM.onDeviceConfig.maxTokens,
                     in: 128...2048)
             VStack(alignment: .leading) {
-                Text("temperature：\(settingsVM.onDeviceConfig.temperature, specifier: "%.1f")")
+                Text(String(format: NSLocalizedString("temperature：%.1f", comment: ""), settingsVM.onDeviceConfig.temperature))
                 Slider(value: $settingsVM.onDeviceConfig.temperature, in: 0.0...1.0)
             }
         } header: {
@@ -417,29 +417,29 @@ struct SettingsView: View {
             .accessibilityHint("选择系统内置 TTS 音色")
 
             VStack(alignment: .leading) {
-                Text("语速：\(Int(settingsVM.ttsConfig.rate * 100))%")
+                Text(String(format: NSLocalizedString("语速：%d%%", comment: ""), Int(settingsVM.ttsConfig.rate * 100)))
                 Slider(value: $settingsVM.ttsConfig.rate, in: 0...1, step: 0.05) { _ in
                     syncTTSConfigToChatViewModel()
                 }
-                .accessibilityValue("\(Int(settingsVM.ttsConfig.rate * 100))%")
+                .accessibilityValue(Text(String(format: NSLocalizedString("%d%%", comment: ""), Int(settingsVM.ttsConfig.rate * 100))))
             }
             .accessibilityLabel("语速")
 
             VStack(alignment: .leading) {
-                Text("音调：\(settingsVM.ttsConfig.pitchMultiplier, specifier: "%.1f")")
+                Text(String(format: NSLocalizedString("音调：%.1f", comment: ""), settingsVM.ttsConfig.pitchMultiplier))
                 Slider(value: $settingsVM.ttsConfig.pitchMultiplier, in: 0.5...2.0, step: 0.1) { _ in
                     syncTTSConfigToChatViewModel()
                 }
-                .accessibilityValue("\(settingsVM.ttsConfig.pitchMultiplier, specifier: "%.1f")")
+                .accessibilityValue(Text(String(format: NSLocalizedString("%.1f", comment: ""), settingsVM.ttsConfig.pitchMultiplier)))
             }
             .accessibilityLabel("音调")
 
             VStack(alignment: .leading) {
-                Text("音量：\(Int(settingsVM.ttsConfig.volume * 100))%")
+                Text(String(format: NSLocalizedString("音量：%d%%", comment: ""), Int(settingsVM.ttsConfig.volume * 100)))
                 Slider(value: $settingsVM.ttsConfig.volume, in: 0...1, step: 0.05) { _ in
                     syncTTSConfigToChatViewModel()
                 }
-                .accessibilityValue("\(Int(settingsVM.ttsConfig.volume * 100))%")
+                .accessibilityValue(Text(String(format: NSLocalizedString("%d%%", comment: ""), Int(settingsVM.ttsConfig.volume * 100))))
             }
             .accessibilityLabel("音量")
 
@@ -502,7 +502,7 @@ struct SettingsView: View {
                     settingsVM.deleteAPIKey(for: settingsVM.selectedProvider)
                 }
             } message: {
-                Text("确定删除 \(settingsVM.selectedProvider.displayName) 的 API Key？删除后无法恢复。")
+                Text(String(format: NSLocalizedString("确定删除 %@ 的 API Key？删除后无法恢复。", comment: ""), settingsVM.selectedProvider.displayName))
             }
         } header: {
             Text("API 配置")
@@ -925,7 +925,7 @@ struct DebugPanelView: View {
                 // 最近一次 embedding 向量维度
                 Section("Embedding 维度") {
                     if let dim = chatViewModel.lastDebugInfo?.embeddingDimension {
-                        Text("\(dim) 维")
+                        Text(String(format: NSLocalizedString("%d 维", comment: ""), dim))
                     } else {
                         Text("无")
                     }
@@ -938,10 +938,10 @@ struct DebugPanelView: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(call.toolName)
                                     .font(.headline)
-                                Text("参数：\(call.arguments)")
+                                Text(String(format: NSLocalizedString("参数：%@", comment: ""), call.arguments))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
-                                Text("返回：\(call.result)")
+                                Text(String(format: NSLocalizedString("返回：%@", comment: ""), call.result))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }

@@ -28,7 +28,7 @@ struct StepCardView: View {
         VStack(alignment: .leading, spacing: 8) {
             // 顶部：第 N 轮 + 状态图标
             HStack(spacing: 6) {
-                Text("第 \(step.loopIndex) 轮")
+                Text(String(format: NSLocalizedString("第 %d 轮", comment: ""), step.loopIndex))
                     .font(.caption2.weight(.medium))
                     .foregroundColor(.secondary)
                     .padding(.horizontal, 8)
@@ -113,9 +113,17 @@ struct StepCardView: View {
         )
         // Day 19: 无障碍——标注工具步骤名称与状态，提示可查看详情
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("工具步骤：\(step.toolName)")
-        .accessibilityValue(step.status == .running ? "执行中" : (step.status == .completed ? "已完成" : "失败"))
+        .accessibilityLabel(Text(String(format: NSLocalizedString("工具步骤：%@", comment: ""), step.toolName)))
+        .accessibilityValue(Text(statusText))
         .accessibilityHint("查看详情")
+    }
+
+    private var statusText: String {
+        switch step.status {
+        case .running: return NSLocalizedString("执行中", comment: "")
+        case .completed: return NSLocalizedString("已完成", comment: "")
+        case .failed: return NSLocalizedString("失败", comment: "")
+        }
     }
 
     private var statusIcon: String {

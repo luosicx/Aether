@@ -225,25 +225,25 @@ enum LLMError: Error, Sendable {
     var userMessage: String {
         switch self {
         case .networkError:
-            return "网络连接失败，请检查网络"
+            return NSLocalizedString("网络连接失败，请检查网络", comment: "")
         case .apiKeyMissing:
-            return "请先在设置中配置 API Key"
+            return NSLocalizedString("请先在设置中配置 API Key", comment: "")
         case .apiKeyInvalid:
-            return "API Key 无效，请检查设置"
+            return NSLocalizedString("API Key 无效，请检查设置", comment: "")
         case .apiError(let code, _):
             switch code {
-            case 400: return "请求格式错误，请重试"
-            case 402: return "账户余额不足"
-            case 429: return "请求过于频繁，请稍后再试"
-            case 500...599: return "服务暂时不可用，请稍后再试"
-            default: return "服务异常（\(code)），请稍后再试"
+            case 400: return NSLocalizedString("请求格式错误，请重试", comment: "")
+            case 402: return NSLocalizedString("账户余额不足", comment: "")
+            case 429: return NSLocalizedString("请求过于频繁，请稍后再试", comment: "")
+            case 500...599: return NSLocalizedString("服务暂时不可用，请稍后再试", comment: "")
+            default: return String(format: NSLocalizedString("服务异常（%d），请稍后再试", comment: ""), code)
             }
         case .timeout:
-            return "请求超时，请重试"
+            return NSLocalizedString("请求超时，请重试", comment: "")
         case .unknown:
-            return "未知错误，请重试"
+            return NSLocalizedString("未知错误，请重试", comment: "")
         case .rateLimited(let retryAfter):
-            return "请求过于频繁，请 \(Int(retryAfter)) 秒后重试"
+            return String(format: NSLocalizedString("请求过于频繁，请 %d 秒后重试", comment: ""), Int(retryAfter))
         case .llmErrorOccurred(let message):
             return message
         }

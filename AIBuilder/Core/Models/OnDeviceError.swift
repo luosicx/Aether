@@ -18,15 +18,15 @@ enum OnDeviceError: LocalizedError, Sendable {
     var errorDescription: String? {
         switch self {
         case .insufficientMemory:
-            return "设备可用内存不足，端侧推理需要至少 4GB 可用内存"
+            return NSLocalizedString("设备可用内存不足，端侧推理需要至少 4GB 可用内存", comment: "")
         case .modelNotFound(let url):
-            return "模型文件未找到：\(url.lastPathComponent)"
+            return String(format: NSLocalizedString("模型文件未找到：%@", comment: ""), url.lastPathComponent)
         case .sha256Mismatch(let expected, let actual):
-            return "模型文件校验失败（SHA256 不匹配），请重新下载\n期望：\(expected.prefix(8))…\n实际：\(actual.prefix(8))…"
+            return String(format: NSLocalizedString("模型文件校验失败（SHA256 不匹配），请重新下载\n期望：%@…\n实际：%@…", comment: ""), String(expected.prefix(8)), String(actual.prefix(8)))
         case .unsupportedQuantization:
-            return "不支持的模型量化格式，请选择 Q4_K_M 或更轻量版本"
+            return NSLocalizedString("不支持的模型量化格式，请选择 Q4_K_M 或更轻量版本", comment: "")
         case .loadFailed(let message):
-            return "端侧模型加载失败：\(message)"
+            return String(format: NSLocalizedString("端侧模型加载失败：%@", comment: ""), message)
         }
     }
 }

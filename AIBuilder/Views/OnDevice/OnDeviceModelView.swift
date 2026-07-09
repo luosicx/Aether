@@ -67,7 +67,7 @@ struct OnDeviceModelView: View {
                 if isDownloading {
                     // 下载中：进度条 + 取消按钮
                     ProgressView(value: progress) {
-                        Text("下载中…\(Int(progress * 100))%")
+                        Text(String(format: NSLocalizedString("下载中…%d%%", comment: ""), Int(progress * 100)))
                     }
                     Button("取消下载", role: .destructive) {
                         Task { await cancelDownload() }

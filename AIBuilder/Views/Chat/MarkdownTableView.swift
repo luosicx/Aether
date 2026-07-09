@@ -36,7 +36,7 @@ struct MarkdownTableView: View {
             )
         }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("表格，\(table.headers.count) 列 \(table.rows.count) 行")
+        .accessibilityLabel(Text(String(format: NSLocalizedString("表格，%d 列 %d 行", comment: ""), table.headers.count, table.rows.count)))
     }
 
     /// 渲染单个单元格

@@ -67,8 +67,8 @@ actor MLXInferenceEngine {
         }
         #else
         // 占位：mlx-swift 未集成时（模拟器或未添加 SPM 依赖），无法真正加载模型
-        lastLoadError = .loadFailed("mlx-swift 未集成，端侧推理不可用")
-        throw OnDeviceError.loadFailed("mlx-swift 未集成，端侧推理不可用")
+        lastLoadError = .loadFailed(NSLocalizedString("mlx-swift 未集成，端侧推理不可用", comment: ""))
+        throw OnDeviceError.loadFailed(NSLocalizedString("mlx-swift 未集成，端侧推理不可用", comment: ""))
         #endif
     }
 
@@ -83,7 +83,7 @@ actor MLXInferenceEngine {
             #if canImport(MLX)
             // 真正调用 MLX 生成（mlx-swift 可用时）
             guard isLoaded else {
-                continuation.yield("[端侧模型未加载，请先下载并加载模型]")
+                continuation.yield(NSLocalizedString("[端侧模型未加载，请先下载并加载模型]", comment: ""))
                 continuation.finish()
                 return
             }
@@ -99,13 +99,13 @@ actor MLXInferenceEngine {
                         }
                     }
                 } catch {
-                    continuation.yield("[生成失败：\(error.localizedDescription)]")
+                    continuation.yield(String(format: NSLocalizedString("[生成失败：%@]", comment: ""), error.localizedDescription))
                 }
                 continuation.finish()
             }
             #else
             // 占位：mlx-swift 不可用时返回提示信息
-            continuation.yield("[端侧推理不可用：mlx-swift 未集成]")
+            continuation.yield(NSLocalizedString("[端侧推理不可用：mlx-swift 未集成]", comment: ""))
             continuation.finish()
             #endif
         }

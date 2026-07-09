@@ -17,7 +17,7 @@ struct HeadingView: View {
         }
         .padding(.vertical, 2)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(level) 级标题")
+        .accessibilityLabel(Text(String(format: NSLocalizedString("%d 级标题", comment: ""), level)))
         .accessibilityAddTraits(.isHeader)
     }
 

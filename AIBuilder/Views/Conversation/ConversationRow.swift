@@ -43,7 +43,7 @@ struct ConversationRow: View {
         }
         .padding(.vertical, 6)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(conversation.title)，最后消息：\(lastMessage?.content ?? "无")")
+        .accessibilityLabel(Text(String(format: NSLocalizedString("%@，最后消息：%@", comment: ""), conversation.title, lastMessage?.content ?? NSLocalizedString("无", comment: ""))))
         .accessibilityHint("打开此会话")
         .accessibilityAddTraits(.isButton)
     }

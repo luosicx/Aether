@@ -6,7 +6,7 @@ import SwiftData
 /// 通过 title 字段做大小写不敏感包含匹配，按创建时间降序取首个匹配。
 struct SwitchConversationIntent: AppIntent {
     /// Siri / 快捷指令中显示的标题
-    static var title: LocalizedStringResource = "Switch Conversation"
+    static var title: LocalizedStringResource = "切换会话"
     /// 描述（用于快捷指令详情页）
     static var description = IntentDescription("按关键词切换到最近匹配的会话")
 
@@ -32,7 +32,7 @@ struct SwitchConversationIntent: AppIntent {
         let matches = try context.fetch(descriptor)
         // 未匹配时返回提示文本
         guard let matched = matches.first else {
-            return .result(value: "未找到匹配会话")
+            return .result(value: NSLocalizedString("未找到匹配会话", comment: ""))
         }
         return .result(value: matched.title)
     }

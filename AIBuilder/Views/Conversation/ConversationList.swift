@@ -163,7 +163,7 @@ struct ConversationList: View {
                                         showBatchDeleteConfirm = true
                                     }
                                 } label: {
-                                    Text("删除选中(\(selectedConversations.count))")
+                                    Text(String(format: NSLocalizedString("删除选中(%d)", comment: ""), selectedConversations.count))
                                         .font(.callout.weight(.medium))
                                 }
                                 .disabled(selectedConversations.isEmpty)
@@ -243,7 +243,7 @@ struct ConversationList: View {
                     isEditMode = false
                 }
             } message: {
-                Text("确定删除选中的 \(selectedConversations.count) 个对话？删除后无法恢复。")
+                Text(String(format: NSLocalizedString("确定删除选中的 %d 个对话？删除后无法恢复。", comment: ""), selectedConversations.count))
             }
         }
     }

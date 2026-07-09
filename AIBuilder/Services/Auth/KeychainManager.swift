@@ -12,9 +12,9 @@ enum AppError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .keychainError(let msg): return "钥匙串错误: \(msg)"
-        case .apiKeyMissing: return "API Key 未设置"
-        case .networkError(let msg): return "网络错误: \(msg)"
+        case .keychainError(let msg): return String(format: NSLocalizedString("钥匙串错误: %@", comment: ""), msg)
+        case .apiKeyMissing: return NSLocalizedString("API Key 未设置", comment: "")
+        case .networkError(let msg): return String(format: NSLocalizedString("网络错误: %@", comment: ""), msg)
         }
     }
 }
@@ -115,7 +115,7 @@ final class KeychainManager {
         _ = backend.secItemDelete(query as CFDictionary)
         let status = backend.secItemAdd(query as CFDictionary)
         guard status == errSecSuccess else {
-            throw AppError.keychainError("保存失败: \(status)")
+            throw AppError.keychainError(String(format: NSLocalizedString("保存失败: %@", comment: ""), String(status)))
         }
     }
 

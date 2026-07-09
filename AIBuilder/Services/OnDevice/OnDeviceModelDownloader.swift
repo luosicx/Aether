@@ -106,7 +106,7 @@ actor OnDeviceModelDownloader {
         do {
             try FileManager.default.removeItem(at: url)
         } catch {
-            throw OnDeviceError.loadFailed("删除模型文件失败：\(error.localizedDescription)")
+            throw OnDeviceError.loadFailed(String(format: NSLocalizedString("删除模型文件失败：%@", comment: ""), error.localizedDescription))
         }
     }
 
@@ -148,7 +148,7 @@ actor OnDeviceModelDownloader {
             if let urlError = error as? URLError {
                 self.resumeData = urlError.userInfo[NSURLSessionDownloadTaskResumeData] as? Data
             }
-            lastError = .loadFailed("下载失败：\(error.localizedDescription)")
+            lastError = .loadFailed(String(format: NSLocalizedString("下载失败：%@", comment: ""), error.localizedDescription))
         }
     }
 

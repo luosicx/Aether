@@ -76,7 +76,7 @@ final class KnowledgeBaseVM {
             text = try? String(contentsOf: url, encoding: .utf8)
         }
         guard let content = text, !content.isEmpty else {
-            errorMessage = "无法读取文档内容：\(source)"
+            errorMessage = String(format: NSLocalizedString("无法读取文档内容：%@", comment: ""), source)
             return
         }
         // 2) 后台线程读取 apiKey，避免主线程阻塞
@@ -92,7 +92,7 @@ final class KnowledgeBaseVM {
             // 4) 刷新列表
             load(modelContext: modelContext)
         } catch {
-            errorMessage = "导入失败：\(error.localizedDescription)"
+            errorMessage = String(format: NSLocalizedString("导入失败：%@", comment: ""), error.localizedDescription)
         }
     }
 }

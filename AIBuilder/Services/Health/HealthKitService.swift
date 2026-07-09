@@ -23,9 +23,9 @@ enum HealthKitError: LocalizedError, Sendable {
     var errorDescription: String? {
         switch self {
         case .notAvailable:
-            return "当前设备不支持 HealthKit"
+            return NSLocalizedString("当前设备不支持 HealthKit", comment: "")
         case .notAuthorized:
-            return "未获得 HealthKit 授权"
+            return NSLocalizedString("未获得 HealthKit 授权", comment: "")
         }
     }
 }

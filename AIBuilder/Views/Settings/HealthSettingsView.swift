@@ -13,7 +13,7 @@ struct HealthSettingsView: View {
     @Bindable var chatViewModel: ChatViewModel
 
     /// 授权状态文案
-    @State private var authorizationStatus: String = "未授权"
+    @State private var authorizationStatus: String = NSLocalizedString("未授权", comment: "")
     /// 是否正在生成洞察
     @State private var isGenerating: Bool = false
     /// 生成结果提示
@@ -125,10 +125,10 @@ struct HealthSettingsView: View {
         }
         do {
             try await chatViewModel.healthKitService?.requestAuthorization()
-            authorizationStatus = "已授权"
+            authorizationStatus = NSLocalizedString("已授权", comment: "")
         } catch {
-            authorizationStatus = "未授权"
-            generateMessage = "授权失败：\(error.localizedDescription)"
+            authorizationStatus = NSLocalizedString("未授权", comment: "")
+            generateMessage = String(format: NSLocalizedString("授权失败：%@", comment: ""), error.localizedDescription)
         }
         #endif
     }
@@ -139,7 +139,7 @@ struct HealthSettingsView: View {
         if chatViewModel.healthKitService == nil {
             chatViewModel.healthKitService = HealthKitService()
         }
-        authorizationStatus = (chatViewModel.healthKitService?.isAuthorized ?? false) ? "已授权" : "未授权"
+        authorizationStatus = (chatViewModel.healthKitService?.isAuthorized ?? false) ? NSLocalizedString("已授权", comment: "") : NSLocalizedString("未授权", comment: "")
         #endif
     }
 
@@ -152,9 +152,9 @@ struct HealthSettingsView: View {
             let generator = HealthInsightGenerator.make(modelContext: modelContext)
             let insight = try await generator.generateInsight(days: 7)
             generator.sendInsightNotification(insight)
-            generateMessage = "洞察已生成"
+            generateMessage = NSLocalizedString("洞察已生成", comment: "")
         } catch {
-            generateMessage = "生成失败：\(error.localizedDescription)"
+            generateMessage = String(format: NSLocalizedString("生成失败：%@", comment: ""), error.localizedDescription)
         }
     }
 }

@@ -39,7 +39,7 @@ struct CitationCard: View {
         )
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("引用 \(index + 1)，来源 \(citation.source)")
+        .accessibilityLabel(Text(String(format: NSLocalizedString("引用 %d，来源 %@", comment: ""), index + 1, citation.source)))
         .accessibilityHint("查看引用的文档片段")
     }
 }

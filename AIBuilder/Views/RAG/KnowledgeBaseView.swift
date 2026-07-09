@@ -156,7 +156,7 @@ struct KnowledgeBaseView: View {
                         .font(.body.weight(.medium))
                         .lineLimit(1)
                     HStack(spacing: 8) {
-                        Text("\(doc.chunkCount) 个片段")
+                        Text(String(format: NSLocalizedString("%d 个片段", comment: ""), doc.chunkCount))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Text(doc.createdAt, style: .relative)
@@ -189,7 +189,7 @@ struct KnowledgeBaseView: View {
                         .font(.body.weight(.medium))
                         .lineLimit(1)
                     HStack(spacing: 8) {
-                        Text("\(doc.chunkCount) 个片段")
+                        Text(String(format: NSLocalizedString("%d 个片段", comment: ""), doc.chunkCount))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Text(doc.createdAt, style: .relative)
@@ -224,7 +224,7 @@ struct KnowledgeBaseView: View {
                     Text(doc.source)
                         .font(.title2.bold())
                     HStack(spacing: 8) {
-                        Text("\(doc.chunkCount) 个片段")
+                        Text(String(format: NSLocalizedString("%d 个片段", comment: ""), doc.chunkCount))
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                         Text("·")
@@ -238,10 +238,10 @@ struct KnowledgeBaseView: View {
                 ForEach(chunks) { chunk in
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {
-                            Text("片段 \(chunk.chunkIndex + 1)")
+                            Text(String(format: NSLocalizedString("片段 %d", comment: ""), chunk.chunkIndex + 1))
                                 .font(.headline)
                             Spacer()
-                            Text(chunk.weight < 1.0 ? "权重 \(String(format: "%.1f", chunk.weight))" : "")
+                            Text(chunk.weight < 1.0 ? String(format: NSLocalizedString("权重 %.1f", comment: ""), chunk.weight) : "")
                                 .font(.caption2)
                                 .foregroundStyle(.tertiary)
                         }

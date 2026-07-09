@@ -109,7 +109,7 @@ enum TTSVoiceCatalog {
     /// 未找到时返回 "(未知音色)"。
     static func displayName(for identifier: String) -> String {
         guard let voice = allVoices().first(where: { $0.id == identifier }) else {
-            return "(未知音色)"
+            return NSLocalizedString("(未知音色)", comment: "")
         }
         return "\(voice.name)(\(voice.language))"
     }

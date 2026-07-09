@@ -64,10 +64,10 @@ final class VoiceService: NSObject {
     /// IsFormatSampleRateAndChannelCountValid）；3) 创建识别请求；4) installTap 接收音频；5) 启动 audioEngine。
     func startRecording() throws {
         guard recognizerAvailabilityCheck() else {
-            throw NSError(domain: "VoiceService", code: -1, userInfo: [NSLocalizedDescriptionKey: "语音识别器不可用"])
+            throw NSError(domain: "VoiceService", code: -1, userInfo: [NSLocalizedDescriptionKey: NSLocalizedString("语音识别器不可用", comment: "")])
         }
         guard let recognizer = speechRecognizer else {
-            throw NSError(domain: "VoiceService", code: -1, userInfo: [NSLocalizedDescriptionKey: "语音识别器不可用"])
+            throw NSError(domain: "VoiceService", code: -1, userInfo: [NSLocalizedDescriptionKey: NSLocalizedString("语音识别器不可用", comment: "")])
         }
         // 1) 激活 AVAudioSession — 必须在取 outputFormat / installTap 之前完成，
         //    否则 inputNode.outputFormat(forBus:0) 会返回 sampleRate=0 / channelCount=0 的无效格式，
@@ -191,7 +191,7 @@ final class VoiceService: NSObject {
             // macOS 上未安装 zh-CN 语音时 AVSpeechSynthesisVoice(language:) 可能返回 nil
             resolved = AVSpeechSynthesisVoice(language: "zh-CN")
             if resolved == nil {
-                errorMessage = "未找到中文语音，使用默认语音"
+                errorMessage = NSLocalizedString("未找到中文语音，使用默认语音", comment: "")
             }
         }
         cachedVoice = resolved

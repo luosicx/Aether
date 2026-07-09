@@ -15,7 +15,7 @@ final class FeedbackService {
     private let recipient = "feedback@aibuilder.app"
 
     /// 邮件主题
-    private let subject = "AI Builder 用户反馈"
+    private var subject: String { NSLocalizedString("AI Builder 用户反馈", comment: "") }
 
     /// 收集设备信息用于反馈邮件正文
     /// - Returns: 包含设备型号、系统版本、App 版本与构建号的字符串
