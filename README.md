@@ -4,7 +4,13 @@
 
 ## 截图
 
-（待补充）
+| iOS 主对话 | iOS 设置 | iOS 知识库 | iOS 健康洞察 |
+|---|---|---|---|
+| ![iOS Chat](screenshots/ios_chat_main.png) | ![iOS Settings](screenshots/ios_settings.png) | ![iOS Knowledge Base](screenshots/ios_knowledge_base.png) | ![iOS Health](screenshots/ios_health_insight.png) |
+
+| iOS 端侧模型 | iOS 预设提示词 | macOS 对话 | macOS 设置 |
+|---|---|---|---|
+| ![iOS On-Device](screenshots/ios_ondevice_model.png) | ![iOS Presets](screenshots/ios_preset_prompts.png) | ![macOS Chat](screenshots/macos_chat.png) | ![macOS Settings](screenshots/macos_settings.png) |
 
 ## 核心功能
 
@@ -47,7 +53,7 @@
 
 ### 工程质量强化
 
-- **国际化基础设施**：String Catalog（`Localizable.xcstrings`，zh-Hans 源 + zh-Hant 繁体 + en 翻译，55 核心 key），`developmentRegion = zh-Hans`，SwiftUI 字面量自动提取
+- **国际化基础设施**：String Catalog（`Localizable.xcstrings`，zh-Hans 源 + zh-Hant 繁体 + en 翻译，385 keys），`developmentRegion = zh-Hans`，SwiftUI 字面量自动提取
 - **App 内语言切换**：`LanguageManager` + 设置页「语言」Section，支持跟随系统 / 简体中文 / 繁体中文 / 英文四选项，切换后写入 `AppleLanguages` 并提示重启
 - **macOS 应用图标**：16/32/64/128/256/512 + @2x 全套 macOS iconset
 - **无障碍支持**：13 个视图新增 `accessibilityLabel`/`accessibilityHint`/`accessibilityElement`，13 个关键交互元素新增 `accessibilityIdentifier`（UITest 可靠性提升）
@@ -88,8 +94,8 @@
 - HealthKit / WatchConnectivity（iOS only，`#if os(iOS)`）
 - NetworkExtension（NWPathMonitor 网络监听）
 - AppIntents（Shortcuts / Spotlight / Siri）
-- XCTest（249 个单元测试，3 skip，覆盖 Service / Model / ViewModel / Core 全层）
-- XCUITest（13 个 UI 测试，2 skip，覆盖 12 个端到端流 + 1 个 launch）
+- XCTest（248 个单元测试，0 skip，覆盖 Service / Model / ViewModel / Core 全层）
+- XCUITest（13 个 UI 测试，0 skip，覆盖 12 个端到端流 + 1 个 launch）
 - GitHub Actions CI（macos-14 + iPhone 17，result bundle + upload-artifact）
 
 ## 环境要求
@@ -99,6 +105,20 @@
 - macOS Deployment Target 14+（作为目标平台）
 - DeepSeek API Key（云端模式，https://platform.deepseek.com 申请）
 - mlx-swift SPM 依赖（端侧推理可选）
+
+## 文档导航
+
+- [使用文档](doc/USAGE.md) — 环境、功能流程、FAQ
+- [架构文档](doc/ARCHITECTURE.md) — 分层、模块、数据流
+- [API 契约](doc/API.md) — LLMProvider / ToolProtocol / SSE
+- [贡献指南](doc/CONTRIBUTING.md) — 规范、提交流程
+- [变更日志](doc/CHANGELOG.md)
+- [手测清单](doc/MANUAL_TEST_CHECKLIST.md)
+- [发布清单](doc/ReleaseChecklist.md)
+- [BFF 部署](doc/BFF_DEPLOYMENT.md)
+- [路线图](doc/ROADMAP.md) — 后续任务方向
+- [优化方案](doc/OPTIMIZATION.md) — 性能与体验优化
+- [设计更新](doc/DESIGN_UPDATE.md) — UI/UX 演进计划
 
 ## 快速开始
 
@@ -154,8 +174,8 @@ AIBuilder/
 │   ├── OnDevice/           # OnDeviceModelView
 │   ├── RAG/                # DocumentPickerView / KnowledgeBaseView
 │   └── Settings/           # SettingsView / TTSVoicePickerView / PresetPrompts / HealthSettingsView / PrivacyPolicyView
-AIBuilderTests/             # 单元测试（69 个文件，249 用例，3 skip）
-AIBuilderUITests/           # UI 测试（2 个文件，13 用例，2 skip）
+AIBuilderTests/             # 单元测试（69 个文件，248 用例，0 skip）
+AIBuilderUITests/           # UI 测试（2 个文件，13 用例，0 skip）
 doc/                        # 文档（ARCHITECTURE.md / USAGE.md / MANUAL_TEST_CHECKLIST.md / ReleaseChecklist.md / BFF_DEPLOYMENT.md / CONTRIBUTING.md / CHANGELOG.md / API.md / plans / 实战计划）
 screenshots/                # 截图目录（含 README 占位，待补充实际截图）
 .github/workflows/ci.yml    # CI 配置
@@ -172,7 +192,7 @@ xcodebuild test \
   -configuration Debug \
   CODE_SIGNING_ALLOWED=NO
 
-# 仅 UT（249 用例，3 skip）
+# 仅 UT（248 用例，0 skip）
 xcodebuild test \
   -project AIBuilder.xcodeproj \
   -scheme AIBuilder \
@@ -180,7 +200,7 @@ xcodebuild test \
   -only-testing:AIBuilderTests \
   CODE_SIGNING_ALLOWED=NO
 
-# 仅 UIT（13 用例，2 skip）
+# 仅 UIT（13 用例，0 skip）
 xcodebuild test \
   -project AIBuilder.xcodeproj \
   -scheme AIBuilder \
