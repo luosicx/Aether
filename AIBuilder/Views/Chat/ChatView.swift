@@ -13,6 +13,8 @@ struct ChatView: View {
     @State private var showSettings = false
     @State private var showDocumentPicker = false
     @State private var showKnowledgeBase = false
+    // Task: macOS 分段工具栏切换的视图标签
+    @State private var selectedTab: ViewTab = .chat
     // 统一 Toast：操作成功/复制/撤销反馈
     @State private var showToast = false
     @State private var toastMessage = ""
@@ -74,51 +76,35 @@ struct ChatView: View {
     private var chatDetail: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                MessageListView(viewModel: viewModel, conversation: currentConversation)
-                Rectangle()
-                    .fill(Color.separator)
-                    .frame(height: 0.5)
-                ChatInputBar(
-                    inputText: $viewModel.inputText,
-                    isLoading: viewModel.isLoading,
-                    isRecording: viewModel.isRecording,
-                    onSend: {
-                        let conv: Conversation
-                        if let existing = currentConversation {
-                            conv = existing
-                        } else {
-                            // 首次发消息时创建新对话（不在启动时创建，避免阻塞）
-                            guard let newConv = conversationListVM.createConversation(
-                                title: "新对话",
-                                systemPrompt: settingsVM.systemPrompt
-                            ) else { return }
-                            currentConversation = newConv
-                            settingsVM.loadSystemPrompt(from: newConv)
-                            conv = newConv
-                        }
-                        // Day 12: 同步模型选择模式到 ChatViewModel
-                        viewModel.modelSelectionMode = settingsVM.modelSelectionMode
-                        // Day 13: 同步 provider 配置
-                        viewModel.selectedProvider = settingsVM.selectedProvider
-                        viewModel.fallbackProvider = settingsVM.enableFallback ? settingsVM.selectedProvider.fallback : nil
-                        viewModel.sendMessage(in: conv, modelContext: modelContext)
-                    },
-                    onPaperclip: {
-                        showKnowledgeBase = true
-                    },
-                    onToggleVoice: {
-                        viewModel.toggleVoiceInput()
-                    },
-                    onImagePicked: { data in
-                        viewModel.pendingImage = data
-                    }
-                )
+                #if os(macOS)
+                switch selectedTab {
+                case .chat:
+                    chatMainContent
+                case .knowledge:
+                    KnowledgeBaseView()
+                case .health:
+                    HealthSettingsView(chatViewModel: viewModel)
+                }
+                #else
+                chatMainContent
+                #endif
             }
             .navigationTitle(currentConversation?.title ?? "AI Builder")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
             .toolbar {
+                #if os(macOS)
+                // Task: macOS 分段工具栏——切换 聊天 / 知识库 / 健康
+                ToolbarItem(placement: .navigation) {
+                    Picker("视图", selection: $selectedTab) {
+                        Label("聊天", systemImage: "bubble.left").tag(ViewTab.chat)
+                        Label("知识库", systemImage: "books.vertical").tag(ViewTab.knowledge)
+                        Label("健康", systemImage: "heart.text.square").tag(ViewTab.health)
+                    }
+                    .pickerStyle(.segmented)
+                }
+                #endif
                 // Day 19: compact 显示会话列表按钮；regular 时侧栏已可见，隐藏此按钮
                 ToolbarItem(placement: .topBarLeadingCompat) {
                     if horizontalSizeClass != .regular {
@@ -225,6 +211,52 @@ struct ChatView: View {
         }
     }
 
+    /// 主聊天内容：消息列表 + 分隔线 + 输入栏。
+    /// macOS 分段工具栏 `.chat` 分支与 iOS compact/regular 共用。
+    private var chatMainContent: some View {
+        VStack(spacing: 0) {
+            MessageListView(viewModel: viewModel, conversation: currentConversation)
+            Rectangle()
+                .fill(Color.separator)
+                .frame(height: 0.5)
+            ChatInputBar(
+                inputText: $viewModel.inputText,
+                isLoading: viewModel.isLoading,
+                isRecording: viewModel.isRecording,
+                onSend: {
+                    let conv: Conversation
+                    if let existing = currentConversation {
+                        conv = existing
+                    } else {
+                        // 首次发消息时创建新对话（不在启动时创建，避免阻塞）
+                        guard let newConv = conversationListVM.createConversation(
+                            title: "新对话",
+                            systemPrompt: settingsVM.systemPrompt
+                        ) else { return }
+                        currentConversation = newConv
+                        settingsVM.loadSystemPrompt(from: newConv)
+                        conv = newConv
+                    }
+                    // Day 12: 同步模型选择模式到 ChatViewModel
+                    viewModel.modelSelectionMode = settingsVM.modelSelectionMode
+                    // Day 13: 同步 provider 配置
+                    viewModel.selectedProvider = settingsVM.selectedProvider
+                    viewModel.fallbackProvider = settingsVM.enableFallback ? settingsVM.selectedProvider.fallback : nil
+                    viewModel.sendMessage(in: conv, modelContext: modelContext)
+                },
+                onPaperclip: {
+                    showKnowledgeBase = true
+                },
+                onToggleVoice: {
+                    viewModel.toggleVoiceInput()
+                },
+                onImagePicked: { data in
+                    viewModel.pendingImage = data
+                }
+            )
+        }
+    }
+
     /// Day 19: 创建新对话的公共逻辑（侧栏与 sheet 复用）
     private func createNewConversation() {
         if let conv = conversationListVM.createConversation(
@@ -260,4 +292,9 @@ struct ChatView: View {
         guard let conversationId = UUID(uuidString: uuidString) else { return }
         switchToConversation(id: conversationId)
     }
+}
+
+/// Task: macOS 分段工具栏切换的视图标签
+enum ViewTab: String, CaseIterable, Hashable {
+    case chat, knowledge, health
 }
