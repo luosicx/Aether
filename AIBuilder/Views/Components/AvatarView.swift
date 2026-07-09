@@ -24,15 +24,15 @@ struct AvatarView: View {
 
     private var backgroundColor: Color {
         switch role {
-        case .user: return Color.accentColor.opacity(0.15)
-        case .assistant: return Color.purple.opacity(0.15)
+        case .user: return Color.vermillion.opacity(0.15)
+        case .assistant: return Color.jadeGreen.opacity(0.15)
         }
     }
 
     private var iconColor: Color {
         switch role {
-        case .user: return Color.accentColor
-        case .assistant: return Color.purple
+        case .user: return Color.vermillion
+        case .assistant: return Color.jadeGreen
         }
     }
 

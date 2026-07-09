@@ -209,8 +209,8 @@ struct MessageListView: View {
             }
 
             VStack(spacing: Spacing.md) {
-                Text("AI Builder")
-                    .font(.system(.largeTitle, design: .rounded).weight(.bold))
+                Text("灵枢")
+                    .font(.brandTitle)
                     .foregroundStyle(.primary)
                 Text("你的智能助手")
                     .font(.bodyAI)

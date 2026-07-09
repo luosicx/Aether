@@ -34,7 +34,7 @@ struct ConversationList: View {
             Group {
                 if conversationListVM.conversations.isEmpty {
                     EmptyStateView(
-                        systemImage: "bubble.left.and.bubble.right",
+                        systemImage: "scroll",
                         title: "还没有对话",
                         message: "点击右上角新建对话开始聊天",
                         primaryButtonTitle: "新建对话",
@@ -176,7 +176,7 @@ struct ConversationList: View {
                     }
                 }
             }
-            .navigationTitle("对话")
+            .navigationTitle("灵枢")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
