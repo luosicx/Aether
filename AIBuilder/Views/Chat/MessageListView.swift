@@ -146,7 +146,7 @@ struct MessageListView: View {
                         ))
                     }
                     if viewModel.isLoading && viewModel.streamingText.isEmpty {
-                        SkeletonView()
+                        LoadingStateView(text: "AI 正在思考...")
                     }
                 }
                 .padding(.horizontal, 16)
