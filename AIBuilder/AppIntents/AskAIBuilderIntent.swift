@@ -6,7 +6,7 @@ import Foundation
 /// AppIntent 不直接持有 ChatViewModel（ViewModel 生命周期绑定 SwiftUI 视图）。
 struct AskAIBuilderIntent: AppIntent {
     /// Siri / 快捷指令中显示的标题
-    static var title: LocalizedStringResource = "Ask AIBuilder"
+    static var title: LocalizedStringResource = "向 AI Builder 提问"
     /// 描述（用于快捷指令详情页）
     static var description = IntentDescription("向 AI Builder 发送问题并获取回复")
 
@@ -20,10 +20,10 @@ struct AskAIBuilderIntent: AppIntent {
         do {
             let reply = try await IntentChatService.shared.ask(query: query)
             // 空回复兜底，避免 Siri 朗读空白
-            return .result(value: reply.isEmpty ? "AI Builder 未返回内容，请重试。" : reply)
+            return .result(value: reply.isEmpty ? NSLocalizedString("AI Builder 未返回内容，请重试。", comment: "") : reply)
         } catch {
             // API Key 未配置或 LLM 失败时返回提示
-            return .result(value: "AI Builder 暂时无法回复：\(error.localizedDescription)")
+            return .result(value: String(format: NSLocalizedString("AI Builder 暂时无法回复：%@", comment: ""), error.localizedDescription))
         }
     }
 }
@@ -35,7 +35,7 @@ struct AskAIBuilderShortcuts: AppShortcutsProvider {
         AppShortcut(
             intent: AskAIBuilderIntent(),
             phrases: ["向 \(.applicationName) 提问", "问 \(.applicationName)"],
-            shortTitle: "Ask AIBuilder",
+            shortTitle: "向 AI Builder 提问",
             systemImageName: "sparkles"
         )
         AppShortcut(

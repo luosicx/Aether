@@ -11,7 +11,6 @@ import AppKit
 #endif
 
 /// 打开 URL 工具：用系统默认方式打开 URL（浏览器、深链接、系统设置）
-@MainActor
 final class OpenURLTool: ToolProtocol {
     /// 工具定义
     /// - name: `open_url`
@@ -35,6 +34,7 @@ final class OpenURLTool: ToolProtocol {
     /// - Parameter arguments: 含 `url` 键的参数字典
     /// - Returns: 成功返回 "已打开"，失败返回错误信息字符串
     /// - Throws: 不抛异常，错误以字符串形式返回
+    @MainActor
     func execute(arguments: [String: Any]) async throws -> String {
         guard let urlString = arguments["url"] as? String, !urlString.isEmpty else {
             return "错误：请提供 URL"

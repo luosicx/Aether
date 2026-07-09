@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import AVFoundation
 #if os(iOS)
 import BackgroundTasks
 import ActivityKit
@@ -14,11 +15,16 @@ struct AIBuilderApp: App {
                 #if os(macOS)
                 .frame(minWidth: 800, minHeight: 500)
                 #endif
+                .task {
+                    // 预热语音引擎：触发 speechsynthesisd daemon 启动和音色库加载，
+                    // 避免首次朗读时冷启动阻塞主线程 1-3 秒。仅加载不发声。
+                    _ = AVSpeechSynthesisVoice.speechVoices()
+                }
         }
         #if os(macOS)
         .defaultSize(width: 1000, height: 700)
         #endif
-        .modelContainer(for: [Conversation.self, ChatMessage.self, DocumentChunk.self, MessageFeedback.self, HealthInsight.self])
+        .modelContainer(for: [Conversation.self, ChatMessage.self, DocumentChunk.self, MessageFeedback.self, HealthInsight.self, UserPreference.self])
         // Task 4: macOS 菜单栏 —— 新建对话 / 搜索会话 / 设置
         .commands {
             // File → 新建对话 (Cmd+N)
@@ -60,18 +66,31 @@ struct AIBuilderApp: App {
         // 注意：App 为 @MainActor 的 struct，init 中 self 为 inout，
         // 无法被 @escaping 闭包捕获，因此 handler 调用 static 方法（不捕获 self）。
         BGTaskScheduler.shared.register(forTaskWithIdentifier: "com.aibuilder.daily-refresh", using: nil) { task in
-            Self.handleDailyRefresh(task: task as! BGAppRefreshTask)
+            // 安全向下转型：若 task 类型与注册标识符不匹配则置为完成并放弃处理
+            guard let refreshTask = task as? BGAppRefreshTask else {
+                task.setTaskCompleted(success: false)
+                return
+            }
+            Self.handleDailyRefresh(task: refreshTask)
         }
         Self.scheduleDailyRefresh()
         // Day 14: 注册遥测上报后台任务
         BGTaskScheduler.shared.register(forTaskWithIdentifier: "com.aibuilder.telemetry-upload", using: nil) { task in
-            Self.handleTelemetryUpload(task: task as! BGAppRefreshTask)
+            guard let refreshTask = task as? BGAppRefreshTask else {
+                task.setTaskCompleted(success: false)
+                return
+            }
+            Self.handleTelemetryUpload(task: refreshTask)
         }
         // Day 14: 调度遥测上报后台任务
         Self.scheduleTelemetryUpload()
         // Day 17: 注册健康洞察生成后台任务（每天 09:00 触发）
         BGTaskScheduler.shared.register(forTaskWithIdentifier: "com.aibuilder.health-insight", using: nil) { task in
-            Self.handleHealthInsight(task: task as! BGAppRefreshTask)
+            guard let refreshTask = task as? BGAppRefreshTask else {
+                task.setTaskCompleted(success: false)
+                return
+            }
+            Self.handleHealthInsight(task: refreshTask)
         }
         Self.scheduleHealthInsight()
         // Day 17: 激活 WatchConnectivity 会话（用于 watchOS 快速对话同步）
@@ -103,7 +122,7 @@ struct AIBuilderApp: App {
             let config = ModelConfiguration(isStoredInMemoryOnly: false)
             let container = try ModelContainer(
                 for: Conversation.self, ChatMessage.self, DocumentChunk.self,
-                    MessageFeedback.self, HealthInsight.self,
+                    MessageFeedback.self, HealthInsight.self, UserPreference.self,
                 configurations: config
             )
             let context = ModelContext(container)

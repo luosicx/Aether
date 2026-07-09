@@ -4,8 +4,14 @@ AIBuilder 的 BFF（Backend For Frontend）代理层运行在 Cloudflare Workers
 
 ## 架构概览
 
-```
-[iOS App] --(X-BFF-Token / X-Provider)--> [Cloudflare Worker] --(Authorization: Bearer <upstream-key>)--> [DeepSeek / Qwen 上游]
+```mermaid
+flowchart LR
+    A[iOS App<br/>BFFProxyClient] -->|X-BFF-Token<br/>X-Provider| B[Cloudflare Worker<br/>worker.js]
+    B -->|Authorization: Bearer<br/>upstream-key| C[DeepSeek<br/>api.deepseek.com]
+    B -->|Authorization: Bearer<br/>upstream-key| D[Qwen<br/>dashscope.aliyuncs.com]
+    C -.->|SSE 流式响应| B
+    D -.->|SSE 流式响应| B
+    B -.->|SSE 转发| A
 ```
 
 - 设备端：`BFFProxyClient`（`AIBuilder/Services/LLM/BFFProxyClient.swift`）将请求发往 BFF endpoint，附带 `X-BFF-Token` 与 `X-Provider`，**不携带上游 API Key**。
@@ -37,6 +43,108 @@ wrangler deploy
 ```
 
 部署成功后，wrangler 输出形如 `https://aibuilder-bff.<your-subdomain>.workers.dev` 的访问地址，即为 BFF endpoint。
+
+## worker.js 关键代码段
+
+以下片段摘自 `CloudflareWorkers/worker.js`，便于快速理解核心逻辑。
+
+### Token 校验
+
+从 header 读取 `X-BFF-Token` 并在 KV `bff_tokens` 中查询合法性，未命中即返回 401。
+
+```javascript
+// 1. 校验 BFF Token：缺失或 KV 未命中则 401
+const bffToken = request.headers.get("X-BFF-Token");
+if (!bffToken) {
+  return jsonError(401, "BFF Token 缺失");
+}
+// 在 KV bff_tokens 中查询，存在即合法
+const tokenRecord = await env.bff_tokens.get(bffToken);
+if (!tokenRecord) {
+  return jsonError(401, "BFF Token 无效");
+}
+```
+
+### Provider 路由
+
+根据 `X-Provider` 选择上游 endpoint 与对应 API Key，默认 `deepseek`，未知 provider 返回 400。
+
+```javascript
+// 默认 deepseek，未知 provider 返回 400
+const provider = request.headers.get("X-Provider") || "deepseek";
+const upstream = resolveUpstream(provider, env);
+if (!upstream) {
+  return jsonError(400, "未知的 X-Provider: " + provider);
+}
+
+// 按 provider 解析 baseUrl + apiKey
+function resolveUpstream(provider, env) {
+  switch (provider) {
+    case "deepseek":
+      return { baseUrl: env.DEEPSEEK_BASE_URL, apiKey: env.DEEPSEEK_API_KEY };
+    case "qwen":
+      return { baseUrl: env.QWEN_BASE_URL, apiKey: env.QWEN_API_KEY };
+    default:
+      return null;
+  }
+}
+```
+
+### 上游 key 注入
+
+从 Workers Secrets 读取上游 key，剥离 BFF 专有 header 后注入 `Authorization: Bearer`。
+
+```javascript
+// 构造上游 Header：移除 X-BFF-Token / X-Provider，注入上游 Authorization
+function buildUpstreamHeaders(headers, apiKey) {
+  const out = new Headers(headers);
+  out.delete("X-BFF-Token");
+  out.delete("X-Provider");
+  out.set("Authorization", "Bearer " + apiKey); // apiKey 来自 Workers secret
+  return out;
+}
+```
+
+### SSE 流式转发
+
+上游 2xx 时通过 `TransformStream` 透传 body，`ctx.waitUntil` 在后台管道传输，不阻塞 Response 返回。
+
+```javascript
+// 上游 2xx：流式透传 SSE（ReadableStream + TransformStream 透传）
+if (upstreamResp.ok) {
+  const { readable, writable } = new TransformStream();
+  // 后台管道：上游 body → writable → readable，不阻塞 Response 返回
+  ctx.waitUntil(upstreamResp.body.pipeTo(writable).catch(() => {}));
+  return new Response(readable, {
+    status: upstreamResp.status,
+    headers: forwardHeaders(upstreamResp.headers),
+  });
+}
+```
+
+## wrangler.toml 完整配置示例
+
+以下为 `CloudflareWorkers/wrangler.toml` 的完整内容（`id` 字段需替换为实际 KV namespace id）：
+
+```toml
+name = "aibuilder-bff"
+main = "worker.js"
+compatibility_date = "2026-07-01"
+
+# BFF Token KV namespace：键为 token 字符串，值为用户元数据（存在即合法）
+# 部署后用 `wrangler kv:namespace create bff_tokens` 创建并替换下方 id
+[[kv_namespaces]]
+binding = "bff_tokens"
+id = "your-kv-namespace-id"
+
+# 上游 endpoint（非敏感，明文配置）
+# Secrets（DEEPSEEK_API_KEY / QWEN_API_KEY）通过 `wrangler secret put` 配置，不在此明文存储
+[vars]
+DEEPSEEK_BASE_URL = "https://api.deepseek.com"
+QWEN_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+```
+
+> 说明：上游 API Key（`DEEPSEEK_API_KEY` / `QWEN_API_KEY`）通过 `wrangler secret put` 注入，密文存储，不写入此文件；BFF Token 存于 KV `bff_tokens`，而非单一 secret。
 
 ## 4. 创建 KV namespace 与配置 Token
 
@@ -145,3 +253,15 @@ wrangler deploy
   ```
 - **轮换上游 key**：重新 `wrangler secret put DEEPSEEK_API_KEY` 后无需改代码。
 - **查看日志**：`wrangler tail` 实时查看 Worker 请求与错误日志。
+
+## 常见部署错误与排查
+
+| 错误现象 | 可能原因 | 排查步骤 |
+|---------|---------|---------|
+| 401 Unauthorized | X-BFF-Token 不匹配 BFF_TOKEN secret | `wrangler secret list` 确认 BFF_TOKEN 已设置；检查 App 端 BFFConfig.userToken 与服务端一致 |
+| CORS 错误 | worker.js 未正确返回 CORS header | 检查 worker.js OPTIONS 预检响应包含 `Access-Control-Allow-Origin: *` |
+| 429 Too Many Requests | 触发客户端 RateLimiter 或 BFF 限流 | 检查 BFFConfig.chatRateLimitPerMin 设置；降低请求频率 |
+| 上游 401 | DEEPSEEK_API_KEY / QWEN_API_KEY secret 未设置或失效 | `wrangler secret list` 确认 secret 存在；在 DeepSeek/Qwen 控制台验证 key 有效性 |
+| SSE 中断 | 上游响应未正确流式转发 | 检查 worker.js 使用 `ReadableStream` 转发而非 `await response.text()` |
+| 部署失败 `wrangler deploy` 报错 | wrangler 版本过旧或未登录 | `npm install -g wrangler@latest` + `wrangler login` |
+| Worker 启动但无响应 | main 字段路径与文件名不匹配 | 确认 wrangler.toml 的 `main` 指向实际 worker 文件路径 |

@@ -67,28 +67,34 @@ struct OnDeviceModelView: View {
                 if isDownloading {
                     // 下载中：进度条 + 取消按钮
                     ProgressView(value: progress) {
-                        Text("下载中…\(Int(progress * 100))%")
+                        Text(String(format: NSLocalizedString("下载中…%d%%", comment: ""), Int(progress * 100)))
                     }
                     Button("取消下载", role: .destructive) {
                         Task { await cancelDownload() }
                     }
+                    .accessibilityLabel("取消下载")
+                    .accessibilityHint("取消当前模型下载")
+                    .accessibilityIdentifier("cancelDownloadButton")
                 } else {
                     Button("下载模型") {
                         Task { await startDownload() }
                     }
+                    .accessibilityLabel("下载模型")
+                    .accessibilityHint("开始下载端侧推理模型文件")
+                    .accessibilityIdentifier("downloadModelButton")
                     if isModelDownloaded {
                         Text("模型已就绪，约 700MB")
-                            .font(.caption)
+                            .font(.captionAI)
                             .foregroundStyle(.secondary)
                     } else {
                         Text("模型文件约 700MB，建议在 Wi-Fi 下下载")
-                            .font(.caption)
+                            .font(.captionAI)
                             .foregroundStyle(.secondary)
                     }
                 }
                 if let msg = errorMessage {
                     Text(msg)
-                        .font(.caption)
+                        .font(.captionAI)
                         .foregroundStyle(.red)
                 }
             }
@@ -99,6 +105,9 @@ struct OnDeviceModelView: View {
                     Task { await deleteModel() }
                 }
                 .disabled(!isModelDownloaded)
+                .accessibilityLabel("删除模型")
+                .accessibilityHint("删除本地模型文件以释放空间")
+                .accessibilityIdentifier("deleteModelButton")
             }
 
             // 切换模型
@@ -108,12 +117,16 @@ struct OnDeviceModelView: View {
                         Text(name).tag(name)
                     }
                 }
+                .accessibilityLabel("选择模型")
+                .accessibilityHint("切换要使用的端侧模型")
+                .accessibilityIdentifier("onDeviceModelPicker")
             }
         }
         .navigationTitle("端侧模型管理")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
+        .accessibilityIdentifier("OnDeviceModelView")
         .onAppear {
             refreshDownloadedStatus()
         }

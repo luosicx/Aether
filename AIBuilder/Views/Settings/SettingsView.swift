@@ -45,11 +45,17 @@ struct SettingsView: View {
     @Bindable var chatViewModel: ChatViewModel
     let conversation: Conversation?
     @Environment(\.modelContext) private var modelContext
-    @Environment(\.dismiss) private var dismiss
+    // macOS 下 NavigationSplitView + NavigationStack + sheet 三层嵌套会截断 dismiss，
+    // 改用 @Binding 直达 sheet 的 isPresented
+    @Binding var isPresented: Bool
     // Day 20: 打开 mailto: URL
     @Environment(\.openURL) private var openURL
     // iPad/macOS 双栏:size class 判断
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    // 语言切换管理器
+    @StateObject private var languageManager = LanguageManager.shared
+    // 语言切换后是否需要提示重启
+    @State private var showRestartAlert = false
 
     // Day 9: 用户偏好本地状态
     @State private var preferredTone: String = "默认"
@@ -65,8 +71,6 @@ struct SettingsView: View {
     #endif
     // Day 20: 邮件 composer sheet 开关
     @State private var showMailComposer: Bool = false
-    // TTS 试听服务（独立于 ChatViewModel.voiceService，避免污染主朗读状态）
-    @State private var ttsPreviewService = VoiceService()
     // iPad/macOS 双栏:当前选中的设置分类
     @State private var selectedSection: SettingsSection? = .provider
 
@@ -80,6 +84,11 @@ struct SettingsView: View {
         }
         .onAppear { handleAppear() }
         .onDisappear { handleDisappear() }
+        .alert("语言", isPresented: $showRestartAlert) {
+            Button("完成") {}
+        } message: {
+            Text("重启 App 以应用语言更改")
+        }
         .sheet(isPresented: $showDebugPanel) {
             DebugPanelView(chatViewModel: chatViewModel)
         }
@@ -99,6 +108,7 @@ struct SettingsView: View {
     private var compactLayout: some View {
         NavigationStack {
             Form {
+                languageSection
                 providerSection
                 fallbackSection
                 bffSection
@@ -147,11 +157,6 @@ struct SettingsView: View {
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    doneButton
-                }
-            }
         } detail: {
             NavigationStack {
                 if let section = selectedSection {
@@ -165,6 +170,11 @@ struct SettingsView: View {
                     #endif
                 } else {
                     ContentUnavailableView("选择一个分类", systemImage: "sidebar.left")
+                }
+            }
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    doneButton
                 }
             }
         }
@@ -183,6 +193,7 @@ struct SettingsView: View {
     private func sectionContent(for section: SettingsSection) -> some View {
         switch section {
         case .provider:
+            languageSection
             providerSection
             fallbackSection
             apiConfigSection
@@ -216,9 +227,42 @@ struct SettingsView: View {
     private var doneButton: some View {
         Button("完成") {
             settingsVM.updateSystemPrompt(in: conversation, modelContext: modelContext)
-            dismiss()
+            isPresented = false
         }
         .fontWeight(.medium)
+        .accessibilityLabel("完成")
+        .accessibilityHint("保存设置并关闭")
+        .accessibilityIdentifier("settingsDoneButton")
+    }
+
+    // MARK: - Section: 语言切换
+
+    @ViewBuilder
+    private var languageSection: some View {
+        Section {
+            // Picker 选择语言，选中后立即写入 AppleLanguages
+            Picker("语言", selection: Binding(
+                get: { languageManager.current },
+                set: { newValue in
+                    languageManager.current = newValue
+                    showRestartAlert = true
+                }
+            )) {
+                ForEach(LanguageManager.AppLanguage.allCases) { language in
+                    Label(language.displayName, systemImage: language.icon)
+                        .tag(language)
+                }
+            }
+            .pickerStyle(.menu)
+            .accessibilityLabel("语言")
+            .accessibilityHint("选择 App 界面语言，切换后需重启 App 生效")
+            .accessibilityIdentifier("languagePicker")
+        } header: {
+            Text("语言")
+        } footer: {
+            Text("切换语言后需重启 App 生效。选择「跟随系统」将使用设备系统语言。")
+                .font(.captionAI)
+        }
     }
 
     // MARK: - Section: 供应商
@@ -233,12 +277,14 @@ struct SettingsView: View {
                 }
             }
             .pickerStyle(.segmented)
+            .accessibilityLabel("供应商")
             .accessibilityHint("选择 LLM 供应商")
+            .accessibilityIdentifier("providerPicker")
         } header: {
             Text("供应商")
         } footer: {
             Text("选择 LLM 供应商。不同供应商的 API Key 独立存储。")
-                .font(.caption2)
+                .font(.captionAI)
         }
     }
 
@@ -249,12 +295,14 @@ struct SettingsView: View {
         // Day 13: 自动降级开关
         Section {
             Toggle("启用自动降级", isOn: $settingsVM.enableFallback)
+                .accessibilityLabel("启用自动降级")
                 .accessibilityHint("主供应商失败时自动切换备用供应商")
+                .accessibilityIdentifier("fallbackToggle")
         } header: {
             Text("自动降级")
         } footer: {
             Text("主供应商失败时自动切换到备用供应商重试一次。")
-                .font(.caption2)
+                .font(.captionAI)
         }
     }
 
@@ -265,6 +313,9 @@ struct SettingsView: View {
         // Day 15: BFF 代理配置
         Section {
             Toggle("启用 BFF 代理", isOn: $settingsVM.bffConfig.enabled)
+                .accessibilityLabel("启用 BFF 代理")
+                .accessibilityHint("启用后端代理转发 API 请求")
+                .accessibilityIdentifier("bffToggle")
             TextField("BFF endpoint", text: Binding(
                 get: { settingsVM.bffConfig.endpointURL.absoluteString },
                 set: { newValue in
@@ -279,19 +330,31 @@ struct SettingsView: View {
             .textInputAutocapitalization(.never)
             #endif
             .autocorrectionDisabled()
+            .accessibilityLabel("BFF endpoint")
+            .accessibilityHint("输入 BFF 服务地址")
+            .accessibilityIdentifier("bffEndpointTextField")
             SecureField("BFF Token", text: $settingsVM.bffConfig.userToken)
                 .textContentType(.password)
-            Stepper("chat 限流（每分钟）：\(settingsVM.bffConfig.chatRateLimitPerMin)",
+                .accessibilityLabel("BFF Token")
+                .accessibilityHint("输入 BFF 访问令牌")
+                .accessibilityIdentifier("bffTokenSecureField")
+            Stepper(String(format: NSLocalizedString("chat 限流（每分钟）：%d", comment: ""), settingsVM.bffConfig.chatRateLimitPerMin),
                     value: $settingsVM.bffConfig.chatRateLimitPerMin,
                     in: 5...60)
-            Stepper("embed 限流（每分钟）：\(settingsVM.bffConfig.embedRateLimitPerMin)",
+                .accessibilityLabel("chat 限流")
+                .accessibilityHint("设置 chat 接口每分钟最大请求数")
+                .accessibilityIdentifier("bffChatRateLimitStepper")
+            Stepper(String(format: NSLocalizedString("embed 限流（每分钟）：%d", comment: ""), settingsVM.bffConfig.embedRateLimitPerMin),
                     value: $settingsVM.bffConfig.embedRateLimitPerMin,
                     in: 5...30)
+                .accessibilityLabel("embed 限流")
+                .accessibilityHint("设置 embed 接口每分钟最大请求数")
+                .accessibilityIdentifier("bffEmbedRateLimitStepper")
         } header: {
             Text("BFF 代理")
         } footer: {
             Text("启用后 API Key 由服务端保护，设备只持有 BFF Token。")
-                .font(.caption2)
+                .font(.captionAI)
         }
     }
 
@@ -302,24 +365,37 @@ struct SettingsView: View {
         // Day 16: 端侧推理配置
         Section {
             Toggle("启用端侧推理", isOn: $settingsVM.onDeviceConfig.enabled)
+                .accessibilityLabel("启用端侧推理")
                 .accessibilityHint("启用后在断网时使用本地模型推理")
+                .accessibilityIdentifier("onDeviceToggle")
             NavigationLink("管理端侧模型") {
                 OnDeviceModelView(settingsVM: settingsVM)
             }
+            .accessibilityLabel("管理端侧模型")
+            .accessibilityHint("下载或删除本地端侧模型")
+            .accessibilityIdentifier("manageOnDeviceModelsLink")
             Toggle("断网自动切换", isOn: $settingsVM.onDeviceConfig.autoSwitchOnNetworkLoss)
+                .accessibilityLabel("断网自动切换")
                 .accessibilityHint("断网时自动切换到端侧推理，联网后切回")
-            Stepper("maxTokens：\(settingsVM.onDeviceConfig.maxTokens)",
+                .accessibilityIdentifier("autoSwitchOnNetworkLossToggle")
+            Stepper(String(format: NSLocalizedString("maxTokens：%d", comment: ""), settingsVM.onDeviceConfig.maxTokens),
                     value: $settingsVM.onDeviceConfig.maxTokens,
                     in: 128...2048)
+                .accessibilityLabel("maxTokens")
+                .accessibilityHint("设置端侧模型最大生成 token 数")
+                .accessibilityIdentifier("onDeviceMaxTokensStepper")
             VStack(alignment: .leading) {
-                Text("temperature：\(settingsVM.onDeviceConfig.temperature, specifier: "%.1f")")
+                Text(String(format: NSLocalizedString("temperature：%.1f", comment: ""), settingsVM.onDeviceConfig.temperature))
                 Slider(value: $settingsVM.onDeviceConfig.temperature, in: 0.0...1.0)
+                    .accessibilityLabel("temperature")
+                    .accessibilityHint("调整模型生成随机程度")
+                    .accessibilityIdentifier("onDeviceTemperatureSlider")
             }
         } header: {
             Text("端侧推理")
         } footer: {
             Text("端侧推理在断网时自动启用，模型文件约 700MB。")
-                .font(.caption2)
+                .font(.captionAI)
         }
     }
 
@@ -338,9 +414,12 @@ struct SettingsView: View {
                     Spacer()
                     Text(healthAuthorizationStatus)
                         .foregroundStyle(healthAuthorizationStatus == "已授权" ? .green : .secondary)
-                        .font(.caption)
+                        .font(.captionAI)
                 }
             }
+            .accessibilityLabel("健康管理")
+            .accessibilityHint("管理 HealthKit 授权与健康洞察")
+            .accessibilityIdentifier("healthManagementLink")
             HStack {
                 Text("已生成洞察")
                 Spacer()
@@ -351,7 +430,7 @@ struct SettingsView: View {
             Text("健康")
         } footer: {
             Text("接入 HealthKit 后 AI 可基于健康数据给出针对性建议。")
-                .font(.caption2)
+                .font(.captionAI)
         }
     }
     #endif
@@ -370,59 +449,69 @@ struct SettingsView: View {
                     Spacer()
                     Text(currentVoiceDisplayName)
                         .foregroundStyle(.secondary)
-                        .font(.caption)
+                        .font(.captionAI)
                 }
             }
+            .accessibilityLabel("音色")
             .accessibilityHint("选择系统内置 TTS 音色")
+            .accessibilityIdentifier("voicePickerLink")
 
             VStack(alignment: .leading) {
-                Text("语速：\(Int(settingsVM.ttsConfig.rate * 100))%")
+                Text(String(format: NSLocalizedString("语速：%d%%", comment: ""), Int(settingsVM.ttsConfig.rate * 100)))
                 Slider(value: $settingsVM.ttsConfig.rate, in: 0...1, step: 0.05) { _ in
                     syncTTSConfigToChatViewModel()
                 }
-                .accessibilityValue("\(Int(settingsVM.ttsConfig.rate * 100))%")
+                .accessibilityValue(Text(String(format: NSLocalizedString("%d%%", comment: ""), Int(settingsVM.ttsConfig.rate * 100))))
+                .accessibilityHint("调整朗读语速")
+                .accessibilityIdentifier("ttsRateSlider")
             }
             .accessibilityLabel("语速")
 
             VStack(alignment: .leading) {
-                Text("音调：\(settingsVM.ttsConfig.pitchMultiplier, specifier: "%.1f")")
+                Text(String(format: NSLocalizedString("音调：%.1f", comment: ""), settingsVM.ttsConfig.pitchMultiplier))
                 Slider(value: $settingsVM.ttsConfig.pitchMultiplier, in: 0.5...2.0, step: 0.1) { _ in
                     syncTTSConfigToChatViewModel()
                 }
-                .accessibilityValue("\(settingsVM.ttsConfig.pitchMultiplier, specifier: "%.1f")")
+                .accessibilityValue(Text(String(format: NSLocalizedString("%.1f", comment: ""), settingsVM.ttsConfig.pitchMultiplier)))
+                .accessibilityHint("调整朗读音调")
+                .accessibilityIdentifier("ttsPitchSlider")
             }
             .accessibilityLabel("音调")
 
             VStack(alignment: .leading) {
-                Text("音量：\(Int(settingsVM.ttsConfig.volume * 100))%")
+                Text(String(format: NSLocalizedString("音量：%d%%", comment: ""), Int(settingsVM.ttsConfig.volume * 100)))
                 Slider(value: $settingsVM.ttsConfig.volume, in: 0...1, step: 0.05) { _ in
                     syncTTSConfigToChatViewModel()
                 }
-                .accessibilityValue("\(Int(settingsVM.ttsConfig.volume * 100))%")
+                .accessibilityValue(Text(String(format: NSLocalizedString("%d%%", comment: ""), Int(settingsVM.ttsConfig.volume * 100))))
+                .accessibilityHint("调整朗读音量")
+                .accessibilityIdentifier("ttsVolumeSlider")
             }
             .accessibilityLabel("音量")
 
             Button {
-                if ttsPreviewService.isPreviewing {
-                    ttsPreviewService.stopPreview()
+                if chatViewModel.voiceService.isPreviewing {
+                    chatViewModel.voiceService.stopPreview()
                 } else {
-                    ttsPreviewService.previewVoice(
+                    chatViewModel.voiceService.previewVoice(
                         "你好,我是 AI Builder,很高兴为你服务。",
                         config: settingsVM.ttsConfig
                     )
                 }
             } label: {
                 Label(
-                    ttsPreviewService.isPreviewing ? "停止试听" : "试听示例",
-                    systemImage: ttsPreviewService.isPreviewing ? "stop.fill" : "play.fill"
+                    chatViewModel.voiceService.isPreviewing ? "停止试听" : "试听示例",
+                    systemImage: chatViewModel.voiceService.isPreviewing ? "stop.fill" : "play.fill"
                 )
             }
-            .accessibilityHint(ttsPreviewService.isPreviewing ? "停止试听" : "用当前音色朗读示例句")
+            .accessibilityLabel(chatViewModel.voiceService.isPreviewing ? "停止试听" : "试听示例")
+            .accessibilityHint(chatViewModel.voiceService.isPreviewing ? "停止试听" : "用当前音色朗读示例句")
+            .accessibilityIdentifier("previewVoiceButton")
         } header: {
             Text("语音朗读")
         } footer: {
             Text("选择朗读音色、语速、音调与音量。增强/优质音色首次使用时系统会自动下载。")
-                .font(.caption2)
+                .font(.captionAI)
         }
     }
 
@@ -437,17 +526,35 @@ struct SettingsView: View {
                 case .deepseek:
                     SecureField("DeepSeek API Key", text: $settingsVM.deepseekAPIKey)
                         .textContentType(.password)
+                        .accessibilityLabel("DeepSeek API Key")
+                        .accessibilityHint("输入 DeepSeek API 密钥")
+                        .accessibilityIdentifier("deepseekAPIKeySecureField")
                     Button("保存 API Key") { settingsVM.saveAPIKey(for: .deepseek) }
+                        .accessibilityLabel("保存 API Key")
+                        .accessibilityHint("保存当前供应商的 API Key 到系统钥匙串")
+                        .accessibilityIdentifier("saveAPIKeyButton")
                     Button("删除 API Key", role: .destructive) {
                         showDeleteAPIKeyConfirm = true
                     }
+                    .accessibilityLabel("删除 API Key")
+                    .accessibilityHint("删除当前供应商已保存的 API Key")
+                    .accessibilityIdentifier("deleteAPIKeyButton")
                 case .qwen:
                     SecureField("Qwen API Key", text: $settingsVM.qwenAPIKey)
                         .textContentType(.password)
+                        .accessibilityLabel("Qwen API Key")
+                        .accessibilityHint("输入 Qwen API 密钥")
+                        .accessibilityIdentifier("qwenAPIKeySecureField")
                     Button("保存 API Key") { settingsVM.saveAPIKey(for: .qwen) }
+                        .accessibilityLabel("保存 API Key")
+                        .accessibilityHint("保存当前供应商的 API Key 到系统钥匙串")
+                        .accessibilityIdentifier("saveAPIKeyButton")
                     Button("删除 API Key", role: .destructive) {
                         showDeleteAPIKeyConfirm = true
                     }
+                    .accessibilityLabel("删除 API Key")
+                    .accessibilityHint("删除当前供应商已保存的 API Key")
+                    .accessibilityIdentifier("deleteAPIKeyButton")
                 case .onDevice:
                     // 端侧推理无需 API Key，提示用户
                     Text("端侧推理无需 API Key，模型在本地运行。")
@@ -461,13 +568,13 @@ struct SettingsView: View {
                     settingsVM.deleteAPIKey(for: settingsVM.selectedProvider)
                 }
             } message: {
-                Text("确定删除 \(settingsVM.selectedProvider.displayName) 的 API Key？删除后无法恢复。")
+                Text(String(format: NSLocalizedString("确定删除 %@ 的 API Key？删除后无法恢复。", comment: ""), settingsVM.selectedProvider.displayName))
             }
         } header: {
             Text("API 配置")
         } footer: {
             Text("API Key 存储在系统 Keychain,不会离开本设备。")
-                .font(.caption2)
+                .font(.captionAI)
         }
     }
 
@@ -482,12 +589,14 @@ struct SettingsView: View {
                 Text("Reasoner").tag("deepseek-reasoner")
             }
             .pickerStyle(.segmented)
+            .accessibilityLabel("模型")
             .accessibilityHint("选自动时智能路由，选具体模型则固定使用")
+            .accessibilityIdentifier("modelPicker")
         } header: {
             Text("模型")
         } footer: {
             Text("选「自动」时由智能路由根据消息特征决定；选具体模型时禁用智能路由。")
-                .font(.caption2)
+                .font(.captionAI)
         }
     }
 
@@ -497,14 +606,18 @@ struct SettingsView: View {
     private var featuresSection: some View {
         Section {
             Toggle("启用 RAG 知识库", isOn: $chatViewModel.ragEnabled)
+                .accessibilityLabel("启用 RAG 知识库")
                 .accessibilityHint("发送消息前检索本地知识库增强上下文")
+                .accessibilityIdentifier("ragToggle")
             Toggle("启用工具调用", isOn: $chatViewModel.toolsEnabled)
+                .accessibilityLabel("启用工具调用")
                 .accessibilityHint("启用后进入 ReAct 循环调用工具")
+                .accessibilityIdentifier("toolsToggle")
         } header: {
             Text("功能开关")
         } footer: {
             Text("RAG 启用后会在发送消息前检索本地知识库；工具调用启用后会进入 ReAct 循环。")
-                .font(.caption2)
+                .font(.captionAI)
         }
     }
 
@@ -524,15 +637,20 @@ struct SettingsView: View {
                         }
                     }
                 }
+                .accessibilityLabel("选择角色")
+                .accessibilityHint("选择预设系统提示词角色")
+                .accessibilityIdentifier("presetRoleMenu")
             }
             TextEditor(text: $settingsVM.systemPrompt)
                 .frame(minHeight: 120)
                 .accessibilityLabel("系统提示词")
+                .accessibilityHint("输入系统提示词以定义 AI 行为")
+                .accessibilityIdentifier("systemPromptTextEditor")
         } header: {
             Text("系统提示词")
         } footer: {
             Text("当前会话生效。新建对话沿用此值。")
-                .font(.caption2)
+                .font(.captionAI)
         }
     }
 
@@ -558,6 +676,9 @@ struct SettingsView: View {
                 Text("正式").tag("正式")
                 Text("轻松").tag("轻松")
             }
+            .accessibilityLabel("语气")
+            .accessibilityHint("选择 AI 回复的语气风格")
+            .accessibilityIdentifier("tonePicker")
 
             // 偏好工具多选：从 ToolRegistry 取所有工具名，Toggle 多选
             ForEach(ToolRegistry.shared.allToolDefs, id: \.function.name) { toolDef in
@@ -572,11 +693,17 @@ struct SettingsView: View {
                         }
                     }
                 ))
+                .accessibilityLabel(toolDef.function.description)
+                .accessibilityHint("启用或禁用此工具")
+                .accessibilityIdentifier("toolToggle_\(name)")
             }
 
             // 自定义事实多行输入，placeholder 用 overlay 实现
             TextEditor(text: $customFact)
                 .frame(minHeight: 60)
+                .accessibilityLabel("自定义事实")
+                .accessibilityHint("输入 AI 需要了解的个性化事实")
+                .accessibilityIdentifier("customFactTextEditor")
                 .overlay(alignment: .topLeading) {
                     if customFact.isEmpty {
                         Text("如：我是素食者…")
@@ -590,7 +717,7 @@ struct SettingsView: View {
             Text("用户偏好")
         } footer: {
             Text("这些偏好会被注入到系统提示词，影响 AI 回复风格与工具选择。")
-                .font(.caption2)
+                .font(.captionAI)
         }
     }
 
@@ -603,11 +730,14 @@ struct SettingsView: View {
             Button("查看调试信息") {
                 showDebugPanel = true
             }
+            .accessibilityLabel("查看调试信息")
+            .accessibilityHint("打开调试信息面板")
+            .accessibilityIdentifier("openDebugPanelButton")
         } header: {
             Text("调试面板")
         } footer: {
             Text("展示最近一次发送的 prompt、API 响应、embedding 维度与工具调用。")
-                .font(.caption2)
+                .font(.captionAI)
         }
     }
 
@@ -626,7 +756,9 @@ struct SettingsView: View {
                     Spacer()
                 }
             }
+            .accessibilityLabel("隐私政策")
             .accessibilityHint("查看 AI Builder 隐私政策")
+            .accessibilityIdentifier("privacyPolicyLink")
 
             // 投诉反馈：优先使用系统邮件 composer，不可用时降级 mailto:
             Button {
@@ -649,7 +781,9 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            .accessibilityLabel("投诉反馈")
             .accessibilityHint("通过邮件反馈问题或投诉")
+            .accessibilityIdentifier("feedbackButton")
 
             // App 版本号
             HStack {
@@ -663,7 +797,7 @@ struct SettingsView: View {
             Text("关于")
         } footer: {
             Text("AI Builder 致力于保护您的隐私")
-                .font(.caption2)
+                .font(.captionAI)
         }
     }
 
@@ -783,6 +917,9 @@ struct DebugPanelView: View {
                             performanceMetrics = await PerformanceMonitor.shared.getMetrics()
                         }
                     }
+                    .accessibilityLabel("清除性能指标")
+                    .accessibilityHint("清空本地记录的性能指标数据")
+                    .accessibilityIdentifier("clearPerformanceMetricsButton")
                 }
 
                 // Day 14: 远程配置 / 遥测
@@ -829,12 +966,18 @@ struct DebugPanelView: View {
                             await refreshTelemetry()
                         }
                     }
+                    .accessibilityLabel("立即上报")
+                    .accessibilityHint("立即上传缓存的遥测日志")
+                    .accessibilityIdentifier("uploadTelemetryButton")
                     Button("重新拉取配置") {
                         Task {
                             await RemoteConfigService.shared.fetch()
                             await refreshConfig()
                         }
                     }
+                    .accessibilityLabel("重新拉取配置")
+                    .accessibilityHint("从服务器获取最新远程配置")
+                    .accessibilityIdentifier("refreshRemoteConfigButton")
                 }
 
                 // Day 13: 供应商 / 模型 / 降级信息
@@ -884,7 +1027,7 @@ struct DebugPanelView: View {
                 // 最近一次 embedding 向量维度
                 Section("Embedding 维度") {
                     if let dim = chatViewModel.lastDebugInfo?.embeddingDimension {
-                        Text("\(dim) 维")
+                        Text(String(format: NSLocalizedString("%d 维", comment: ""), dim))
                     } else {
                         Text("无")
                     }
@@ -896,12 +1039,12 @@ struct DebugPanelView: View {
                         ForEach(calls) { call in
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(call.toolName)
-                                    .font(.headline)
-                                Text("参数：\(call.arguments)")
-                                    .font(.caption)
+                                    .font(.headlineAI)
+                                Text(String(format: NSLocalizedString("参数：%@", comment: ""), call.arguments))
+                                    .font(.captionAI)
                                     .foregroundStyle(.secondary)
-                                Text("返回：\(call.result)")
-                                    .font(.caption)
+                                Text(String(format: NSLocalizedString("返回：%@", comment: ""), call.result))
+                                    .font(.captionAI)
                                     .foregroundStyle(.secondary)
                             }
                         }

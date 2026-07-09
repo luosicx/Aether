@@ -58,6 +58,7 @@ struct MarkdownText: View {
                 }
             }
         }
+        .accessibilityElement(children: .contain)
     }
 
     // MARK: - 解析逻辑

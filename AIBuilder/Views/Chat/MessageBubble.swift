@@ -92,12 +92,15 @@ struct MessageBubble: View {
     private var canSpeak: Bool { isAssistant && !message.content.isEmpty && !message.isStreaming }
 
     var body: some View {
-        HStack {
+        HStack(alignment: .top, spacing: Spacing.sm) {
             if isUser { Spacer(minLength: 48) }
-            VStack(alignment: isUser ? .trailing : .leading, spacing: 4) {
+            if !isUser {
+                AvatarView(role: .assistant, size: 28)
+            }
+            VStack(alignment: isUser ? .trailing : .leading, spacing: Spacing.sm) {
                 if isTool {
                     Text("工具调用")
-                        .font(.caption2.weight(.medium))
+                        .font(.toolLabel)
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 4)
                 }
@@ -112,19 +115,22 @@ struct MessageBubble: View {
                 if canSpeak {
                     Button(action: onToggleSpeak) {
                         Image(systemName: isSpeaking ? "stop.fill" : "speaker.wave.2.fill")
-                            .font(.caption2)
+                            .font(.captionAI)
                             .foregroundStyle(isSpeaking ? .red : .secondary)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(isSpeaking ? "停止朗读" : "朗读")
-                    .padding(.horizontal, 14)
+                    .padding(.horizontal, Spacing.lg)
                     .padding(.top, 2)
                 }
                 if isAssistant && !message.content.isEmpty && !message.isStreaming {
                     FeedbackBar(isPositive: feedbackState, onFeedback: onFeedback)
-                        .padding(.horizontal, 14)
+                        .padding(.horizontal, Spacing.lg)
                         .padding(.top, 2)
                 }
+            }
+            if isUser {
+                AvatarView(role: .user, size: 28)
             }
             if !isUser { Spacer(minLength: 48) }
         }
@@ -136,13 +142,13 @@ struct MessageBubble: View {
             HStack(spacing: 6) {
                 Rectangle()
                     #if os(iOS)
-                    .fill(Color(.tertiaryLabel).opacity(0.3))
+                    .fill(Color.textTertiary.opacity(0.3))
                     #else
                     .fill(Color.secondary.opacity(0.3))
                     #endif
                     .frame(width: 2)
                 Text(message.content)
-                    .font(.callout.monospaced())
+                    .font(.monoAI)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.vertical, 2)
@@ -187,11 +193,11 @@ struct MessageBubble: View {
                     }
                 }
             }
-            .font(.body)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
+            .font(.bodyAI)
+            .padding(.horizontal, Spacing.lg)
+            .padding(.vertical, Spacing.md)
             .background(bubbleBackground)
-            .foregroundStyle(isUser ? Color.white : Color.primary)
+            .foregroundStyle(isUser ? Color.white : Color.textPrimary)
             .clipShape(bubbleShape)
             // Day 19: 无障碍——合并气泡内文本与光标为一个元素，用完整消息文本作为朗读值
             .accessibilityElement(children: .combine)
@@ -216,11 +222,7 @@ struct MessageBubble: View {
     }
 
     private var bubbleBackground: Color {
-        #if os(iOS)
-        return isUser ? Color.accentColor : Color(.systemGray6)
-        #else
-        return isUser ? Color.accentColor : Color(NSColor.controlBackgroundColor)
-        #endif
+        isUser ? Color.bubbleUser : Color.bubbleAssistant
     }
 
     private var bubbleShape: some Shape {
@@ -228,12 +230,12 @@ struct MessageBubble: View {
         let corners: UIRectCorner = isUser
             ? [.topLeft, .topRight, .bottomLeft]
             : [.topLeft, .topRight, .bottomRight]
-        return RoundedCornerShape(radius: 18, corners: corners)
+        return RoundedCornerShape(radius: CornerRadius.large, corners: corners)
         #else
         return UnevenRoundedRectangle(
             cornerRadii: isUser
-                ? .init(topLeading: 18, bottomLeading: 18, bottomTrailing: 0, topTrailing: 18)
-                : .init(topLeading: 18, bottomLeading: 0, bottomTrailing: 18, topTrailing: 18)
+                ? .init(topLeading: CornerRadius.large, bottomLeading: CornerRadius.large, bottomTrailing: 0, topTrailing: CornerRadius.large)
+                : .init(topLeading: CornerRadius.large, bottomLeading: 0, bottomTrailing: CornerRadius.large, topTrailing: CornerRadius.large)
         )
         #endif
     }
@@ -291,7 +293,7 @@ struct BlinkingCursor: ViewModifier {
             content
                 .opacity(visible ? 1 : 0)
                 .onAppear {
-                    withAnimation(.easeInOut(duration: 0.5).repeatForever(autoreverses: true)) {
+                    withAnimation(AnimationTokens.blink) {
                         visible = false
                     }
                 }

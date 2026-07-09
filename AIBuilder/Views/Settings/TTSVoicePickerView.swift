@@ -5,6 +5,9 @@ struct TTSVoicePickerView: View {
     @Bindable var settingsVM: SettingsViewModel
     @Bindable var chatViewModel: ChatViewModel
 
+    /// 按语言分组的音色列表(在 onAppear 中加载,避免每次 body 重算都触发查询)。
+    @State private var groupedVoices: [(language: String, voices: [TTSVoice])] = []
+
     var body: some View {
         List {
             // 系统默认选项(空 identifier,使用 zh-CN 默认音色)
@@ -41,13 +44,9 @@ struct TTSVoicePickerView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
-    }
-
-    // MARK: - 数据
-
-    /// 按语言分组的音色列表(缓存在视图内,生命周期跟随视图)
-    private var groupedVoices: [(language: String, voices: [TTSVoice])] {
-        TTSVoiceCatalog.groupedByLanguage()
+        .onAppear {
+            groupedVoices = TTSVoiceCatalog.groupedByLanguage()
+        }
     }
 
     // MARK: - 行视图
@@ -65,11 +64,11 @@ struct TTSVoicePickerView: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(name)
-                        .font(.body)
+                        .font(.bodyAI)
                     qualityTag(quality)
                     if !isDownloaded && !identifier.isEmpty {
                         Text("需下载")
-                            .font(.caption2)
+                            .font(.captionAI)
                             .foregroundStyle(.orange)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
@@ -78,7 +77,7 @@ struct TTSVoicePickerView: View {
                     }
                 }
                 Text(languageDisplay(language))
-                    .font(.caption)
+                    .font(.captionAI)
                     .foregroundStyle(.secondary)
             }
             Spacer()
@@ -106,7 +105,7 @@ struct TTSVoicePickerView: View {
     private func qualityTag(_ quality: TTSVoice.Quality) -> some View {
         let (text, color) = qualityStyling(quality)
         Text(text)
-            .font(.caption2)
+            .font(.captionAI)
             .foregroundStyle(color)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)

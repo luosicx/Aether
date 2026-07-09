@@ -36,7 +36,7 @@ nonisolated final class DeepSeekClient: LLMProvider {
         ]
         guard let jsonData = try? JSONSerialization.data(withJSONObject: body),
               let url = URL(string: APIConfig.deepseekBaseURL + APIConfig.embeddingEndpoint) else {
-            throw LLMError.unknown("无效的 embedding 请求")
+            throw LLMError.unknown(NSLocalizedString("无效的 embedding 请求", comment: ""))
         }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"

@@ -39,7 +39,7 @@ nonisolated final class QwenClient: LLMProvider {
         ]
         guard let jsonData = try? JSONSerialization.data(withJSONObject: body),
               let url = URL(string: provider.baseURL + provider.embeddingEndpoint) else {
-            throw LLMError.unknown("无效的 embedding 请求")
+            throw LLMError.unknown(NSLocalizedString("无效的 embedding 请求", comment: ""))
         }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"

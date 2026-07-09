@@ -9,6 +9,8 @@ final class SettingsViewModelTests: XCTestCase {
     private var vm: SettingsViewModel!
 
     override func setUpWithError() throws {
+        // 注入内存 Keychain 后端，避免依赖真实系统 Keychain
+        KeychainManager.shared.backend = InMemoryKeychainBackend()
         vm = SettingsViewModel()
         // 清理可能残留的 Keychain API key
         KeychainManager.shared.deleteAPIKey()
@@ -16,16 +18,13 @@ final class SettingsViewModelTests: XCTestCase {
 
     override func tearDownWithError() throws {
         KeychainManager.shared.deleteAPIKey()
+        KeychainManager.shared.backend = SystemKeychainBackend()
         vm = nil
     }
 
     /// 后台读取：先 saveAPIKey，再 loadAPIKeyFromKeychain，应返回相同字符串
     func testLoadAPIKeyFromKeychain() async throws {
-        do {
-            try KeychainManager.shared.saveAPIKey("test-key-abc")
-        } catch {
-            throw XCTSkip("Keychain 不可用：\(error)")
-        }
+        try KeychainManager.shared.saveAPIKey("test-key-abc")
 
         XCTAssertEqual(vm.apiKey, "", "加载前 apiKey 应为空字符串")
         await vm.loadAPIKeyFromKeychain()
@@ -35,12 +34,7 @@ final class SettingsViewModelTests: XCTestCase {
 
     /// saveAPIKey 后 saveMessage 应含「已保存」
     func testSaveAPIKeySuccessMessage() throws {
-        // 先用 KeychainManager 直接 try 探测 Keychain 是否可用
-        do {
-            try KeychainManager.shared.saveAPIKey("probe")
-        } catch {
-            throw XCTSkip("Keychain 不可用：\(error)")
-        }
+        try KeychainManager.shared.saveAPIKey("probe")
 
         vm.apiKey = "new-key-123"
         vm.saveAPIKey()  // 内部 do/catch，不抛出
@@ -55,11 +49,7 @@ final class SettingsViewModelTests: XCTestCase {
     /// deleteAPIKey 后 saveMessage 应含「已删除」
     func testDeleteAPIKeySuccessMessage() throws {
         // 先保存一个 key 再删除
-        do {
-            try KeychainManager.shared.saveAPIKey("will-delete")
-        } catch {
-            throw XCTSkip("Keychain 不可用：\(error)")
-        }
+        try KeychainManager.shared.saveAPIKey("will-delete")
         vm.apiKey = "will-delete"
 
         vm.deleteAPIKey()

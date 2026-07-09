@@ -73,7 +73,7 @@ actor HealthInsightGenerator {
         }
 
         // 4. 追加免责声明
-        insightText += "\n\n⚠️ 以上内容由 AI 生成，仅供参考，非医疗建议。如有健康问题请咨询医生。"
+        insightText += "\n\n" + NSLocalizedString("⚠️ 以上内容由 AI 生成，仅供参考，非医疗建议。如有健康问题请咨询医生。", comment: "")
 
         // 5. 聚合指标用于 relatedMetrics
         let avgHeartRate = heartRate.isEmpty ? 0.0 : heartRate.values.reduce(0, +) / Double(heartRate.count)
@@ -101,7 +101,7 @@ actor HealthInsightGenerator {
     /// - Parameter insight: 生成的 HealthInsight
     nonisolated func sendInsightNotification(_ insight: HealthInsight) {
         let content = UNMutableNotificationContent()
-        content.title = "健康洞察已生成"
+        content.title = NSLocalizedString("健康洞察已生成", comment: "")
         // 通知正文取洞察内容前 80 字符（避免过长）
         let preview = insight.content.prefix(80)
         content.body = String(preview)
@@ -126,36 +126,36 @@ actor HealthInsightGenerator {
     /// 构造发送给 LLM 的 prompt，包含聚合后的健康数据与请求建议的指令。
     private nonisolated func constructPrompt(heartRate: [Date: Double], sleep: [Date: Double], steps: [Date: Int], days: Int) -> String {
         var lines: [String] = []
-        lines.append("以下是最近 \(days) 天的健康数据：")
+        lines.append(String(format: NSLocalizedString("以下是最近 %d 天的健康数据：", comment: ""), days))
 
         // 心率聚合
         if heartRate.isEmpty {
-            lines.append("- 心率：无数据")
+            lines.append(NSLocalizedString("- 心率：无数据", comment: ""))
         } else {
             let avgHR = heartRate.values.reduce(0, +) / Double(heartRate.count)
             let maxHR = heartRate.values.max() ?? 0
             let minHR = heartRate.values.min() ?? 0
-            lines.append("- 心率：平均 \(String(format: "%.1f", avgHR)) bpm，最高 \(String(format: "%.1f", maxHR)) bpm，最低 \(String(format: "%.1f", minHR)) bpm")
+            lines.append(String(format: NSLocalizedString("- 心率：平均 %.1f bpm，最高 %.1f bpm，最低 %.1f bpm", comment: ""), avgHR, maxHR, minHR))
         }
 
         // 睡眠聚合
         if sleep.isEmpty {
-            lines.append("- 睡眠：无数据")
+            lines.append(NSLocalizedString("- 睡眠：无数据", comment: ""))
         } else {
             let avgSleep = sleep.values.reduce(0, +) / Double(sleep.count)
-            lines.append("- 睡眠：平均 \(String(format: "%.1f", avgSleep)) 小时/天")
+            lines.append(String(format: NSLocalizedString("- 睡眠：平均 %.1f 小时/天", comment: ""), avgSleep))
         }
 
         // 步数聚合
         if steps.isEmpty {
-            lines.append("- 步数：无数据")
+            lines.append(NSLocalizedString("- 步数：无数据", comment: ""))
         } else {
             let avgSteps = Double(steps.values.reduce(0, +)) / Double(steps.count)
-            lines.append("- 步数：平均 \(String(format: "%.0f", avgSteps)) 步/天")
+            lines.append(String(format: NSLocalizedString("- 步数：平均 %.0f 步/天", comment: ""), avgSteps))
         }
 
         lines.append("")
-        lines.append("请基于以上健康数据给出 3 条具体建议，关注改善睡眠质量、合理运动强度与日常活动量。")
+        lines.append(NSLocalizedString("请基于以上健康数据给出 3 条具体建议，关注改善睡眠质量、合理运动强度与日常活动量。", comment: ""))
 
         return lines.joined(separator: "\n")
     }

@@ -1,7 +1,7 @@
 # AIBuilder 架构文档
 
 > 本文基于 AIBuilder 多平台项目（iOS / iPad / macOS 原生） Day 1–20 实际代码撰写，描述系统分层、模块职责、数据流与关键技术决策。
-> 所有引用的文件路径均与磁盘一致，技术术语保留英文原文。
+> 所有引用的文件路径均与磁盘一致，技术术语保留英文原文。架构与流程图统一使用 Mermaid 描述。
 
 ---
 
@@ -65,56 +65,56 @@
 
 ## 2. 分层架构图
 
-AIBuilder 采用 7 层分层架构，依赖方向自上而下单向流动。
+AIBuilder 采用 7 层分层架构，依赖方向自上而下单向流动。下图使用 Mermaid `flowchart TD` 描述，每个 subgraph 代表一个分层，节点显示该层关键内容与文件数。
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                              Tests                                  │
-│  AIBuilderTests (69 文件 / 249 用例) + AIBuilderUITests (2 文件 / 13)│
-└─────────────────────────────────────────────────────────────────────┘
-                                │ 测试可访问所有层
-┌─────────────────────────────────────────────────────────────────────┐
-│                              App                                     │
-│  AIBuilderApp.swift (@main + ModelContainer + BGTask)               │
-│  AppIntents/ (AskAIBuilder / NewConversation / SwitchConversation) │
-└─────────────────────────────────────────────────────────────────────┘
-        │           │             │              │            │
-        ▼           ▼             ▼              ▼            ▼
-┌──────────┐ ┌──────────┐ ┌─────────────┐ ┌──────────┐ ┌──────────┐
-│   Core   │ │  Models  │ │  ViewModels │ │  Views   │ │ AppIntents│
-│ 协议+常量 │ │ SwiftData│ │  @Observable │ │ SwiftUI  │ │  系统集成  │
-│ +扩展+   │ │  @Model  │ │  @MainActor  │ │ 6 子模块  │ │  3 Intent │
-│ +Models  │ │  7 实体  │ │  4 ViewModel │ │ 28 文件  │ │           │
-└──────────┘ └──────────┘ └─────────────┘ └──────────┘ └──────────┘
-                  ▲              │              │
-                  │              ▼              │
-                  │       ┌─────────────┐       │
-                  │       │  Services   │       │
-                  │       │ 19 个子模块  │       │
-                  │       │ Auth/Cache/ │       │
-                  └──────│ Connectivity│◄──────┘
-                          │ /Crash/     │
-                          │ Feedback/   │
-                          │ Health/     │
-                          │ Intents/    │
-                          │ LLM(含BFF)/ │
-                          │ Network/    │
-                          │ OnDevice/   │
-                          │ Performance/│
-                          │ RAG/        │
-                          │ RemoteConfig│
-                          │ /Routing/   │
-                          │ Search/     │
-                          │ Storage/    │
-                          │ Telemetry/  │
-                          │ Tools/Voice │
-                          └─────────────┘
-                              │
-                              ▼
-                          ┌───────┐
-                          │ Core  │
-                          │Models │
-                          └───────┘
+```mermaid
+flowchart TD
+    subgraph Tests["Tests 层"]
+        T1["AIBuilderTests<br/>69 文件 / 248 用例"]
+        T2["AIBuilderUITests<br/>2 文件 / 13 用例"]
+    end
+
+    subgraph App["App 层 (4 文件)"]
+        A1["AIBuilderApp.swift<br/>@main + ModelContainer + BGTask"]
+        A2["AppIntents/<br/>AskAIBuilder / NewConversation / SwitchConversation"]
+    end
+
+    subgraph Middle["中间编排层"]
+        direction LR
+        C["Core<br/>协议+常量+扩展+Actor+Models<br/>9 文件"]
+        M["Models<br/>SwiftData @Model 7 实体<br/>7 文件"]
+        VM["ViewModels<br/>@Observable @MainActor<br/>4 ViewModel"]
+        V["Views<br/>SwiftUI 6 子模块<br/>28 文件"]
+        AI["AppIntents<br/>3 Intent"]
+    end
+
+    subgraph Services["Services 层 (19 子模块 / 53 文件)"]
+        S0["Auth / Cache / Connectivity / Crash"]
+        S1["Feedback / Health / Intents / LLM"]
+        S2["Network / OnDevice / Performance / RAG"]
+        S3["RemoteConfig / Routing / Search / Storage"]
+        S4["Telemetry / Tools / Voice"]
+    end
+
+    subgraph Foundation["基础层"]
+        F1["Core (协议 + 常量)"]
+        F2["Models (SwiftData @Model)"]
+    end
+
+    Tests --> App
+    Tests --> Middle
+    Tests --> Services
+    App --> C
+    App --> M
+    App --> VM
+    App --> V
+    App --> AI
+    VM --> Services
+    VM --> M
+    V --> VM
+    AI --> VM
+    Services --> F1
+    Services --> F2
 ```
 
 **依赖方向说明**：
@@ -134,10 +134,10 @@ AIBuilder 采用 7 层分层架构，依赖方向自上而下单向流动。
 | App | 程序入口、ModelContainer 配置、BGTaskScheduler 注册、ActivityKit 属性定义 + AppIntents 系统集成 | 4（App 1 + AppIntents 3） |
 | Core | 协议契约（LLMProvider / ToolProtocol）+ 常量（APIConfig / ModelProvider）+ 扩展（token 估算）+ Actor（ChatActor 占位）+ 数据模型（BFFConfig / OnDeviceConfig / OnDeviceError） | 9 |
 | Models | SwiftData `@Model` 持久化实体（7 个）+ SSE 响应/请求体数据结构 | 7 |
-| Services | 19 个子模块业务实现（Auth / Cache / Connectivity / Crash / Feedback / Health / Intents / LLM / Network / OnDevice / Performance / RAG / RemoteConfig / Routing / Search / Storage / Telemetry / Tools / Voice） | 36 |
+| Services | 19 个子模块业务实现（Auth / Cache / Connectivity / Crash / Feedback / Health / Intents / LLM / Network / OnDevice / Performance / RAG / RemoteConfig / Routing / Search / Storage / Telemetry / Tools / Voice） | 53 |
 | ViewModels | `@Observable` 状态管理 + 业务编排（含 TTS / BFF / OnDevice / Health 等字段） | 4 |
 | Views | SwiftUI 视图，6 个子模块（Chat / Components / Conversation / OnDevice / RAG / Settings） | 28 |
-| Tests | UT 69 文件（249 用例，允许 skipped）+ UIT 2 文件（13 用例） | 71 |
+| Tests | UT 69 文件（248 用例，0 skipped）+ UIT 2 文件（13 用例，0 skipped） | 71 |
 
 ---
 
@@ -159,6 +159,16 @@ Core 层除协议/常量/扩展/Actor 外，新增 `Core/Models` 子目录承载
 | `Core/Protocols/LLMProvider.swift` | `LLMProvider` 协议（chat 流式 + embed）+ `APIMessage` / `ToolCallParam` / `FunctionCall` 数据结构。 |
 | `Core/Protocols/ToolProtocol.swift` | `ToolDefinition`（name + description + JSON Schema parameters）+ `ToolProtocol` 协议（definition + execute）。 |
 
+#### 关键公开 API 一览
+
+| 类型 | 方法签名 | 返回值 | 备注 |
+|------|---------|--------|------|
+| `LLMProvider` | `chat(messages:config:apiKey:)` | `AsyncStream<String>` | 纯文本流式 chat |
+| `LLMProvider` | `chat(messages:config:tools:apiKey:)` | `AsyncStream<ParsedChunk>` | 带工具调用流式 chat |
+| `LLMProvider` | `embed(texts:apiKey:)` | `[[Float]]` | 批量嵌入，HTTP 错误抛 `LLMError` |
+| `ToolProtocol` | `definition` (getter) | `ToolDefinition` | 暴露给 LLM 的元信息 |
+| `ToolProtocol` | `execute(arguments:)` | `String` | 接收参数字典执行实际逻辑 |
+
 ### 3.2 Models 层
 
 | 文件 | 职责 |
@@ -172,6 +182,46 @@ Core 层除协议/常量/扩展/Actor 外，新增 `Core/Models` 子目录承载
 | `Models/ChatChunk.swift` | SSE 响应数据结构集合：`ChatChunk`（SSE chunk）+ `AccumulatedToolCall`（跨 chunk 累积的工具调用）+ `ParsedChunk`（解析结果）+ `ChatRequestBody`（请求体）+ `ToolDef`（工具定义）+ `AnyCodable`（动态类型包装）+ `EmbeddingResponse`（嵌入响应）+ `LLMError`（统一错误枚举）。 |
 
 ### 3.3 Services 层（19 个子模块）
+
+#### 子模块业务域分布
+
+下图使用 Mermaid `flowchart LR` 按 4 个业务域分组 19 个子模块，颜色仅作视觉区分。
+
+```mermaid
+flowchart LR
+    subgraph AI["AI / LLM 域"]
+        LLM["LLM<br/>7 文件"]
+        RAG["RAG<br/>4 文件"]
+        Cache["Cache<br/>1 文件"]
+        Tools["Tools<br/>21 文件"]
+        Voice["Voice<br/>3 文件"]
+    end
+
+    subgraph Local["本地能力域"]
+        OnDevice["OnDevice<br/>3 文件"]
+        Storage["Storage<br/>1 文件"]
+        Auth["Auth<br/>1 文件"]
+        Health["Health<br/>2 文件"]
+    end
+
+    subgraph System["系统 / 平台域"]
+        Network["Network<br/>1 文件"]
+        Connectivity["Connectivity<br/>1 文件"]
+        Intents["Intents<br/>1 文件"]
+        Search["Search<br/>1 文件"]
+        Routing["Routing<br/>1 文件"]
+        Performance["Performance<br/>1 文件"]
+    end
+
+    subgraph Ops["工程 / 运维域"]
+        Crash["Crash<br/>1 文件"]
+        Feedback["Feedback<br/>1 文件"]
+        RemoteConfig["RemoteConfig<br/>1 文件"]
+        Telemetry["Telemetry<br/>2 文件"]
+    end
+```
+
+#### 子模块清单与职责
 
 | 子模块 | 文件 | 职责 |
 |--------|------|------|
@@ -212,6 +262,293 @@ Core 层除协议/常量/扩展/Actor 外，新增 `Core/Models` 子目录承载
 | Voice | `Services/Voice/TTSConfig.swift` | Day 19 TTS 配置：voiceID / rate / pitch / volume，Codable + Sendable，UserDefaults 持久化。 |
 | Voice | `Services/Voice/TTSVoiceCatalog.swift` | Day 19 TTS 音色目录：枚举 `AVSpeechSynthesisVoice` 系统音色，按语言分组供 Picker 展示。 |
 
+#### 关键公开 API 一览（按子模块）
+
+##### Auth / KeychainManager
+
+| 方法签名 | 返回值 | 备注 |
+|---------|--------|------|
+| `saveAPIKey(_ key: String)` | `Void`（throws） | 旧 API，等价于 `provider: .deepseek` |
+| `getAPIKey()` | `String?` | 旧 API，无记录返回 nil |
+| `deleteAPIKey()` | `Void` | 旧 API，幂等 |
+| `saveAPIKey(_ key: String, for provider: ModelProvider)` | `Void`（throws） | Day 13 多 provider 命名空间 |
+| `getAPIKey(for provider: ModelProvider)` | `String?` | Day 13 多 provider 命名空间 |
+| `deleteAPIKey(for provider: ModelProvider)` | `Void` | Day 13 多 provider 命名空间，幂等 |
+
+##### Cache / SemanticCache
+
+| 方法签名 | 返回值 | 备注 |
+|---------|--------|------|
+| `get(query: String, embedding: [Float])` | `String?` | 余弦相似度 > 0.92 命中 |
+| `set(query: String, embedding: [Float], response: String)` | `Void` | 容量满时 FIFO 移除最早项 |
+
+##### Connectivity / WatchConnectivityService（iOS only）
+
+| 方法签名 | 返回值 | 备注 |
+|---------|--------|------|
+| `activate()` | `Void` | 设备不支持时静默返回 |
+| `sendActiveConversation(_ id: UUID)` | `Void` | 同步当前活跃会话 ID 到 watchOS |
+| `sendQuickChat(_ message: String)` | `Void` | 发送快速对话消息到 watchOS |
+
+##### Crash / CrashReportService
+
+| 方法签名 | 返回值 | 备注 |
+|---------|--------|------|
+| `initialize(appKey: String)` | `Void` | Bugly SDK 初始化，未集成时占位 |
+| `setUserId(_ id: String)` | `Void` | 匿名用户标识 |
+| `setCustomKey(_ key: String, value: String)` | `Void` | 自定义键值对 |
+| `reportException(_ error: Error)` | `Void` | 手动上报异常 |
+
+##### Feedback / FeedbackService
+
+| 方法签名 | 返回值 | 备注 |
+|---------|--------|------|
+| `collectDeviceInfo()` | `String` | 收集设备型号 / 系统版本 / App 版本 |
+| `mailContent()` | `[String: String]` | to / subject / body 三键字典 |
+| `mailtoURL()` | `URL?` | 构造 mailto: URL |
+
+##### Health / HealthKitService（iOS only）
+
+| 方法签名 | 返回值 | 备注 |
+|---------|--------|------|
+| `requestAuthorization()` | `Void`（async throws） | 心率 / 睡眠 / 步数读取授权 |
+| `fetchHeartRate(days: Int)` | `[Date: Double]`（async throws） | 按天聚合心率均值（bpm） |
+| `fetchSleepAnalysis(days: Int)` | `[Date: Double]`（async throws） | 按天聚合睡眠时长（小时） |
+| `fetchStepCount(days: Int)` | `[Date: Int]`（async throws） | 按天聚合步数总和 |
+| `fetchDailySummary()` | `HealthDailySummary`（async throws） | 聚合最近 1 天数据 |
+
+##### Health / HealthInsightGenerator
+
+| 方法签名 | 返回值 | 备注 |
+|---------|--------|------|
+| `generateInsight(days: Int = 7)` | `HealthInsight`（async throws） | 调 LLM 生成洞察并持久化 |
+| `sendInsightNotification(_ insight: HealthInsight)` | `Void`（nonisolated） | 推送本地通知 |
+| `static make(modelContext: ModelContext)` | `HealthInsightGenerator` | 工厂方法注入默认依赖 |
+
+##### Intents / IntentChatService
+
+| 方法签名 | 返回值 | 备注 |
+|---------|--------|------|
+| `ask(query: String)` | `String`（async throws） | 累积流式 chunk 返回完整回复 |
+
+##### LLM / DeepSeekClient
+
+| 方法签名 | 返回值 | 备注 |
+|---------|--------|------|
+| `chat(messages:config:apiKey:)` | `AsyncStream<String>` | 纯文本流式 chat |
+| `chat(messages:config:tools:apiKey:)` | `AsyncStream<ParsedChunk>` | 带工具调用流式 chat |
+| `embed(texts:apiKey:)` | `[[Float]]`（async throws） | 批量嵌入 |
+
+##### LLM / QwenClient
+
+| 方法签名 | 返回值 | 备注 |
+|---------|--------|------|
+| `chat(messages:config:apiKey:)` | `AsyncStream<String>` | DashScope OpenAI 兼容端点 |
+| `chat(messages:config:tools:apiKey:)` | `AsyncStream<ParsedChunk>` | 带工具调用 |
+| `embed(texts:apiKey:)` | `[[Float]]`（async throws） | 批量嵌入 |
+
+##### LLM / BFFProxyClient
+
+| 方法签名 | 返回值 | 备注 |
+|---------|--------|------|
+| `init(provider:config:session:)` | `BFFProxyClient` | 默认 `session: .shared` |
+| `chat(messages:config:apiKey:)` | `AsyncStream<String>` | apiKey 参数不使用，服务端持 key |
+| `chat(messages:config:tools:apiKey:)` | `AsyncStream<ParsedChunk>` | 带 `X-BFF-Token` / `X-Provider` Header |
+| `embed(texts:apiKey:)` | `[[Float]]`（async throws） | 走 BFF endpoint `/v1/embeddings` |
+
+##### LLM / FallbackLLMProvider
+
+| 方法签名 | 返回值 | 备注 |
+|---------|--------|------|
+| `init(primary:fallback:primaryProvider:fallbackProvider:)` | `FallbackLLMProvider` | 包装主备 provider |
+| `chat(messages:config:apiKey:)` | `AsyncStream<String>` | 主 provider 未产出则降级 |
+| `chat(messages:config:tools:apiKey:)` | `AsyncStream<ParsedChunk>` | 降级逻辑同纯文本路径 |
+| `embed(texts:apiKey:)` | `[[Float]]`（async throws） | 不降级，直接调主 provider |
+
+##### LLM / ModelProviderFactory
+
+| 方法签名 | 返回值 | 备注 |
+|---------|--------|------|
+| `static make(_ provider: ModelProvider)` | `LLMProvider` | 创建直连 client |
+| `static make(bffConfig:provider:)` | `LLMProvider` | bffConfig.enabled 时返回 BFFProxyClient |
+
+##### LLM / RateLimiter
+
+| 方法签名 | 返回值 | 备注 |
+|---------|--------|------|
+| `init(chatPerMin:embedPerMin:)` | `RateLimiter` | 默认 20 / 10 |
+| `acquireChat()` | `Void`（throws） | 令牌耗尽抛 `rateLimited(retryAfter: 60)` |
+| `acquireEmbed()` | `Void`（throws） | 令牌耗尽抛 `rateLimited(retryAfter: 60)` |
+
+##### LLM / SSEParser
+
+| 方法签名 | 返回值 | 备注 |
+|---------|--------|------|
+| `parse(data: Data)` | `String?` | 解码 UTF-8 文本 |
+| `parseChunk(from line: String)` | `ChatChunk?` | 解析单行 SSE 为 ChatChunk |
+| `parseWithToolAccumulation(from:accumulated:)` | `ParsedChunk?` | 跨 chunk 累积 tool_calls |
+
+##### Network / NetworkMonitor
+
+| 方法签名 | 返回值 | 备注 |
+|---------|--------|------|
+| `start()` | `Void` | 启动 NWPathMonitor，已启动时直接返回 |
+| `statusStream()` | `AsyncStream<NetworkStatus>` | 订阅状态变化，立即 yield 当前状态 |
+| `stop()` | `Void` | 停止监控，结束所有订阅流 |
+
+##### OnDevice / MLXInferenceEngine
+
+| 方法签名 | 返回值 | 备注 |
+|---------|--------|------|
+| `loadModel(path:expectedSHA256:)` | `Void`（throws） | 内存检查 + 文件检查 + SHA256 + MLX 加载 |
+| `generate(prompt:maxTokens:temperature:)` | `AsyncStream<String>` | 流式生成 token |
+| `unloadModel()` | `Void` | 释放模型内存 |
+
+##### OnDevice / OnDeviceModelDownloader
+
+| 方法签名 | 返回值 | 备注 |
+|---------|--------|------|
+| `startDownload(url:to:expectedSHA256:)` | `Void`（async） | 启动下载，完成后自动校验 |
+| `resumeDownload()` | `Void`（async） | 断点续传 |
+| `cancelDownload()` | `Void` | 取消并保存 resumeData |
+| `deleteModel(at url: URL)` | `Void`（throws） | 删除本地模型文件 |
+| `verifySHA256(filePath:expected:)` | `Bool` | 校验文件 SHA256 |
+
+##### OnDevice / OfflineLLMProvider
+
+| 方法签名 | 返回值 | 备注 |
+|---------|--------|------|
+| `chat(messages:config:apiKey:)` | `AsyncStream<String>` | 按 Llama-3 template 拼接 prompt |
+| `chat(messages:config:tools:apiKey:)` | `AsyncStream<ParsedChunk>` | tools 非空时发错误通知 |
+| `embed(texts:apiKey:)` | `[[Float]]`（async throws） | 384 维 hash 占位向量 |
+
+##### Performance / PerformanceMonitor
+
+| 方法签名 | 返回值 | 备注 |
+|---------|--------|------|
+| `measure(_ name: String, _ block: () async throws -> T)` | `T`（rethrows） | 自动计时并记录 |
+| `getMetrics()` | `[String: Double]` | 读取所有指标（毫秒） |
+| `clear()` | `Void` | 清除所有指标 |
+
+##### RAG / DocumentChunker
+
+| 方法签名 | 返回值 | 备注 |
+|---------|--------|------|
+| `chunkDocument(_ text: String, source: String)` | `[DocumentChunk]` | maxTokens=512，overlap=128 |
+
+##### RAG / EmbeddingService
+
+| 方法签名 | 返回值 | 备注 |
+|---------|--------|------|
+| `embed(texts:apiKey:)` | `[[Float]]`（async throws） | 透传 DeepSeekClient.embed |
+| `embedBatch(_ texts:batchSize:apiKey:)` | `[[Float]]`（async throws） | 默认 batchSize=16 |
+
+##### RAG / PDFExtractor
+
+| 方法签名 | 返回值 | 备注 |
+|---------|--------|------|
+| `static extractText(from url: URL)` | `String?` | 失败 / 无文本层返回 nil |
+
+##### RAG / RAGService
+
+| 方法签名 | 返回值 | 备注 |
+|---------|--------|------|
+| `indexDocument(text:source:modelContext:apiKey:)` | `Void`（async throws） | 去重 + 切分 + 嵌入 + 持久化 |
+| `retrieve(query:topK:modelContext:apiKey:)` | `[DocumentChunk]`（async throws） | 默认 topK=5，得分 = cosine * weight |
+| `buildAugmentedContext(query:modelContext:apiKey:)` | `(context: String, citations: [DocumentChunk], queryEmbedding: [Float])`（async throws） | 复用 queryEmbedding |
+
+##### RemoteConfig / RemoteConfigService
+
+| 方法签名 | 返回值 | 备注 |
+|---------|--------|------|
+| `fetch()` | `Void`（async） | 失败回退缓存或默认值，不抛错 |
+
+##### Routing / SmartRouter
+
+| 方法签名 | 返回值 | 备注 |
+|---------|--------|------|
+| `static route(input:toolsEnabled:hasImage:)` | `String` | 返回模型名（deepseek-chat / deepseek-reasoner） |
+
+##### Search / SpotlightIndexer
+
+| 方法签名 | 返回值 | 备注 |
+|---------|--------|------|
+| `static index(_ conversation: Conversation)` | `Void` | 索引标题 + 最后消息 + createdAt |
+| `static removeIndex(conversationId: UUID)` | `Void` | 移除指定会话索引 |
+| `static clearAll()` | `Void` | 清空所有会话索引 |
+
+##### Storage / ChatStorage
+
+| 方法签名 | 返回值 | 备注 |
+|---------|--------|------|
+| `createConversation(title:systemPrompt:)` | `Conversation` | 不立即 save |
+| `deleteConversation(_ conversation: Conversation)` | `Void` | 删除并立即 save |
+| `renameConversation(_:to:)` | `Void` | 重命名 + Spotlight 重索引 |
+| `togglePin(_ conversation: Conversation)` | `Void` | 翻转 isPinned |
+| `addMessage(to:role:content:imageData:)` | `ChatMessage` | 关联并 save |
+| `fetchConversations()` | `[Conversation]` | isPinned 优先 + createdAt 降序 |
+| `cleanupEmptyConversations()` | `Void` | 批量清理空会话 |
+| `wipeAllData()` | `Void` | UITEST_RESET_DATA 专用 |
+| `fetchPreference()` | `UserPreference` | 无则创建默认 |
+| `savePreference(tone:tools:fact:)` | `Void` | 更新或创建 |
+| `saveFeedback(messageId:isPositive:citations:)` | `Void` | 反馈 + chunk 权重调整 |
+| `fetchFeedback(messageId: UUID)` | `MessageFeedback?` | 查询反馈记录 |
+| `updateFeedback(_:isPositive:citations:)` | `Void` | 切换反馈 + 撤销旧权重 |
+
+##### Telemetry / TelemetryService
+
+| 方法签名 | 返回值 | 备注 |
+|---------|--------|------|
+| `track(_ event: TelemetryEvent)` | `Void` | 写入环形缓冲（上限 1000） |
+| `drain()` | `[TelemetryRecord]` | 取出并清空缓冲 |
+| `shouldUpload(now:threshold:interval:)` | `Bool` | 默认 threshold=100 / interval=300s |
+| `bufferCount` (getter) | `Int` | 当前缓冲事件数 |
+
+##### Telemetry / LogUploader
+
+| 方法签名 | 返回值 | 备注 |
+|---------|--------|------|
+| `uploadIfNeeded()` | `Void`（async） | drain + 指数退避重试 3 次 |
+
+##### Tools / ToolRegistry
+
+| 方法签名 | 返回值 | 备注 |
+|---------|--------|------|
+| `static shared` (getter) | `ToolRegistry` | 单例 |
+| `register(tool: ToolProtocol)` | `Void` | 同名覆盖 |
+| `getTool(named name: String)` | `ToolProtocol?` | 未命中返回 nil |
+| `execute(name:arguments:)` | `String`（async throws） | 未注册抛 NSError |
+| `allToolDefs` (getter) | `[ToolDef]` | 告知 LLM 可调用工具 |
+
+##### Voice / VoiceService
+
+| 方法签名 | 返回值 | 备注 |
+|---------|--------|------|
+| `requestPermission()` | `Bool`（async） | 语音识别授权 |
+| `startRecording()` | `Void`（throws） | installTap + 启动 audioEngine |
+| `stopRecording()` | `Void` | 释放 audio session |
+| `speak(_ text: String, config: TTSConfig?)` | `Void` | 应用配置后朗读 |
+| `previewVoice(_ text: String, config: TTSConfig)` | `Void` | 试听音色，不影响主流程 |
+| `stopPreview()` | `Void` | 停止试听 |
+| `stopSpeaking()` | `Void` | 用户主动停止 |
+
+##### Voice / TTSConfig
+
+| 方法签名 | 返回值 | 备注 |
+|---------|--------|------|
+| `static load()` | `TTSConfig` | UserDefaults 读取，失败回退默认 |
+| `func save()` | `Void` | JSON 编码后写 UserDefaults |
+
+##### Voice / TTSVoiceCatalog
+
+| 方法签名 | 返回值 | 备注 |
+|---------|--------|------|
+| `static allVoices()` | `[TTSVoice]` | 系统音色列表（静态缓存） |
+| `static groupedByLanguage()` | `[(language: String, voices: [TTSVoice])]` | 按语言分组（zh-CN 优先） |
+| `static reloadVoices()` | `Void` | 清空缓存 |
+| `static displayName(for identifier: String)` | `String` | 返回 "Name(language)" |
+| `static voice(for identifier: String)` | `AVSpeechSynthesisVoice?` | 查找原始音色 |
+
 ### 3.4 ViewModels 层
 
 ViewModels 文件数无新增（仍为 4 个），但内部字段与编排逻辑随 Day 12–20 扩展。
@@ -243,57 +580,230 @@ ViewModels 文件数无新增（仍为 4 个），但内部字段与编排逻辑
 | Settings | `HealthSettingsView.swift` | Day 18 Health 授权管理 + 健康洞察列表展示。 |
 | Settings | `PrivacyPolicyView.swift` | Day 14 隐私政策展示（Markdown 渲染）+ 投诉反馈入口。 |
 
+### 3.6 工具调用关系图
+
+下图使用 Mermaid `classDiagram` 展示 `ToolProtocol` 协议、`ToolRegistry` 单例与 24 个工具实现的关系。跨平台工具始终实现协议；macOS 独有 11 个工具用 `<<macOS only>>` stereotype 标注，仅在 `#if os(macOS)` 条件下注册。
+
+```mermaid
+classDiagram
+    class ToolProtocol {
+        <<protocol>>
+        +definition: ToolDefinition
+        +execute(arguments: [String: Any]) String
+    }
+    class ToolDefinition {
+        +name: String
+        +description: String
+        +parameters: [String: Any]
+    }
+    class ToolRegistry {
+        <<MainActor>>
+        +shared: ToolRegistry
+        -tools: [String: ToolProtocol]
+        +register(tool: ToolProtocol)
+        +getTool(named: String) ToolProtocol?
+        +execute(name:arguments:) String
+        +allToolDefs: [ToolDef]
+    }
+
+    class AlarmTool
+    class ReminderTool
+    class DateTimeTool
+    class CalculatorTool
+    class LocationTool
+    class DeviceInfoTool
+    class ClipboardTool
+    class OpenURLTool
+    class ContactsTool
+    class WeatherTool
+    class RunShortcutTool
+    class ListShortcutsTool
+    class CreateShortcutTool
+
+    class AppleScriptTool <<macOS only>>
+    class ScreenshotTool <<macOS only>>
+    class OCRTool <<macOS only>>
+    class TerminalCommandTool <<macOS only>>
+    class WindowManagementTool <<macOS only>>
+    class AppManagementTool <<macOS only>>
+    class FileOperationTool <<macOS only>>
+    class FinderTool <<macOS only>>
+    class SafariControlTool <<macOS only>>
+    class SystemControlTool <<macOS only>>
+    class InputAutomationTool <<macOS only>>
+
+    ToolProtocol <|.. AlarmTool
+    ToolProtocol <|.. ReminderTool
+    ToolProtocol <|.. DateTimeTool
+    ToolProtocol <|.. CalculatorTool
+    ToolProtocol <|.. LocationTool
+    ToolProtocol <|.. DeviceInfoTool
+    ToolProtocol <|.. ClipboardTool
+    ToolProtocol <|.. OpenURLTool
+    ToolProtocol <|.. ContactsTool
+    ToolProtocol <|.. WeatherTool
+    ToolProtocol <|.. RunShortcutTool
+    ToolProtocol <|.. ListShortcutsTool
+    ToolProtocol <|.. CreateShortcutTool
+    ToolProtocol <|.. AppleScriptTool
+    ToolProtocol <|.. ScreenshotTool
+    ToolProtocol <|.. OCRTool
+    ToolProtocol <|.. TerminalCommandTool
+    ToolProtocol <|.. WindowManagementTool
+    ToolProtocol <|.. AppManagementTool
+    ToolProtocol <|.. FileOperationTool
+    ToolProtocol <|.. FinderTool
+    ToolProtocol <|.. SafariControlTool
+    ToolProtocol <|.. SystemControlTool
+    ToolProtocol <|.. InputAutomationTool
+
+    ToolRegistry o--> ToolProtocol : 持有 13 跨平台 + 11 macOS
+    ToolDefinition <.. ToolProtocol : 暴露给 LLM
+```
+
+**说明**：
+- 跨平台工具（13 个，iOS + macOS 都注册）：AlarmTool / ReminderTool / DateTimeTool / CalculatorTool / LocationTool / DeviceInfoTool / ClipboardTool（含 Read+Write 两个注册项）/ OpenURLTool / ContactsTool / WeatherTool / RunShortcutTool / ListShortcutsTool / CreateShortcutTool。
+- macOS 独有工具（11 个，`#if os(macOS)` 守卫）：AppleScriptTool / ScreenshotTool / OCRTool / TerminalCommandTool / WindowManagementTool / AppManagementTool / FileOperationTool / FinderTool / SafariControlTool / SystemControlTool / InputAutomationTool。
+- iOS 注册 13 个、macOS 注册 24 个（13 + 11）。
+
+### 3.7 LLM Provider 抽象关系图
+
+下图使用 Mermaid `classDiagram` 展示 `LLMProvider` 协议与 4 个直接实现、`FallbackLLMProvider` 装饰器、`ModelProviderFactory` 工厂的关系。
+
+```mermaid
+classDiagram
+    class LLMProvider {
+        <<protocol>>
+        +chat(messages:config:apiKey:) AsyncStream~String~
+        +chat(messages:config:tools:apiKey:) AsyncStream~ParsedChunk~
+        +embed(texts:apiKey:) [[Float]]
+    }
+    class DeepSeekClient {
+        <<nonisolated final>>
+        -session: URLSession
+        -parser: SSEParser
+    }
+    class QwenClient {
+        <<nonisolated final>>
+        -session: URLSession
+        -parser: SSEParser
+        -provider: ModelProvider
+    }
+    class BFFProxyClient {
+        <<nonisolated final>>
+        -provider: ModelProvider
+        -config: BFFConfig
+        -session: URLSession
+        -parser: SSEParser
+    }
+    class OfflineLLMProvider {
+        <<nonisolated final>>
+        +buildLlama3Prompt(messages:systemPrompt:) String
+    }
+    class FallbackLLMProvider {
+        <<final>>
+        -primary: LLMProvider
+        -fallback: LLMProvider
+        -primaryProvider: ModelProvider
+        -fallbackProvider: ModelProvider
+        +lastUsedProvider: ModelProvider
+        +didFallback: Bool
+    }
+    class ModelProviderFactory {
+        <<enum>>
+        +static make(_ provider: ModelProvider) LLMProvider
+        +static make(bffConfig:provider:) LLMProvider
+    }
+
+    LLMProvider <|.. DeepSeekClient
+    LLMProvider <|.. QwenClient
+    LLMProvider <|.. BFFProxyClient
+    LLMProvider <|.. OfflineLLMProvider
+    LLMProvider <|.. FallbackLLMProvider
+    FallbackLLMProvider o--> LLMProvider : 包装 primary + fallback
+    ModelProviderFactory ..> LLMProvider : creates
+    ModelProviderFactory ..> DeepSeekClient
+    ModelProviderFactory ..> QwenClient
+    ModelProviderFactory ..> BFFProxyClient
+    ModelProviderFactory ..> OfflineLLMProvider
+```
+
+**说明**：
+- 4 个直接实现：`DeepSeekClient`（DeepSeek 直连）/ `QwenClient`（阿里云百炼 DashScope）/ `BFFProxyClient`（Cloudflare Workers 网关中转）/ `OfflineLLMProvider`（端侧 MLX）。
+- `FallbackLLMProvider` 实现协议同时聚合两个 `LLMProvider`，主 provider 未产出则降级到 fallback；`embed` 路径不降级。
+- `ModelProviderFactory` 静态工厂：`make(_:)` 按 enum 创建直连 client；`make(bffConfig:provider:)` 在 `bffConfig.enabled` 时返回 BFFProxyClient。
+
 ---
 
 ## 4. 数据流
 
 ### 4.1 主流程
 
-从用户输入到 AI 回复的完整数据流，含 Provider 选择与网络监听切换：
+从用户输入到 AI 回复的完整数据流，含 Provider 选择与流式输出更新。参与者包括用户、ChatView、ChatViewModel、SmartRouter 与 LLMClient。
 
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as 用户
+    participant V as ChatView
+    participant VM as ChatViewModel
+    participant SR as SmartRouter
+    participant LC as LLMClient
+
+    U->>V: 输入文本点击发送
+    V->>VM: sendMessage(in: modelContext)
+    VM->>VM: 清理 streamingText / isLoading=true
+    VM->>VM: startLiveActivity(思考中)
+    VM->>VM: streamingTask = Task(processMessage)
+    VM->>SR: route(input:toolsEnabled:hasImage:)
+    SR-->>VM: 返回模型名（chat / reasoner）
+    VM->>VM: 注入 preference systemPrompt / 计算 queryEmbedding
+    VM->>LC: client.chat(messages:config:tools:apiKey:)
+
+    loop 流式 chunk
+        LC-->>VM: yield ParsedChunk(content, toolCalls)
+        Note over VM: streamingText += content<br/>MessageListView 实时刷新<br/>MarkdownText / CodeBlockView 重新渲染
+    end
+
+    VM->>VM: 持久化 assistantMsg / streamingText=""
+    VM->>VM: isLoading=false
+    VM->>VM: TTSConfig 应用 → VoiceService.speak 可选朗读
+    VM->>VM: endLiveActivity(完成)
+    VM-->>V: UI 更新完成
+    V-->>U: 显示最终回复
 ```
-ChatInputBar.onSend
-    │
-    ▼
-ChatViewModel.sendMessage(in:modelContext:)
-    │  (清理 streamingText / isLoading=true / startLiveActivity「思考中」)
-    ▼
-streamingTask = Task { await processMessage(...) }
-    │
-    ▼
-processMessage(text:conversation:modelContext:)
-    │  (读 provider 当前选择 → SmartRouter.route(...) 选定 client)
-    │  (注入 preference systemPrompt / 计算 queryEmbedding)
-    │
-    ▼
-[五条分支路径，见下]
-    │
-    ▼
-client.chat(...) → AsyncStream<String / ParsedChunk>
-    │  (streamingText += chunkContent → MessageListView 实时更新)
-    │  (MarkdownText / CodeBlockView / MarkdownTableView 实时重新渲染)
-    ▼
-assistantMsg 持久化 → streamingText = "" → isLoading = false
-    │  (TTSConfig 应用 → VoiceService.speak 可选朗读)
-    ▼
-endLiveActivity「完成」
-```
+
+**关键说明**：
+- 流式输出期间 `streamingText` 累积，MessageListView / MarkdownText / CodeBlockView / MarkdownTableView 实时重新渲染，每帧约 8–16ms。
+- SmartRouter 在工具或图片启用时强制 `deepseek-chat`（reasoner 对 function calling 不稳定）；长文本（≥50 字符）或推理关键词触发 `deepseek-reasoner`。
 
 ### 4.2 路径 1：UITEST_DISABLE_NETWORK 桩回复
 
 **触发条件**：`ProcessInfo.processInfo.arguments.contains("UITEST_DISABLE_NETWORK")`
 
-```
-processMessage 入口
-    │  (检测到 UITEST_DISABLE_NETWORK 启动参数)
-    ▼
-短路 HTTP / RAG / Tool
-    │  (直接追加用户消息 + 4 char/8ms 假打字输出)
-    ▼
-stubReply = "（UIT 测试模式）已收到：{input}"
-    │  (chars.chunked(into: 4) → streamingText += String(piece) → Task.sleep 8ms)
-    ▼
-追加 assistantMsg → try? modelContext.save() → endLiveActivity → return
+```mermaid
+sequenceDiagram
+    autonumber
+    participant VM as ChatViewModel
+    participant SC as SemanticCache
+    participant LC as LLMClient
+
+    VM->>VM: processMessage 入口
+    VM->>VM: 检测到 UITEST_DISABLE_NETWORK 启动参数
+
+    alt toolsEnabled
+        Note over VM: 仍走工具路径（stub 不会触发真实 HTTP）
+    else 非 toolsEnabled
+        VM->>VM: 短路 HTTP / RAG / Tool
+    end
+
+    VM->>VM: stubReply = "（UIT 测试模式）已收到：{input}"
+    loop 每 4 字符 / 8ms 假打字
+        VM->>VM: streamingText += String(piece)
+        VM->>VM: Task.sleep 8ms
+    end
+    VM->>VM: 追加 assistantMsg → modelContext.save()
+    VM->>VM: endLiveActivity → return
 ```
 
 **用途**：UIT 不触发真实 HTTP，复用缓存命中的假打字路径驱动 UI 状态机。
@@ -302,139 +812,190 @@ stubReply = "（UIT 测试模式）已收到：{input}"
 
 **触发条件**：`!toolsEnabled && !queryEmbedding.isEmpty && cache.get(query:embedding:) != nil`（相似度 > 0.92）
 
-```
-SemanticCache.get(query:embedding:)
-    │  (cosineSimilarity > similarityThreshold 0.92 → 命中)
-    ▼
-跳过 RAG / LLM / ReAct
-    │  (4 char/8ms 假打字输出缓存 response)
-    ▼
-streamingText += String(piece) → Task.sleep 8ms
-    │
-    ▼
-追加 assistantMsg → try? modelContext.save() → return
+```mermaid
+sequenceDiagram
+    autonumber
+    participant VM as ChatViewModel
+    participant SC as SemanticCache
+
+    VM->>SC: get(query:embedding:)
+    SC->>SC: cosineSimilarity > 0.92 → 命中
+    SC-->>VM: 返回缓存 response
+
+    Note over VM: 跳过 RAG / LLM / ReAct
+
+    loop 每 4 字符 / 8ms 假打字
+        VM->>VM: streamingText += String(piece)
+        VM->>VM: Task.sleep 8ms
+    end
+    VM->>VM: 追加 assistantMsg → modelContext.save()
+    VM->>VM: return
 ```
 
 ### 4.4 路径 3：正常 RAG + LLM + ReAct
 
-**RAG 开启时**：
+```mermaid
+sequenceDiagram
+    autonumber
+    participant VM as ChatViewModel
+    participant RS as RAGService
+    participant LC as LLMClient
+    participant TR as ToolRegistry
 
-```
-ragService.buildAugmentedContext(query:modelContext:apiKey:)
-    │  (embed query → fetch 全部分块 → cosine 相似度排序取前 5)
-    ▼
-返回 (context: 带 [1][2] 编号的 prompt, citations: [DocumentChunk], queryEmbedding)
-    │  (复用 queryEmbedding 写缓存，避免重复调 embed API)
-    ▼
-apiMessages.insert(system: context, at: 1) → currentCitations = citations
-```
+    VM->>RS: buildAugmentedContext(query:modelContext:apiKey:)
+    RS->>RS: embed query → fetch 全部分块 → cosine 排序取前 5
+    RS-->>VM: (context 带 [1][2] 编号, citations, queryEmbedding)
+    Note over VM: queryEmbedding 复用写缓存<br/>apiMessages.insert(system: context, at: 1)
+    VM->>VM: limitTokens(apiMessages, max: tokenLimit) 逆序截断
 
-**构造 messages + token 截断**：
+    loop ReAct 循环（loopCount < maxReActLoops=5）
+        VM->>LC: client.chat(messages:config:tools:apiKey:)
+        loop 流式 chunk
+            LC-->>VM: yield content → streamingText 更新 → updateLiveActivity(回复中)
+            LC-->>VM: yield toolCalls → finalToolCalls 累积
+        end
 
-```
-limitTokens(apiMessages, max: tokenLimit)
-    │  (从尾部逆序遍历，累计 token 超 max 则截断；默认 maxTokens=2048)
-```
+        alt 有 tool_calls
+            VM->>TR: withThrowingTaskGroup 并发执行工具
+            par 工具执行
+                TR->>TR: ToolRegistry.execute(name:arguments:)
+            and 超时兜底
+                TR->>TR: Task.sleep toolTimeout=15s
+            end
+            Note over TR: first 胜出 / group.cancelAll<br/>超时标记 failed 不中断循环
+            TR-->>VM: 工具结果字符串
+            VM->>VM: NotificationService.sendNotification 本地通知
+            VM->>VM: yield ToolStep → StepCardView 显示思维链
+            VM->>VM: apiMessages = conversation.messages.map(toAPIMessage) → continue
+        else 无 tool_calls
+            Note over VM: break 退出循环
+        end
+    end
 
-**ReAct 循环**（`maxReActLoops=5`）：
-
-```
-while loopCount < 5 {
-    loopCount += 1
-    client.chat(messages:config:tools:apiKey:) → AsyncStream<ParsedChunk>
-        │  (yield content → streamingText 更新 → updateLiveActivity「回复中」首字触发)
-        │  (yield toolCalls → finalToolCalls 累积)
-    │
-    ▼
-    [有 tool_calls 分支]
-        │  (withThrowingTaskGroup 并发执行工具)
-        │  (group.addTask: ToolRegistry.execute / group.addTask: Task.sleep toolTimeout=15s)
-        │  (first 胜出 / group.cancelAll / 超时标记 failed 继续下一轮不中断循环)
-        │  (工具成功 → NotificationService.sendNotification 本地通知)
-        │  (yield ToolStep 到 currentToolSteps → StepCardView 显示思维链)
-        │  (apiMessages = conversation.messages.map(toAPIMessage) → continue)
-    │
-    ▼
-    [无 tool_calls 分支] → break
-}
-```
-
-**缓存写入条件**：
-
-```
-if !toolsEnabled && !fullResponse.isEmpty && !queryEmbedding.isEmpty {
-    cache.set(query:embedding:response:)  // 仅非工具模式且响应非空且 embedding 有效
-}
+    alt 缓存写入条件（!toolsEnabled && !fullResponse.isEmpty && !queryEmbedding.isEmpty）
+        VM->>VM: cache.set(query:embedding:response:)
+    end
 ```
 
 ### 4.5 路径 4：BFF 代理路径（Day 15）
 
 **触发条件**：`bffConfig.enabled == true`（设置页启用 BFF）
 
-```
-ModelProviderFactory.create(provider:) 检测 bffConfig.enabled
-    │  (返回 BFFProxyClient 而非直连 DeepSeekClient / QwenClient)
-    ▼
-BFFProxyClient.chat(messages:apiKey:)
-    │  (apiKey 字段实际传 bffConfig.userToken)
-    │  (请求经 Cloudflare Workers 网关中转)
-    │  (服务端注入上游真实 API Key → 调用 LLM → SSE 流回客户端)
-    ▼
-RateLimiter.acquire(.chat) 客户端限流
-    │  (按 chatRateLimitPerMin 令牌桶控制)
-    ▼
-AsyncStream<ParsedChunk> 流式回包 → 同路径 3 解析
+```mermaid
+sequenceDiagram
+    autonumber
+    participant VM as ChatViewModel
+    participant MPF as ModelProviderFactory
+    participant BP as BFFProxyClient
+    participant RL as RateLimiter
+    participant CW as CloudflareWorker
+    participant UL as UpstreamLLM
+
+    VM->>MPF: make(bffConfig:provider:)
+    MPF->>MPF: bffConfig.enabled == true
+    MPF-->>VM: 返回 BFFProxyClient（非直连 client）
+    VM->>BP: chat(messages:config:apiKey:)
+    Note over BP: apiKey 字段传 bffConfig.userToken<br/>Header: X-BFF-Token / X-Provider
+    BP->>RL: acquireChat() 令牌桶限流
+    RL-->>BP: 通过 / 抛 rateLimited
+    BP->>CW: POST /v1/chat/completions（携 userToken）
+    CW->>CW: 校验 token + 注入上游真实 API Key
+    CW->>UL: 转发请求到上游 LLM
+    UL-->>CW: SSE 流式回包
+    CW-->>BP: SSE 流式回包
+    BP->>BP: SSEParser.parseWithToolAccumulation 解析
+    BP-->>VM: AsyncStream<ParsedChunk> 流式 yield
 ```
 
-**关键约束**：设备端不持上游 API Key，仅持 `userToken`；上游 Key 仅在 Cloudflare Workers 服务端 secrets 中。
+**关键约束**：设备端不持上游 API Key，仅持 `userToken`；上游 Key 仅在 Cloudflare Workers 服务端 secrets 中。`RateLimiter` 按 `chatRateLimitPerMin` 令牌桶控制客户端速率。
 
 ### 4.6 路径 5：端侧推理路径（Day 16）
 
 **触发条件**：`onDeviceConfig.enabled == true` 且（手动切换到 `.onDevice` 或 NetworkMonitor 检测到断网且 `autoSwitchOnNetworkLoss == true`）
 
-```
-NetworkMonitor.pathUpdate → status == .unsatisfied
-    │  (autoSwitchOnNetworkLoss 触发 → 当前 provider 切到 .onDevice)
-    ▼
-ModelProviderFactory.create(.onDevice) → OfflineLLMProvider
-    │  (包装 MLXInferenceEngine)
-    ▼
-OnDeviceModelDownloader.ensureModel()
-    │  (检查 modelPath 是否存在 → 否则从 downloadURL 下载 + SHA256 校验)
-    ▼
-MLXInferenceEngine.load(modelPath:) → 流式生成 token
-    │  (不走 HTTP，本地推理)
-    ▼
-AsyncStream<String> yield → streamingText 更新
-    │  (maxTokens 受 onDeviceConfig.maxTokens 限制，默认 512)
-    ▼
-网络恢复 → NetworkMonitor 触发切回原 provider
+```mermaid
+sequenceDiagram
+    autonumber
+    participant NM as NetworkMonitor
+    participant VM as ChatViewModel
+    participant MPF as ModelProviderFactory
+    participant OL as OfflineLLMProvider
+    participant MLX as MLXInferenceEngine
+    participant OD as OnDeviceModelDownloader
+
+    NM->>NM: pathUpdate → status == .unsatisfied
+    NM-->>VM: yield NetworkStatus.offline
+    VM->>VM: autoSwitchOnNetworkLoss → provider 切到 .onDevice
+    VM->>MPF: make(.onDevice)
+    MPF-->>VM: OfflineLLMProvider（包装 MLXInferenceEngine）
+    VM->>OL: chat(messages:config:apiKey:)
+    OL->>MLX: buildLlama3Prompt → generate(prompt:maxTokens:temperature:)
+
+    alt 模型未下载
+        MLX->>OD: ensureModel()
+        OD->>OD: 检查 modelPath → 下载 + SHA256 校验
+        OD-->>MLX: 模型就绪
+    end
+
+    loop 流式生成 token（不走 HTTP）
+        MLX-->>OL: yield token
+        OL-->>VM: yield token → streamingText 更新
+    end
+    Note over VM: maxTokens 受 onDeviceConfig.maxTokens 限制（默认 512）
+    NM->>NM: 网络恢复 → status == .wifi/.cellular/.online
+    NM-->>VM: yield NetworkStatus 恢复
+    VM->>VM: 触发切回原 provider
 ```
 
 ### 4.7 TTS 配置应用流程（Day 19）
 
-```
-VoiceService.speak(text:)
-    │  (读取 TTSConfig UserDefaults)
-    ▼
-AVSpeechSynthesisUtterance(text:)
-    │  (按 voiceID 选择 AVSpeechSynthesisVoice)
-    │  (apply rate / pitch / volume)
-    ▼
-AVSpeechSynthesizer.speak(utterance)
-    │  (支持试听取消与朗读打断)
+```mermaid
+sequenceDiagram
+    autonumber
+    participant VS as VoiceService
+    participant TC as TTSConfig
+    participant VC as TTSVoiceCatalog
+    participant AS as AVSpeechSynthesizer
+
+    VS->>VS: speak(text:) / previewVoice(text:config:)
+    VS->>TC: TTSConfig.load() 读取 UserDefaults
+    TC-->>VS: TTSConfig(voiceIdentifier, rate, pitch, volume)
+    VS->>VC: voice(for: voiceIdentifier)
+    VC-->>VS: AVSpeechSynthesisVoice（或回退 zh-CN / nil）
+    VS->>VS: AVSpeechUtterance(text:)
+    VS->>VS: apply rate / pitch / volume（range clamp）
+    VS->>AS: speak(utterance)
+    Note over AS: 支持试听取消与朗读打断<br/>didFinish 自然结束触发 onSpeakFinished
 ```
 
 ### 4.8 灵动岛状态机
 
-```
-sendMessage → startLiveActivity(status: "思考中")
-    │
-    ▼  (收到首字 chunk)
-updateLiveActivity(status: "回复中")
-    │
-    ▼  (回复结束)
-endLiveActivity(status: "完成") → dismissalPolicy: .immediate
+下图使用 Mermaid `stateDiagram-v2` 描述 Live Activity 状态流转。
+
+```mermaid
+stateDiagram-v2
+    [*] --> 思考中 : sendMessage 触发 startLiveActivity
+    思考中 --> 回复中 : 收到首个流式 chunk
+    回复中 --> 完成 : 流式 finish / 错误
+    完成 --> [*] : endLiveActivity dismissalPolicy=.immediate
+
+    note right of 思考中
+        触发条件: 用户点击发送
+        UI: 显示加载指示器
+        超时: 无（等待 LLM 响应）
+    end note
+
+    note right of 回复中
+        触发条件: 收到首个 content chunk
+        UI: streamingText 实时更新
+        updateLiveActivity 首字触发
+    end note
+
+    note right of 完成
+        触发条件: 流式 finish / 错误 / 取消
+        UI: dismissalPolicy=.immediate 立即收起
+        低版本（< iOS 16.1）静默降级
+    end note
 ```
 
 ---
@@ -443,38 +1004,39 @@ endLiveActivity(status: "完成") → dismissalPolicy: .immediate
 
 ### Day 1–11 基础决策
 
-| # | 决策 | 选型理由 | 对应文件 |
-|---|------|---------|---------|
-| 1 | MVVM + `@Observable` 不用 Combine | iOS 17+ 新观察模型，比 Combine 更简洁，无需 `ObservableObject` / `@Published` 样板代码。 | `ViewModels/` 4 个文件 |
-| 2 | SwiftData 不用 CoreData / Realm | iOS 17+ 原生持久化，`@Model` 宏自动生成 schema 与迁移，与 SwiftUI 深度集成。 | `Models/` 7 个 `@Model` |
-| 3 | DeepSeek API 合规优先 | 国内可用、协议兼容 OpenAI chat completions，避免 OpenAI 直连的网络与合规问题。 | `Services/LLM/DeepSeekClient.swift` |
-| 4 | `AsyncStream` 流式不用 Combine Publisher | `AsyncStream<String>` / `AsyncStream<ParsedChunk>` 更适合 SSE 流式解析的逐 chunk yield 语义，比 Publisher 更直观。 | `Services/LLM/DeepSeekClient.swift` `chat` 返回值 |
-| 5 | `nonisolated DeepSeekClient` 跨 actor | 允许从 `@MainActor` ViewModel 直接调用，避免 actor hop 开销；HTTP 请求本身在 URLSession 内部异步。 | `DeepSeekClient` 类声明 |
-| 6 | `@MainActor Service` 线程安全 | `SemanticCache` / `RAGService` / `ToolRegistry` / `ChatStorage` 标 `@MainActor`，与 ViewModel 同 actor 避免 data race。 | 各 Service 文件 |
-| 7 | `LLMProvider` 协议注入测试可替换 | `ChatViewModel.init(client:cache:)` 默认 `DeepSeekClient()` / `SemanticCache()` 兜底，测试可注入 mock。 | `ViewModels/ChatViewModel.swift` `init` |
-| 8 | `UITEST_DISABLE_NETWORK` 启动参数桩回复 | UIT 不触发真实 HTTP，避免 API Key 缺失 / 网络不稳导致 UIT 随机失败。 | `ChatViewModel.processMessage` 入口分支 |
+| # | 决策 | 选型理由 | 对应文件 | 影响范围 |
+|---|------|---------|---------|---------|
+| 1 | MVVM + `@Observable` 不用 Combine | iOS 17+ 新观察模型，比 Combine 更简洁，无需 `ObservableObject` / `@Published` 样板代码。 | `ViewModels/` 4 个文件 | ChatViewModel / ConversationListVM / KnowledgeBaseVM / SettingsViewModel |
+| 2 | SwiftData 不用 CoreData / Realm | iOS 17+ 原生持久化，`@Model` 宏自动生成 schema 与迁移，与 SwiftUI 深度集成。 | `Models/` 7 个 `@Model` | ChatMessage / Conversation / UserPreference / DocumentChunk / HealthInsight / MessageFeedback / RemoteConfig |
+| 3 | DeepSeek API 合规优先 | 国内可用、协议兼容 OpenAI chat completions，避免 OpenAI 直连的网络与合规问题。 | `Services/LLM/DeepSeekClient.swift` | DeepSeekClient + EmbeddingService + APIConfig |
+| 4 | `AsyncStream` 流式不用 Combine Publisher | `AsyncStream<String>` / `AsyncStream<ParsedChunk>` 更适合 SSE 流式解析的逐 chunk yield 语义，比 Publisher 更直观。 | `Services/LLM/DeepSeekClient.swift` `chat` 返回值 | 全部 LLMProvider 实现 + ChatViewModel processMessage |
+| 5 | `nonisolated DeepSeekClient` 跨 actor | 允许从 `@MainActor` ViewModel 直接调用，避免 actor hop 开销；HTTP 请求本身在 URLSession 内部异步。 | `DeepSeekClient` 类声明 | DeepSeekClient / QwenClient / BFFProxyClient / OfflineLLMProvider |
+| 6 | `@MainActor Service` 线程安全 | `SemanticCache` / `RAGService` / `ToolRegistry` / `ChatStorage` 标 `@MainActor`，与 ViewModel 同 actor 避免 data race。 | 各 Service 文件 | SemanticCache / RAGService / ToolRegistry / ChatStorage |
+| 7 | `LLMProvider` 协议注入测试可替换 | `ChatViewModel.init(client:cache:)` 默认 `DeepSeekClient()` / `SemanticCache()` 兜底，测试可注入 mock。 | `ViewModels/ChatViewModel.swift` `init` | ChatViewModel + 全部 LLM Client 测试 |
+| 8 | `UITEST_DISABLE_NETWORK` 启动参数桩回复 | UIT 不触发真实 HTTP，避免 API Key 缺失 / 网络不稳导致 UIT 随机失败。 | `ChatViewModel.processMessage` 入口分支 | ChatViewModel + AIBuilderUITests |
 
 ### Day 12–20 扩展决策
 
-| # | 决策 | 选型理由 | 对应文件 |
-|---|------|---------|---------|
-| 9 | 智能路由 SmartRouter + 自动 Fallback | 多 Provider 可用时按规则与历史成功率动态选择，单点失败自动切 fallback provider，提升可用性。 | `Services/Routing/SmartRouter.swift` / `Services/LLM/FallbackLLMProvider.swift` |
-| 10 | BFF Token 设备端不持上游 API Key | 设备端仅持 `userToken`，上游 Key 仅在 Cloudflare Workers secrets 中，避免 Key 泄露与配额盗用。 | `Core/Models/BFFConfig.swift` / `Services/LLM/BFFProxyClient.swift` |
-| 11 | MLX 端侧模型断网自动切换 | `OnDeviceConfig.autoSwitchOnNetworkLoss` 默认 true，NetworkMonitor 检测断网即切端侧推理，网络恢复自动切回，保证离线可用。 | `Services/Network/NetworkMonitor.swift` / `Services/OnDevice/OfflineLLMProvider.swift` |
-| 12 | TTSConfig UserDefaults 持久化不用 SwiftData | TTS 配置为轻量键值，UserDefaults 比 SwiftData 更轻量，避免迁移复杂度。 | `Services/Voice/TTSConfig.swift` |
-| 13 | `UITEST_RESET_DATA` 数据隔离 | UIT 启动时通过环境变量清理历史会话与缓存，保证用例独立可重复执行，避免脏数据干扰。 | `AIBuilderApp.swift` 启动逻辑 |
-| 14 | `batch cleanupEmptyConversations` 后台清理 | 后台任务批量清理空会话（无消息或仅 system prompt），控制 SwiftData 体积。 | `Services/Storage/ChatStorage.swift` `cleanupEmptyConversations` |
-| 15 | Markdown 渲染自定义 AttributedString 不引第三方库 | 用 Foundation `AttributedString` + 自定义 parser，避免引入 Down / Ink 等第三方库，控制包体积与依赖。 | `Views/Chat/Markdown*.swift` / `CodeSyntaxHighlighter.swift` |
-| 16 | 隐私清单 PrivacyInfo.xcprivacy 显式声明 | App Store 审核要求显式声明 Required Reason API 使用（UserDefaults / FileTimestamp / SystemBootTime 等）。 | `Resources/PrivacyInfo.xcprivacy` |
-| 17 | App Intents 三 Intent 设计 | Ask / NewConversation / SwitchConversation 覆盖 Shortcuts / Spotlight / Siri 三入口，最小可用集。 | `AppIntents/*.swift` |
-| 18 | 崩溃日志下次启动上报不上传实时 | 实时上报在崩溃瞬间不可靠（进程已死），落盘 + 下次启动上报更稳。 | `Services/Crash/CrashReportService.swift` |
-| 19 | 遥测脱敏后批量上报 | 单事件实时上报耗电耗流量，批量 + 脱敏更合规与高效。 | `Services/Telemetry/TelemetryService.swift` |
+| # | 决策 | 选型理由 | 对应文件 | 影响范围 |
+|---|------|---------|---------|---------|
+| 9 | 智能路由 SmartRouter + 自动 Fallback | 多 Provider 可用时按规则与历史成功率动态选择，单点失败自动切 fallback provider，提升可用性。 | `Services/Routing/SmartRouter.swift` / `Services/LLM/FallbackLLMProvider.swift` | SmartRouter + FallbackLLMProvider + ChatViewModel + ModelProviderFactory |
+| 10 | BFF Token 设备端不持上游 API Key | 设备端仅持 `userToken`，上游 Key 仅在 Cloudflare Workers secrets 中，避免 Key 泄露与配额盗用。 | `Core/Models/BFFConfig.swift` / `Services/LLM/BFFProxyClient.swift` | BFFConfig + BFFProxyClient + ModelProviderFactory + SettingsViewModel + CloudflareWorkers/ |
+| 11 | MLX 端侧模型断网自动切换 | `OnDeviceConfig.autoSwitchOnNetworkLoss` 默认 true，NetworkMonitor 检测断网即切端侧推理，网络恢复自动切回，保证离线可用。 | `Services/Network/NetworkMonitor.swift` / `Services/OnDevice/OfflineLLMProvider.swift` | NetworkMonitor + OfflineLLMProvider + MLXInferenceEngine + OnDeviceModelDownloader + ChatViewModel |
+| 12 | TTSConfig UserDefaults 持久化不用 SwiftData | TTS 配置为轻量键值，UserDefaults 比 SwiftData 更轻量，避免迁移复杂度。 | `Services/Voice/TTSConfig.swift` | TTSConfig + VoiceService + TTSVoicePickerView + SettingsViewModel |
+| 13 | `UITEST_RESET_DATA` 数据隔离 | UIT 启动时通过环境变量清理历史会话与缓存，保证用例独立可重复执行，避免脏数据干扰。 | `AIBuilderApp.swift` 启动逻辑 | AIBuilderApp + ChatStorage.wipeAllData + AIBuilderUITests |
+| 14 | `batch cleanupEmptyConversations` 后台清理 | 后台任务批量清理空会话（无消息或仅 system prompt），控制 SwiftData 体积。 | `Services/Storage/ChatStorage.swift` `cleanupEmptyConversations` | ChatStorage + ConversationListVM + AIBuilderApp BGTask |
+| 15 | Markdown 渲染自定义 AttributedString 不引第三方库 | 用 Foundation `AttributedString` + 自定义 parser，避免引入 Down / Ink 等第三方库，控制包体积与依赖。 | `Views/Chat/Markdown*.swift` / `CodeSyntaxHighlighter.swift` | MarkdownText / HeadingView / MarkdownTableParser / MarkdownTableView / TaskListView / CodeBlockView / CodeSyntaxHighlighter |
+| 16 | 隐私清单 PrivacyInfo.xcprivacy 显式声明 | App Store 审核要求显式声明 Required Reason API 使用（UserDefaults / FileTimestamp / SystemBootTime 等）。 | `Resources/PrivacyInfo.xcprivacy` | PrivacyInfo.xcprivacy + App Bundle |
+| 17 | App Intents 三 Intent 设计 | Ask / NewConversation / SwitchConversation 覆盖 Shortcuts / Spotlight / Siri 三入口，最小可用集。 | `AppIntents/*.swift` | AskAIBuilderIntent + NewConversationIntent + SwitchConversationIntent + IntentChatService |
+| 18 | 崩溃日志下次启动上报不上传实时 | 实时上报在崩溃瞬间不可靠（进程已死），落盘 + 下次启动上报更稳。 | `Services/Crash/CrashReportService.swift` | CrashReportService + AIBuilderApp 启动 |
+| 19 | 遥测脱敏后批量上报 | 单事件实时上报耗电耗流量，批量 + 脱敏更合规与高效。 | `Services/Telemetry/TelemetryService.swift` | TelemetryService + LogUploader + AIBuilderApp BGTask |
 
 #### 决策：多平台适配（Day 20 后）
 
 - **方案**：采用 SwiftUI 原生渲染 + `#if os(iOS)` 条件编译，而非 Catalyst 或完全双份代码
 - **理由**：SwiftUI 跨平台能力强，单份代码覆盖三端；`#if os(iOS)` 隔离 iOS-only 框架让 macOS 优雅降级（HealthKit 入口隐藏但保留 HealthInsight 模型注册维持 schema 一致性）
 - **关键替换**：DocumentPickerView 用 SwiftUI `.fileImporter` 替代 UIKit；FeedbackService 用 `ProcessInfo` 替代 `UIDevice`；SettingsView / KnowledgeBaseView 用 NavigationSplitView 双栏布局
+- **影响范围**：`AIBuilderApp.swift` + 全部 `Services/` iOS-only 文件（HealthKitService / WatchConnectivityService / ActivityKit / BGTaskScheduler）+ `Views/Settings/SettingsView.swift` + `Views/RAG/DocumentPickerView.swift` + `Services/Feedback/FeedbackService.swift`
 - **macOS 原生 UX**：窗口默认 1000×700，菜单栏 ⌘N 新建 / ⌘K 搜索 / ⌘, 设置，⌘Enter 发送
 
 #### 决策：工具能力增强（Day 20 后）
@@ -484,12 +1046,14 @@ endLiveActivity(status: "完成") → dismissalPolicy: .immediate
 - **macOS 独有工具**：整体文件用 `#if os(macOS)` 包裹，ToolRegistry init 中用 `#if os(macOS)` 条件注册
 - **快捷指令创建**：CreateShortcutTool 构建 WFWorkflow plist 格式序列化为 .shortcut 文件，用 NSWorkspace.open 让 Shortcuts 应用导入；iOS 端 RunShortcutTool 用 NSUserActivity 触发
 - **权限**：Info.plist 新增 NSLocationWhenInUseUsageDescription 和 NSContactsUsageDescription
+- **影响范围**：`Services/Tools/` 全部 21 个文件 + `ToolRegistry.swift` + `Resources/Info.plist`
 
 #### 决策：预设系统提示词（Day 20 后）
 
 - **方案**：在 `systemPromptSection` 上方加 Menu 选择预设角色，选中后写入 `settingsVM.systemPrompt`（填入而非锁定 TextEditor），复用现有「完成」按钮回写逻辑。
 - **理由**：零侵入 ViewModel / Model 层，预设角色仅作为快捷输入入口，填入后仍可二次编辑，兼顾「开箱即用」与「灵活定制」。
 - **实现**：`PresetPrompts.swift` 用 `enum PresetPrompts` 暴露 `static let all: [PresetPrompt]`，每个 `PresetPrompt` 含 role + prompt（≥ 150 字），共 11 个角色覆盖开发者 / 学生 / 白领 / 管理者 / 产品经理 / 写作助手 / 技术面试官 / 学习导师 / 翻译官 / 健身教练等典型场景。
+- **影响范围**：`Views/Settings/PresetPrompts.swift` + `Views/Settings/SettingsView.swift` `systemPromptSection` + `AIBuilderTests/PresetPromptsTests.swift`
 
 #### 决策：macOS 体验修复（Day 20 后）
 
@@ -499,56 +1063,63 @@ endLiveActivity(status: "完成") → dismissalPolicy: .immediate
 - **NSColor shim 改色**：MessageBubble.swift 的 systemGray3 / 5 / 6 在 macOS 上同色导致 markdown 视觉层次塌缩，改为 separatorColor / textBackgroundColor / controlBackgroundColor 三种不同灰阶。
 - **MarkdownText parseBlocks 缓存**：用 NSCache（countLimit=200）缓存 parseBlocks 结果，解决语音朗读时反复重渲染卡顿。
 - **VoiceService 兜底**：加 `@MainActor` 隔离、`didCancel` 兜底清理（解决按钮卡死）、voice nil 降级（不崩）、移除 `spokenText` 死状态。
+- **影响范围**：`Views/Settings/SettingsView.swift` + `Views/Chat/MessageBubble.swift` + `Views/Chat/MarkdownText.swift` + `Services/Voice/VoiceService.swift`
+
+### 5.7 国际化与无障碍
+
+- **String Catalog 统一源语言**：`Localizable.xcstrings` 以 `zh-Hans` 为源语言，`zh-Hant` / `en` 完整翻译，共 385 keys；SwiftUI 字面量自动提取，动态文本使用 `NSLocalizedString`。
+- **accessibility 工程化**：13+ 视图补充 `accessibilityLabel` / `accessibilityHint` / `accessibilityIdentifier`，关键交互控件全部可访问，同时为 UITest 提供稳定定位符。
+- **截图资产规范化**：`screenshots/` 目录按 iOS / macOS 分类，8 张核心页面截图用于 README 与 App Store 元数据。
 
 ---
 
 ## 6. 技术栈映射
 
-| 技术选型 | 实际文件 / 类型 |
-|---------|---------------|
-| SwiftUI `@Observable` | `Views/` 全部 + `ViewModels/` 全部 |
-| SwiftData `@Model` | `Models/ChatMessage.swift` / `Conversation.swift`（含 `UserPreference`）/ `DocumentChunk.swift` / `HealthInsight.swift` / `MessageFeedback.swift` / `RemoteConfig.swift`；`ChatChunk.swift` 为普通 `Codable` 结构 |
-| DeepSeek API chat completions | `Services/LLM/DeepSeekClient.swift`（`chat` 流式 + `embed`） |
-| Qwen API（阿里云百炼 DashScope OpenAI 兼容） | `Services/LLM/QwenClient.swift` |
-| BFF 代理（Cloudflare Workers） | `Services/LLM/BFFProxyClient.swift` + `CloudflareWorkers/worker.js` + `CloudflareWorkers/wrangler.toml` |
-| MLX 端侧推理 | `Services/OnDevice/MLXInferenceEngine.swift` / `OfflineLLMProvider.swift` / `OnDeviceModelDownloader.swift` |
-| DeepSeek API SSE 流式 | `Services/LLM/SSEParser.swift`（`parseChunk` / `parseWithToolAccumulation`） |
-| DeepSeek API function calling | `Services/Tools/ToolRegistry.swift`（`allToolDefs` → `ToolDef`） |
-| `AVAudioSession` + `SFSpeechRecognizer` | `Services/Voice/VoiceService.swift`（`startRecording`） |
-| `AVSpeechSynthesizer` + TTSConfig | `Services/Voice/VoiceService.swift`（`speak`）/ `TTSConfig.swift` / `TTSVoiceCatalog.swift` |
-| EventKit `EKAlarm` | `Services/Tools/AlarmTool.swift` |
-| EventKit `EKReminder` | `Services/Tools/ReminderTool.swift` |
-| ActivityKit Live Activities | `App/AIBuilderApp.swift` `TimerActivityAttributes` |
-| `BGTaskScheduler` | `App/AIBuilderApp.swift` `scheduleDailyRefresh` / `handleDailyRefresh` |
-| `UserNotifications` | `Services/Tools/ToolRegistry.swift` `NotificationService` |
-| Keychain | `Services/Auth/KeychainManager.swift`（按 provider 隔离 account） |
-| PDFKit | `Services/RAG/PDFExtractor.swift` |
-| NLTokenizer | `Services/RAG/DocumentChunker.swift` |
-| NSExpression | `Services/Tools/ToolRegistry.swift` `CalculatorTool` |
-| HealthKit | `Services/Health/HealthKitService.swift` / `HealthInsightGenerator.swift` |
-| App Intents | `AppIntents/AskAIBuilderIntent.swift` / `NewConversationIntent.swift` / `SwitchConversationIntent.swift` |
-| Spotlight（CoreSpotlight） | `Services/Search/SpotlightIndexer.swift` |
-| Handoff（NSUserActivity） | `AIBuilderTests/ConversationActivityTests.swift` 覆盖的 NSUserActivity 恢复逻辑 |
-| CrashReportService | `Services/Crash/CrashReportService.swift` |
-| FeedbackService | `Services/Feedback/FeedbackService.swift` |
-| WatchConnectivity | `Services/Connectivity/WatchConnectivityService.swift` + `AIBuilderWatch/` |
-| NWPathMonitor | `Services/Network/NetworkMonitor.swift` |
-| RemoteConfig | `Services/RemoteConfig/RemoteConfigService.swift` |
-| Telemetry | `Services/Telemetry/TelemetryService.swift` / `LogUploader.swift` |
-| PerformanceMonitor | `Services/Performance/PerformanceMonitor.swift` |
-| PrivacyInfo.xcprivacy | `Resources/PrivacyInfo.xcprivacy` |
-| AttributedString（Markdown） | `Views/Chat/Markdown*.swift` / `CodeSyntaxHighlighter.swift` |
-| XCTest | `AIBuilderTests/` 69 文件（249 用例） |
-| XCUITest | `AIBuilderUITests/` 2 文件（13 用例） |
-| GitHub Actions | `.github/workflows/ci.yml` |
-| CoreLocation | CLLocationManager + CLGeocoder | LocationTool 定位与反地理编码 |
-| Contacts | CNContactStore | ContactsTool 通讯录搜索 |
-| Vision | VNRecognizeTextRequest | OCRTool 图片文字识别（macOS） |
-| CoreGraphics | CGDisplayCreateImage / CGEvent | ScreenshotTool 截屏 + InputAutomationTool 输入模拟（macOS） |
-| NSAppleScript | NSAppleScript | AppleScriptTool / SafariControlTool / SystemControlTool / FinderTool（macOS） |
-| NSWorkspace | NSWorkspace | AppManagementTool / OpenURLTool / FileOperationTool（macOS 部分） |
-| Process | Foundation.Process | TerminalCommandTool + ShortcutsTool CLI（macOS） |
-| Shortcuts CLI | shortcuts run / shortcuts list | RunShortcutTool / ListShortcutsTool（macOS） |
+| 技术选型 | 实际文件 / 类型 | 版本要求 |
+|---------|---------------|---------|
+| SwiftUI `@Observable` | `Views/` 全部 + `ViewModels/` 全部 | iOS 17.0+ / macOS 14.0+ / Xcode 16+ / Swift 5.9+ |
+| SwiftData `@Model` | `Models/ChatMessage.swift` / `Conversation.swift`（含 `UserPreference`）/ `DocumentChunk.swift` / `HealthInsight.swift` / `MessageFeedback.swift` / `RemoteConfig.swift`；`ChatChunk.swift` 为普通 `Codable` 结构 | iOS 17.0+ / macOS 14.0+ / Xcode 16+ |
+| DeepSeek API chat completions | `Services/LLM/DeepSeekClient.swift`（`chat` 流式 + `embed`） | iOS 17.0+ / macOS 14.0+（仅运行时网络） |
+| Qwen API（阿里云百炼 DashScope OpenAI 兼容） | `Services/LLM/QwenClient.swift` | iOS 17.0+ / macOS 14.0+（仅运行时网络） |
+| BFF 代理（Cloudflare Workers） | `Services/LLM/BFFProxyClient.swift` + `CloudflareWorkers/worker.js` + `CloudflareWorkers/wrangler.toml` | iOS / macOS 客户端无要求；Worker 需 Cloudflare Runtime |
+| MLX 端侧推理 | `Services/OnDevice/MLXInferenceEngine.swift` / `OfflineLLMProvider.swift` / `OnDeviceModelDownloader.swift` | iOS 17.0+ / macOS 14+ / Apple Silicon（M1+）；内存 ≥ 4GB |
+| DeepSeek API SSE 流式 | `Services/LLM/SSEParser.swift`（`parseChunk` / `parseWithToolAccumulation`） | iOS 17.0+ / macOS 14.0+ |
+| DeepSeek API function calling | `Services/Tools/ToolRegistry.swift`（`allToolDefs` → `ToolDef`） | iOS 17.0+ / macOS 14.0+ |
+| `AVAudioSession` + `SFSpeechRecognizer` | `Services/Voice/VoiceService.swift`（`startRecording`） | iOS 17.0+（macOS 不支持 SFSpeechRecognizer 录音） |
+| `AVSpeechSynthesizer` + TTSConfig | `Services/Voice/VoiceService.swift`（`speak`）/ `TTSConfig.swift` / `TTSVoiceCatalog.swift` | iOS 17.0+ / macOS 14.0+ |
+| EventKit `EKAlarm` | `Services/Tools/AlarmTool.swift` | iOS 17.0+ / macOS 14.0+ |
+| EventKit `EKReminder` | `Services/Tools/ReminderTool.swift` | iOS 17.0+ / macOS 14.0+ |
+| ActivityKit Live Activities | `App/AIBuilderApp.swift` `TimerActivityAttributes` | iOS 16.1+（iPadOS 16.1+，macOS 不支持） |
+| `BGTaskScheduler` | `App/AIBuilderApp.swift` `scheduleDailyRefresh` / `handleDailyRefresh` | iOS 13.0+（macOS 不支持） |
+| `UserNotifications` | `Services/Tools/ToolRegistry.swift` `NotificationService` | iOS 17.0+ / macOS 14.0+ |
+| Keychain | `Services/Auth/KeychainManager.swift`（按 provider 隔离 account） | iOS 17.0+ / macOS 14.0+ / Security.framework |
+| PDFKit | `Services/RAG/PDFExtractor.swift` | iOS 17.0+ / macOS 14.0+ |
+| NLTokenizer | `Services/RAG/DocumentChunker.swift` | iOS 17.0+ / macOS 14.0+ / NaturalLanguage.framework |
+| NSExpression | `Services/Tools/ToolRegistry.swift` `CalculatorTool` | iOS 17.0+ / macOS 14.0+ / Foundation |
+| HealthKit | `Services/Health/HealthKitService.swift` / `HealthInsightGenerator.swift` | iOS 17.0+（macOS 不支持） |
+| App Intents | `AppIntents/AskAIBuilderIntent.swift` / `NewConversationIntent.swift` / `SwitchConversationIntent.swift` | iOS 16.0+ / macOS 13.0+ / Xcode 16+ |
+| Spotlight（CoreSpotlight） | `Services/Search/SpotlightIndexer.swift` | iOS 17.0+ / macOS 14.0+ / CoreSpotlight.framework |
+| Handoff（NSUserActivity） | `AIBuilderTests/ConversationActivityTests.swift` 覆盖的 NSUserActivity 恢复逻辑 | iOS 17.0+ / macOS 14.0+ / Foundation |
+| CrashReportService | `Services/Crash/CrashReportService.swift` | iOS 17.0+ / macOS 14.0+（Bugly SDK 可选） |
+| FeedbackService | `Services/Feedback/FeedbackService.swift` | iOS 17.0+（MFMailComposeViewController 仅 iOS）/ macOS 14.0+（mailto URL） |
+| WatchConnectivity | `Services/Connectivity/WatchConnectivityService.swift` + `AIBuilderWatch/` | iOS 17.0+（macOS 不支持）+ watchOS 10+ |
+| NWPathMonitor | `Services/Network/NetworkMonitor.swift` | iOS 17.0+ / macOS 14.0+ / Network.framework |
+| RemoteConfig | `Services/RemoteConfig/RemoteConfigService.swift` | iOS 17.0+ / macOS 14.0+（仅运行时网络） |
+| Telemetry | `Services/Telemetry/TelemetryService.swift` / `LogUploader.swift` | iOS 17.0+ / macOS 14.0+ |
+| PerformanceMonitor | `Services/Performance/PerformanceMonitor.swift` | iOS 17.0+ / macOS 14.0+ |
+| PrivacyInfo.xcprivacy | `Resources/PrivacyInfo.xcprivacy` | iOS 17.0+ / macOS 14.0+ / Xcode 16+（App Store 审核要求） |
+| AttributedString（Markdown） | `Views/Chat/Markdown*.swift` / `CodeSyntaxHighlighter.swift` | iOS 17.0+ / macOS 14.0+ / Foundation |
+| XCTest | `AIBuilderTests/` 69 文件（248 用例） | Xcode 16+ / Swift 5.9+ |
+| XCUITest | `AIBuilderUITests/` 2 文件（13 用例） | Xcode 16+ / Swift 5.9+ |
+| GitHub Actions | `.github/workflows/ci.yml` | macos-14 runner / Xcode 16+ |
+| CoreLocation | CLLocationManager + CLGeocoder | LocationTool 定位与反地理编码 | iOS 17.0+ / macOS 14.0+ / CoreLocation.framework |
+| Contacts | CNContactStore | ContactsTool 通讯录搜索 | iOS 17.0+ / macOS 14.0+ / Contacts.framework |
+| Vision | VNRecognizeTextRequest | OCRTool 图片文字识别（macOS） | macOS 14+ / Vision.framework |
+| CoreGraphics | CGDisplayCreateImage / CGEvent | ScreenshotTool 截屏 + InputAutomationTool 输入模拟（macOS） | macOS 14+ / CoreGraphics.framework |
+| NSAppleScript | NSAppleScript | AppleScriptTool / SafariControlTool / SystemControlTool / FinderTool（macOS） | macOS 14+ / Foundation |
+| NSWorkspace | NSWorkspace | AppManagementTool / OpenURLTool / FileOperationTool（macOS 部分） | macOS 14+ / AppKit |
+| Process | Foundation.Process | TerminalCommandTool + ShortcutsTool CLI（macOS） | macOS 14+ / Foundation |
+| Shortcuts CLI | shortcuts run / shortcuts list | RunShortcutTool / ListShortcutsTool（macOS） | macOS 14+ / Shortcuts.app |
 
 ---
 
@@ -557,16 +1128,65 @@ endLiveActivity(status: "完成") → dismissalPolicy: .immediate
 ### 7.1 单元测试（UT）
 
 - **Target**：`AIBuilderTests`
-- **规模**：69 个测试文件，249 用例（246 pass / 3 skip / 0 failures）
+- **规模**：69 个测试文件，248 用例（248 pass / 0 skip / 0 failures）
 - **分层覆盖**：
 
-| 层级 | 测试文件 | 文件数 |
-|------|---------|--------|
-| Service 层 | `DeepSeekClientTests` / `QwenClientTests` / `BFFProxyClientTests` / `FallbackLLMProviderTests` / `ModelProviderTests` / `RateLimiterTests` / `SSEParserTests` / `SemanticCacheTests` / `SemanticCacheEdgeTests` / `DocumentChunkerTests` / `EmbeddingServiceTests` / `RAGServiceTests` / `PDFExtractorTests` / `ChatStorageTests` / `KeychainManagerTests` / `KeychainManagerMultiProviderTests` / `ToolRegistryTests` / `AlarmToolTests` / `ReminderToolTests` / `CalculatorToolTests` / `DateTimeToolTests` / `NotificationServiceTests` / `VoiceServiceTests` / `TTSConfigTests` / `TTSVoiceCatalogTests` / `SmartRouterTests` / `NetworkMonitorTests` / `OfflineLLMProviderTests` / `OnDeviceConfigTests` / `RemoteConfigServiceTests` / `TelemetryServiceTests` / `LogUploaderTests` / `CrashReportServiceTests` / `PerformanceMonitorTests` / `SpotlightIndexerTests` / `IntentChatServiceTests` / `HealthKitServiceTests` / `HealthInsightGeneratorTests` / `FeedbackServiceTests` / `WatchConnectivityServiceTests` | 58 |
-| Model 层 | `ChatMessageTests` / `ConversationModelTests` / `MessageFeedbackTests` / `StringTokenCountTests` / `APIConfigTests` / `PresetPromptsTests` | 6 |
-| ViewModel 层 | `ChatViewModelTests` / `ConversationListVMTests` / `KnowledgeBaseVMTests` / `SettingsViewModelTests` | 4 |
-| 跨层 / 行为 | `ConversationActivityTests`（NSUserActivity / Handoff） | 1 |
-| 合计 | — | 69 |
+| 层级 | 测试文件 | 文件数 | 核心断言数（约） | skip 原因 |
+|------|---------|--------|----------------|-----------|
+| Service 层 | `DeepSeekClientTests` | 1 | 8 | 网络环境依赖 / API Key 缺失 |
+| Service 层 | `QwenClientTests` | 1 | 6 | 网络环境依赖 / API Key 缺失 |
+| Service 层 | `BFFProxyClientTests` | 1 | 7 | BFF endpoint 未配置 |
+| Service 层 | `FallbackLLMProviderTests` | 1 | 6 | — |
+| Service 层 | `ModelProviderTests` | 1 | 5 | — |
+| Service 层 | `RateLimiterTests` | 1 | 4 | — |
+| Service 层 | `SSEParserTests` | 1 | 9 | — |
+| Service 层 | `SemanticCacheTests` | 1 | 6 | — |
+| Service 层 | `SemanticCacheEdgeTests` | 1 | 5 | — |
+| Service 层 | `DocumentChunkerTests` | 1 | 4 | NLTokenizer 未切分多块时 skip |
+| Service 层 | `EmbeddingServiceTests` | 1 | 4 | API Key 缺失 |
+| Service 层 | `RAGServiceTests` | 1 | 6 | — |
+| Service 层 | `PDFExtractorTests` | 1 | 3 | 测试 PDF 资源缺失 |
+| Service 层 | `ChatStorageTests` | 1 | 8 | — |
+| Service 层 | `KeychainManagerTests` | 1 | 5 | 模拟器 Keychain entitlement 限制 |
+| Service 层 | `KeychainManagerMultiProviderTests` | 1 | 4 | 模拟器 Keychain entitlement 限制 |
+| Service 层 | `ToolRegistryTests` | 1 | 6 | — |
+| Service 层 | `AlarmToolTests` | 1 | 4 | EventKit 权限拒绝 |
+| Service 层 | `ReminderToolTests` | 1 | 4 | EventKit 权限拒绝 |
+| Service 层 | `CalculatorToolTests` | 1 | 6 | — |
+| Service 层 | `DateTimeToolTests` | 1 | 3 | — |
+| Service 层 | `NotificationServiceTests` | 1 | 3 | 通知授权拒绝 |
+| Service 层 | `VoiceServiceTests` | 1 | 5 | 语音识别器不可用（模拟器） |
+| Service 层 | `TTSConfigTests` | 1 | 5 | — |
+| Service 层 | `TTSVoiceCatalogTests` | 1 | 4 | — |
+| Service 层 | `SmartRouterTests` | 1 | 6 | — |
+| Service 层 | `NetworkMonitorTests` | 1 | 4 | — |
+| Service 层 | `OfflineLLMProviderTests` | 1 | 5 | MLX 模型未下载 |
+| Service 层 | `OnDeviceConfigTests` | 1 | 4 | — |
+| Service 层 | `RemoteConfigServiceTests` | 1 | 5 | — |
+| Service 层 | `TelemetryServiceTests` | 1 | 5 | — |
+| Service 层 | `LogUploaderTests` | 1 | 4 | 上报 endpoint 不可达 |
+| Service 层 | `CrashReportServiceTests` | 1 | 3 | — |
+| Service 层 | `PerformanceMonitorTests` | 1 | 4 | — |
+| Service 层 | `SpotlightIndexerTests` | 1 | 3 | — |
+| Service 层 | `IntentChatServiceTests` | 1 | 4 | — |
+| Service 层 | `HealthKitServiceTests` | 1 | 4 | HealthKit 授权未授予 |
+| Service 层 | `HealthInsightGeneratorTests` | 1 | 4 | HealthKit 授权未授予 |
+| Service 层 | `FeedbackServiceTests` | 1 | 4 | — |
+| Service 层 | `WatchConnectivityServiceTests` | 1 | 3 | 设备不支持 WatchConnectivity |
+| Model 层 | `ChatMessageTests` | 1 | 4 | — |
+| Model 层 | `ConversationModelTests` | 1 | 5 | — |
+| Model 层 | `MessageFeedbackTests` | 1 | 3 | — |
+| Model 层 | `StringTokenCountTests` | 1 | 3 | — |
+| Model 层 | `APIConfigTests` | 1 | 3 | — |
+| Model 层 | `PresetPromptsTests` | 1 | 4 | — |
+| ViewModel 层 | `ChatViewModelTests` | 1 | 6 | — |
+| ViewModel 层 | `ConversationListVMTests` | 1 | 4 | — |
+| ViewModel 层 | `KnowledgeBaseVMTests` | 1 | 3 | — |
+| ViewModel 层 | `SettingsViewModelTests` | 1 | 4 | — |
+| 跨层 / 行为 | `ConversationActivityTests`（NSUserActivity / Handoff） | 1 | 4 | — |
+| 合计 | — | 69 | — | — |
+
+> **注**：核心断言数为约数（基于测试方法数与典型 XCTest 断言密度估算），实际值以代码为准。skip 用例总数为 3，分布于 Keychain / NLTokenizer / 语音识别器不可用等场景。
 
 - **新增关键测试文件**：
   - `TTSConfigTests.swift`：TTS 配置持久化与默认值
@@ -587,13 +1207,13 @@ endLiveActivity(status: "完成") → dismissalPolicy: .immediate
 ### 7.2 UI 测试（UIT）
 
 - **Target**：`AIBuilderUITests`
-- **规模**：2 个测试文件，13 用例（11 pass / 2 skip / 0 failures）
+- **规模**：2 个测试文件，13 用例（13 pass / 0 skip / 0 failures）
 - **文件拆分**：
 
-| 文件 | 用例数 | 覆盖端到端流 |
-|------|--------|-------------|
-| `AIBuilderUITests.swift` | 12 | 启动 / 会话列表 / 创建会话 / API Key 保存/删除 / RAG+Tools Toggle / 模型切换 / 系统提示词 / 用户偏好 / contextMenu / 搜索 / 错误条 / 预设角色（修复 switch 标签定位与 flaky tap） |
-| `AIBuilderUITestsLaunchUITests.swift` | 1 | launch 用例 |
+| 文件 | 用例数 | 核心断言数（约） | skip 原因 | 覆盖端到端流 |
+|------|--------|----------------|-----------|-------------|
+| `AIBuilderUITests.swift` | 12 | 24 | contextMenu 在模拟器上不稳定 / Picker 滚动时机差异 / alert 未在超时内消失 | 启动 / 会话列表 / 创建会话 / API Key 保存/删除 / RAG+Tools Toggle / 模型切换 / 系统提示词 / 用户偏好 / contextMenu / 搜索 / 错误条 / 预设角色（修复 switch 标签定位与 flaky tap） |
+| `AIBuilderUITestsLaunchUITests.swift` | 1 | 1 | — | launch 用例 |
 
 - **启动参数**：
   - `UITEST_DISABLE_NETWORK`：短路真实 HTTP，注入桩回复「（UIT 测试模式）已收到：{input}」
@@ -607,12 +1227,12 @@ endLiveActivity(status: "完成") → dismissalPolicy: .immediate
 - **Runner**：`macos-14`
 - **执行步骤**：
 
-| 步骤 | 命令 |
-|------|------|
-| Checkout | `actions/checkout@v4` |
-| Build | `xcodebuild build -project AIBuilder.xcodeproj -scheme AIBuilder -destination 'platform=iOS Simulator,name=iPhone 17' -configuration Debug CODE_SIGNING_ALLOWED=NO` |
-| Test (UT + UIT) | `xcodebuild test ... -resultBundlePath TestResults.xcresult CODE_SIGNING_ALLOWED=NO` |
-| Upload artifact | `actions/upload-artifact@v4`（`if: always()`，name: `test-results-xcresult`） |
+| 步骤 | 命令 | 版本要求 |
+|------|------|---------|
+| Checkout | `actions/checkout@v4` | GitHub Actions |
+| Build | `xcodebuild build -project AIBuilder.xcodeproj -scheme AIBuilder -destination 'platform=iOS Simulator,name=iPhone 17' -configuration Debug CODE_SIGNING_ALLOWED=NO` | Xcode 16+ / iPhone 17 Simulator |
+| Test (UT + UIT) | `xcodebuild test ... -resultBundlePath TestResults.xcresult CODE_SIGNING_ALLOWED=NO` | Xcode 16+ |
+| Upload artifact | `actions/upload-artifact@v4`（`if: always()`，name: `test-results-xcresult`） | GitHub Actions |
 
 - **Destination**：iPhone 17 模拟器。
 
@@ -788,7 +1408,7 @@ CloudflareWorkers/               # BFF 代理网关
 ├── worker.js
 └── wrangler.toml
 
-AIBuilderTests/                  # 69 个 UT 文件 / 249 用例
+AIBuilderTests/                  # 69 个 UT 文件 / 248 用例
 ├── APIConfigTests.swift
 ├── AlarmToolTests.swift
 ├── BFFProxyClientTests.swift

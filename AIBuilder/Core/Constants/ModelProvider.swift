@@ -12,8 +12,8 @@ enum ModelProvider: String, CaseIterable, Sendable {
     var displayName: String {
         switch self {
         case .deepseek: return "DeepSeek"
-        case .qwen: return "通义千问 Qwen"
-        case .onDevice: return "端侧推理"
+        case .qwen: return NSLocalizedString("通义千问 Qwen", comment: "")
+        case .onDevice: return NSLocalizedString("端侧推理", comment: "")
         }
     }
 

@@ -5,7 +5,7 @@ struct TypingIndicator: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: Spacing.sm) {
             ForEach(0..<3, id: \.self) { index in
                 Circle()
                     .fill(Color.secondary)
@@ -15,9 +15,9 @@ struct TypingIndicator: View {
                     .accessibilityHidden(true)
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(Color(.systemGray6))
+        .padding(.horizontal, Spacing.lg)
+        .padding(.vertical, Spacing.md)
+        .background(Color.backgroundTertiary)
         #if os(iOS)
         .clipShape(RoundedCornerShape(radius: 16, corners: [.topLeft, .topRight, .bottomRight]))
         #else

@@ -13,7 +13,7 @@ struct HealthSettingsView: View {
     @Bindable var chatViewModel: ChatViewModel
 
     /// 授权状态文案
-    @State private var authorizationStatus: String = "未授权"
+    @State private var authorizationStatus: String = NSLocalizedString("未授权", comment: "")
     /// 是否正在生成洞察
     @State private var isGenerating: Bool = false
     /// 生成结果提示
@@ -37,23 +37,32 @@ struct HealthSettingsView: View {
                         await requestAuthorization()
                     }
                 }
+                .accessibilityLabel("请求 HealthKit 授权")
+                .accessibilityHint("授权后可读取心率、睡眠、步数等健康数据")
+                .accessibilityIdentifier("requestHealthAuthButton")
                 #if os(iOS)
                 Button("跳转系统设置") {
                     if let url = URL(string: UIApplication.openSettingsURLString) {
                         UIApplication.shared.open(url)
                     }
                 }
+                .accessibilityLabel("跳转系统设置")
+                .accessibilityHint("前往系统设置中修改健康数据权限")
+                .accessibilityIdentifier("openHealthSettingsButton")
                 #endif
             }
 
             // MARK: - 健康上下文
             Section {
                 Toggle("注入健康上下文", isOn: $chatViewModel.injectHealthContext)
+                    .accessibilityLabel("注入健康上下文")
+                    .accessibilityHint("发送消息时注入最近健康数据")
+                    .accessibilityIdentifier("injectHealthContextToggle")
             } header: {
                 Text("健康上下文")
             } footer: {
                 Text("开启后发送消息时会注入最近 24 小时的睡眠/心率/步数数据，AI 将给出针对性建议。")
-                    .font(.caption2)
+                    .font(.captionAI)
             }
 
             // MARK: - 洞察
@@ -62,6 +71,9 @@ struct HealthSettingsView: View {
                     Task { await generateInsight() }
                 }
                 .disabled(isGenerating)
+                .accessibilityLabel("立即生成洞察")
+                .accessibilityHint("基于最近健康数据生成洞察")
+                .accessibilityIdentifier("generateHealthInsightButton")
 
                 if isGenerating {
                     HStack {
@@ -73,26 +85,26 @@ struct HealthSettingsView: View {
 
                 if let msg = generateMessage {
                     Text(msg)
-                        .font(.caption)
+                        .font(.captionAI)
                         .foregroundStyle(msg.contains("失败") ? .red : .green)
                 }
 
                 ForEach(insights) { insight in
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: Spacing.sm) {
                         HStack {
                             Text(insight.insightType)
-                                .font(.caption)
+                                .font(.captionAI)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
                                 .background(Color.blue.opacity(0.15))
                                 .cornerRadius(4)
                             Spacer()
                             Text(insight.timestamp.formatted(.dateTime.month().day().hour().minute()))
-                                .font(.caption2)
+                                .font(.captionAI)
                                 .foregroundStyle(.secondary)
                         }
                         Text(insight.content)
-                            .font(.caption)
+                            .font(.captionAI)
                             .lineLimit(5)
                     }
                 }
@@ -100,13 +112,14 @@ struct HealthSettingsView: View {
                 Text("洞察")
             } footer: {
                 Text("每天 09:00 自动生成一次，也可手动触发。")
-                    .font(.caption2)
+                    .font(.captionAI)
             }
         }
         .navigationTitle("健康管理")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
+        .accessibilityIdentifier("HealthSettingsView")
         .onAppear {
             refreshAuthorizationStatus()
         }
@@ -121,10 +134,10 @@ struct HealthSettingsView: View {
         }
         do {
             try await chatViewModel.healthKitService?.requestAuthorization()
-            authorizationStatus = "已授权"
+            authorizationStatus = NSLocalizedString("已授权", comment: "")
         } catch {
-            authorizationStatus = "未授权"
-            generateMessage = "授权失败：\(error.localizedDescription)"
+            authorizationStatus = NSLocalizedString("未授权", comment: "")
+            generateMessage = String(format: NSLocalizedString("授权失败：%@", comment: ""), error.localizedDescription)
         }
         #endif
     }
@@ -135,7 +148,7 @@ struct HealthSettingsView: View {
         if chatViewModel.healthKitService == nil {
             chatViewModel.healthKitService = HealthKitService()
         }
-        authorizationStatus = (chatViewModel.healthKitService?.isAuthorized ?? false) ? "已授权" : "未授权"
+        authorizationStatus = (chatViewModel.healthKitService?.isAuthorized ?? false) ? NSLocalizedString("已授权", comment: "") : NSLocalizedString("未授权", comment: "")
         #endif
     }
 
@@ -148,9 +161,9 @@ struct HealthSettingsView: View {
             let generator = HealthInsightGenerator.make(modelContext: modelContext)
             let insight = try await generator.generateInsight(days: 7)
             generator.sendInsightNotification(insight)
-            generateMessage = "洞察已生成"
+            generateMessage = NSLocalizedString("洞察已生成", comment: "")
         } catch {
-            generateMessage = "生成失败：\(error.localizedDescription)"
+            generateMessage = String(format: NSLocalizedString("生成失败：%@", comment: ""), error.localizedDescription)
         }
     }
 }

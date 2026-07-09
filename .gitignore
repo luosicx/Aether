@@ -24,3 +24,10 @@ output/
 # Swift Package Manager 缓存
 .build/
 Package.resolved
+
+# Xcode test result bundles
+*.xcresult/
+TestResults.xcresult/
+
+# i18n extraction intermediate JSON
+scripts/*.json

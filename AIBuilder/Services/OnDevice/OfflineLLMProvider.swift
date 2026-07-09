@@ -35,7 +35,7 @@ nonisolated final class OfflineLLMProvider: LLMProvider {
         AsyncStream { continuation in
             if !tools.isEmpty {
                 // 端侧模型不支持工具调用，发错误通知让 ChatViewModel 自动降级到云端
-                let err = LLMError.llmErrorOccurred("端侧模型不支持工具调用，已自动切换到云端")
+                let err = LLMError.llmErrorOccurred(NSLocalizedString("端侧模型不支持工具调用，已自动切换到云端", comment: ""))
                 Task { @MainActor in
                     NotificationCenter.default.post(
                         name: .llmErrorOccurred,

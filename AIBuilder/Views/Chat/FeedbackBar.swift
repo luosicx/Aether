@@ -19,6 +19,8 @@ struct FeedbackBar: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("赞")
+            .accessibilityHint("标记此回复为有帮助")
+            .accessibilityIdentifier("thumbsUpButton")
 
             Button {
                 onFeedback(false)
@@ -29,6 +31,8 @@ struct FeedbackBar: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("踩")
+            .accessibilityHint("标记此回复为无帮助")
+            .accessibilityIdentifier("thumbsDownButton")
         }
     }
 }

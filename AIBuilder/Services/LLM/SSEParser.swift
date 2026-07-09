@@ -27,7 +27,7 @@ final class SSEParser: @unchecked Sendable {
         guard let chunk = parseChunk(from: line) else { return nil }
         guard let choice = chunk.choices?.first else { return nil }
 
-        var content = choice.delta?.content
+        let content = choice.delta?.content
 
         if let toolDeltas = choice.delta?.tool_calls {
             for td in toolDeltas {

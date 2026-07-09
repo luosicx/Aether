@@ -48,6 +48,8 @@
 	<string>用于语音识别功能</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
+	<key>NSApplicationSupportsMultipleWindows</key>
+	<true/>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

@@ -55,7 +55,7 @@ nonisolated final class BFFProxyClient: LLMProvider {
         ]
         guard let jsonData = try? JSONSerialization.data(withJSONObject: body),
               let url = URL(string: config.endpointURL.appending(path: "v1/embeddings").absoluteString) else {
-            throw LLMError.unknown("无效的 BFF embedding 请求")
+            throw LLMError.unknown(NSLocalizedString("无效的 BFF embedding 请求", comment: ""))
         }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -268,13 +268,13 @@ nonisolated final class BFFProxyClient: LLMProvider {
         let err: LLMError
         switch http.statusCode {
         case 401:
-            err = .llmErrorOccurred("BFF Token 无效")
+            err = .llmErrorOccurred(NSLocalizedString("BFF Token 无效", comment: ""))
         case 429:
             // 解析 Retry-After Header（秒），缺省 60
             let retryAfter = Double(http.value(forHTTPHeaderField: "Retry-After") ?? "") ?? 60
             err = .rateLimited(retryAfter: max(retryAfter, 1))
         case 500...599:
-            err = .llmErrorOccurred("BFF 服务异常")
+            err = .llmErrorOccurred(NSLocalizedString("BFF 服务异常", comment: ""))
         default:
             err = .apiError(code: http.statusCode, message: "BFF HTTP \(http.statusCode)")
         }

@@ -99,6 +99,7 @@ final class ChatStorage {
         let chunkDescriptor = FetchDescriptor<DocumentChunk>()
         let feedbackDescriptor = FetchDescriptor<MessageFeedback>()
         let insightDescriptor = FetchDescriptor<HealthInsight>()
+        let preferenceDescriptor = FetchDescriptor<UserPreference>()
 
         if let conversations = try? modelContext.fetch(conversationDescriptor) {
             for conv in conversations { modelContext.delete(conv) }
@@ -114,6 +115,9 @@ final class ChatStorage {
         }
         if let insights = try? modelContext.fetch(insightDescriptor) {
             for insight in insights { modelContext.delete(insight) }
+        }
+        if let prefs = try? modelContext.fetch(preferenceDescriptor) {
+            for pref in prefs { modelContext.delete(pref) }
         }
         try? modelContext.save()
     }

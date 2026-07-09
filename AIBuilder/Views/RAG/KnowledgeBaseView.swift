@@ -63,9 +63,15 @@ struct KnowledgeBaseView: View {
                     Button { showPicker = true } label: {
                         Image(systemName: "plus").fontWeight(.medium)
                     }
+                    .accessibilityLabel("导入文档")
+                    .accessibilityHint("从文件选择 PDF 或文本文档导入知识库")
+                    .accessibilityIdentifier("importDocumentButton")
                 }
                 ToolbarItem(placement: .topBarLeading) {
                     Button("完成") { dismiss() }
+                        .accessibilityLabel("完成")
+                        .accessibilityHint("关闭知识库")
+                        .accessibilityIdentifier("knowledgeBaseDoneButton")
                 }
             }
             #endif
@@ -93,9 +99,15 @@ struct KnowledgeBaseView: View {
                     Button { showPicker = true } label: {
                         Image(systemName: "plus").fontWeight(.medium)
                     }
+                    .accessibilityLabel("导入文档")
+                    .accessibilityHint("从文件选择 PDF 或文本文档导入知识库")
+                    .accessibilityIdentifier("importDocumentButton")
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("完成") { dismiss() }
+                        .accessibilityLabel("完成")
+                        .accessibilityHint("关闭知识库")
+                        .accessibilityIdentifier("knowledgeBaseDoneButton")
                 }
             }
         } detail: {
@@ -110,34 +122,13 @@ struct KnowledgeBaseView: View {
     // MARK: - 空状态
 
     private var emptyState: some View {
-        VStack(spacing: 20) {
-            ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [Color.accentColor.opacity(0.12), Color.accentColor.opacity(0.04)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .frame(width: 88, height: 88)
-                Image(systemName: "book.closed")
-                    .font(.system(size: 34, weight: .light))
-                    .foregroundStyle(Color.accentColor.opacity(0.7))
-            }
-
-            VStack(spacing: 6) {
-                Text("知识库为空")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(.primary)
-                Text("导入 PDF 或文本文档，让 AI 基于你的资料回答")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        EmptyStateView(
+            systemImage: "doc.text",
+            title: "暂无文档",
+            message: "导入文档以启用 RAG 知识库",
+            primaryButtonTitle: "导入文档",
+            primaryAction: { showPicker = true }
+        )
     }
 
     // MARK: - 文档列表 (Compact)
@@ -150,7 +141,7 @@ struct KnowledgeBaseView: View {
                         .font(.body.weight(.medium))
                         .lineLimit(1)
                     HStack(spacing: 8) {
-                        Text("\(doc.chunkCount) 个片段")
+                        Text(String(format: NSLocalizedString("%d 个片段", comment: ""), doc.chunkCount))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Text(doc.createdAt, style: .relative)
@@ -159,12 +150,19 @@ struct KnowledgeBaseView: View {
                     }
                 }
                 .padding(.vertical, 4)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(doc.source)
+                .accessibilityHint("查看文档分块")
+                .accessibilityIdentifier("documentRow_\(doc.id)")
                 .swipeActions(edge: .trailing) {
                     Button(role: .destructive) {
                         vm.deleteDocument(source: doc.source, modelContext: modelContext)
                     } label: {
                         Label("删除", systemImage: "trash")
                     }
+                    .accessibilityLabel("删除")
+                    .accessibilityHint("从知识库删除此文档")
+                    .accessibilityIdentifier("deleteDocumentButton")
                 }
             }
         }
@@ -183,7 +181,7 @@ struct KnowledgeBaseView: View {
                         .font(.body.weight(.medium))
                         .lineLimit(1)
                     HStack(spacing: 8) {
-                        Text("\(doc.chunkCount) 个片段")
+                        Text(String(format: NSLocalizedString("%d 个片段", comment: ""), doc.chunkCount))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Text(doc.createdAt, style: .relative)
@@ -193,6 +191,10 @@ struct KnowledgeBaseView: View {
                 }
                 .tag(doc)
                 .padding(.vertical, 4)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(doc.source)
+                .accessibilityHint("查看文档分块")
+                .accessibilityIdentifier("documentRow_\(doc.id)")
                 .swipeActions(edge: .trailing) {
                     Button(role: .destructive) {
                         if selectedDocument == doc {
@@ -202,6 +204,9 @@ struct KnowledgeBaseView: View {
                     } label: {
                         Label("删除", systemImage: "trash")
                     }
+                    .accessibilityLabel("删除")
+                    .accessibilityHint("从知识库删除此文档")
+                    .accessibilityIdentifier("deleteDocumentButton")
                 }
             }
         }
@@ -218,7 +223,7 @@ struct KnowledgeBaseView: View {
                     Text(doc.source)
                         .font(.title2.bold())
                     HStack(spacing: 8) {
-                        Text("\(doc.chunkCount) 个片段")
+                        Text(String(format: NSLocalizedString("%d 个片段", comment: ""), doc.chunkCount))
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                         Text("·")
@@ -232,10 +237,10 @@ struct KnowledgeBaseView: View {
                 ForEach(chunks) { chunk in
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {
-                            Text("片段 \(chunk.chunkIndex + 1)")
+                            Text(String(format: NSLocalizedString("片段 %d", comment: ""), chunk.chunkIndex + 1))
                                 .font(.headline)
                             Spacer()
-                            Text(chunk.weight < 1.0 ? "权重 \(String(format: "%.1f", chunk.weight))" : "")
+                            Text(chunk.weight < 1.0 ? String(format: NSLocalizedString("权重 %.1f", comment: ""), chunk.weight) : "")
                                 .font(.caption2)
                                 .foregroundStyle(.tertiary)
                         }

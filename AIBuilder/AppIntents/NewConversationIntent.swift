@@ -7,7 +7,7 @@ import SwiftData
 /// （schema 与 AIBuilderApp 保持一致以保证读写同一 SQLite 文件）。
 struct NewConversationIntent: AppIntent {
     /// Siri / 快捷指令中显示的标题
-    static var title: LocalizedStringResource = "New Conversation"
+    static var title: LocalizedStringResource = "新建对话"
     /// 描述（用于快捷指令详情页）
     static var description = IntentDescription("在 AI Builder 中创建新对话")
 

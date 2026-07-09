@@ -42,7 +42,7 @@ final class SettingsViewModel {
     @ObservationIgnored private var isLoadingFromRemote = false
 
     /// 默认人设（新建对话时使用，不与具体会话绑定）
-    static let defaultSystemPrompt = "你是一个有帮助的AI助手。"
+    nonisolated static let defaultSystemPrompt = "你是一个有帮助的AI助手。"
 
     /// 可选模型列表 ["deepseek-chat", "deepseek-reasoner"]
     let availableModels = ["deepseek-chat", "deepseek-reasoner"]
@@ -151,9 +151,9 @@ final class SettingsViewModel {
         do {
             let key = provider == .deepseek ? deepseekAPIKey : qwenAPIKey
             try KeychainManager.shared.saveAPIKey(key, for: provider)
-            saveMessage = "\(provider.displayName) API Key 已保存"
+            saveMessage = String(format: NSLocalizedString("%@ API Key 已保存", comment: ""), provider.displayName)
         } catch {
-            saveMessage = "保存失败：\(error.localizedDescription)"
+            saveMessage = String(format: NSLocalizedString("保存失败：%@", comment: ""), error.localizedDescription)
         }
     }
 
@@ -165,7 +165,7 @@ final class SettingsViewModel {
         } else {
             qwenAPIKey = ""
         }
-        saveMessage = "\(provider.displayName) API Key 已删除"
+        saveMessage = String(format: NSLocalizedString("%@ API Key 已删除", comment: ""), provider.displayName)
     }
 
     /// 旧 API（向后兼容）：等价于 provider: .deepseek

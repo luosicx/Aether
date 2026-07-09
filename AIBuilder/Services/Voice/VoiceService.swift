@@ -1,11 +1,11 @@
 import Foundation
 import Speech
-import AVFoundation
+@preconcurrency import AVFoundation
 
 /// 语音服务，封装 SFSpeechRecognizer 语音识别和 AVSpeechSynthesizer 语音合成。@Observable 支持 UI 绑定。
 @MainActor
 @Observable
-final class VoiceService: NSObject, AVSpeechSynthesizerDelegate {
+final class VoiceService: NSObject {
     /// 是否正在录音
     var isRecording = false
     /// 当前识别结果文本（实时更新）
@@ -33,6 +33,15 @@ final class VoiceService: NSObject, AVSpeechSynthesizerDelegate {
     private var isUserInitiatedStop = false
     /// 错误消息（如语音不可用降级提示），nil 表示无错误
     var errorMessage: String?
+    /// 音色解析缓存（实例级），避免每次朗读都查询系统语音目录阻塞主线程
+    private var cachedVoice: AVSpeechSynthesisVoice?
+    /// cachedVoice 对应的 voiceIdentifier（nil 表示尚未缓存）
+    private var cachedVoiceIdentifier: String?
+    /// 识别器可用性检查（测试可注入；默认使用真实 SFSpeechRecognizer）
+    internal var recognizerAvailabilityCheck: () -> Bool = {
+        let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "zh-CN"))
+        return recognizer?.isAvailable ?? false
+    }
 
     /// 初始化合成器和 delegate
     override init() {
@@ -54,8 +63,11 @@ final class VoiceService: NSObject, AVSpeechSynthesizerDelegate {
     /// 未激活时 inputNode.outputFormat 返回 sampleRate=0/channelCount=0 无效格式，installTab 会崩
     /// IsFormatSampleRateAndChannelCountValid）；3) 创建识别请求；4) installTap 接收音频；5) 启动 audioEngine。
     func startRecording() throws {
-        guard let recognizer = speechRecognizer, recognizer.isAvailable else {
-            throw NSError(domain: "VoiceService", code: -1, userInfo: [NSLocalizedDescriptionKey: "语音识别器不可用"])
+        guard recognizerAvailabilityCheck() else {
+            throw NSError(domain: "VoiceService", code: -1, userInfo: [NSLocalizedDescriptionKey: NSLocalizedString("语音识别器不可用", comment: "")])
+        }
+        guard let recognizer = speechRecognizer else {
+            throw NSError(domain: "VoiceService", code: -1, userInfo: [NSLocalizedDescriptionKey: NSLocalizedString("语音识别器不可用", comment: "")])
         }
         // 1) 激活 AVAudioSession — 必须在取 outputFormat / installTap 之前完成，
         //    否则 inputNode.outputFormat(forBus:0) 会返回 sampleRate=0 / channelCount=0 的无效格式，
@@ -150,24 +162,41 @@ final class VoiceService: NSObject, AVSpeechSynthesizerDelegate {
     /// rate / pitchMultiplier / volume 做 range clamp 保证安全。
     private func applyConfig(utterance: AVSpeechUtterance, config: TTSConfig?) {
         let cfg = config ?? .defaultValue
-        // 解析音色
-        if !cfg.voiceIdentifier.isEmpty,
-           let voice = TTSVoiceCatalog.voice(for: cfg.voiceIdentifier) {
-            utterance.voice = voice
-        } else {
-            // macOS 上未安装 zh-CN 语音时 AVSpeechSynthesisVoice(language:) 可能返回 nil
-            let voice = AVSpeechSynthesisVoice(language: "zh-CN")
-            if voice == nil {
-                errorMessage = "未找到中文语音，使用默认语音"
-            }
-            utterance.voice = voice  // nil 时用系统默认 voice，确保 didFinish 正常回调
-        }
+        // 解析音色（带实例级缓存，避免重复查询系统语音目录）
+        utterance.voice = resolveVoice(for: cfg.voiceIdentifier)
         // 应用语速（0...1）
         utterance.rate = Float(max(0, min(1, cfg.rate)))
         // 应用音调（0.5...2.0）
         utterance.pitchMultiplier = Float(max(0.5, min(2.0, cfg.pitchMultiplier)))
         // 应用音量（0...1）
         utterance.volume = max(0, min(1, cfg.volume))
+    }
+
+    /// 根据 voiceIdentifier 解析音色，命中缓存时直接复用，避免每次朗读都调用
+    /// AVSpeechSynthesisVoice(language:) / TTSVoiceCatalog.voice(for:) 阻塞主线程。
+    /// - identifier 非空且 catalog 命中：用 catalog voice
+    /// - identifier 为空或 catalog 未命中：回退 zh-CN（macOS 未安装时返回 nil 并设置 errorMessage）
+    /// - identifier 为空时以空字符串作为缓存 key
+    private func resolveVoice(for identifier: String) -> AVSpeechSynthesisVoice? {
+        // 命中缓存（含 nil 缓存）：identifier 一致即复用，跳过系统语音目录查询
+        if identifier == cachedVoiceIdentifier {
+            return cachedVoice
+        }
+        // 解析新 voice（与原 applyConfig 逻辑一致）
+        let resolved: AVSpeechSynthesisVoice?
+        if !identifier.isEmpty,
+           let voice = TTSVoiceCatalog.voice(for: identifier) {
+            resolved = voice
+        } else {
+            // macOS 上未安装 zh-CN 语音时 AVSpeechSynthesisVoice(language:) 可能返回 nil
+            resolved = AVSpeechSynthesisVoice(language: "zh-CN")
+            if resolved == nil {
+                errorMessage = NSLocalizedString("未找到中文语音，使用默认语音", comment: "")
+            }
+        }
+        cachedVoice = resolved
+        cachedVoiceIdentifier = identifier
+        return resolved
     }
 
     /// 释放音频资源
@@ -183,8 +212,12 @@ final class VoiceService: NSObject, AVSpeechSynthesizerDelegate {
         #endif
     }
 
-    // MARK: - AVSpeechSynthesizerDelegate
+}
 
+// MARK: - AVSpeechSynthesizerDelegate
+
+@MainActor
+extension VoiceService: @preconcurrency AVSpeechSynthesizerDelegate {
     /// 自然结束才触发 onSpeakFinished。试听结束不触发回调。
     func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
         Task { @MainActor [weak self] in

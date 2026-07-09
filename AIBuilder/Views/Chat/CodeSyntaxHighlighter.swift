@@ -1,24 +1,63 @@
 import SwiftUI
 
+/// 代码语法高亮主题（深浅色）
+enum SyntaxTheme {
+    case light
+    case dark
+
+    /// 关键字
+    var keyword: Color {
+        switch self {
+        case .light: return Color(red: 0.51, green: 0.20, blue: 0.55)
+        case .dark:  return Color(red: 0.84, green: 0.51, blue: 0.84)
+        }
+    }
+    /// 字符串
+    var string: Color {
+        switch self {
+        case .light: return Color(red: 0.16, green: 0.55, blue: 0.24)
+        case .dark:  return Color(red: 0.51, green: 0.78, blue: 0.51)
+        }
+    }
+    /// 注释
+    var comment: Color {
+        switch self {
+        case .light: return Color(red: 0.40, green: 0.40, blue: 0.40)
+        case .dark:  return Color(red: 0.55, green: 0.55, blue: 0.55)
+        }
+    }
+    /// 数字
+    var number: Color {
+        switch self {
+        case .light: return Color(red: 0.80, green: 0.40, blue: 0.00)
+        case .dark:  return Color(red: 0.95, green: 0.69, blue: 0.40)
+        }
+    }
+    /// 类型名
+    var type: Color {
+        switch self {
+        case .light: return Color(red: 0.20, green: 0.40, blue: 0.80)
+        case .dark:  return Color(red: 0.55, green: 0.78, blue: 0.95)
+        }
+    }
+    /// 函数名
+    var function: Color {
+        switch self {
+        case .light: return Color(red: 0.40, green: 0.20, blue: 0.80)
+        case .dark:  return Color(red: 0.69, green: 0.51, blue: 0.95)
+        }
+    }
+    /// 普通文本
+    var plainText: Color {
+        switch self {
+        case .light: return Color.primary
+        case .dark:  return Color(red: 0.92, green: 0.93, blue: 0.94)
+        }
+    }
+}
+
 /// 轻量级代码语法高亮器：基于正则匹配关键字/字符串/注释/数字
 enum CodeSyntaxHighlighter {
-    // MARK: - 深色主题配色（类似 Xcode 深色）
-
-    /// 关键字：粉紫色
-    static let keywordColor = Color(red: 0.85, green: 0.45, blue: 0.85)
-    /// 字符串：绿色
-    static let stringColor = Color(red: 0.55, green: 0.80, blue: 0.50)
-    /// 注释：灰色斜体
-    static let commentColor = Color(red: 0.50, green: 0.55, blue: 0.60)
-    /// 数字：橙色
-    static let numberColor = Color(red: 0.90, green: 0.65, blue: 0.40)
-    /// 类型名：黄色
-    static let typeColor = Color(red: 0.85, green: 0.80, blue: 0.50)
-    /// 函数名：蓝色
-    static let functionColor = Color(red: 0.50, green: 0.70, blue: 0.95)
-    /// 普通文本：浅灰白
-    static let plainColor = Color(red: 0.88, green: 0.88, blue: 0.88)
-
     // MARK: - 语言关键字
 
     private static let keywords: [String: Set<String>] = [
@@ -38,23 +77,27 @@ enum CodeSyntaxHighlighter {
     // MARK: - 高亮入口
 
     /// 将代码转换为带语法高亮的 AttributedString
-    static func highlight(_ code: String, language: String?) -> AttributedString {
+    /// - Parameters:
+    ///   - code: 源代码文本
+    ///   - language: 语言标识（如 "swift" / "python"）
+    ///   - theme: 语法高亮主题（默认 `.dark`，保持历史行为）
+    static func highlight(_ code: String, language: String?, theme: SyntaxTheme = .dark) -> AttributedString {
         let lang = (language ?? "").lowercased()
         var attributed = AttributedString(code)
-        attributed.foregroundColor = plainColor
+        attributed.foregroundColor = theme.plainText
 
         // 通用高亮：字符串、注释、数字（所有语言适用）
-        applyStringHighlights(&attributed, code: code)
-        applyCommentHighlights(&attributed, code: code)
-        applyNumberHighlights(&attributed, code: code)
+        applyStringHighlights(&attributed, code: code, theme: theme)
+        applyCommentHighlights(&attributed, code: code, theme: theme)
+        applyNumberHighlights(&attributed, code: code, theme: theme)
 
         // 语言特定关键字高亮
         if let keywordSet = keywords[lang] ?? keywords[lang.replacingOccurrences(of: " ", with: "")] {
-            applyKeywordHighlights(&attributed, code: code, keywords: keywordSet, caseSensitive: lang != "sql")
+            applyKeywordHighlights(&attributed, code: code, keywords: keywordSet, caseSensitive: lang != "sql", theme: theme)
         } else {
             // 未知语言：尝试大小写不敏感匹配通用关键字
             let allKeywords = Set(keywords.values.flatMap { $0 })
-            applyKeywordHighlights(&attributed, code: code, keywords: allKeywords, caseSensitive: true)
+            applyKeywordHighlights(&attributed, code: code, keywords: allKeywords, caseSensitive: true, theme: theme)
         }
 
         return attributed
@@ -62,42 +105,42 @@ enum CodeSyntaxHighlighter {
 
     // MARK: - 字符串高亮
 
-    private static func applyStringHighlights(_ attributed: inout AttributedString, code: String) {
+    private static func applyStringHighlights(_ attributed: inout AttributedString, code: String, theme: SyntaxTheme) {
         // 双引号字符串
         let pattern = #""(?:[^"\\]|\\.)*""#
-        highlightPattern(&attributed, code: code, pattern: pattern, color: stringColor)
+        highlightPattern(&attributed, code: code, pattern: pattern, color: theme.string)
         // 单引号字符串
         let singlePattern = #"'(?:[^'\\]|\\.)*'"#
-        highlightPattern(&attributed, code: code, pattern: singlePattern, color: stringColor)
+        highlightPattern(&attributed, code: code, pattern: singlePattern, color: theme.string)
     }
 
     // MARK: - 注释高亮
 
-    private static func applyCommentHighlights(_ attributed: inout AttributedString, code: String) {
+    private static func applyCommentHighlights(_ attributed: inout AttributedString, code: String, theme: SyntaxTheme) {
         // 单行注释 //
         let singleLinePattern = #"//[^\n]*"#
-        highlightPattern(&attributed, code: code, pattern: singleLinePattern, color: commentColor, italic: true)
+        highlightPattern(&attributed, code: code, pattern: singleLinePattern, color: theme.comment, italic: true)
         // 单行注释 #
         let hashPattern = #"#[^\n]*"#
-        highlightPattern(&attributed, code: code, pattern: hashPattern, color: commentColor, italic: true)
+        highlightPattern(&attributed, code: code, pattern: hashPattern, color: theme.comment, italic: true)
         // 多行注释 /* ... */
         let multiPattern = #"/\*[\s\S]*?\*/"#
-        highlightPattern(&attributed, code: code, pattern: multiPattern, color: commentColor, italic: true)
+        highlightPattern(&attributed, code: code, pattern: multiPattern, color: theme.comment, italic: true)
     }
 
     // MARK: - 数字高亮
 
-    private static func applyNumberHighlights(_ attributed: inout AttributedString, code: String) {
+    private static func applyNumberHighlights(_ attributed: inout AttributedString, code: String, theme: SyntaxTheme) {
         let pattern = #"\b\d+\.?\d*[eE]?[+-]?\d*\b"#
-        highlightPattern(&attributed, code: code, pattern: pattern, color: numberColor)
+        highlightPattern(&attributed, code: code, pattern: pattern, color: theme.number)
     }
 
     // MARK: - 关键字高亮
 
-    private static func applyKeywordHighlights(_ attributed: inout AttributedString, code: String, keywords: Set<String>, caseSensitive: Bool) {
+    private static func applyKeywordHighlights(_ attributed: inout AttributedString, code: String, keywords: Set<String>, caseSensitive: Bool, theme: SyntaxTheme) {
         for keyword in keywords {
             let pattern = caseSensitive ? "\\b\(NSRegularExpression.escapedPattern(for: keyword))\\b" : "\\b\(NSRegularExpression.escapedPattern(for: keyword))\\b"
-            highlightPattern(&attributed, code: code, pattern: pattern, color: keywordColor, options: caseSensitive ? [] : .caseInsensitive)
+            highlightPattern(&attributed, code: code, pattern: pattern, color: theme.keyword, options: caseSensitive ? [] : .caseInsensitive)
         }
     }
 

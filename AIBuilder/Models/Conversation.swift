@@ -14,6 +14,8 @@ final class Conversation {
     var createdAt: Date
     /// Day 9: 是否置顶。置顶会话在侧边栏排在最上方。
     var isPinned: Bool = false
+    /// 未读消息数。大于 0 时在会话行末尾显示胶囊徽标。
+    var unreadCount: Int = 0
     /// 消息列表；cascade 删除规则，删除 Conversation 时级联删除所有 ChatMessage
     @Relationship(deleteRule: .cascade, inverse: \ChatMessage.conversation)
     var messages: [ChatMessage]
@@ -28,6 +30,7 @@ final class Conversation {
         self.systemPrompt = systemPrompt
         self.createdAt = Date()
         self.isPinned = false
+        self.unreadCount = 0
         self.messages = []
     }
 

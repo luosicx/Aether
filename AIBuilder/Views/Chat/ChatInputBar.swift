@@ -25,6 +25,7 @@ struct ChatInputBar: View {
             }
             .accessibilityLabel("知识库")
             .accessibilityHint("打开知识库管理文档")
+            .accessibilityIdentifier("knowledgeBaseButton")
             // Day 5 补充A：相册图片选择按钮（位于附件按钮与麦克风按钮之间）
             PhotosPicker(selection: $selectedItem, matching: .images) {
                 Image(systemName: "photo.on.rectangle.angled")
@@ -45,9 +46,12 @@ struct ChatInputBar: View {
                 .lineLimit(1...5)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .background(Color(.systemGray6))
+                .background(Color.backgroundTertiary)
                 .clipShape(RoundedRectangle(cornerRadius: 20))
                 .focused($isFocused)
+                .accessibilityLabel("消息输入框")
+                .accessibilityHint("输入要发送的消息")
+                .accessibilityIdentifier("messageInputField")
             Button {
                 onToggleVoice()
             } label: {
@@ -58,6 +62,7 @@ struct ChatInputBar: View {
             }
             .accessibilityLabel(isRecording ? "停止录音" : "开始录音")
             .accessibilityHint(isRecording ? "停止语音输入" : "开始语音输入")
+            .accessibilityIdentifier("voiceInputButton")
             Button {
                 onSend()
             } label: {
@@ -73,6 +78,7 @@ struct ChatInputBar: View {
             .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: canSend)
             .accessibilityLabel("发送")
             .accessibilityHint("发送消息")
+            .accessibilityIdentifier("sendButton")
             #if os(macOS)
             .keyboardShortcut(.return, modifiers: .command)
             #endif
@@ -85,7 +91,7 @@ struct ChatInputBar: View {
         .background(.bar)
         .overlay(alignment: .top) {
             Rectangle()
-                .fill(Color(.separator).opacity(0.3))
+                .fill(Color.separator)
                 .frame(height: 0.5)
         }
     }

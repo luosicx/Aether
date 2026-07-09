@@ -4,6 +4,11 @@ import SwiftData
 import ActivityKit
 #endif
 
+/// 非隔离的通知观察者持有者，用于在 deinit 中安全移除观察者。
+private final class ErrorObserver: @unchecked Sendable {
+    var token: NSObjectProtocol?
+}
+
 /// 核心 ViewModel，管理聊天消息、流式输出、工具调用、RAG 检索、语音输入输出、灵动岛 Live Activity。
 /// 使用 @Observable + @MainActor 隔离。
 @Observable
@@ -89,16 +94,16 @@ final class ChatViewModel {
     private let ragService = RAGService()
     /// 语义缓存（支持注入便于测试）
     let cache: SemanticCache
-    /// 语音服务（录音识别 + 朗读）
-    private let voiceService = VoiceService()
+    /// 语音服务（录音识别 + 朗读）。SettingsView 复用此实例试听音色，避免独立 synthesizer 争用音频 daemon
+    let voiceService = VoiceService()
     /// 当前流式输出 Task（可取消）
     private var streamingTask: Task<Void, Never>?
     /// ReAct 循环最大轮次
     private let maxReActLoops = 5
     /// Day 8: 单工具执行超时（秒）。超时不中断 ReAct 循环，标记失败后继续下一轮。
     private let toolTimeout: TimeInterval = 15
-    /// Day 10: 用 nonisolated(unsafe) 让 deinit 能访问
-    nonisolated(unsafe) private var errorObserver: NSObjectProtocol?
+    /// Day 10: 通知中心观察者，deinit 中移除
+    nonisolated private let errorObserver = ErrorObserver()
     /// 补充 D：灵动岛 Live Activity 引用
     #if os(iOS)
     private var liveActivity: Activity<TimerActivityAttributes>?
@@ -133,7 +138,7 @@ final class ChatViewModel {
         self.client = client ?? DeepSeekClient()
         self.cache = cache ?? SemanticCache()
         self.injectedClientUsed = client != nil   // Day 13: 标记是否注入
-        errorObserver = NotificationCenter.default.addObserver(
+        errorObserver.token = NotificationCenter.default.addObserver(
             forName: .llmErrorOccurred,
             object: nil,
             queue: OperationQueue()  // 改为后台 OperationQueue，避免主线程同步回调
@@ -185,7 +190,7 @@ final class ChatViewModel {
     deinit {
         // Day 10: 释放 errorObserver，避免泄漏
         // streamingTask 通过 .cancel() 在 switchTo / 新消息发送时已处理
-        if let observer = errorObserver {
+        if let observer = errorObserver.token {
             NotificationCenter.default.removeObserver(observer)
         }
     }
@@ -292,7 +297,7 @@ final class ChatViewModel {
         Task {
             let granted = await voiceService.requestPermission()
             guard granted else {
-                errorMessage = "需要语音识别权限"
+                errorMessage = NSLocalizedString("需要语音识别权限", comment: "")
                 return
             }
             // 开始录音前清空输入框与上一次识别结果
@@ -308,7 +313,7 @@ final class ChatViewModel {
                 // 录音启动失败（如音频会话激活失败 / 识别器不可用）：避免按钮卡住
                 isRecording = false
                 voiceService.onRecognized = nil
-                errorMessage = "录音启动失败: \(error.localizedDescription)"
+                errorMessage = String(format: NSLocalizedString("录音启动失败: %@", comment: ""), error.localizedDescription)
             }
         }
     }
@@ -377,7 +382,7 @@ final class ChatViewModel {
         // UIT 测试模式：短路真实 HTTP/RAG/Tool，注入固定桩回复
         // 说明：避免 UIT 触发真实 HTTP，复用缓存命中的假打字路径驱动 UI 状态机
         if ProcessInfo.processInfo.arguments.contains("UITEST_DISABLE_NETWORK") {
-            let stubReply = "（UIT 测试模式）已收到：\(text)"
+            let stubReply = String(format: NSLocalizedString("（UIT 测试模式）已收到：%@", comment: ""), text)
             // 保持流式打字效果以驱动 UI 状态机（复用缓存命中的 4 char/8ms 假打字模式）
             isLoading = true
             streamingText = ""
@@ -395,6 +400,16 @@ final class ChatViewModel {
             streamingText = ""
             isLoading = false
             try? modelContext.save()
+            endLiveActivity()
+            return
+        }
+
+        // UIT 测试模式：强制注入 LLM 错误，驱动 ErrorBanner 出现
+        // 说明：避免依赖真实网络/Keychain 时序，保证错误条用例确定性
+        if ProcessInfo.processInfo.arguments.contains("UITEST_FORCE_LLM_ERROR") {
+            errorMessage = "请先在设置中配置 API Key"
+            isLoading = false
+            streamingText = ""
             endLiveActivity()
             return
         }
@@ -418,7 +433,7 @@ final class ChatViewModel {
         #if os(iOS)
         if injectHealthContext, let healthService = healthKitService, healthService.isAuthorized {
             if let summary = try? await healthService.fetchDailySummary() {
-                let healthLine = "用户最近 24h：睡眠 \(String(format: "%.1f", summary.sleepHours))h，心率均值 \(String(format: "%.0f", summary.avgHeartRate))bpm，步数 \(summary.stepCount)"
+                let healthLine = String(format: NSLocalizedString("用户最近 24h：%@", comment: ""), String(format: NSLocalizedString("睡眠 %.1fh，心率均值 %.0fbpm，步数 %d", comment: ""), summary.sleepHours, summary.avgHeartRate, summary.stepCount))
                 effectiveSystemPrompt = (effectiveSystemPrompt.isEmpty ? "" : effectiveSystemPrompt + "\n") + healthLine
             }
         }
@@ -449,7 +464,7 @@ final class ChatViewModel {
                 queryEmbedding = ragQueryEmbedding
             } catch {
                 currentCitations = []
-                errorMessage = "知识库检索失败: \(error.localizedDescription)"
+                errorMessage = String(format: NSLocalizedString("知识库检索失败: %@", comment: ""), error.localizedDescription)
             }
         } else {
             currentCitations = []
@@ -494,7 +509,7 @@ final class ChatViewModel {
             } catch {
                 // 令牌耗尽：rateLimited → UI 错误条「请求过于频繁，请 X 秒后重试」
                 if let llmErr = error as? LLMError, case .rateLimited(let retryAfter) = llmErr {
-                    errorMessage = "请求过于频繁，请 \(Int(retryAfter)) 秒后重试"
+                    errorMessage = String(format: NSLocalizedString("请求过于频繁，请 %d 秒后重试", comment: ""), Int(retryAfter))
                 } else {
                     errorMessage = error.localizedDescription
                 }
@@ -621,7 +636,7 @@ final class ChatViewModel {
                             }
                             group.addTask {
                                 try await Task.sleep(nanoseconds: UInt64(self.toolTimeout * 1_000_000_000))
-                                throw NSError(domain: "ToolTimeout", code: -1, userInfo: [NSLocalizedDescriptionKey: "工具执行超时（\(Int(self.toolTimeout))s）"])
+                                throw NSError(domain: "ToolTimeout", code: -1, userInfo: [NSLocalizedDescriptionKey: String(format: NSLocalizedString("工具执行超时（%ds）", comment: ""), Int(self.toolTimeout))])
                             }
                             let first = try await group.next() ?? ""
                             group.cancelAll()
@@ -635,8 +650,8 @@ final class ChatViewModel {
                         Task.detached { await TelemetryService.shared.track(.toolCall(toolName: toolName, success: true, durationMs: toolDurationMs)) }
                         // 补充 D：工具执行成功后发本地通知
                         NotificationService.shared.sendNotification(
-                            title: "工具调用成功",
-                            body: "\(tc.name) 已完成：\(result)"
+                            title: NSLocalizedString("工具调用成功", comment: ""),
+                            body: String(format: NSLocalizedString("%@ 已完成：%@", comment: ""), tc.name, result)
                         )
                         toolResults.append(APIMessage(role: "tool", content: result, images: nil, toolCallId: tc.id, toolName: tc.name, toolCalls: nil))
                         let toolMsg = ChatMessage(role: "tool", content: result, toolCallId: tc.id, toolName: tc.name)
@@ -649,20 +664,20 @@ final class ChatViewModel {
                         let toolDurationMs = Int(Date().timeIntervalSince(toolStartTime) * 1000)
                         let toolName = tc.name
                         let errorType = String(describing: error)
-                        let errorMsg = "工具 \(tc.name) 执行失败"
+                        let errorMsg = String(format: NSLocalizedString("工具 %@ 执行失败: %@", comment: ""), tc.name, error.localizedDescription)
                         Task.detached { await TelemetryService.shared.track(.toolCall(toolName: toolName, success: false, durationMs: toolDurationMs)) }
                         Task.detached { await TelemetryService.shared.track(.errorOccurred(errorType: errorType, userMessage: errorMsg)) }
                         let errMsg = error.localizedDescription
                         currentToolSteps[stepIdx].status = .failed
                         currentToolSteps[stepIdx].result = errMsg
                         // Day 8: 超时/失败时也给 AI 一个 tool message，让它知道该工具失败的原因
-                        toolResults.append(APIMessage(role: "tool", content: "工具执行失败: \(errMsg)", images: nil, toolCallId: tc.id, toolName: tc.name, toolCalls: nil))
-                        let toolMsg = ChatMessage(role: "tool", content: "工具执行失败: \(errMsg)", toolCallId: tc.id, toolName: tc.name)
+                        toolResults.append(APIMessage(role: "tool", content: String(format: NSLocalizedString("工具执行失败: %@", comment: ""), errMsg), images: nil, toolCallId: tc.id, toolName: tc.name, toolCalls: nil))
+                        let toolMsg = ChatMessage(role: "tool", content: String(format: NSLocalizedString("工具执行失败: %@", comment: ""), errMsg), toolCallId: tc.id, toolName: tc.name)
                         toolMsg.conversation = conversation
                         conversation.messages.append(toolMsg)
                         messages.append(toolMsg)
                         try? modelContext.save()
-                        errorMessage = "工具 \(tc.name) 执行失败: \(errMsg)"
+                        errorMessage = String(format: NSLocalizedString("工具 %@ 执行失败: %@", comment: ""), tc.name, errMsg)
                     }
                 }
                 apiMessages = conversation.messages.map { $0.toAPIMessage() }
@@ -672,10 +687,10 @@ final class ChatViewModel {
             }
         }
         if loopCount >= maxReActLoops && fullResponse.isEmpty {
-            errorMessage = "工具调用循环超过 \(maxReActLoops) 轮，已中止"
+            errorMessage = String(format: NSLocalizedString("工具调用循环超过 %d 轮，已中止", comment: ""), maxReActLoops)
             // Day 14: 循环超限埋点 errorOccurred
             let maxLoops = maxReActLoops
-            Task.detached { await TelemetryService.shared.track(.errorOccurred(errorType: "MaxReActLoopsExceeded", userMessage: "工具调用循环超过 \(maxLoops) 轮，已中止")) }
+            Task.detached { await TelemetryService.shared.track(.errorOccurred(errorType: "MaxReActLoopsExceeded", userMessage: String(format: NSLocalizedString("工具调用循环超过 %d 轮，已中止", comment: ""), maxLoops))) }
         }
         // Day 13: 循环结束后读取 FallbackLLMProvider 的最终状态（若装饰了 fallback）
         if let fallback = llmClient as? FallbackLLMProvider {
@@ -762,7 +777,7 @@ final class ChatViewModel {
         }
         // 更新 UI 状态
         feedbackStates[messageId] = isPositive
-        feedbackToast = isPositive ? "感谢点赞" : "感谢反馈，我们会持续改进"
+        feedbackToast = isPositive ? NSLocalizedString("感谢点赞", comment: "") : NSLocalizedString("感谢反馈，我们会持续改进", comment: "")
         // 持久化反馈
         submitFeedback(messageId: messageId, isPositive: isPositive, citations: currentCitations, modelContext: modelContext)
         // 2 秒后自动清除提示
@@ -830,13 +845,13 @@ final class ChatViewModel {
     func buildEffectiveSystemPrompt(base: String, preference: UserPreference) -> String {
         var prefParts: [String] = []
         if !preference.preferredTone.isEmpty && preference.preferredTone != "默认" {
-            prefParts.append("语气：\(preference.preferredTone)")
+            prefParts.append(String(format: NSLocalizedString("语气：%@", comment: ""), preference.preferredTone))
         }
         if !preference.preferredTools.isEmpty {
-            prefParts.append("偏好工具：\(preference.preferredTools.joined(separator: "、"))")
+            prefParts.append(String(format: NSLocalizedString("偏好工具：%@", comment: ""), preference.preferredTools.joined(separator: "、")))
         }
         if !preference.customFact.isEmpty {
-            prefParts.append("自定义事实：\(preference.customFact)")
+            prefParts.append(String(format: NSLocalizedString("自定义事实：%@", comment: ""), preference.customFact))
         }
         guard !prefParts.isEmpty else { return base }
         return (base.isEmpty ? "" : base + "\n") + "【用户偏好】" + prefParts.joined(separator: "；")
