@@ -86,7 +86,7 @@ struct MarkdownText: View {
             } else {
                 // 奇数索引：代码块段
                 let lines = segment.components(separatedBy: "\n")
-                var language: String? = nil
+                var language: String?
                 var code = segment
 
                 if let firstLine = lines.first,

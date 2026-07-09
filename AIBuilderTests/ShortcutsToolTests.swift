@@ -1,5 +1,5 @@
 import XCTest
-@testable import AIBuilder
+@testable import Aether
 
 final class ShortcutsToolTests: XCTestCase {
     private let runTool = RunShortcutTool()

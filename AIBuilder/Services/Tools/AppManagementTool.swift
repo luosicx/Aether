@@ -79,11 +79,9 @@ final class AppManagementTool: ToolProtocol {
             return "错误：请提供 app 参数"
         }
         let ws = NSWorkspace.shared
-        for app in ws.runningApplications {
-            if app.localizedName == appName {
-                app.terminate()
-                return "已退出 \(appName)"
-            }
+        for app in ws.runningApplications where app.localizedName == appName {
+            app.terminate()
+            return "已退出 \(appName)"
         }
         return "未找到运行中的应用：\(appName)"
     }
@@ -94,11 +92,9 @@ final class AppManagementTool: ToolProtocol {
             return "错误：请提供 app 参数"
         }
         let ws = NSWorkspace.shared
-        for app in ws.runningApplications {
-            if app.localizedName == appName {
-                app.activate(options: [.activateAllWindows])
-                return "已激活 \(appName)"
-            }
+        for app in ws.runningApplications where app.localizedName == appName {
+            app.activate(options: [.activateAllWindows])
+            return "已激活 \(appName)"
         }
         return "未找到运行中的应用：\(appName)"
     }

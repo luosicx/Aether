@@ -1,5 +1,5 @@
 import XCTest
-@testable import AIBuilder
+@testable import Aether
 
 /// KeychainManager 单元测试：使用真实 Keychain，setUp/tearDown 清理测试 key
 /// 源码确认：service = "com.aibuilder.apikey"，account = "apikey"

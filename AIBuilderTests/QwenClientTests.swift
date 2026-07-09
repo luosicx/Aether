@@ -1,5 +1,5 @@
 import XCTest
-@testable import AIBuilder
+@testable import Aether
 
 /// Day 13 Phase 5 Task 12: QwenClient 单元测试
 /// 参考 DeepSeekClientTests 的 MockURLProtocol + 全局 URLProtocol.registerClass 模式。
@@ -182,10 +182,8 @@ data: [DONE]
         let stream = client.chat(messages: messages, config: .default, tools: tools, apiKey: apiKey)
 
         var chunksWithToolCalls: [ParsedChunk] = []
-        for await chunk in stream {
-            if chunk.toolCalls != nil {
-                chunksWithToolCalls.append(chunk)
-            }
+        for await chunk in stream where chunk.toolCalls != nil {
+            chunksWithToolCalls.append(chunk)
         }
         XCTAssertFalse(chunksWithToolCalls.isEmpty, "应收到带 toolCalls 的 ParsedChunk")
         let first = chunksWithToolCalls.first?.toolCalls?.first

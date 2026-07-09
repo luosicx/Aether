@@ -1,5 +1,5 @@
 import XCTest
-@testable import AIBuilder
+@testable import Aether
 
 /// Day 11: DateTimeTool 单元测试
 final class DateTimeToolTests: XCTestCase {

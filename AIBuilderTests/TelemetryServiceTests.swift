@@ -1,5 +1,5 @@
 import XCTest
-@testable import AIBuilder
+@testable import Aether
 
 /// Day 14 Phase 5 Task 10: TelemetryService 单元测试
 /// TelemetryService 是 actor，测试中需要 await。

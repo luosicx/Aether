@@ -202,7 +202,7 @@ struct EmbeddingResponse: Codable, Sendable {
 }
 
 /// Day 10: 统一 LLM 错误类型，供 UI 转成用户友好提示
-enum LLMError: Error, Sendable {
+enum LLMError: Error, Sendable, LocalizedError {
     /// 网络连接错误（如断网、DNS 失败）
     case networkError(String)        // 网络连接错误
     /// API Key 缺失（用户未在设置中配置）
@@ -247,6 +247,10 @@ enum LLMError: Error, Sendable {
         case .llmErrorOccurred(let message):
             return message
         }
+    }
+
+    var errorDescription: String? {
+        userMessage
     }
 
     /// 从 HTTP 状态码构造 LLMError

@@ -3,13 +3,19 @@ import SwiftData
 
 struct KnowledgeBaseView: View {
     @Environment(\.modelContext) private var modelContext
-    @State private var vm = KnowledgeBaseVM()
+    let provider: ModelProvider
+    @State private var vm: KnowledgeBaseVM
     @State private var showPicker = false
     @Environment(\.dismiss) private var dismiss
     // iPad/macOS 双栏:size class 判断
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     // 双栏:当前选中的文档(用于右侧分块预览)
     @State private var selectedDocument: KnowledgeBaseVM.DocumentRow?
+
+    init(provider: ModelProvider = .deepseek) {
+        self.provider = provider
+        _vm = State(initialValue: KnowledgeBaseVM(provider: provider))
+    }
 
     var body: some View {
         Group {
@@ -114,7 +120,11 @@ struct KnowledgeBaseView: View {
             if let doc = selectedDocument, vm.documents.contains(doc) {
                 chunkPreview(for: doc)
             } else {
-                ContentUnavailableView("选择一个文档", systemImage: "doc.text")
+                EmptyStateView(
+                    systemImage: "doc.text",
+                    title: "选择一个文档",
+                    message: "从左侧列表选择一个文档查看详情"
+                )
             }
         }
     }

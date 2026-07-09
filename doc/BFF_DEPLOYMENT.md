@@ -1,6 +1,6 @@
 # BFF 代理层部署文档（Day 15）
 
-AIBuilder 的 BFF（Backend For Frontend）代理层运行在 Cloudflare Workers 上，负责在服务端持有上游 LLM API Key，设备端仅持有 BFF Token。本文档描述从账号注册到设备端配置的完整部署流程。
+Aether 的 BFF（Backend For Frontend）代理层运行在 Cloudflare Workers 上，负责在服务端持有上游 LLM API Key，设备端仅持有 BFF Token。本文档描述从账号注册到设备端配置的完整部署流程。
 
 ## 架构概览
 

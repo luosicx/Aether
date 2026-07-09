@@ -1,5 +1,5 @@
 import XCTest
-@testable import AIBuilder
+@testable import Aether
 
 /// OpenURLTool 单元测试
 @MainActor

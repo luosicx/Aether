@@ -42,12 +42,25 @@ struct ChatInputBar: View {
                     }
                 }
             }
-            TextField("输入消息…", text: $inputText, axis: .vertical)
+            TextField("", text: $inputText, axis: .vertical)
                 .lineLimit(1...5)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .background(Color.backgroundTertiary)
-                .clipShape(RoundedRectangle(cornerRadius: 20))
+                .foregroundColor(Color.starlight)
+                .background(
+                    RoundedRectangle(cornerRadius: CornerRadius.large, style: .continuous)
+                        .fill(Color.liquidGlass.opacity(0.4))
+                )
+                .overlay(alignment: .topLeading) {
+                    if inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        Text("输入消息…")
+                            .font(.body)
+                            .foregroundColor(Color.duskGray)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .allowsHitTesting(false)
+                    }
+                }
                 .focused($isFocused)
                 .accessibilityLabel("消息输入框")
                 .accessibilityHint("输入要发送的消息")
@@ -70,8 +83,15 @@ struct ChatInputBar: View {
                     .font(.system(.body, design: .rounded).weight(.bold))
                     .foregroundStyle(.white)
                     .frame(width: 36, height: 36)
-                    .background(canSend ? Color.accentColor : Color(.systemGray3))
+                    .background {
+                        if canSend {
+                            Color.aetherGradient
+                        } else {
+                            Color.duskGray.opacity(0.4)
+                        }
+                    }
                     .clipShape(Circle())
+                    .shadow(color: canSend ? Color.aetherPurple.opacity(0.4) : .clear, radius: 6, y: 2)
             }
             .contentShape(Circle().inset(by: -4))
             .disabled(!canSend)
@@ -84,15 +104,23 @@ struct ChatInputBar: View {
             #endif
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.vertical, 10)
         // Day 19: iPad 适配——输入内容限宽 600 居中，避免在 iPad 上拉伸过宽
         .frame(maxWidth: 600)
+        .background(
+            // 液态玻璃质感：regularMaterial 毛玻璃 + liquidGlass 半透明叠加
+            RoundedRectangle(cornerRadius: CornerRadius.large, style: .continuous)
+                .fill(Color.liquidGlass.opacity(0.5))
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: CornerRadius.large, style: .continuous))
+        )
+        .clipShape(RoundedRectangle(cornerRadius: CornerRadius.large, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: CornerRadius.large, style: .continuous)
+                .stroke(Color.aetherPurple.opacity(0.2), lineWidth: 0.5)
+        )
+        .shadow(color: Color.aetherPurple.opacity(0.15), radius: 12, y: 6)
         .frame(maxWidth: .infinity)
-        .background(.bar)
-        .overlay(alignment: .top) {
-            Rectangle()
-                .fill(Color.separator)
-                .frame(height: 0.5)
-        }
+        .padding(.horizontal, 12)
+        .padding(.bottom, 6)
     }
 }

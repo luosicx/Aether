@@ -82,7 +82,7 @@ final class VoiceService: NSObject {
         guard let request = recognitionRequest else { return }
         request.shouldReportPartialResults = true
         let inputNode = audioEngine.inputNode
-        recognitionTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
+        recognitionTask = recognizer.recognitionTask(with: request) { [weak self] result, _ in
             if let result = result {
                 let text = result.bestTranscription.formattedString
                 Task { @MainActor [weak self] in

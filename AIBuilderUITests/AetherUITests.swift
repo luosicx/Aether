@@ -1,6 +1,6 @@
 import XCTest
 
-final class AIBuilderUITests: XCTestCase {
+final class AetherUITests: XCTestCase {
 
     override func setUp() {
         super.setUp()
@@ -51,8 +51,8 @@ final class AIBuilderUITests: XCTestCase {
         let app = makeApp()
         app.launch()
 
-        XCTAssertTrue(app.staticTexts["灵枢"].waitForExistence(timeout: 10),
-                      "emptyState 应显示「灵枢」标题")
+        XCTAssertTrue(app.staticTexts["以太"].waitForExistence(timeout: 10),
+                      "emptyState 应显示「以太」标题")
         XCTAssertTrue(inputField(in: app).exists, "应显示输入框 placeholder「输入消息…」")
 
         let sendButton = app.buttons["发送"]

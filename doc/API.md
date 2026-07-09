@@ -1,6 +1,6 @@
 # API 契约文档
 
-本文档描述 AIBuilder 项目的核心 API 契约：LLMProvider 协议、ToolProtocol 协议、ToolDefinition JSON Schema、SSE 响应格式，以及 DeepSeek / Qwen / BFF 三种 endpoint 的请求示例。所有方法签名与 endpoint 均取自源码，如代码演进请同步更新本文档。
+本文档描述 Aether 项目的核心 API 契约：LLMProvider 协议、ToolProtocol 协议、ToolDefinition JSON Schema、SSE 响应格式，以及 DeepSeek / Qwen / BFF 三种 endpoint 的请求示例。所有方法签名与 endpoint 均取自源码，如代码演进请同步更新本文档。
 
 ---
 

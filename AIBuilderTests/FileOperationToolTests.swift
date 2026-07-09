@@ -1,6 +1,6 @@
 #if os(macOS)
 import XCTest
-@testable import AIBuilder
+@testable import Aether
 
 final class FileOperationToolTests: XCTestCase {
     private let tool = FileOperationTool()

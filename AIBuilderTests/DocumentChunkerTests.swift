@@ -1,11 +1,11 @@
 import XCTest
-@testable import AIBuilder
+@testable import Aether
 
 /// Day 11: DocumentChunker 表驱动单元测试
 final class DocumentChunkerTests: XCTestCase {
     private let chunker = DocumentChunker()
-    /// overlap 字符数 = overlap(tokens) * 4 = 128 * 4 = 512
-    private let overlapChars = 128 * 4
+    /// overlap 字符数 = 256（DocumentChunker.overlapChars）
+    private let overlapChars = 256
 
     // MARK: - 表驱动用例
 

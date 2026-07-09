@@ -1,5 +1,5 @@
 import XCTest
-@testable import AIBuilder
+@testable import Aether
 
 /// DeviceInfoTool 单元测试
 final class DeviceInfoToolTests: XCTestCase {

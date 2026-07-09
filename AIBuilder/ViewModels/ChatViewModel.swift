@@ -40,7 +40,7 @@ final class ChatViewModel {
     /// Day 13: 当前选中的 LLM 供应商（默认 .deepseek，向后兼容）
     var selectedProvider: ModelProvider = .deepseek
     /// Day 13: 备用供应商（nil=不降级；非 nil 时用 FallbackLLMProvider 装饰主 provider）
-    var fallbackProvider: ModelProvider? = nil
+    var fallbackProvider: ModelProvider?
     /// Day 15: BFF 代理配置（默认未启用；启用后请求经服务端中转，上游 API Key 不落设备）
     var bffConfig: BFFConfig = .default
     /// Day 16: 端侧推理配置（开关 / 模型路径 / 采样参数）
@@ -90,8 +90,16 @@ final class ChatViewModel {
     // 生产侧行为不变：默认参数 DeepSeekClient() / SemanticCache() 兜底
     /// LLMProvider，支持注入便于测试
     let client: LLMProvider
-    /// RAG 服务（构建检索增强上下文）
-    private let ragService = RAGService()
+    /// RAG 服务（构建检索增强上下文）。DeepSeek 不支持 embedding 时降级到 Qwen
+    private var ragService: RAGService {
+        let resolved = EmbeddingService.resolveEmbedding(for: selectedProvider)
+            ?? (DeepSeekClient(), selectedProvider)
+        return RAGService(embeddingService: EmbeddingService(client: resolved.0))
+    }
+    /// RAG embedding 实际使用的供应商（DeepSeek 降级到 Qwen）
+    private var ragEmbeddingProvider: ModelProvider {
+        EmbeddingService.resolveEmbedding(for: selectedProvider)?.1 ?? selectedProvider
+    }
     /// 语义缓存（支持注入便于测试）
     let cache: SemanticCache
     /// 语音服务（录音识别 + 朗读）。SettingsView 复用此实例试听音色，避免独立 synthesizer 争用音频 daemon
@@ -422,8 +430,9 @@ final class ChatViewModel {
         self.didFallbackLastRequest = false
 
         // 后台线程读取 apiKey，避免主线程阻塞
+        let provider = self.selectedProvider
         let apiKey = await Task.detached(priority: .userInitiated) {
-            KeychainManager.shared.getAPIKey() ?? ""
+            KeychainManager.shared.getAPIKey(for: provider) ?? ""
         }.value
 
         // 补充 C：注入用户偏见到 systemPrompt 末尾（提取为 buildEffectiveSystemPrompt 便于单测）
@@ -453,18 +462,30 @@ final class ChatViewModel {
         //       工具开启时不查不写缓存但可复用 embedding。
         var queryEmbedding: [Float] = []
         if ragEnabled {
-            do {
-                let (context, citations, ragQueryEmbedding) = try await ragService.buildAugmentedContext(query: text, modelContext: modelContext, apiKey: apiKey)
-                if !context.isEmpty {
-                    apiMessages.insert(APIMessage(role: "system", content: context, images: nil, toolCallId: nil, toolName: nil, toolCalls: nil), at: 1)
-                    currentCitations = citations
-                } else {
-                    currentCitations = []
-                }
-                queryEmbedding = ragQueryEmbedding
-            } catch {
+            // DeepSeek 不支持 embedding，未配置 Qwen Key 时降级失败，跳过 RAG 检索避免 404
+            if ragEmbeddingProvider == .deepseek {
                 currentCitations = []
-                errorMessage = String(format: NSLocalizedString("知识库检索失败: %@", comment: ""), error.localizedDescription)
+                errorMessage = NSLocalizedString("DeepSeek 不支持知识库嵌入，请在设置中配置 Qwen API Key 或切换供应商为 Qwen", comment: "")
+                queryEmbedding = []
+            } else {
+                do {
+                    // RAG embedding 可能降级到 Qwen（DeepSeek 不支持 embedding），需用对应 provider 的 apiKey
+                    let embProvider = ragEmbeddingProvider
+                    let ragApiKey = await Task.detached(priority: .userInitiated) {
+                        KeychainManager.shared.getAPIKey(for: embProvider) ?? ""
+                    }.value
+                    let (context, citations, ragQueryEmbedding) = try await ragService.buildAugmentedContext(query: text, modelContext: modelContext, apiKey: ragApiKey)
+                    if !context.isEmpty {
+                        apiMessages.insert(APIMessage(role: "system", content: context, images: nil, toolCallId: nil, toolName: nil, toolCalls: nil), at: 1)
+                        currentCitations = citations
+                    } else {
+                        currentCitations = []
+                    }
+                    queryEmbedding = ragQueryEmbedding
+                } catch {
+                    currentCitations = []
+                    errorMessage = String(format: NSLocalizedString("知识库检索失败: %@", comment: ""), error.localizedDescription)
+                }
             }
         } else {
             currentCitations = []
@@ -518,6 +539,13 @@ final class ChatViewModel {
                 endLiveActivity()
                 return
             }
+        } else if provider != .onDevice, apiKey.isEmpty {
+            // API Key 空值预检（缓存未命中、非端侧、非 BFF 模式时）：提前给出友好提示
+            errorMessage = LLMError.apiKeyMissing.userMessage
+            isLoading = false
+            streamingText = ""
+            endLiveActivity()
+            return
         }
 
         // Day 12+13: SmartRouter 决定模型名（按实际使用的 provider 映射到对应 provider 的模型名）
@@ -575,7 +603,8 @@ final class ChatViewModel {
                     chunkContent += content
                     // throttle：距上次 UI 更新 >= 100ms 才刷新 streamingText
                     let now = Date()
-                    if lastStreamingUIUpdateAt == nil || now.timeIntervalSince(lastStreamingUIUpdateAt!) >= 0.1 {
+                    let shouldUpdate = lastStreamingUIUpdateAt.map { now.timeIntervalSince($0) >= 0.1 } ?? true
+                    if shouldUpdate {
                         streamingText = fullResponse + chunkContent
                         lastStreamingUIUpdateAt = now
                     }

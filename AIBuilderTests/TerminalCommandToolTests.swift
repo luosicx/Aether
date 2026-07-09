@@ -1,6 +1,6 @@
 #if os(macOS)
 import XCTest
-@testable import AIBuilder
+@testable import Aether
 
 final class TerminalCommandToolTests: XCTestCase {
     private let tool = TerminalCommandTool()

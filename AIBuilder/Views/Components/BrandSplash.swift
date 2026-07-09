@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 灵枢品牌 Splash 动画：开屏展示 1.2 秒后淡出
+/// Aether 品牌 Splash 动画：深空开屏展示 1.2 秒后淡出 0.4 秒
 struct BrandSplash: View {
     @Binding var isVisible: Bool
     @State private var fadeOut = false

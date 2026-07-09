@@ -1,6 +1,6 @@
 import XCTest
 
-final class AIBuilderUITestsLaunchUITests: XCTestCase {
+final class AetherUITestsLaunchUITests: XCTestCase {
 
     func testLaunch() throws {
         let app = XCUIApplication()

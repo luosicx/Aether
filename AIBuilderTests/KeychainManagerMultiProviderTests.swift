@@ -1,5 +1,5 @@
 import XCTest
-@testable import AIBuilder
+@testable import Aether
 
 /// Day 13: KeychainManager 多 provider API Key 隔离测试
 final class KeychainManagerMultiProviderTests: XCTestCase {

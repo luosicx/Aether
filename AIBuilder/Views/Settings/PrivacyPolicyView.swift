@@ -6,7 +6,7 @@ struct PrivacyPolicyView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 // 标题
-                Text("AI Builder 隐私政策")
+                Text("以太隐私政策")
                     .font(.title2)
                     .bold()
                 Text("更新日期：2026年7月")
@@ -39,7 +39,7 @@ struct PrivacyPolicyView: View {
                     content: """
                     1. 查看已收集数据：可在「设置 - 调试面板」查看最近的请求与响应。
                     2. 删除对话记录：可在会话列表中删除任意对话，相关数据会从本地数据库移除。
-                    3. 撤回 HealthKit 授权：可在「系统设置 - 隐私 - 健康」中撤回对 AI Builder 的授权。
+                    3. 撤回 HealthKit 授权：可在「系统设置 - 隐私 - 健康」中撤回对以太的授权。
                     4. 关闭遥测上报：可在「设置 - 调试面板 - 立即上报」控制上报行为，本地缓冲不强制上报。
                     """
                 )
@@ -47,7 +47,7 @@ struct PrivacyPolicyView: View {
                 // 联系方式
                 policySection(
                     title: "四、联系方式",
-                    content: "如有任何隐私相关问题，请通过邮件联系：feedback@aibuilder.app"
+                    content: "如有任何隐私相关问题，请通过邮件联系：feedback@aether.app"
                 )
             }
             .padding()

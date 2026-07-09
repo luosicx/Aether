@@ -1,5 +1,5 @@
 import XCTest
-@testable import AIBuilder
+@testable import Aether
 
 /// Day 16: 网络监控 actor 单元测试。
 /// NetworkMonitor 基于 NWPathMonitor，start() 后异步更新 currentStatus，

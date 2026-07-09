@@ -1,5 +1,5 @@
 import XCTest
-@testable import AIBuilder
+@testable import Aether
 
 /// Day 16: 端侧推理配置 + ModelProvider.onDevice 元信息单元测试。
 final class OnDeviceConfigTests: XCTestCase {

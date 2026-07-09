@@ -129,6 +129,10 @@ struct SettingsView: View {
                 aboutSection
             }
             .formStyle(.grouped)
+            .tint(Color.aetherPurple)
+            .foregroundStyle(Color.starlight)
+            .scrollContentBackground(.hidden)
+            .background(Color.deepSpace.ignoresSafeArea())
             .navigationTitle("设置")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -153,6 +157,10 @@ struct SettingsView: View {
                 }
             }
             .listStyle(.sidebar)
+            .tint(Color.aetherPurple)
+            .foregroundStyle(Color.starlight)
+            .scrollContentBackground(.hidden)
+            .background(Color.deepSpace.ignoresSafeArea())
             .navigationTitle("设置")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -164,6 +172,10 @@ struct SettingsView: View {
                         sectionContent(for: section)
                     }
                     .formStyle(.grouped)
+                    .tint(Color.aetherPurple)
+                    .foregroundStyle(Color.starlight)
+                    .scrollContentBackground(.hidden)
+                    .background(Color.deepSpace.ignoresSafeArea())
                     .navigationTitle(section.title)
                     #if os(iOS)
                     .navigationBarTitleDisplayMode(.inline)
@@ -494,7 +506,7 @@ struct SettingsView: View {
                     chatViewModel.voiceService.stopPreview()
                 } else {
                     chatViewModel.voiceService.previewVoice(
-                        "你好,我是 AI Builder,很高兴为你服务。",
+                        "你好,我是以太,很高兴为你服务。",
                         config: settingsVM.ttsConfig
                     )
                 }
@@ -757,7 +769,7 @@ struct SettingsView: View {
                 }
             }
             .accessibilityLabel("隐私政策")
-            .accessibilityHint("查看 AI Builder 隐私政策")
+            .accessibilityHint("查看以太隐私政策")
             .accessibilityIdentifier("privacyPolicyLink")
 
             // 投诉反馈：优先使用系统邮件 composer，不可用时降级 mailto:
@@ -796,7 +808,7 @@ struct SettingsView: View {
         } header: {
             Text("关于")
         } footer: {
-            Text("AI Builder 致力于保护您的隐私")
+            Text("以太致力于保护您的隐私")
                 .font(.captionAI)
         }
     }

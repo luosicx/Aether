@@ -1,5 +1,5 @@
 import XCTest
-@testable import AIBuilder
+@testable import Aether
 
 /// Day 12: SmartRouter 智能路由单元测试
 final class SmartRouterTests: XCTestCase {

@@ -1,5 +1,5 @@
 import XCTest
-@testable import AIBuilder
+@testable import Aether
 
 /// Day 15 Phase 5 Task 12: RateLimiter 单元测试
 /// 验证令牌桶限流器的 chat/embed 独立计数、耗尽抛 LLMError.rateLimited、以及自定义限额。

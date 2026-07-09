@@ -191,40 +191,11 @@ struct MessageListView: View {
     }
 
     private var emptyState: some View {
-        VStack(spacing: 24) {
-            // 视觉锚点：渐变光晕的圆形图标
-            ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [Color.accentColor.opacity(0.15), Color.accentColor.opacity(0.05)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .frame(width: 88, height: 88)
-                Image(systemName: "sparkles")
-                    .font(.system(size: 36, weight: .light))
-                    .foregroundStyle(Color.accentColor.opacity(0.8))
-            }
-
-            VStack(spacing: Spacing.md) {
-                Text("灵枢")
-                    .font(.brandTitle)
-                    .foregroundStyle(.primary)
-                Text("你的智能助手")
-                    .font(.bodyAI)
-                    .foregroundStyle(.secondary)
-            }
-
-            Text("在下方输入消息，或点击右上角设置 API Key")
-                .font(.callout)
-                .foregroundStyle(.tertiary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, Spacing.xxxl)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.top, 40)
+        EmptyStateView(
+            systemImage: "sparkles",
+            title: "以太",
+            message: "你的智能助手，在下方输入消息开始对话"
+        )
     }
 
     private func convertStatus(_ status: ChatViewModel.ToolStepStatus) -> ToolStepSnapshot.Status {

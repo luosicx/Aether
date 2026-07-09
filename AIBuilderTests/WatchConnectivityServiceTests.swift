@@ -1,7 +1,7 @@
 #if os(iOS)
 import XCTest
 import WatchConnectivity
-@testable import AIBuilder
+@testable import Aether
 
 /// Day 17: WatchConnectivityService 单元测试
 ///

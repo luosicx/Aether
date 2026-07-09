@@ -6,7 +6,7 @@ struct BFFConfig: Codable, Sendable, Equatable {
     /// 是否启用 BFF 代理（默认 false，启用后请求经服务端中转，API Key 不落设备）
     var enabled: Bool = false
     /// BFF 网关 endpoint（默认占位地址，部署后替换为真实域名）
-    var endpointURL: URL = URL(string: "https://aibuilder-bff.example.com")!
+    var endpointURL: URL = URL(string: "https://aibuilder-bff.example.com") ?? URL(fileURLWithPath: "")
     /// 用户级 BFF Token（用于服务端鉴权，替代上游 API Key）
     var userToken: String = ""
     /// chat 接口客户端限流（每分钟令牌数，默认 20）

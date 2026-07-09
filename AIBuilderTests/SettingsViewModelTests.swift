@@ -1,5 +1,5 @@
 import XCTest
-@testable import AIBuilder
+@testable import Aether
 
 /// SettingsViewModel 单元测试
 /// 使用真实 Keychain（service="com.aibuilder.apikey"，account="apikey"），

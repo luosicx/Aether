@@ -13,6 +13,8 @@ enum OnDeviceError: LocalizedError, Sendable {
     case unsupportedQuantization
     /// 模型加载失败，携带底层错误信息
     case loadFailed(String)
+    /// 下载超时（可从断点续传恢复）
+    case downloadTimeout
 
     /// 用户友好的错误描述（不暴露底层实现细节）
     var errorDescription: String? {
@@ -27,6 +29,8 @@ enum OnDeviceError: LocalizedError, Sendable {
             return NSLocalizedString("不支持的模型量化格式，请选择 Q4_K_M 或更轻量版本", comment: "")
         case .loadFailed(let message):
             return String(format: NSLocalizedString("端侧模型加载失败：%@", comment: ""), message)
+        case .downloadTimeout:
+            return NSLocalizedString("下载超时，请检查网络后点击「继续下载」从断点继续", comment: "")
         }
     }
 }

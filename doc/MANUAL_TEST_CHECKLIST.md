@@ -539,12 +539,12 @@
   - **预期结果**：端侧模式下发起工具调用提示「端侧模型不支持工具调用」并自动降级到云端
   - **失败排查**：检查工具调用前的 provider 判定；查看降级逻辑
 
-- [ ] Shortcuts 中 Ask AIBuilder
+- [ ] Shortcuts 中 Ask Aether
   - **前置条件**：App 已安装到真机
   - **操作步骤**：
     1. 打开 Shortcuts app
-    2. 查看 AIBuilder 相关动作
-  - **预期结果**：Shortcuts app 中出现「Ask AIBuilder」动作，输入 query 返回回复文本
+    2. 查看以太相关动作
+  - **预期结果**：Shortcuts app 中出现「Ask Aether」动作，输入 query 返回回复文本
   - **失败排查**：检查 AppIntent 注册；查看 AppShortcutsProvider
 
 - [ ] 内存不足提示
@@ -687,13 +687,13 @@
 
 ### 14.1 Shortcuts 真实对话
 
-- [ ] Ask AIBuilder 真实回复
+- [ ] Ask Aether 真实回复
   - **前置条件**：API Key 已配置
   - **操作步骤**：
     1. 在 Shortcuts app 中创建快捷指令
-    2. 添加「Ask AIBuilder」动作
+    2. 添加「Ask Aether」动作
     3. 输入 query 并运行
-  - **预期结果**：Shortcuts app 中「Ask AIBuilder」动作输入 query，返回真实 LLM 回复（非占位文本）
+  - **预期结果**：Shortcuts app 中「Ask Aether」动作输入 query，返回真实 LLM 回复（非占位文本）
   - **失败排查**：检查 AppIntent.perform；查看 LLM provider 注入
 
 - [ ] 未配置 API Key 时 Intent 提示
@@ -741,7 +741,7 @@
   - **操作步骤**：
     1. 在 iPhone 上查看会话 A
     2. 在 iPad 上打开 App Switcher
-  - **预期结果**：在 iPhone 上查看会话 A，iPad App Switcher 出现 AIBuilder Handoff 图标
+  - **预期结果**：在 iPhone 上查看会话 A，iPad App Switcher 出现 Aether Handoff 图标
   - **失败排查**：检查 NSUserActivity userInfo；查看 Handoff 权限
 
 - [ ] 点击 Handoff 打开 App
@@ -999,14 +999,14 @@
   - **前置条件**：邮件 composer 已打开
   - **操作步骤**：
     1. 查看收件人字段
-  - **预期结果**：邮件收件人预填 feedback@aibuilder.app
+  - **预期结果**：邮件收件人预填 feedback@aether.app
   - **失败排查**：检查 setToRecipients；查看 email 配置
 
 - [ ] 邮件主题预填
   - **前置条件**：邮件 composer 已打开
   - **操作步骤**：
     1. 查看主题字段
-  - **预期结果**：邮件主题预填「AI Builder 用户反馈」
+  - **预期结果**：邮件主题预填「以太用户反馈」
   - **失败排查**：检查 setSubject；查看主题字符串
 
 - [ ] 邮件正文含设备信息

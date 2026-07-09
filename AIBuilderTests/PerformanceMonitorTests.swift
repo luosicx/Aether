@@ -1,5 +1,5 @@
 import XCTest
-@testable import AIBuilder
+@testable import Aether
 
 /// Day 19: PerformanceMonitor 单元测试
 final class PerformanceMonitorTests: XCTestCase {

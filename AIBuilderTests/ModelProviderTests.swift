@@ -1,5 +1,5 @@
 import XCTest
-@testable import AIBuilder
+@testable import Aether
 
 /// Day 13: ModelProvider 枚举单元测试
 final class ModelProviderTests: XCTestCase {

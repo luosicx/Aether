@@ -198,7 +198,9 @@ struct MessageBubble: View {
             .padding(.vertical, Spacing.md)
             .background(bubbleBackground)
             .foregroundStyle(isUser ? Color.white : Color.textPrimary)
+            .overlay { bubbleBorder }
             .clipShape(bubbleShape)
+            .shadow(color: isUser ? .clear : Color.nebulaGlow.opacity(0.3), radius: 10)
             // Day 19: 无障碍——合并气泡内文本与光标为一个元素，用完整消息文本作为朗读值
             .accessibilityElement(children: .combine)
             .accessibilityValue(message.content)
@@ -221,8 +223,37 @@ struct MessageBubble: View {
         }
     }
 
-    private var bubbleBackground: Color {
-        isUser ? Color.bubbleUser : Color.bubbleAssistant
+    /// 气泡背景：液态玻璃风格
+    /// - 用户：品牌紫半透明 + 毛玻璃
+    /// - AI：液态玻璃基底 + 毛玻璃 + 星云光晕（叠加 bubbleBorder 描边）
+    @ViewBuilder
+    private var bubbleBackground: some View {
+        if isUser {
+            Color.bubbleUser
+                .opacity(0.85)
+                .background(.ultraThinMaterial)
+        } else {
+            Color.bubbleAI
+                .opacity(0.75)
+                .background(.ultraThinMaterial)
+        }
+    }
+
+    /// AI 气泡紫-蓝渐变描边，强化 Aether 星云边框
+    @ViewBuilder
+    private var bubbleBorder: some View {
+        if !isUser {
+            bubbleShape
+                .stroke(
+                    LinearGradient(
+                        colors: [.aetherPurple, .electricBlue],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1.5
+                )
+                .opacity(0.6)
+        }
     }
 
     private var bubbleShape: some Shape {

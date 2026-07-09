@@ -1,5 +1,5 @@
 import XCTest
-@testable import AIBuilder
+@testable import Aether
 
 /// Day 16: 端侧离线 LLM Provider 单元测试。
 /// OfflineLLMProvider 为 nonisolated class，将请求转发给 MLXInferenceEngine（actor）。

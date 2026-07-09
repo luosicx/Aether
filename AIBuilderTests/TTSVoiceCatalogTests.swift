@@ -1,5 +1,5 @@
 import XCTest
-@testable import AIBuilder
+@testable import Aether
 
 /// TTSVoiceCatalog 单元测试:验证按语言分组排序、displayName 回退、voice 查找。
 final class TTSVoiceCatalogTests: XCTestCase {

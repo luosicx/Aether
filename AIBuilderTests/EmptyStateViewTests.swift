@@ -1,6 +1,6 @@
 import XCTest
 import SwiftUI
-@testable import AIBuilder
+@testable import Aether
 
 final class EmptyStateViewTests: XCTestCase {
 

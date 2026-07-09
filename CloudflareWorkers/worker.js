@@ -1,5 +1,5 @@
 /**
- * AIBuilder BFF 代理 Cloudflare Worker
+ * Aether BFF 代理 Cloudflare Worker
  *
  * 职责：
  * 1. 校验 X-BFF-Token（从 KV `bff_tokens` 查询合法性）

@@ -1,5 +1,5 @@
 import XCTest
-@testable import AIBuilder
+@testable import Aether
 
 /// Day 18 Task 11: IntentChatService 单元测试
 /// 通过注入 LLMProvider 与 API Key 闭包验证 ask(query:) 的错误处理与流式累积逻辑，

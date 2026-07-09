@@ -13,10 +13,8 @@ final class SemanticCache {
 
     /// 查询缓存。入参 query 仅用于调试，实际匹配用 embedding。返回命中的 response 或 nil。
     func get(query: String, embedding: [Float]) -> String? {
-        for entry in cache {
-            if cosineSimilarity(embedding, entry.embedding) > similarityThreshold {
-                return entry.response
-            }
+        for entry in cache where cosineSimilarity(embedding, entry.embedding) > similarityThreshold {
+            return entry.response
         }
         return nil
     }

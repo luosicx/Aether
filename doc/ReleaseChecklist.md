@@ -1,4 +1,4 @@
-# AI Builder 上架前发布检查清单
+# Aether 上架前发布检查清单
 
 > Day 20 上架准备：Archive / TestFlight / App Store 元数据 / 审核信息 / 提交审核前最终检查
 
@@ -21,7 +21,7 @@
 ## 3. App Store 元数据
 
 ### 3.1 基本信息
-- [ ] **名称**：AI Builder（30 字符内，符合 App Store 命名规范）
+- [ ] **名称**：以太（30 字符内，符合 App Store 命名规范）
 - [ ] **副标题**：AI 对话助手（30 字符内，突出核心功能）
 - [ ] **描述**：覆盖 SwiftUI + SwiftData + 流式对话 / RAG / 工具调用 / 健康洞察等核心特性
 - [ ] **关键词**：AI / Chat / 对话 / 助手 / 健康（100 字符内，逗号分隔）
@@ -37,7 +37,7 @@
 - [ ] **App 分类**：Productivity 或 Utilities
 - [ ] **版权**：© 2026 [开发者/公司名]
 - [ ] **URL**：可选，指向产品官网
-- [ ] **支持 URL**：指向 feedback@aibuilder.app 或支持页面
+- [ ] **支持 URL**：指向 feedback@aether.app 或支持页面
 
 ## 4. 审核信息
 
@@ -62,12 +62,12 @@
 - [ ] 双端构建均无警告（或警告已审查）
 
 ### 4.2 工具数量审计
-- [ ] iOS 工具数：13 个（4 原有 AlarmTool/ReminderTool/DateTimeTool/CalculatorTool + 6 跨平台 LocationTool/DeviceInfoTool/ClipboardTool(含 Read+Write 两个)/OpenURLTool/ContactsTool/WeatherTool + 3 快捷指令 RunShortcutTool/ListShortcutsTool/CreateShortcutTool）
-- [ ] macOS 工具数：24 个（iOS 13 个 + 11 macOS 独有 AppleScriptTool/ScreenshotTool/OCRTool/TerminalCommandTool/WindowManagementTool/AppManagementTool/FileOperationTool/FinderTool/SafariControlTool/SystemControlTool/InputAutomationTool）
-- [ ] ToolRegistry.swift 注册数验证：跨平台工具无条件注册，macOS 独有工具用 `#if os(macOS)` 条件注册
+- [ ] iOS 工具数：14 个（14 个跨平台工具，无条件注册）
+- [ ] macOS 工具数：25 个（14 跨平台 + 11 macOS 独有 AppleScriptTool/ScreenshotTool/OCRTool/TerminalCommandTool/WindowManagementTool/AppManagementTool/FileOperationTool/FinderTool/SafariControlTool/SystemControlTool/InputAutomationTool）
+- [ ] ToolRegistry.swift 注册数验证：14 个跨平台工具无条件注册，11 个 macOS 独有工具用 `#if os(macOS)` 条件注册
 
 ### 4.3 测试规模
-- [ ] UT 用例数：248
+- [ ] UT 用例数：266
 - [ ] UIT 用例数：13（之前 12 + 新增 1）
 - [ ] iOS UT 运行：`xcodebuild test -destination 'platform=iOS Simulator,name=iPhone 17'` 全部通过（0 skipped，0 failures）
 - [ ] UIT 运行全部通过（0 failures）
@@ -136,20 +136,20 @@
 
 ## 4.11 工具数量审计
 
-- [ ] iOS 工具数 = 13（DateTimeTool / CalculatorTool / AlarmTool / ReminderTool + 6 跨平台 + 3 快捷指令）
-- [ ] macOS 工具数 = 24（上述 13 + 11 macOS 独有）
+- [ ] iOS 工具数 = 14（14 个跨平台工具）
+- [ ] macOS 工具数 = 25（14 跨平台 + 11 macOS 独有）
 - [ ] 验证命令：
   ```bash
   # 在 Xcode 中运行 Debug Playground 或在 ChatViewModel 加日志：
   # print("Tools count: \(ToolRegistry.shared.allToolDefs.count)")
   ```
-- [ ] 预期：iOS 13，macOS 24
+- [ ] 预期：iOS 14，macOS 25
 - [ ] ToolRegistry 注册逻辑：14 个跨平台工具无条件注册 + 11 个 macOS 工具用 `#if os(macOS)` 条件注册
 
 ## 4.12 测试规模审计
 
 ### 单元测试（UT）
-- [ ] UT 用例数 = 248（248 pass / 0 skip / 0 failures）
+- [ ] UT 用例数 = 266（266 pass / 0 skip / 0 failures）
 - [ ] UT 文件数 = 69
 - [ ] 验证命令：
   ```bash
@@ -160,7 +160,7 @@
     -only-testing:AIBuilderTests \
     CODE_SIGNING_ALLOWED=NO 2>&1 | tail -5
   ```
-- [ ] 预期输出包含：`Executed 248 tests, with 0 failures, 0 skipped`
+- [ ] 预期输出包含：`Executed 266 tests, with 0 failures, 0 skipped`
 
 ### UI 测试（UIT）
 - [ ] UIT 用例数 = 13（13 pass / 0 skip / 0 failures）
@@ -205,6 +205,18 @@
 - [ ] 13 个视图含 `accessibilityLabel`（MarkdownText / CodeBlockView / MarkdownTableView / HeadingView / ErrorOverlay / CitationCard / ConversationRow / OnDeviceModelView / KnowledgeBaseView / HealthSettingsView / PrivacyPolicyView / DocumentPickerView / PresetPrompts）
 - [ ] 13 个关键交互元素含 `accessibilityIdentifier`（sendButton / messageInputField / voiceInputButton / knowledgeBaseButton / settingsButton / conversationListButton / newConversationButton / importDocumentButton / downloadModelButton / deleteModelButton / requestHealthAuthButton / thumbsUpButton / thumbsDownButton）
 - [ ] VoiceOver 开启后能正确朗读各视图标签与提示
+
+## 4.15 SwiftLint 静态分析
+
+- [ ] SwiftLint 已安装（`brew install swiftlint` 或通过 SPM 集成）
+- [ ] `.swiftlint.yml` 配置文件存在于项目根目录
+- [ ] 执行 SwiftLint 检查：
+  ```bash
+  swiftlint lint --path AIBuilder --reporter emoji
+  ```
+- [ ] 预期输出：0 serious / 0 violations（或所有 warning 已审查并标记 `// swiftlint:disable`）
+- [ ] Xcode Build Phase 中 SwiftLint Run Script 已配置（构建时自动触发）
+- [ ] 提交前确认无新增 SwiftLint violation
 
 ## 5. 提交审核前最终检查
 

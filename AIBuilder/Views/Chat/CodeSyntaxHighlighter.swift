@@ -61,17 +61,116 @@ enum CodeSyntaxHighlighter {
     // MARK: - 语言关键字
 
     private static let keywords: [String: Set<String>] = [
-        "swift": ["func", "let", "var", "if", "else", "guard", "return", "for", "while", "switch", "case", "default", "struct", "class", "enum", "protocol", "extension", "import", "init", "deinit", "self", "super", "nil", "true", "false", "throws", "rethrows", "try", "catch", "do", "defer", "in", "where", "as", "is", "private", "public", "internal", "fileprivate", "static", "final", "open", "lazy", "weak", "unowned", "inout", "mutating", "nonmutating", "override", "required", "optional", "associatedtype", "typealias", "subscript", "operator", "precedencegroup", "convenience"],
-        "python": ["def", "class", "if", "elif", "else", "for", "while", "return", "import", "from", "as", "try", "except", "finally", "with", "lambda", "yield", "global", "nonlocal", "pass", "break", "continue", "raise", "assert", "del", "in", "is", "not", "and", "or", "None", "True", "False", "async", "await", "self", "cls", "print", "len", "range", "int", "str", "float", "list", "dict", "set", "tuple", "bool"],
-        "javascript": ["var", "let", "const", "function", "return", "if", "else", "for", "while", "switch", "case", "break", "continue", "new", "this", "class", "extends", "super", "import", "export", "default", "try", "catch", "finally", "throw", "typeof", "instanceof", "in", "of", "async", "await", "yield", "true", "false", "null", "undefined", "void", "delete", "void", "console"],
+        "swift": [
+            "func", "let", "var", "if", "else",
+            "guard", "return", "for", "while", "switch",
+            "case", "default", "struct", "class", "enum",
+            "protocol", "extension", "import", "init", "deinit",
+            "self", "super", "nil", "true", "false",
+            "throws", "rethrows", "try", "catch", "do",
+            "defer", "in", "where", "as", "is",
+            "private", "public", "internal", "fileprivate", "static",
+            "final", "open", "lazy", "weak", "unowned",
+            "inout", "mutating", "nonmutating", "override", "required",
+            "optional", "associatedtype", "typealias", "subscript", "operator",
+            "precedencegroup", "convenience"
+        ],
+        "python": [
+            "def", "class", "if", "elif", "else",
+            "for", "while", "return", "import", "from",
+            "as", "try", "except", "finally", "with",
+            "lambda", "yield", "global", "nonlocal", "pass",
+            "break", "continue", "raise", "assert", "del",
+            "in", "is", "not", "and", "or",
+            "None", "True", "False", "async", "await",
+            "self", "cls", "print", "len", "range",
+            "int", "str", "float", "list", "dict",
+            "set", "tuple", "bool"
+        ],
+        "javascript": [
+            "var", "let", "const", "function", "return",
+            "if", "else", "for", "while", "switch",
+            "case", "break", "continue", "new", "this",
+            "class", "extends", "super", "import", "export",
+            "default", "try", "catch", "finally", "throw",
+            "typeof", "instanceof", "in", "of", "async",
+            "await", "yield", "true", "false", "null",
+            "undefined", "void", "delete", "console"
+        ],
         "json": ["true", "false", "null"],
-        "java": ["public", "private", "protected", "class", "interface", "extends", "implements", "static", "final", "void", "int", "long", "double", "float", "boolean", "char", "String", "if", "else", "for", "while", "switch", "case", "break", "continue", "return", "new", "this", "super", "try", "catch", "finally", "throw", "throws", "import", "package", "null", "true", "false", "instanceof"],
-        "kotlin": ["fun", "val", "var", "class", "object", "interface", "if", "else", "for", "while", "when", "return", "override", "private", "public", "protected", "internal", "companion", "import", "package", "null", "true", "false", "is", "as", "in", "by", "data", "sealed", "enum", "annotation", "open", "abstract", "final", "lateinit", "suspend", "async", "await"],
-        "go": ["func", "var", "const", "type", "struct", "interface", "package", "import", "if", "else", "for", "switch", "case", "default", "return", "break", "continue", "defer", "go", "chan", "range", "map", "make", "new", "nil", "true", "false", "select", "type"],
-        "rust": ["fn", "let", "mut", "if", "else", "match", "for", "while", "loop", "return", "break", "continue", "struct", "enum", "trait", "impl", "pub", "use", "mod", "crate", "self", "Self", "super", "as", "in", "ref", "move", "static", "const", "unsafe", "async", "await", "dyn", "where", "type", "true", "false"],
-        "c": ["int", "char", "float", "double", "void", "long", "short", "unsigned", "signed", "struct", "union", "enum", "typedef", "const", "static", "extern", "register", "volatile", "auto", "if", "else", "for", "while", "do", "switch", "case", "default", "break", "continue", "return", "goto", "sizeof", "include", "define", "ifdef", "ifndef", "endif", "pragma", "NULL"],
-        "cpp": ["int", "char", "float", "double", "void", "long", "short", "unsigned", "signed", "struct", "class", "union", "enum", "typedef", "const", "static", "extern", "register", "volatile", "auto", "if", "else", "for", "while", "do", "switch", "case", "default", "break", "continue", "return", "goto", "sizeof", "include", "define", "ifdef", "ifndef", "endif", "namespace", "using", "template", "typename", "new", "delete", "public", "private", "protected", "virtual", "override", "final", "nullptr", "true", "false", "std"],
-        "sql": ["SELECT", "FROM", "WHERE", "INSERT", "INTO", "VALUES", "UPDATE", "SET", "DELETE", "CREATE", "TABLE", "ALTER", "DROP", "INDEX", "VIEW", "JOIN", "LEFT", "RIGHT", "INNER", "OUTER", "ON", "AND", "OR", "NOT", "NULL", "IS", "IN", "EXISTS", "GROUP", "BY", "ORDER", "HAVING", "LIMIT", "OFFSET", "DISTINCT", "AS", "UNION", "ALL", "CASE", "WHEN", "THEN", "ELSE", "END", "COUNT", "SUM", "AVG", "MIN", "MAX"]
+        "java": [
+            "public", "private", "protected", "class", "interface",
+            "extends", "implements", "static", "final", "void",
+            "int", "long", "double", "float", "boolean",
+            "char", "String", "if", "else", "for",
+            "while", "switch", "case", "break", "continue",
+            "return", "new", "this", "super", "try",
+            "catch", "finally", "throw", "throws", "import",
+            "package", "null", "true", "false", "instanceof"
+        ],
+        "kotlin": [
+            "fun", "val", "var", "class", "object",
+            "interface", "if", "else", "for", "while",
+            "when", "return", "override", "private", "public",
+            "protected", "internal", "companion", "import", "package",
+            "null", "true", "false", "is", "as",
+            "in", "by", "data", "sealed", "enum",
+            "annotation", "open", "abstract", "final", "lateinit",
+            "suspend", "async", "await"
+        ],
+        "go": [
+            "func", "var", "const", "type", "struct",
+            "interface", "package", "import", "if", "else",
+            "for", "switch", "case", "default", "return",
+            "break", "continue", "defer", "go", "chan",
+            "range", "map", "make", "new", "nil",
+            "true", "false", "select", "type"
+        ],
+        "rust": [
+            "fn", "let", "mut", "if", "else",
+            "match", "for", "while", "loop", "return",
+            "break", "continue", "struct", "enum", "trait",
+            "impl", "pub", "use", "mod", "crate",
+            "self", "Self", "super", "as", "in",
+            "ref", "move", "static", "const", "unsafe",
+            "async", "await", "dyn", "where", "type",
+            "true", "false"
+        ],
+        "c": [
+            "int", "char", "float", "double", "void",
+            "long", "short", "unsigned", "signed", "struct",
+            "union", "enum", "typedef", "const", "static",
+            "extern", "register", "volatile", "auto", "if",
+            "else", "for", "while", "do", "switch",
+            "case", "default", "break", "continue", "return",
+            "goto", "sizeof", "include", "define", "ifdef",
+            "ifndef", "endif", "pragma", "NULL"
+        ],
+        "cpp": [
+            "int", "char", "float", "double", "void",
+            "long", "short", "unsigned", "signed", "struct",
+            "class", "union", "enum", "typedef", "const",
+            "static", "extern", "register", "volatile", "auto",
+            "if", "else", "for", "while", "do",
+            "switch", "case", "default", "break", "continue",
+            "return", "goto", "sizeof", "include", "define",
+            "ifdef", "ifndef", "endif", "namespace", "using",
+            "template", "typename", "new", "delete", "public",
+            "private", "protected", "virtual", "override", "final",
+            "nullptr", "true", "false", "std"
+        ],
+        "sql": [
+            "SELECT", "FROM", "WHERE", "INSERT", "INTO",
+            "VALUES", "UPDATE", "SET", "DELETE", "CREATE",
+            "TABLE", "ALTER", "DROP", "INDEX", "VIEW",
+            "JOIN", "LEFT", "RIGHT", "INNER", "OUTER",
+            "ON", "AND", "OR", "NOT", "NULL",
+            "IS", "IN", "EXISTS", "GROUP", "BY",
+            "ORDER", "HAVING", "LIMIT", "OFFSET", "DISTINCT",
+            "AS", "UNION", "ALL", "CASE", "WHEN",
+            "THEN", "ELSE", "END", "COUNT", "SUM",
+            "AVG", "MIN", "MAX"
+        ]
     ]
 
     // MARK: - 高亮入口

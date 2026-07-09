@@ -1,5 +1,5 @@
 import XCTest
-@testable import AIBuilder
+@testable import Aether
 
 /// Day 18 Task 13: Conversation.userActivity 计算属性单元测试
 /// 验证 NSUserActivity 的 activityType / userInfo / Handoff & Search 资格配置正确。

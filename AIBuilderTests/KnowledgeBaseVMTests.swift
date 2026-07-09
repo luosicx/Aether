@@ -1,6 +1,6 @@
 import XCTest
 import SwiftData
-@testable import AIBuilder
+@testable import Aether
 
 /// KnowledgeBaseVM 单元测试
 @MainActor
@@ -91,5 +91,26 @@ final class KnowledgeBaseVMTests: XCTestCase {
         // B 的 chunks 应保留
         let remainingB = allChunks.filter { $0.source == "B.pdf" }
         XCTAssertEqual(remainingB.count, 2, "B 的 chunks 应保留")
+    }
+
+    /// importDocument 在 DeepSeek 无 Qwen Key 时实时解析失败，显示友好错误（不发送 404 请求）
+    func testImportDocumentDeepSeekNoQwenKeyShowsFriendlyError() async {
+        // KnowledgeBaseVM 默认 provider = .deepseek，测试环境中 Keychain 无 Qwen Key
+        // resolveEmbedding 应返回 nil，importDocument 应设置友好错误
+        let vm = KnowledgeBaseVM(provider: .deepseek)
+
+        // 创建临时文件
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("test_import_\(UUID().uuidString).txt")
+        try? "这是一段测试文本".write(to: tempURL, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: tempURL) }
+
+        await vm.importDocument(url: tempURL, modelContext: context)
+
+        XCTAssertNotNil(vm.errorMessage, "DeepSeek 无 Qwen Key 时应设置错误消息")
+        XCTAssertTrue(
+            vm.errorMessage?.contains("DeepSeek 不支持知识库嵌入") == true,
+            "错误消息应包含'DeepSeek 不支持知识库嵌入'，实际：\(vm.errorMessage ?? "nil")"
+        )
+        XCTAssertFalse(vm.isImporting, "应未进入导入状态")
     }
 }

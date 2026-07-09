@@ -22,11 +22,11 @@ enum Spacing {
     static let xxxl: CGFloat = 32
 }
 
-/// 圆角 token
+/// 圆角 token（适配液态玻璃圆润感）
 enum CornerRadius {
-    static let small: CGFloat = 8
-    static let medium: CGFloat = 12
-    static let large: CGFloat = 18
+    static let small: CGFloat = 12
+    static let medium: CGFloat = 16
+    static let large: CGFloat = 24
     static let pill: CGFloat = 999
 }
 

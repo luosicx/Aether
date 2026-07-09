@@ -1,5 +1,5 @@
 import XCTest
-@testable import AIBuilder
+@testable import Aether
 
 /// Day 13: FallbackLLMProvider 装饰器单元测试
 final class FallbackLLMProviderTests: XCTestCase {

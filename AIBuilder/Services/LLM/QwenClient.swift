@@ -82,7 +82,22 @@ nonisolated final class QwenClient: LLMProvider {
         let body = ChatRequestBody(
             model: config.model,
             messages: messages.map {
-                ChatRequestBody.ChatMessageBody(role: $0.role, content: $0.content, images: $0.images, tool_call_id: $0.toolCallId, tool_calls: $0.toolCalls?.map { ChatRequestBody.ToolCallBody(id: $0.id, type: $0.type, function: ChatRequestBody.FunctionBody(name: $0.function.name, arguments: $0.function.arguments)) })
+                ChatRequestBody.ChatMessageBody(
+                    role: $0.role,
+                    content: $0.content,
+                    images: $0.images,
+                    tool_call_id: $0.toolCallId,
+                    tool_calls: $0.toolCalls?.map {
+                        ChatRequestBody.ToolCallBody(
+                            id: $0.id,
+                            type: $0.type,
+                            function: ChatRequestBody.FunctionBody(
+                                name: $0.function.name,
+                                arguments: $0.function.arguments
+                            )
+                        )
+                    }
+                )
             },
             stream: true,
             max_tokens: config.maxTokens,
@@ -98,7 +113,22 @@ nonisolated final class QwenClient: LLMProvider {
         let body = ChatRequestBody(
             model: config.model,
             messages: messages.map {
-                ChatRequestBody.ChatMessageBody(role: $0.role, content: $0.content, images: $0.images, tool_call_id: $0.toolCallId, tool_calls: $0.toolCalls?.map { ChatRequestBody.ToolCallBody(id: $0.id, type: $0.type, function: ChatRequestBody.FunctionBody(name: $0.function.name, arguments: $0.function.arguments)) })
+                ChatRequestBody.ChatMessageBody(
+                    role: $0.role,
+                    content: $0.content,
+                    images: $0.images,
+                    tool_call_id: $0.toolCallId,
+                    tool_calls: $0.toolCalls?.map {
+                        ChatRequestBody.ToolCallBody(
+                            id: $0.id,
+                            type: $0.type,
+                            function: ChatRequestBody.FunctionBody(
+                                name: $0.function.name,
+                                arguments: $0.function.arguments
+                            )
+                        )
+                    }
+                )
             },
             stream: true,
             max_tokens: config.maxTokens,

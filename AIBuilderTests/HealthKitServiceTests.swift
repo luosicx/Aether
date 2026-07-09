@@ -1,6 +1,6 @@
 #if os(iOS)
 import XCTest
-@testable import AIBuilder
+@testable import Aether
 
 /// Day 17: HealthKitService 单元测试
 ///

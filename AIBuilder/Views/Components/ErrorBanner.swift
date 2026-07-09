@@ -3,6 +3,8 @@ import SwiftUI
 struct ErrorBanner: View {
     let message: String
     let onDismiss: () -> Void
+    var onRetry: (() -> Void)?
+    var onSettings: (() -> Void)?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -15,6 +17,22 @@ struct ErrorBanner: View {
                 .foregroundStyle(.primary)
                 .lineLimit(3)
             Spacer()
+            if let onRetry {
+                Button("重试") { onRetry() }
+                    .font(.footnote.weight(.medium))
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .tint(.aetherPurple)
+                    .accessibilityLabel("重试")
+            }
+            if let onSettings {
+                Button("前往设置") { onSettings() }
+                    .font(.footnote.weight(.medium))
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .tint(.aetherPurple)
+                    .accessibilityLabel("前往设置")
+            }
             Button { onDismiss() } label: {
                 Image(systemName: "xmark")
                     .foregroundStyle(.secondary)

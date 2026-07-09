@@ -15,8 +15,8 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "B06AF15605D68E7EA565058C"
-               BuildableName = "AIBuilder.app"
-               BlueprintName = "AIBuilder"
+               BuildableName = "Aether.app"
+               BlueprintName = "Aether"
                ReferencedContainer = "container:AIBuilder.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -29,8 +29,8 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "8DE141236A8DDF7895D8AB48"
-               BuildableName = "AIBuilderTests.xctest"
-               BlueprintName = "AIBuilderTests"
+               BuildableName = "AetherTests.xctest"
+               BlueprintName = "AetherTests"
                ReferencedContainer = "container:AIBuilder.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -43,8 +43,8 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "D98AD396A6D4DD6ACC7428FA"
-               BuildableName = "AIBuilderUITests.xctest"
-               BlueprintName = "AIBuilderUITests"
+               BuildableName = "AetherUITests.xctest"
+               BlueprintName = "AetherUITests"
                ReferencedContainer = "container:AIBuilder.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -62,8 +62,8 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "8DE141236A8DDF7895D8AB48"
-               BuildableName = "AIBuilderTests.xctest"
-               BlueprintName = "AIBuilderTests"
+               BuildableName = "AetherTests.xctest"
+               BlueprintName = "AetherTests"
                ReferencedContainer = "container:AIBuilder.xcodeproj">
             </BuildableReference>
          </TestableReference>
@@ -72,8 +72,8 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "D98AD396A6D4DD6ACC7428FA"
-               BuildableName = "AIBuilderUITests.xctest"
-               BlueprintName = "AIBuilderUITests"
+               BuildableName = "AetherUITests.xctest"
+               BlueprintName = "AetherUITests"
                ReferencedContainer = "container:AIBuilder.xcodeproj">
             </BuildableReference>
          </TestableReference>
@@ -94,24 +94,24 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "B06AF15605D68E7EA565058C"
-            BuildableName = "AIBuilder.app"
-            BlueprintName = "AIBuilder"
+            BuildableName = "Aether.app"
+            BlueprintName = "Aether"
             ReferencedContainer = "container:AIBuilder.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
+   <ProfileAction
+      buildConfiguration = "Release"
+      shouldUseLaunchSchemeArgsEnv = "YES"
+      savedToolIdentifier = ""
+      useCustomWorkingDirectory = "NO"
+      debugDocumentVersioning = "YES">
+   </ProfileAction>
+   <AnalyzeAction
+      buildConfiguration = "Debug">
+   </AnalyzeAction>
    <ArchiveAction
       buildConfiguration = "Release"
       revealArchiveInOrganizer = "YES">
-      <BuildableProductRunnable
-         runnableDebuggingMode = "0">
-         <BuildableReference
-            BuildableIdentifier = "primary"
-            BlueprintIdentifier = "B06AF15605D68E7EA565058C"
-            BuildableName = "AIBuilder.app"
-            BlueprintName = "AIBuilder"
-            ReferencedContainer = "container:AIBuilder.xcodeproj">
-         </BuildableReference>
-      </BuildableProductRunnable>
    </ArchiveAction>
 </Scheme>

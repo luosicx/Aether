@@ -7,6 +7,23 @@ struct CodeBlockView: View {
 
     @Environment(\.colorScheme) private var colorScheme
 
+    /// 缓存语法高亮结果的包装类（NSCache value 要求 NSObject 子类，AttributedString 不是 NSObject）
+    private final class CachedHighlight: NSObject {
+        let attributed: AttributedString
+        init(attributed: AttributedString) {
+            self.attributed = attributed
+            super.init()
+        }
+    }
+
+    /// 模块级语法高亮缓存：避免 body 重算时重复执行正则匹配导致主线程卡顿。
+    /// key 由 `code + language + theme` 组合，确保不同代码/语言/主题互不干扰。
+    private static let highlightCache: NSCache<NSString, CachedHighlight> = {
+        let cache = NSCache<NSString, CachedHighlight>()
+        cache.countLimit = 100  // 代码块缓存数量比 markdown 少
+        return cache
+    }()
+
     /// 当前主题（跟随系统深浅色）
     private var theme: SyntaxTheme {
         colorScheme == .dark ? .dark : .light
@@ -17,13 +34,20 @@ struct CodeBlockView: View {
         colorScheme == .dark ? Color.codeBackgroundDark : Color.codeBackgroundLight
     }
 
-    /// 语法高亮后的属性字符串
+    /// 语法高亮后的属性字符串（命中缓存则直接返回，未命中则计算并写入缓存）
     private var highlightedText: AttributedString {
-        CodeSyntaxHighlighter.highlight(
-            code.trimmingCharacters(in: .whitespacesAndNewlines),
+        let trimmedCode = code.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cacheKey = "\(trimmedCode)\u{1F}\(language ?? "")\u{1F}\(theme)" as NSString
+        if let cached = CodeBlockView.highlightCache.object(forKey: cacheKey) {
+            return cached.attributed
+        }
+        let attributed = CodeSyntaxHighlighter.highlight(
+            trimmedCode,
             language: language,
             theme: theme
         )
+        CodeBlockView.highlightCache.setObject(CachedHighlight(attributed: attributed), forKey: cacheKey)
+        return attributed
     }
 
     var body: some View {

@@ -8,16 +8,29 @@ import Foundation
 nonisolated final class OfflineLLMProvider: LLMProvider {
 
     /// 纯文本 chat 流：拼接 Llama-3 prompt → 调用 MLXInferenceEngine.generate 流式生成。
+    /// 若模型未加载且 OnDeviceConfig 中有 modelPath，会先自动加载模型。
     func chat(messages: [APIMessage], config: ChatConfig, apiKey: String) -> AsyncStream<String> {
         AsyncStream { continuation in
             Task {
+                let storedPath = Self.loadStoredModelPath()
+                // 自动加载：模型未加载且有路径时，先加载（失败则交由 generate 输出占位提示）
+                var effectivePath = storedPath
+                if !(await MLXInferenceEngine.shared.isLoaded), let path = storedPath {
+                    do {
+                        try await MLXInferenceEngine.shared.loadModel(path: path)
+                    } catch {
+                        // 加载失败：清空路径避免 generate 重复尝试，交由 generate 输出提示
+                        effectivePath = nil
+                    }
+                }
                 // 按 Llama-3 chat template 拼接完整 prompt
                 let prompt = Self.buildLlama3Prompt(messages: messages, systemPrompt: config.systemPrompt)
                 // 调用 MLX 引擎流式生成（maxTokens/temperature 用 config 传入值）
                 let stream = await MLXInferenceEngine.shared.generate(
                     prompt: prompt,
                     maxTokens: config.maxTokens,
-                    temperature: config.temperature
+                    temperature: config.temperature,
+                    modelPath: effectivePath
                 )
                 for await token in stream {
                     if Task.isCancelled { break }
@@ -48,11 +61,22 @@ nonisolated final class OfflineLLMProvider: LLMProvider {
             }
             // tools 为空：退化为纯文本 chat，包装为 ParsedChunk
             Task {
+                let storedPath = Self.loadStoredModelPath()
+                // 自动加载：模型未加载且有路径时，先加载
+                var effectivePath = storedPath
+                if !(await MLXInferenceEngine.shared.isLoaded), let path = storedPath {
+                    do {
+                        try await MLXInferenceEngine.shared.loadModel(path: path)
+                    } catch {
+                        effectivePath = nil
+                    }
+                }
                 let prompt = Self.buildLlama3Prompt(messages: messages, systemPrompt: config.systemPrompt)
                 let stream = await MLXInferenceEngine.shared.generate(
                     prompt: prompt,
                     maxTokens: config.maxTokens,
-                    temperature: config.temperature
+                    temperature: config.temperature,
+                    modelPath: effectivePath
                 )
                 for await token in stream {
                     if Task.isCancelled { break }
@@ -84,6 +108,17 @@ nonisolated final class OfflineLLMProvider: LLMProvider {
             }
             return vec
         }
+    }
+
+    /// 从 UserDefaults 读取持久化的模型路径（OnDeviceConfig.modelPath）。
+    /// OfflineLLMProvider 无 settingsVM 注入，直接读 UserDefaults 获取配置。
+    /// - Returns: 持久化存储的模型路径，无配置或解码失败时返回 nil
+    private static func loadStoredModelPath() -> URL? {
+        guard let data = UserDefaults.standard.data(forKey: OnDeviceConfig.userDefaultsKey) else {
+            return nil
+        }
+        let config = (try? JSONDecoder().decode(OnDeviceConfig.self, from: data)) ?? .default
+        return config.modelPath
     }
 
     /// 按 Llama-3 chat template 拼接完整 prompt。

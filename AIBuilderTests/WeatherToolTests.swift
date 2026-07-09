@@ -1,5 +1,5 @@
 import XCTest
-@testable import AIBuilder
+@testable import Aether
 
 /// 拦截 URLSession.shared 请求的 URLProtocol mock，用于注入预置响应。
 /// 通过 URLProtocol.registerClass 全局注册后即可拦截 WeatherTool 内部的网络请求。

@@ -1,6 +1,6 @@
 import XCTest
 import SwiftData
-@testable import AIBuilder
+@testable import Aether
 
 /// Day 11: RAGService 单元测试
 @MainActor

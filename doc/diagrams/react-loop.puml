@@ -1,0 +1,101 @@
+@startuml react-loop
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName "Helvetica Neue"
+skinparam sequenceMessageAlign center
+skinparam ArrowColor #555555
+skinparam ParticipantPadding 10
+
+title Aether ReAct 工具调用循环时序图
+
+actor User as 用户
+participant "ChatViewModel" as VM
+participant "SemanticCache" as Cache
+participant "RAGService" as RAG
+participant "LLMProvider\n(Fallback 装饰)" as LLM
+participant "ToolRegistry" as Tools
+database "SwiftData" as DB
+
+' 1. 用户输入
+用户 -> VM: 输入消息 text
+activate VM
+
+' 2. 缓存查询
+VM -> Cache: get(query, embedding)
+alt 缓存命中
+    Cache --> VM: 返回 cached response
+    VM -> VM: 流式假打字展示
+    VM -> DB: 持久化 assistant 消息
+    VM --> 用户: 返回缓存结果
+    deactivate VM
+else 缓存未命中
+    Cache --> VM: nil
+end
+
+' 3. RAG 检索
+opt RAG 启用
+    VM -> RAG: buildAugmentedContext(query)
+    activate RAG
+    RAG -> RAG: embed query
+    RAG -> RAG: cosine 相似度 topK=5 检索
+    RAG --> VM: (context, citations, queryEmbedding)
+    deactivate RAG
+    VM -> VM: 注入 [1][2] 编号 system context
+end
+
+' 4-8. ReAct 循环（最大 5 轮）
+loop loopCount < 5 轮
+    VM -> LLM: chat(messages, config, tools)
+    activate LLM
+    LLM --> VM: 流式 ParsedChunk (content + toolCalls)
+    deactivate LLM
+
+    opt 有 tool_calls
+        VM -> VM: 追加 assistant 消息 (含 toolCalls)
+        VM -> DB: 保存 assistant 消息
+
+        loop 每个 tool_call
+            VM -> Tools: execute(name, arguments)
+            activate Tools
+            alt 执行成功
+                Tools --> VM: result 字符串
+            else 执行超时 (>15s) 或失败
+                Tools --> VM: 错误描述字符串
+            end
+            deactivate Tools
+            VM -> VM: 追加 tool role 消息到 messages
+            VM -> DB: 保存 tool 消息
+        end
+
+        VM -> VM: apiMessages = conversation.messages
+        note right of VM: 继续下一轮 ReAct 循环
+    else 无 tool_calls
+        VM -> VM: break 跳出循环
+    end
+end
+
+' 循环结束
+alt loopCount >= 5 且无输出
+    VM -> VM: errorMessage = "工具调用循环超过 5 轮，已中止"
+end
+
+VM -> VM: 读取 FallbackLLMProvider 最终状态
+VM -> DB: 持久化最终 assistant 消息
+
+' 9. 缓存写入
+opt 非工具模式 且 响应非空 且 embedding 有效
+    VM -> Cache: set(query, embedding, response)
+end
+
+VM --> 用户: 展示最终回复
+deactivate VM
+
+note over VM, LLM
+  <b>ReAct 循环关键参数</b>
+  • maxReActLoops = 5
+  • toolTimeout = 15s（单工具超时不中断循环）
+  • SmartRouter 自动选择模型（auto 模式）
+  • FallbackLLMProvider 主 provider 无产出时自动降级
+end note
+
+@enduml

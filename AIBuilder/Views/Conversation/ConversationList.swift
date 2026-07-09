@@ -71,8 +71,8 @@ struct ConversationList: View {
                         }
                         .listRowBackground(Color.clear)
 
-                        // Day 9: 过滤后的会话列表
-                        ForEach(filteredConversations) { conversation in
+                        // Day 9: 过滤后的会话列表（显式按 UUID 稳定化，避免依赖 @Model 的默认 Identifiable 行为）
+                        ForEach(filteredConversations, id: \.id) { conversation in
                             Button {
                                 if isEditMode {
                                     if selectedConversations.contains(conversation.id) {
@@ -176,7 +176,7 @@ struct ConversationList: View {
                     }
                 }
             }
-            .navigationTitle("灵枢")
+            .navigationTitle("以太")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif

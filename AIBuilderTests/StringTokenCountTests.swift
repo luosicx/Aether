@@ -1,22 +1,23 @@
 import XCTest
-@testable import AIBuilder
+@testable import Aether
 
 /// String.estimatedTokens 表驱动单元测试
 ///
-/// 源码实现：`Int(Double(split(separator: " ").count) * 1.3)`
-/// - 按单空格 split，连续空格折叠（split 默认 omitEmptySubsequences=true）
-/// - 中文无空格，整体算 1 个 token 词
-/// - 最终乘以 1.3 后向零取整（Int 截断）
+/// 源码实现：英文按空格分词乘 1.3 + 非 ASCII 字符每字 1.5
+/// - 空字符串 → 0
+/// - 纯英文按空格分词
+/// - 中文每字约 1.5 token
 final class StringTokenCountTests: XCTestCase {
     func testEstimatedTokens() {
         // (输入, 期望 token 数)
         let cases: [(String, Int)] = [
-            ("", 0),                       // 空字符串 split 为 0 个 → 0
+            ("", 0),                       // 空字符串 → 0
             ("hello", 1),                  // 1 词 → Int(1.3) = 1
             ("hello world", 2),            // 2 词 → Int(2.6) = 2
             ("hello  world", 2),           // 连续空格 split 折叠 → 2 词
-            ("你好世界", 1),                // 无空格整体算 1 词 → Int(1.3) = 1
+            ("你好世界", 7),                // 1 词 Int(1.3) + 4 非 ASCII 字 Int(4*1.5) = 1+6 = 7
             ("hello world foo bar", 5),    // 4 词 → Int(4 * 1.3 = 5.2) = 5
+            ("你好 hello", 5)              // 2 英文词 Int(2*1.3) + 2 中文字 Int(2*1.5) = 2+3 = 5
         ]
         for (input, expected) in cases {
             XCTAssertEqual(

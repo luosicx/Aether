@@ -17,16 +17,25 @@
 - USAGE.md 新增 macOS 系统集成与性能监控章节
 - MANUAL_TEST_CHECKLIST.md 手测项四字段结构化（前置条件 / 操作步骤 / 预期结果 / 失败排查）
 - ReleaseChecklist.md 新增 4.4-4.7 审计项（多平台构建 / 工具数 / 测试规模 / 文档完整性）
-- **完整国际化补全**：`Localizable.xcstrings` 从 55 核心 key 扩展至 385 keys，覆盖 Views / ViewModels / Services / AppIntents / Core；新增 `scripts/` 提取/翻译/合并工具链
+- **完整国际化补全**：`Localizable.xcstrings` 从 55 核心 key 扩展至 387 keys，覆盖 Views / ViewModels / Services / AppIntents / Core；新增 `scripts/` 提取/翻译/合并工具链
 - **无障碍全面增强**：7 个核心视图新增约 75 个 `accessibilityLabel` / `accessibilityHint` / `accessibilityIdentifier`
 - **项目截图**：`screenshots/` 新增 8 张 iOS / macOS 核心页面截图
 - **后续规划文档**：新增 `doc/ROADMAP.md`、`doc/OPTIMIZATION.md`、`doc/DESIGN_UPDATE.md`
+- **工程质量工具链**：`.swiftlint.yml` 配置完成，启用 `force_unwrapping` / `force_cast` / `force_try` / `implicitly_unwrapped_optional` / `empty_count` / `empty_string` / `explicit_init` 等 opt-in 规则；`.swiftformat` 配置完成（Swift 5.9 / 4 空格缩进）；新增 `scripts/run_swiftlint.sh` CI 集成脚本（未安装时跳过不报错，有 error 时退出码 1 阻断合并）；全量代码格式修复
+
+### Changed
+- **Aether 品牌重塑**：AIBuilder → Aether（以太），确立液态玻璃（Liquid Glass）+ 深空（Deep Space）主题设计语言。新增色彩体系（AetherPurple / ElectricBlue / NebulaGlow / Starlight / LiquidGlass / DeepSpace 色板）、字体体系（TypographyTokens）、设计令牌（DesignTokens / ColorTokens）；App 入口 `AIBuilderApp` → `AetherApp`，AppIntent `AskAIBuilderIntent` → `AskAetherIntent`，UITests → `AetherUITests`；新增 `BrandSplash` 开屏品牌动画与 `DesignSystem/` 目录
+- **性能优化**：BGTask 调度从 `init()` 延迟到首次进入后台触发（懒调度），减少冷启动耗时；远程配置拉取从 `init()` 移到首屏 `.task` 出现后执行；`CodeBlockView` 语法高亮结果通过 NSCache 缓存，避免重复解析；`ConversationList` `.id` 稳定化，避免列表刷新时全量重建；MLX 模型加载通过 `Task.detached` 在后台线程执行，不阻塞 actor 与 UI 线程
+- **体验优化**：API Key 空值预检——发起对话前检测 Key 是否为空，为空时直接展示 `ErrorBanner` 提示「请先在设置中配置 API Key」而不发起无效网络请求；`ErrorBanner` 组件支持可选「重试」与「前往设置」按钮，便于用户快速恢复；`EmptyStateView` 统一空态展示（会话列表 / 知识库 / 端侧模型管理等场景复用）；macOS 新增 ⌘Shift+F 快捷键聚焦搜索输入框
 
 ### Fixed
-- **BGTaskScheduler 强制向下转型崩溃风险修复**：`AIBuilderApp.swift` 中 3 处 `task as! BGAppRefreshTask` 改为 `guard let refreshTask = task as? BGAppRefreshTask else { task.setTaskCompleted(success: false); return }`，任务类型不匹配时安全退出而非崩溃
+- **BGTaskScheduler 强制向下转型崩溃风险修复**：`AetherApp.swift` 中 3 处 `task as! BGAppRefreshTask` 改为 `guard let refreshTask = task as? BGAppRefreshTask else { task.setTaskCompleted(success: false); return }`，任务类型不匹配时安全退出而非崩溃
 - **UT/UIT 全部 0 skip**：修复 `testUserPreferencePersistence` 根因（`UserPreference` @Model 未注册到 App `ModelContainer` schema）；修复 7 处 `XCTSkip`
 - **Swift 6 并发警告**：修复 `VoiceService` / `ChatViewModel` / `ConversationListVM` / `ClipboardTool` / `OpenURLTool` / `LocationTool` / `SSEParser` 等 7 类警告
 - **macOS AppIcon 警告**：清理 3 个未分配子图标
+
+### Removed
+- **清理**：移除 9 个根目录一次性临时脚本（pbxproj 注册 / 路径修复等 Ruby 脚本）与 `.wolf/buglog.json.tmp` 临时文件；合并 `doc/plans/` 目录（历史 Day 计划文档统一归档）；清理代码与文档中残留的「灵枢」/「LingShu」品牌 KEY，统一为 Aether（以太）
 
 （详见 spec：[enhance-docs-architecture-diagrams](../.trae/specs/enhance-docs-architecture-diagrams/spec.md)）
 

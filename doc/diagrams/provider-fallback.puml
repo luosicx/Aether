@@ -1,0 +1,94 @@
+@startuml provider-fallback
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName "Helvetica Neue"
+skinparam StateBackgroundColor #E3F2FD
+skinparam StateBorderColor #1976D2
+skinparam ArrowColor #555555
+
+title Aether Provider 降级流程图
+
+state "SmartRouter 路由决策" as Route {
+  Route : 按消息特征选择模型
+  Route : 工具/图片 → deepseek-chat
+  Route : 长文本(≥50字) → deepseek-reasoner
+  Route : 推理关键词 → deepseek-reasoner
+  Route : 默认 → deepseek-chat
+}
+
+state "主 Provider 调用" as PrimaryCall {
+  PrimaryCall : DeepSeekClient / QwenClient / BFFProxyClient
+  PrimaryCall : 流式 chat (AsyncStream)
+}
+
+state "失败检测" as Detect {
+  Detect : yieldedAny == false ?
+  Detect : (主 provider 未产出任何内容)
+}
+
+state "FallbackLLMProvider 降级" as Fallback {
+  Fallback : lastUsedProvider = fallbackProvider
+  Fallback : didFallback = true
+}
+
+state "备用 Provider 调用" as FallbackCall {
+  FallbackCall : 使用备用 provider 重试
+  FallbackCall : 全量重发 chat 请求
+}
+
+state "返回结果" as Result {
+  Result : 合并流式内容
+  Result : 更新 DebugInfo.provider
+}
+
+[*] --> Route
+Route --> PrimaryCall
+PrimaryCall --> Detect
+
+Detect --> Result : 主 provider 正常产出\n(yieldedAny == true)
+Detect --> Fallback : 主 provider 无产出\n(yieldedAny == false)
+Fallback --> FallbackCall
+FallbackCall --> Result
+Result --> [*]
+
+note right of Fallback
+  <b>降级触发条件</b>
+  • 主 provider stream finish 时 yieldedAny 为 false
+  • 覆盖 HTTP 错误提前 finish 的场景
+  • embed 路径不降级（避免双倍调用）
+end note
+
+|网络监听自动切换|
+
+state "NetworkMonitor 监听" as Monitor {
+  Monitor : NWPathMonitor 实时检测
+  Monitor : statusStream 暴露状态流
+}
+
+state "断网 → 端侧" as Offline {
+  Offline : currentNetworkStatus == .offline
+  Offline : 保存 originalSelectedProvider
+  Offline : 切换到 OfflineLLMProvider (MLX)
+}
+
+state "联网 → 恢复" as Online {
+  Online : 网络恢复
+  Online : 切回 originalSelectedProvider
+  Online : 恢复云端 LLM 调用
+}
+
+Monitor --> Offline : 网络断开
+Offline --> Monitor : 持续监听
+Monitor --> Online : 网络恢复
+Online --> Monitor : 持续监听
+
+note bottom of Monitor
+  <b>网络自动切换说明</b>
+  • NetworkMonitor 基于 NWPathMonitor
+  • OnDeviceConfig.autoSwitchOnNetworkLoss 控制开关
+  • 断网 → OfflineLLMProvider (MLX 端侧推理)
+  • 联网 → 恢复原 provider
+  • 状态：online / offline / wifi / cellular
+end note
+
+@enduml

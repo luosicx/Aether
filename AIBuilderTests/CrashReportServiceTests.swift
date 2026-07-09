@@ -1,5 +1,5 @@
 import XCTest
-@testable import AIBuilder
+@testable import Aether
 
 /// Day 20: CrashReportService 单元测试。
 /// Bugly 不可用时走占位分支，测试验证不 crash 即可。

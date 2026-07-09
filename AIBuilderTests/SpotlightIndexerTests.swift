@@ -1,5 +1,5 @@
 import XCTest
-@testable import AIBuilder
+@testable import Aether
 
 /// Day 18 Task 12: SpotlightIndexer 单元测试
 /// 验证 index / removeIndex / clearAll 三个静态方法在模拟器环境下不崩溃。

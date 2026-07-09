@@ -1,5 +1,5 @@
 import XCTest
-@testable import AIBuilder
+@testable import Aether
 
 /// Day 14 Phase 5 Task 9: RemoteConfigService 单元测试
 /// 参考 DeepSeekClientTests 的 MockURLProtocol + 全局 URLProtocol.registerClass 模式拦截 URLSession.shared 请求。
@@ -147,7 +147,10 @@ final class RemoteConfigServiceTests: XCTestCase {
             configVersion: 99
         )
         expiredConfig.fetchedAt = Date().addingTimeInterval(-25 * 3600)
-        let cachedData = try! JSONEncoder().encode(expiredConfig)
+        guard let cachedData = try? JSONEncoder().encode(expiredConfig) else {
+            XCTFail("编码失败")
+            return
+        }
         UserDefaults.standard.set(cachedData, forKey: cacheKey)
 
         // 模拟拉取失败

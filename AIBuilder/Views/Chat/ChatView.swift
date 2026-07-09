@@ -81,7 +81,7 @@ struct ChatView: View {
                 case .chat:
                     chatMainContent
                 case .knowledge:
-                    KnowledgeBaseView()
+                    KnowledgeBaseView(provider: viewModel.selectedProvider)
                 case .health:
                     HealthSettingsView(chatViewModel: viewModel)
                 }
@@ -89,7 +89,7 @@ struct ChatView: View {
                 chatMainContent
                 #endif
             }
-            .navigationTitle(currentConversation?.title ?? "AI Builder")
+            .navigationTitle(currentConversation?.title ?? "以太")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
@@ -163,7 +163,7 @@ struct ChatView: View {
                     }
             }
             .sheet(isPresented: $showKnowledgeBase) {
-                KnowledgeBaseView()
+                KnowledgeBaseView(provider: viewModel.selectedProvider)
             }
             .onAppear {
                 viewModel.selectedModel = settingsVM.selectedModel
@@ -185,7 +185,9 @@ struct ChatView: View {
             .overlay(alignment: .top) {
                 ErrorOverlay(
                     errorMessage: viewModel.errorMessage,
-                    onDismiss: { viewModel.errorMessage = nil }
+                    onDismiss: { viewModel.errorMessage = nil },
+                    onRetry: nil,
+                    onSettings: { showSettings = true }
                 )
             }
             // Day 18: 接收 Handoff / NSUserActivity 搜索延续，切换到对应会话
@@ -207,6 +209,10 @@ struct ChatView: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: .settingsRequested)) { _ in
                 showSettings = true
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .focusSearchRequested)) { _ in
+                showConversationList = true
+                // TODO: 后续可通过 FocusState 进一步聚焦到搜索框
             }
         }
     }

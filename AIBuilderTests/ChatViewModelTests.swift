@@ -1,7 +1,7 @@
 import XCTest
 import SwiftData
 import Speech
-@testable import AIBuilder
+@testable import Aether
 
 /// ChatViewModel 单元测试（SubTask 17.1 - 17.10）
 /// 使用 in-memory SwiftData ModelContainer + 可注入 LLMProvider
@@ -33,7 +33,7 @@ final class ChatViewModelTests: XCTestCase {
             ("超限截断最早一条", ["a b", "c d", "e f", "g h"], 5, 2),  // 反向累加：g h(2)+e f(2)=4 ≤5；再加 c d=6>5 截断 → 保留最近 2 条
             ("空消息列表", [], 10, 0),
             ("tokenLimit=0 立即截断", ["a b"], 0, 0),           // 0+2 > 0 立即 break
-            ("单条刚好等于 limit", ["a b"], 2, 1),                // 0+2 ≤2 → 保留 1 条
+            ("单条刚好等于 limit", ["a b"], 2, 1)                // 0+2 ≤2 → 保留 1 条
         ]
         let vm = ChatViewModel()
         for (name, contents, limit, expectedCount) in cases {
@@ -219,6 +219,20 @@ final class ChatViewModelTests: XCTestCase {
         vm.toggleSpeak(messageId: id2, content: "world")
         XCTAssertEqual(vm.speakingMessageId, id2,
                        "切换到不同 id 应更新 speakingMessageId")
+    }
+
+    /// 17.x RAG 检索降级守卫：DeepSeek 无 Qwen Key 时 resolveEmbedding 返回 nil
+    /// 这是 ChatViewModel RAG 守卫的依赖条件——resolveEmbedding 返回 nil 时，
+    /// ragEmbeddingProvider 回退到 selectedProvider（.deepseek），触发守卫跳过 embedding 调用
+    func testRAGEmbeddingDegradationDeepSeekNoQwenKey() {
+        // 测试环境中 Keychain 无 Qwen Key
+        let resolved = EmbeddingService.resolveEmbedding(for: .deepseek)
+        XCTAssertNil(resolved, "DeepSeek 无 Qwen Key 时 resolveEmbedding 应返回 nil（触发降级守卫）")
+
+        // Qwen provider 应正常解析（不需要 Qwen Key 降级）
+        let qwenResolved = EmbeddingService.resolveEmbedding(for: .qwen)
+        XCTAssertNotNil(qwenResolved, "Qwen provider 应正常解析")
+        XCTAssertEqual(qwenResolved?.1, .qwen, "Qwen provider 解析结果应为 .qwen")
     }
 }
 

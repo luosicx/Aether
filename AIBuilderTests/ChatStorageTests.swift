@@ -1,6 +1,6 @@
 import XCTest
 import SwiftData
-@testable import AIBuilder
+@testable import Aether
 
 /// ChatStorage 单元测试：使用 in-memory ModelContainer
 @MainActor

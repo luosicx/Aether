@@ -7,19 +7,35 @@ import AppKit
 
 /// 语义颜色 token：所有视图统一使用这些扩展，不直接引用 Color.red / Color(.systemGray5)
 extension Color {
-    // MARK: - 灵枢品牌色
-    /// 朱砂红——强调色
-    static let vermillion = Color(red: 0.77, green: 0.24, blue: 0.27)
-    /// 墨黑
-    static let inkBlack = Color(red: 0.10, green: 0.10, blue: 0.18)
-    /// 宣纸白
-    static let ricePaper = Color(red: 0.96, green: 0.94, blue: 0.91)
-    /// 青翠
-    static let jadeGreen = Color(red: 0.29, green: 0.49, blue: 0.35)
-    /// 古金
-    static let antiqueGold = Color(red: 0.72, green: 0.53, blue: 0.04)
-    /// 淡墨
-    static let inkGray = Color(red: 0.29, green: 0.29, blue: 0.35)
+    // MARK: - Aether 品牌色
+    /// 深空黑/浅空白基底
+    static let deepSpace = Color("DeepSpace")
+    /// 神秘紫强调色
+    static let aetherPurple = Color("AetherPurple")
+    /// 电光蓝交互色
+    static let electricBlue = Color("ElectricBlue")
+    /// 液态玻璃卡片基底
+    static let liquidGlass = Color("LiquidGlass")
+    /// 星云光晕高光
+    static let nebulaGlow = Color("NebulaGlow")
+    /// 星光白/夜色文字
+    static let starlight = Color("Starlight")
+    /// 暮色灰（系统色 fallback）
+    static var duskGray: Color {
+        #if canImport(UIKit)
+        return Color(.systemGray2)
+        #else
+        return Color(NSColor.systemGray)
+        #endif
+    }
+
+    // MARK: - Aether 渐变
+    /// 品牌主渐变：紫 → 电光蓝
+    static var aetherGradient: LinearGradient {
+        LinearGradient(colors: [aetherPurple, electricBlue],
+                      startPoint: .topLeading,
+                      endPoint: .bottomTrailing)
+    }
 
     // MARK: - 背景
     /// 主背景（List / Form 默认背景）
@@ -49,15 +65,9 @@ extension Color {
 
     // MARK: - 气泡
     /// 用户气泡背景
-    static let bubbleUser = vermillion
-    /// 助手气泡背景
-    static var bubbleAssistant: Color {
-        #if canImport(UIKit)
-        return Color(.systemGray6)
-        #else
-        return Color(NSColor.controlBackgroundColor)
-        #endif
-    }
+    static let bubbleUser = aetherPurple
+    /// 助手气泡背景（液态玻璃基底，配合视图中 .ultraThinMaterial 使用）
+    static let bubbleAI = liquidGlass
 
     // MARK: - 文字
     /// 主要文字

@@ -47,10 +47,8 @@ final class TerminalCommandTool: ToolProtocol {
             return "错误：请提供要执行的命令"
         }
         // 危险命令防护：检测 rm -rf / / mkfs / dd if= / shutdown / reboot 等
-        for pattern in dangerousPatterns {
-            if command.contains(pattern) {
-                return "错误：禁止执行危险命令"
-            }
+        for pattern in dangerousPatterns where command.contains(pattern) {
+            return "错误：禁止执行危险命令"
         }
         // 用 Process 启动 /bin/bash 执行命令，stdout/stderr 分别接 Pipe
         let process = Process()

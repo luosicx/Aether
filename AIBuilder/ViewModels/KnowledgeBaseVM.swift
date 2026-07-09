@@ -25,7 +25,18 @@ final class KnowledgeBaseVM {
     var errorMessage: String?
 
     /// RAG 服务
-    private let ragService = RAGService()
+    private let ragService: RAGService
+    /// 当前供应商
+    let provider: ModelProvider
+    /// 实际用于 embedding 的供应商（DeepSeek 降级到 Qwen）
+    private let embeddingProvider: ModelProvider
+
+    init(provider: ModelProvider = .deepseek) {
+        self.provider = provider
+        let resolved = EmbeddingService.resolveEmbedding(for: provider) ?? (DeepSeekClient(), provider)
+        self.ragService = RAGService(embeddingService: EmbeddingService(client: resolved.0))
+        self.embeddingProvider = resolved.1
+    }
 
     /// 加载文档列表。
     /// 聚合逻辑：fetch 全部 DocumentChunk，按 source 聚合计 chunkCount，
@@ -79,16 +90,30 @@ final class KnowledgeBaseVM {
             errorMessage = String(format: NSLocalizedString("无法读取文档内容：%@", comment: ""), source)
             return
         }
-        // 2) 后台线程读取 apiKey，避免主线程阻塞
+        // DeepSeek 不支持 embedding，实时解析当前可用的 embedding provider（避免 init 时缓存 stale state）
+        guard let resolved = EmbeddingService.resolveEmbedding(for: provider) else {
+            errorMessage = NSLocalizedString("DeepSeek 不支持知识库嵌入，请在设置中配置 Qwen API Key 或切换供应商为 Qwen", comment: "")
+            return
+        }
+        let resolvedClient = resolved.0
+        let resolvedProvider = resolved.1
+        // 2) 后台线程读取 apiKey（使用实时解析的 provider），避免主线程阻塞
+        let embProvider = resolvedProvider
         let apiKey = await Task.detached(priority: .userInitiated) {
-            KeychainManager.shared.getAPIKey() ?? ""
+            KeychainManager.shared.getAPIKey(for: embProvider) ?? ""
         }.value
+        // 校验 apiKey 非空，避免无效调用 embedding API
+        guard !apiKey.isEmpty else {
+            errorMessage = NSLocalizedString("请先在设置中配置 API Key", comment: "")
+            return
+        }
         isImporting = true
         errorMessage = nil
         defer { isImporting = false }
         do {
-            // 3) 索引文档
-            try await ragService.indexDocument(text: content, source: source, modelContext: modelContext, apiKey: apiKey)
+            // 3) 索引文档（使用实时解析的 RAGService）
+            let resolvedRagService = RAGService(embeddingService: EmbeddingService(client: resolvedClient))
+            try await resolvedRagService.indexDocument(text: content, source: source, modelContext: modelContext, apiKey: apiKey)
             // 4) 刷新列表
             load(modelContext: modelContext)
         } catch {

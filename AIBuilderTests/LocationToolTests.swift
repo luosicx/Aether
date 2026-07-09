@@ -1,5 +1,5 @@
 import XCTest
-@testable import AIBuilder
+@testable import Aether
 
 /// LocationTool 单元测试
 /// 注：定位依赖设备权限与环境，测试可能成功或返回错误字符串，仅校验不崩溃且返回非空字符串

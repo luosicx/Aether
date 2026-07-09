@@ -1,5 +1,5 @@
 import XCTest
-@testable import AIBuilder
+@testable import Aether
 
 /// Day 14 Phase 5 Task 11: LogUploader 单元测试
 /// 参考 DeepSeekClientTests 的 MockURLProtocol 模式，扩展为支持响应队列以测试重试。
@@ -13,7 +13,7 @@ final class LogUploaderTests: XCTestCase {
         /// 响应队列：按请求顺序消费；队列空时使用 fallbackStatusCode
         static var responseQueue: [Int] = []
         static var fallbackStatusCode: Int = 200
-        static var responseData: Data? = nil
+        static var responseData: Data?
         static var error: Error?
         static var lastRequest: URLRequest?
         /// 保存请求 body 副本（URLSession 可能将 body 转为 httpBodyStream，

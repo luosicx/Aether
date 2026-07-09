@@ -1,6 +1,6 @@
 # 截图目录
 
-本目录存放 AIBuilder App 的截图，用于文档与 App Store 展示。
+本目录存放 Aether App 的截图，用于文档与 App Store 展示。
 
 ## 截图清单
 

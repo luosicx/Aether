@@ -5,23 +5,24 @@ struct EmptyStateView: View {
     let systemImage: String
     let title: String
     let message: String
-    var primaryButtonTitle: String? = nil
-    var primaryAction: (() -> Void)? = nil
+    var primaryButtonTitle: String?
+    var primaryAction: (() -> Void)?
 
     var body: some View {
         VStack(spacing: Spacing.xl) {
             Image(systemName: systemImage)
                 .font(.system(size: 48))
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(Color.nebulaGlow)
+                .shadow(color: Color.nebulaGlow.opacity(0.6), radius: 16, y: 0)
                 .accessibilityHidden(true)
 
             VStack(spacing: Spacing.sm) {
                 Text(title)
-                    .font(.emptyStateTitle)
-                    .foregroundStyle(.secondary)
+                    .font(.aetherTitle)
+                    .foregroundStyle(Color.starlight)
                 Text(message)
-                    .font(.subheadlineAI)
-                    .foregroundStyle(.tertiary)
+                    .font(.aetherBody)
+                    .foregroundStyle(Color.duskGray)
                     .multilineTextAlignment(.center)
             }
             .padding(.horizontal, Spacing.xxxl)
@@ -30,6 +31,7 @@ struct EmptyStateView: View {
                 Button(title, action: action)
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
+                    .tint(Color.aetherPurple)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

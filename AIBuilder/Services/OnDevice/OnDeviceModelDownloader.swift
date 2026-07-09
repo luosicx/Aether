@@ -16,25 +16,53 @@ actor OnDeviceModelDownloader {
     private(set) var lastError: OnDeviceError?
     /// 断点续传数据（取消时保存，resumeDownload 时使用）
     private var resumeData: Data?
+    /// 是否存在可恢复的断点续传数据（供 UI 决定是否展示「继续下载」按钮）
+    var hasResumeData: Bool { resumeData != nil }
 
     /// 当前下载会话与任务（受 actor 隔离保护）
     private var session: URLSession?
     private var task: URLSessionDownloadTask?
     private var delegate: DownloadDelegate?
 
-    /// 启动下载。下载完成后自动校验 SHA256。
+    /// 启动下载。下载完成后自动校验 SHA256。主地址失败且未捕获断点续传数据时回退到镜像地址。
     /// - Parameters:
     ///   - url: 模型文件远端下载地址
     ///   - destinationURL: 本地保存路径
     ///   - expectedSHA256: 期望的 SHA256 摘要（非空时下载完成后校验）
-    func startDownload(url: URL, to destinationURL: URL, expectedSHA256: String = "") async {
+    ///   - mirrorURL: 镜像下载地址（主地址失败时回退使用，nil 表示不回退）
+    func startDownload(url: URL, to destinationURL: URL, expectedSHA256: String = "", mirrorURL: URL? = nil) async {
         // 已在下载则直接返回，避免并发重复下载
         guard !isDownloading else { return }
+        // 若存在断点续传数据，优先续传而非重新下载
+        if resumeData != nil {
+            await resumeDownload()
+            return
+        }
         isDownloading = true
         progress = 0.0
         lastError = nil
 
-        // 使用 CheckedContinuation 等待下载完成回调（delegate 在后台队列触发）
+        let primaryFailed = await performDownload(url: url, to: destinationURL, expectedSHA256: expectedSHA256)
+
+        // 镜像回退：主地址失败且未捕获断点续传数据时，使用镜像地址重试一次
+        if primaryFailed, let mirrorURL = mirrorURL, mirrorURL != url {
+            let currentResumeExists = resumeData != nil
+            if !currentResumeExists {
+                isDownloading = true
+                progress = 0.0
+                lastError = nil
+                await performDownload(url: mirrorURL, to: destinationURL, expectedSHA256: expectedSHA256)
+            }
+        }
+    }
+
+    /// 执行单次下载尝试，返回是否失败（lastError 非空即视为失败）。
+    /// - Parameters:
+    ///   - url: 模型文件远端下载地址
+    ///   - destinationURL: 本地保存路径
+    ///   - expectedSHA256: 期望的 SHA256 摘要（非空时下载完成后校验）
+    /// - Returns: 下载失败返回 true，成功返回 false
+    private func performDownload(url: URL, to destinationURL: URL, expectedSHA256: String) async -> Bool {
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             let delegate = DownloadDelegate(
                 destinationURL: destinationURL,
@@ -47,12 +75,13 @@ actor OnDeviceModelDownloader {
                 }
             )
             self.delegate = delegate
-            let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
+            let session = URLSession(configuration: makeDownloadSessionConfig(), delegate: delegate, delegateQueue: nil)
             self.session = session
             let task = session.downloadTask(with: url)
             self.task = task
             task.resume()
         }
+        return lastError != nil
     }
 
     /// 断点续传下载（使用上次取消保存的 resumeData）。
@@ -75,7 +104,7 @@ actor OnDeviceModelDownloader {
                 }
             )
             self.delegate = delegate
-            let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
+            let session = URLSession(configuration: makeDownloadSessionConfig(), delegate: delegate, delegateQueue: nil)
             self.session = session
             let task = session.downloadTask(withResumeData: data)
             self.task = task
@@ -123,6 +152,19 @@ actor OnDeviceModelDownloader {
 
     // MARK: - 内部方法
 
+    /// 构建下载专用 URLSessionConfiguration。
+    /// Apple 默认 timeoutIntervalForRequest = 60s，对 ~700MB MLX 模型（尤其国内访问 HuggingFace CDN）过短，
+    /// 这里放宽到 5 分钟单请求超时、2 小时整体资源超时，并禁用蜂窝、等待连通。
+    /// internal 以便单元测试验证配置值。
+    func makeDownloadSessionConfig() -> URLSessionConfiguration {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 300
+        config.timeoutIntervalForResource = 7200
+        config.waitsForConnectivity = true
+        config.allowsCellularAccess = false
+        return config
+    }
+
     /// 更新下载进度（由 delegate 回调经 actor hop 触发）
     private func updateProgress(_ p: Double) {
         progress = p
@@ -144,9 +186,13 @@ actor OnDeviceModelDownloader {
             progress = 1.0
             lastError = nil
         case .failure(let error):
-            // URLError 已取消时保存 resumeData
+            // URLError（取消 / 超时等）时尝试保存 resumeData 供断点续传
             if let urlError = error as? URLError {
                 self.resumeData = urlError.userInfo[NSURLSessionDownloadTaskResumeData] as? Data
+                if urlError.code == .timedOut {
+                    lastError = .downloadTimeout
+                    return
+                }
             }
             lastError = .loadFailed(String(format: NSLocalizedString("下载失败：%@", comment: ""), error.localizedDescription))
         }

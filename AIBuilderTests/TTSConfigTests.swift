@@ -1,5 +1,5 @@
 import XCTest
-@testable import AIBuilder
+@testable import Aether
 
 /// TTSConfig 单元测试:验证默认值、UserDefaults 往返持久化、损坏数据回退默认值。
 final class TTSConfigTests: XCTestCase {

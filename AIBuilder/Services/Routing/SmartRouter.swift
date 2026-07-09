@@ -26,10 +26,8 @@ enum SmartRouter {
         }
         // 关键词触发：用 reasoner
         let lowercased = input.lowercased()
-        for keyword in reasonerKeywords {
-            if lowercased.contains(keyword) {
-                return "deepseek-reasoner"
-            }
+        for keyword in reasonerKeywords where lowercased.contains(keyword) {
+            return "deepseek-reasoner"
         }
         // 默认：deepseek-chat 快速响应
         return APIConfig.defaultModel

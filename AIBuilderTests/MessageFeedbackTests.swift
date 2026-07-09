@@ -1,6 +1,6 @@
 import XCTest
 import SwiftData
-@testable import AIBuilder
+@testable import Aether
 
 /// Day 12: MessageFeedback 与 ChatStorage.feedback API 单元测试
 @MainActor

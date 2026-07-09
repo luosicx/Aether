@@ -1,5 +1,5 @@
 import XCTest
-@testable import AIBuilder
+@testable import Aether
 
 /// Day 11: CalculatorTool 表驱动单元测试
 final class CalculatorToolTests: XCTestCase {
@@ -18,7 +18,7 @@ final class CalculatorToolTests: XCTestCase {
         ("1 / 0", "错误：除零"),                 // 除零
         ("1 + ", "错误：表达式无效"),            // 无效表达式
         ("abc", "错误：表达式无效"),             // 非法字符
-        ("", "错误：请提供表达式"),              // 空表达式
+        ("", "错误：请提供表达式")              // 空表达式
     ]
 
     func testCalculatorExpressions() async throws {

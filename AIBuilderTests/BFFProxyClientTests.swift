@@ -1,5 +1,5 @@
 import XCTest
-@testable import AIBuilder
+@testable import Aether
 
 /// Day 15 Phase 5 Task 11: BFFProxyClient 单元测试
 /// 验证 BFF 代理客户端的请求头注入（X-BFF-Token / X-Provider）、

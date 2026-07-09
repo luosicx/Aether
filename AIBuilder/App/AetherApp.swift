@@ -8,7 +8,7 @@ import ActivityKit
 
 /// AIBuilder App 入口。配置 SwiftData ModelContainer 并注册每日刷新后台任务。
 @main
-struct AIBuilderApp: App {
+struct AetherApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
@@ -19,7 +19,11 @@ struct AIBuilderApp: App {
                     // 预热语音引擎：触发 speechsynthesisd daemon 启动和音色库加载，
                     // 避免首次朗读时冷启动阻塞主线程 1-3 秒。仅加载不发声。
                     _ = AVSpeechSynthesisVoice.speechVoices()
+                    // 性能优化：远程配置拉取从 init() 移到首屏出现后，避免影响冷启动
+                    await RemoteConfigService.shared.fetch()
                 }
+                // Aether 主题在深色模式下效果最佳，默认启用深色模式
+                .preferredColorScheme(.dark)
         }
         #if os(macOS)
         .defaultSize(width: 1000, height: 700)
@@ -40,6 +44,11 @@ struct AIBuilderApp: App {
                     NotificationCenter.default.post(name: .searchRequested, object: nil)
                 }
                 .keyboardShortcut("k", modifiers: .command)
+                // 性能优化：⌘Shift+F 聚焦搜索（直接进入搜索模式并聚焦输入框）
+                Button("聚焦搜索") {
+                    NotificationCenter.default.post(name: .focusSearchRequested, object: nil)
+                }
+                .keyboardShortcut("f", modifiers: [.command, .shift])
             }
             // App → 设置 (Cmd+,) —— 当前用 sheet 展示设置，手动绑定快捷键
             CommandGroup(replacing: .appSettings) {
@@ -62,19 +71,14 @@ struct AIBuilderApp: App {
             wipeAllDataForUITest()
         }
         #if os(iOS)
-        // 注册每日刷新后台任务（BGTaskScheduler 仅 iOS 13+）
-        // 注意：App 为 @MainActor 的 struct，init 中 self 为 inout，
-        // 无法被 @escaping 闭包捕获，因此 handler 调用 static 方法（不捕获 self）。
+        // 性能优化：BGTask register 必须在 init 中（系统要求），schedule 调度延迟到首次进入后台
         BGTaskScheduler.shared.register(forTaskWithIdentifier: "com.aibuilder.daily-refresh", using: nil) { task in
-            // 安全向下转型：若 task 类型与注册标识符不匹配则置为完成并放弃处理
             guard let refreshTask = task as? BGAppRefreshTask else {
                 task.setTaskCompleted(success: false)
                 return
             }
             Self.handleDailyRefresh(task: refreshTask)
         }
-        Self.scheduleDailyRefresh()
-        // Day 14: 注册遥测上报后台任务
         BGTaskScheduler.shared.register(forTaskWithIdentifier: "com.aibuilder.telemetry-upload", using: nil) { task in
             guard let refreshTask = task as? BGAppRefreshTask else {
                 task.setTaskCompleted(success: false)
@@ -82,9 +86,6 @@ struct AIBuilderApp: App {
             }
             Self.handleTelemetryUpload(task: refreshTask)
         }
-        // Day 14: 调度遥测上报后台任务
-        Self.scheduleTelemetryUpload()
-        // Day 17: 注册健康洞察生成后台任务（每天 09:00 触发）
         BGTaskScheduler.shared.register(forTaskWithIdentifier: "com.aibuilder.health-insight", using: nil) { task in
             guard let refreshTask = task as? BGAppRefreshTask else {
                 task.setTaskCompleted(success: false)
@@ -92,13 +93,7 @@ struct AIBuilderApp: App {
             }
             Self.handleHealthInsight(task: refreshTask)
         }
-        Self.scheduleHealthInsight()
-        // Day 17: 激活 WatchConnectivity 会话（用于 watchOS 快速对话同步）
-        WatchConnectivityService.shared.activate()
         #endif
-        // Day 14: 启动时异步拉取远程配置（不阻塞 init）
-        Task { await RemoteConfigService.shared.fetch() }
-
         // Day 20: 初始化崩溃监控（Bugly SDK，条件编译保护，未集成时占位）
         let buglyAppKey = Bundle.main.object(forInfoDictionaryKey: "BuglyAppKey") as? String ?? ""
         CrashReportService.shared.initialize(appKey: buglyAppKey)
@@ -269,6 +264,8 @@ extension Notification.Name {
     static let newConversationRequested = Notification.Name("newConversationRequested")
     /// 菜单「搜索会话」(Cmd+K) 触发
     static let searchRequested = Notification.Name("searchRequested")
+    /// 菜单「聚焦搜索」(Cmd+Shift+F) 触发
+    static let focusSearchRequested = Notification.Name("focusSearchRequested")
     /// 菜单「设置」(Cmd+,) 触发
     static let settingsRequested = Notification.Name("settingsRequested")
 }
@@ -278,6 +275,10 @@ extension Notification.Name {
 /// 根视图：在 ChatView 之上叠加品牌 Splash，开屏展示后淡出。
 struct RootView: View {
     @State private var showSplash = !ProcessInfo.processInfo.arguments.contains("UITEST_DISABLE_SPLASH")
+    @Environment(\.scenePhase) private var scenePhase
+    #if os(iOS)
+    @State private var hasScheduledBGTasks = false
+    #endif
 
     var body: some View {
         ChatView()
@@ -285,6 +286,18 @@ struct RootView: View {
                 if showSplash {
                     BrandSplash(isVisible: $showSplash)
                 }
+            }
+            .onChange(of: scenePhase) { _, newPhase in
+                #if os(iOS)
+                // 性能优化：BGTask schedule 延迟到首次进入后台，减少冷启动耗时
+                if newPhase == .background && !hasScheduledBGTasks {
+                    hasScheduledBGTasks = true
+                    AetherApp.scheduleDailyRefresh()
+                    AetherApp.scheduleTelemetryUpload()
+                    AetherApp.scheduleHealthInsight()
+                    WatchConnectivityService.shared.activate()
+                }
+                #endif
             }
     }
 }

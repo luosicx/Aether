@@ -82,11 +82,9 @@ final class WindowManagementTool: ToolProtocol {
             return "错误：请提供 app 参数"
         }
         let ws = NSWorkspace.shared
-        for app in ws.runningApplications {
-            if app.localizedName == appName {
-                app.activate(options: [.activateAllWindows])
-                return "已聚焦 \(appName)"
-            }
+        for app in ws.runningApplications where app.localizedName == appName {
+            app.activate(options: [.activateAllWindows])
+            return "已聚焦 \(appName)"
         }
         return "未找到运行中的应用：\(appName)"
     }
@@ -130,21 +128,19 @@ final class WindowManagementTool: ToolProtocol {
     private func setWindowFrame(_ appName: String, modify: (inout CGRect) -> Void) -> String {
         // 通过 AXUIElement 设置窗口位置/大小
         let ws = NSWorkspace.shared
-        for app in ws.runningApplications {
-            if app.localizedName == appName {
-                // 创建应用的 Accessibility 顶元素，用于访问其窗口列表
-                let axApp = AXUIElementCreateApplication(app.processIdentifier)
-                var windowsRef: CFTypeRef?
-                let result = AXUIElementCopyAttributeValue(axApp, kAXWindowsAttribute as CFString, &windowsRef)
-                if result == .success, let windows = windowsRef as? [AXUIElement] {
-                    if let window = windows.first {
-                        var frameRef: CFTypeRef?
-                        AXUIElementCopyAttributeValue(window, kAXPositionAttribute as CFString, &frameRef)
-                        // 简化实现：用 AppleScript 设置
-                        let script = "tell application \"\(appName)\" to set bounds of window 1 to {0, 0, 800, 600}"
-                        _ = runAppleScript(script)
-                        return "已调整 \(appName) 窗口"
-                    }
+        for app in ws.runningApplications where app.localizedName == appName {
+            // 创建应用的 Accessibility 顶元素，用于访问其窗口列表
+            let axApp = AXUIElementCreateApplication(app.processIdentifier)
+            var windowsRef: CFTypeRef?
+            let result = AXUIElementCopyAttributeValue(axApp, kAXWindowsAttribute as CFString, &windowsRef)
+            if result == .success, let windows = windowsRef as? [AXUIElement] {
+                if let window = windows.first {
+                    var frameRef: CFTypeRef?
+                    AXUIElementCopyAttributeValue(window, kAXPositionAttribute as CFString, &frameRef)
+                    // 简化实现：用 AppleScript 设置
+                    let script = "tell application \"\(appName)\" to set bounds of window 1 to {0, 0, 800, 600}"
+                    _ = runAppleScript(script)
+                    return "已调整 \(appName) 窗口"
                 }
             }
         }

@@ -1,6 +1,6 @@
 #if os(macOS)
 import XCTest
-@testable import AIBuilder
+@testable import Aether
 
 final class ScreenshotToolTests: XCTestCase {
     private let tool = ScreenshotTool()

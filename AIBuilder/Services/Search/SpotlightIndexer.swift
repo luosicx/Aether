@@ -32,7 +32,7 @@ enum SpotlightIndexer {
         ) { _ in }
     }
 
-    /// 清空所有 AI Builder 会话索引。
+    /// 清空所有以太会话索引。
     static func clearAll() {
         CSSearchableIndex.default().deleteAllSearchableItems { _ in }
     }

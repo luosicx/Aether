@@ -195,7 +195,7 @@ final class HealthKitService: @unchecked Sendable {
     /// 聚合最近 1 天的健康数据为 HealthDailySummary。未授权或无数据时返回全零摘要。
     func fetchDailySummary() async throws -> HealthDailySummary {
         // 未授权或设备不支持时直接返回全零摘要（不抛错）
-        guard let _ = healthStore, isAuthorized else {
+        guard healthStore != nil, isAuthorized else {
             return HealthDailySummary(sleepHours: 0, avgHeartRate: 0, stepCount: 0)
         }
         let heartRate = (try? await fetchHeartRate(days: 1)) ?? [:]

@@ -1,5 +1,5 @@
 import XCTest
-@testable import AIBuilder
+@testable import Aether
 
 /// AlarmTool 单元测试
 /// 注：不测真实 EventKit 保存（避免权限依赖）

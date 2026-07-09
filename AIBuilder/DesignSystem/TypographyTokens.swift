@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 字体 token：统一字体样式
+/// 字体 token：统一字体样式（中文由系统 PingFang SC 自动 fallback，无需显式指定）
 extension Font {
     /// AI 对话正文（.body）
     static let bodyAI = Font.body
@@ -18,10 +18,12 @@ extension Font {
     static let monoAI = Font.callout.monospaced()
     /// 工具标签（caption2 medium）
     static let toolLabel = Font.caption2.weight(.medium)
-    /// 灵枢品牌标题（宋体）
-    static let brandTitle = Font.custom("Songti SC", size: 28, relativeTo: .title2)
-    /// 灵枢开屏 Logo 字体（楷体）
-    static let brandLogo = Font.custom("Kaiti SC", size: 48, relativeTo: .largeTitle)
-    /// 灵枢装饰文字
-    static let brandDecorative = Font.custom("Songti SC", size: 16, relativeTo: .subheadline)
+
+    // MARK: - Aether 品牌字体
+    /// Aether 标题
+    static let aetherTitle = Font.system(size: 28, weight: .semibold)
+    /// Aether 展示字体（开屏 Logo / 大标题）
+    static let aetherDisplay = Font.system(size: 48, weight: .bold)
+    /// Aether 正文
+    static let aetherBody = Font.system(size: 16, weight: .regular)
 }

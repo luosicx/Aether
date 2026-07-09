@@ -1,7 +1,7 @@
 #if os(iOS)
 import XCTest
 import SwiftData
-@testable import AIBuilder
+@testable import Aether
 
 /// Day 17: HealthInsightGenerator 单元测试
 ///

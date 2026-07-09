@@ -1,6 +1,6 @@
 import XCTest
 import SwiftUI
-@testable import AIBuilder
+@testable import Aether
 
 final class DesignTokensTests: XCTestCase {
 
@@ -15,9 +15,10 @@ final class DesignTokensTests: XCTestCase {
     }
 
     func testCornerRadiusTokens() {
-        XCTAssertEqual(CornerRadius.small, 8)
-        XCTAssertEqual(CornerRadius.medium, 12)
-        XCTAssertEqual(CornerRadius.large, 18)
+        // 液态玻璃主题：圆角增大以获得更柔和的视觉
+        XCTAssertEqual(CornerRadius.small, 12)
+        XCTAssertEqual(CornerRadius.medium, 16)
+        XCTAssertEqual(CornerRadius.large, 24)
     }
 
     func testColorTokensResolveOnCurrentPlatform() {
@@ -26,7 +27,7 @@ final class DesignTokensTests: XCTestCase {
         _ = Color.backgroundSecondary
         _ = Color.backgroundTertiary
         _ = Color.bubbleUser
-        _ = Color.bubbleAssistant
+        _ = Color.bubbleAI
         _ = Color.textPrimary
         _ = Color.textSecondary
         _ = Color.textTertiary

@@ -1,4 +1,4 @@
-# AIBuilder 使用文档
+# Aether 使用文档
 
 > AI Native 多平台 App（iOS / iPad / macOS 原生），基于 SwiftUI + 多 LLM Provider（DeepSeek / Qwen / 端侧 MLX）构建。本文件描述环境要求、安装运行、API Key 配置、Day 1-20 全部用户可见功能（21 项核心能力）、多平台支持、工具能力清单、开发与测试工作流、CI、权限与常见问题。
 
@@ -263,7 +263,7 @@ open AIBuilder.xcodeproj
   3. 返回设置页，拖动 **语速 Slider**（0~1，步进 0.05，默认 0.5）
   4. 拖动 **音调 Slider**（0.5~2.0，步进 0.1，默认 1.0）
   5. 拖动 **音量 Slider**（0~1，步进 0.05，默认 1.0）
-  6. 点击 **「试听示例」** 按钮，用当前配置朗读示例句「你好,我是 AI Builder,很高兴为你服务。」
+  6. 点击 **「试听示例」** 按钮，用当前配置朗读示例句「你好,我是以太,很高兴为你服务。」
 - **预期行为**：
   - 音色列表分组排序：**zh-CN 永远第一组**（含「系统默认」选项），其次 zh-TW / zh-HK，再 en-US，最后其他语言按字母序
   - 每行显示音色名、质量标签（标准 / 增强 / 优质 / 未知，对应 compact / enhanced / premium / unknown）、下载状态与选中 checkmark
@@ -335,23 +335,23 @@ open AIBuilder.xcodeproj
 
 - **触发路径**：系统「快捷指令」App 中创建快捷指令，或对 Siri 说出注册短语
 - **操作步骤与预期行为**：本 App 通过 `AppShortcutsProvider` 注册了 3 个 AppShortcut：
-  1. **Ask AIBuilder**（短语：「向 AIBuilder 提问」/「问 AIBuilder」）
+  1. **Ask Aether**（短语：「向以太提问」/「问以太」）
      - 接受一个 `query` 参数（用户问题）
      - 调用 `IntentChatService.shared.ask(query:)` 走真实 LLM 流程返回完整回复
-     - 空回复兜底「AI Builder 未返回内容，请重试。」
-     - API Key 未配置或 LLM 失败时返回「AI Builder 暂时无法回复：{错误描述}」（不抛错打断 Siri）
-  2. **New Conversation**（短语：「新建对话 AIBuilder」/「新对话 AIBuilder」）
+     - 空回复兜底「以太未返回内容，请重试。」
+     - API Key 未配置或 LLM 失败时返回「以太暂时无法回复：{错误描述}」（不抛错打断 Siri）
+  2. **New Conversation**（短语：「新建对话以太」/「新对话以太」）
      - 创建独立的 `ModelContainer`（与主 App 同 schema，读写同一 SQLite 文件）
      - 插入新 `Conversation` 并 `context.save()`
      - 返回 `conversationId.uuidString` 供后续 intent / Handoff 使用
-  3. **Switch Conversation**（短语：「切换会话 AIBuilder」/「查找会话 AIBuilder」）
+  3. **Switch Conversation**（短语：「切换会话以太」/「查找会话以太」）
      - 接受 `keyword` 参数
      - 用 `#Predicate { $0.title.localizedStandardContains(keyword) }` 查询 title 包含关键词的会话，按 `createdAt` 降序取首个
      - 未匹配时返回「未找到匹配会话」
-- **对应代码**：`AIBuilder/AppIntents/AskAIBuilderIntent.swift`、`AIBuilder/AppIntents/NewConversationIntent.swift`、`AIBuilder/AppIntents/SwitchConversationIntent.swift`、`AIBuilder/Services/Intents/IntentChatService.swift`
+- **对应代码**：`AIBuilder/AppIntents/AskAetherIntent.swift`、`AIBuilder/AppIntents/NewConversationIntent.swift`、`AIBuilder/AppIntents/SwitchConversationIntent.swift`、`AIBuilder/Services/Intents/IntentChatService.swift`
 
-> **对应代码文件**：`AIBuilder/AppIntents/AskAIBuilderIntent.swift`、`AIBuilder/AppIntents/NewConversationIntent.swift`、`AIBuilder/AppIntents/SwitchConversationIntent.swift`、`AIBuilder/Services/Intents/IntentChatService.swift`
-> **常见问题**：Siri 不识别时检查「系统设置 → Siri 与搜索」中 AI Builder 是否启用，并使用注册的标准短语；Intent 不响应多为 App 未在前台或最近使用过，需先打开 App 一次；API Key 未配置时 `AskAIBuilderIntent` 会返回「AI Builder 暂时无法回复：{错误描述}」不抛错打断 Siri。
+> **对应代码文件**：`AIBuilder/AppIntents/AskAetherIntent.swift`、`AIBuilder/AppIntents/NewConversationIntent.swift`、`AIBuilder/AppIntents/SwitchConversationIntent.swift`、`AIBuilder/Services/Intents/IntentChatService.swift`
+> **常见问题**：Siri 不识别时检查「系统设置 → Siri 与搜索」中以太是否启用，并使用注册的标准短语；Intent 不响应多为 App 未在前台或最近使用过，需先打开 App 一次；API Key 未配置时 `AskAetherIntent` 会返回「以太暂时无法回复：{错误描述}」不抛错打断 Siri。
 
 ### 4.16 BFF 代理层配置
 
@@ -390,6 +390,7 @@ open AIBuilder.xcodeproj
 - **预期行为**：
   - 启用后断网时（`NetworkMonitor` 监听到 `.unavailable`）自动切换到 `MLXInferenceEngine` 本地推理，联网后切回云端
   - 模型加载流程：内存检查（设备需 ≥ 4GB 物理内存）→ 文件存在性检查 → SHA256 完整性校验（分块 4MB 读取）→ `ModelContainer.load`
+  - **下载完成后自动预加载**：模型下载（或断点续传完成）且 SHA256 校验通过后，`OnDeviceModelView` 会自动调用 `MLXInferenceEngine.shared.loadModel()` 将模型权重加载到内存，并随后调用 `preloadTokenizer()` 并行预读 tokenizer.json 与 config.json 以 warm OS page cache，减少首次推理的磁盘 I/O 延迟。预加载全程在后台 Task 执行，不阻塞 UI；加载期间页面显示「正在加载模型…」进度指示器（`isPreloadingModel` 状态），加载失败仅记录错误不影响下载完成状态
   - 流式生成按 token yield，`Task.isCancelled` 时中断
   - **条件编译**：`#if canImport(MLX)`——真机集成 mlx-swift SPM 后调用真正 MLX API；模拟器或未集成时走占位实现，返回「端侧推理不可用：mlx-swift 未集成」
   - 离开设置页时 `settingsVM.saveOnDeviceConfig()` 持久化到 UserDefaults（key=`ondevice_config_cache`）
@@ -403,13 +404,13 @@ open AIBuilder.xcodeproj
 
 - **触发路径**：设置页 → **「关于」Section**
 - **操作步骤与预期行为**：
-  - **隐私政策**：点击「隐私政策」NavigationLink 进入 `PrivacyPolicyView`，展示「AI Builder 隐私政策」（更新日期 2026年7月）包含四个段落：
+  - **隐私政策**：点击「隐私政策」NavigationLink 进入 `PrivacyPolicyView`，展示「以太隐私政策」（更新日期 2026年7月）包含四个段落：
     1. **数据收集范围**：对话内容（用于上下文与缓存）/ 健康数据（仅授权后读取，用于洞察）/ 使用统计（性能埋点与崩溃日志）
     2. **第三方 SDK**：DeepSeek API、阿里云百炼 Qwen API、Bugly 崩溃监控
     3. **用户权利**：查看已收集数据（调试面板）/ 删除对话记录 / 撤回 HealthKit 授权 / 关闭遥测上报
-    4. **联系方式**：feedback@aibuilder.app
+    4. **联系方式**：feedback@aether.app
   - **投诉反馈**：点击「投诉反馈」按钮（envelope 图标）
-    - 设备支持邮件时（`MFMailComposeViewController.canSendMail()` 为 true）弹出系统邮件 composer `MailComposerView`，预填收件人 `feedback@aibuilder.app`、主题「AI Builder 用户反馈」、正文末尾追加设备信息（设备型号 / iOS 版本 / App 版本与构建号）
+    - 设备支持邮件时（`MFMailComposeViewController.canSendMail()` 为 true）弹出系统邮件 composer `MailComposerView`，预填收件人 `feedback@aether.app`、主题「以太用户反馈」、正文末尾追加设备信息（设备型号 / iOS 版本 / App 版本与构建号）
     - 设备不支持邮件时降级为 `FeedbackService.shared.mailtoURL()` 构造 `mailto:` URL（subject 与 body 已 URL 编码），通过 `Environment(\.openURL)` 打开系统邮件 App
   - **版本号**：Section 末尾展示 `CFBundleShortVersionString (CFBundleVersion)` 等宽字体
 - **对应代码**：`AIBuilder/Views/Settings/PrivacyPolicyView.swift`、`AIBuilder/Services/Feedback/FeedbackService.swift`（`MailComposerView` UIViewControllerRepresentable 桥接 `MFMailComposeViewController`）、`AIBuilder/Views/Settings/SettingsView.swift`
@@ -459,17 +460,18 @@ open AIBuilder.xcodeproj
   - 启动 App 后查看窗口默认尺寸 **1000×700**（由 `frame(minWidth:1000, minHeight:700)` 约束，可缩放但不可小于该值）
   - 菜单栏 **「文件 → 新建会话」**（快捷键 ⌘N）创建新会话，等价于点击工具栏「+」
   - 菜单栏 **「编辑 → 搜索」**（快捷键 ⌘K）打开会话搜索 sheet，按会话标题过滤
+  - 菜单栏 **「编辑 → 聚焦搜索」**（快捷键 ⌘Shift+F）直接进入搜索模式并聚焦输入框，便于快速定位会话
   - 菜单栏 **「App → 设置」**（快捷键 ⌘,）打开设置页
   - 在底部输入框按 **⌘Enter** 发送消息（Enter 为换行，与 iOS 单击发送按钮行为一致）
   - 设置页使用 `NavigationSplitView` 双栏布局，左侧 sidebar 选择分类（API 配置 / 用户偏好 / 语音朗读 / 端侧推理 / 关于 等），右侧 detail 显示对应内容
 - **预期行为**：
   - macOS 原生窗口体验，非 Mac Catalyst，窗口由 SwiftUI 原生渲染
-  - 快捷键符合 macOS 规范（⌘N / ⌘K / ⌘, / ⌘Enter）
+  - 快捷键符合 macOS 规范（⌘N / ⌘K / ⌘Shift+F / ⌘, / ⌘Enter）
   - 设置二级页面（TTS 音色选择 / 隐私政策 / 端侧模型管理）顶部显示返回按钮 `<`，点击可返回当前分类根 Form；切换 sidebar 分类时 detail 自动回到该分类根
   - macOS 不支持 HealthKit，「健康」Section 隐藏；`BGTaskScheduler` / `ActivityKit` / `WatchConnectivity` 相关代码用 `#if os(iOS)` 包裹优雅降级
-- **对应代码**：`AIBuilder/App/AIBuilderApp.swift`（`.commands` 注册 ⌘N / ⌘K / ⌘, 与窗口尺寸）、`AIBuilder/Views/Settings/SettingsView.swift`（`NavigationSplitView` 双栏布局）
+- **对应代码**：`AIBuilder/App/AetherApp.swift`（`.commands` 注册 ⌘N / ⌘K / ⌘Shift+F / ⌘, 与窗口尺寸）、`AIBuilder/Views/Settings/SettingsView.swift`（`NavigationSplitView` 双栏布局）
 
-> **对应代码文件**：`AIBuilder/App/AIBuilderApp.swift`、`AIBuilder/Views/Settings/SettingsView.swift`
+> **对应代码文件**：`AIBuilder/App/AetherApp.swift`、`AIBuilder/Views/Settings/SettingsView.swift`
 > **常见问题**：快捷键不生效时检查 `CommandGroup` / `CommandMenu` 是否被其他菜单覆盖；窗口尺寸异常多为 `frame(minWidth:minHeight:)` 未生效，确认 `.windowStyle` 与 `WindowGroup` 配置正确；设置二级页面无法返回时确认 macOS 分支下 `NavigationLink` 已注入返回按钮逻辑。
 
 ### 4.21 性能监控与调试
@@ -505,13 +507,15 @@ open AIBuilder.xcodeproj
 2. 选择「跟随系统 / 简体中文 / 繁体中文 / 英文」。
 3. 点击「完成」，按提示重启 App 生效。
 
-对应代码：`AIBuilder/Services/Language/LanguageManager.swift`、`AIBuilder/Views/Settings/SettingsView.swift`。
+> **i18n 覆盖**：`Localizable.xcstrings` String Catalog 当前包含 **387 个 key**，覆盖 Views / ViewModels / Services / AppIntents / Core 全部用户可见文本，提供 zh-Hans（源语言）/ zh-Hant / en 三种语言翻译。
+
+对应代码：`AIBuilder/Services/Language/LanguageManager.swift`、`AIBuilder/Views/Settings/SettingsView.swift`、`AIBuilder/Resources/Localizable.xcstrings`。
 
 ---
 
 ## 5. 多平台支持
 
-AIBuilder 已从 iOS-only 适配为 **iOS / iPad / macOS 三端原生**应用，基于 SwiftUI 原生渲染 + `#if os(iOS)` / `#if os(macOS)` 条件编译实现平台分流，**非 Mac Catalyst**。三端共享同一份 SwiftUI 代码与 SwiftData schema，仅在系统 API 差异处用条件编译分流。
+Aether 已从 iOS-only 适配为 **iOS / iPad / macOS 三端原生**应用，基于 SwiftUI 原生渲染 + `#if os(iOS)` / `#if os(macOS)` 条件编译实现平台分流，**非 Mac Catalyst**。三端共享同一份 SwiftUI 代码与 SwiftData schema，仅在系统 API 差异处用条件编译分流。
 
 ### 5.1 支持平台
 
@@ -540,6 +544,7 @@ AIBuilder 已从 iOS-only 适配为 **iOS / iPad / macOS 三端原生**应用，
 - **菜单栏快捷键**：
   - ⌘N 新建会话
   - ⌘K 搜索（会话列表）
+  - ⌘Shift+F 聚焦搜索（直接进入搜索模式并聚焦输入框）
   - ⌘, 打开设置
 - **⌘Enter 发送消息**（Enter 为换行）
 - **双栏 NavigationSplitView 布局**：`SettingsView` / `KnowledgeBaseView` 在 macOS 下使用 `NavigationSplitView` 双栏布局
@@ -702,15 +707,22 @@ GitHub Actions 配置文件：`.github/workflows/ci.yml`
 | `NSRemindersUsageDescription` | 用于创建提醒事项 | `ReminderTool` 创建 `EKReminder` |
 | `NSHealthShareUsageDescription` | 用于读取健康数据生成洞察 | `HealthKitService` 读取心率 / 睡眠 / 步数 |
 | `NSSupportsLiveActivities` | `true` | `TimerActivityAttributes` 灵动岛 |
-| `BGTaskSchedulerPermittedIdentifiers` | `com.aibuilder.daily-refresh` | `AIBuilderApp` 每日刷新（健康洞察生成） |
+| `BGTaskSchedulerPermittedIdentifiers` | `com.aibuilder.daily-refresh` | `AetherApp` 每日刷新（健康洞察生成） |
 
 ---
 
 ## 10. 常见问题（FAQ）
 
-### Q1: API Key 保存失败怎么办？
+### Q1: API Key 保存失败 / 缺失怎么办？
 
 **A**：模拟器下 Keychain 通常正常工作。真机需要配置 `keychain-access-groups` entitlement。若保存失败，可在设置页查看 `saveMessage` 错误提示（`KeychainManager.saveAPIKey` 失败会抛出 `AppError.keychainError`，错误码对应 `OSStatus`）。
+
+**API Key 缺失预检**：发起对话时若检测到当前供应商的 API Key 为空，App 会直接在顶部展示 `ErrorBanner` 提示「请先在设置中配置 API Key」，不会发起无效的网络请求。`ErrorBanner` 组件提供以下操作按钮：
+- **「重试」**：重新执行上次失败的请求（适用于网络抖动等临时错误）
+- **「前往设置」**：直接跳转到设置页 API 配置 Section，便于用户快速配置 Key
+- **「✕」关闭**：手动关闭错误提示条
+
+对应代码：`AIBuilder/Views/Components/ErrorBanner.swift`（`onRetry` / `onSettings` 可选回调）、`AIBuilder/ViewModels/ChatViewModel.swift`（API Key 空值预检逻辑）
 
 ### Q2: 语音识别不可用？
 
@@ -770,9 +782,9 @@ GitHub Actions 配置文件：`.github/workflows/ci.yml`
 
 **A**：
 1. **App 未在前台或最近使用**：AppIntent 由系统调度，可能需要先打开 App 一次。
-2. **API Key 未配置**：`AskAIBuilderIntent` 在 LLM 失败时返回「AI Builder 暂时无法回复：{错误描述}」，不抛错打断 Siri。请到设置页配置 DeepSeek API Key。
-3. **Siri 权限**：在「系统设置 → Siri 与搜索」中确认 AI Builder 已启用 Siri 快捷指令。
-4. **短语识别**：尝试使用注册的标准短语「向 AIBuilder 提问」「新建对话 AIBuilder」「切换会话 AIBuilder」。
+2. **API Key 未配置**：`AskAetherIntent` 在 LLM 失败时返回「以太暂时无法回复：{错误描述}」，不抛错打断 Siri。请到设置页配置 DeepSeek API Key。
+3. **Siri 权限**：在「系统设置 → Siri 与搜索」中确认以太已启用 Siri 快捷指令。
+4. **短语识别**：尝试使用注册的标准短语「向以太提问」「新建对话以太」「切换会话以太」。
 
 ### Q12: macOS 上为什么没有 HealthKit 入口？
 

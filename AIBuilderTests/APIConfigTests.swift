@@ -1,5 +1,5 @@
 import XCTest
-@testable import AIBuilder
+@testable import Aether
 
 /// APIConfig 常量与 ChatConfig.default 单元测试
 final class APIConfigTests: XCTestCase {

@@ -1,5 +1,5 @@
 import XCTest
-@testable import AIBuilder
+@testable import Aether
 
 /// Conversation / UserPreference / DocumentChunk / ChatChunk 模型默认值与解码测试
 @MainActor

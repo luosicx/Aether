@@ -191,6 +191,9 @@
         }
       }
     },
+    "[模型加载失败：%@]" : {
+
+    },
     "[生成失败：%@]" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -712,19 +715,19 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "3. Revoke HealthKit authorization: you can revoke AI Builder's authorization in System Settings - Privacy - Health."
+            "value" : "3. Revoke HealthKit authorization: you can revoke Aether's authorization in System Settings - Privacy - Health."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "3. 撤回 HealthKit 授权：可在「系统设置 - 隐私 - 健康」中撤回对 AI Builder 的授权。"
+            "value" : "3. 撤回 HealthKit 授权：可在「系统设置 - 隐私 - 健康」中撤回对以太的授权。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "3. 撤回 HealthKit 授權：可在「系統設定 - 隱私 - 健康」中撤回對 AI Builder 的授權。"
+            "value" : "3. 撤回 HealthKit 授權：可在「系統設定 - 隱私 - 健康」中撤回對以太的授權。"
           }
         }
       }
@@ -752,7 +755,13 @@
         }
       }
     },
+    "A" : {
+
+    },
     "Action" : {
+
+    },
+    "Aether · AI Assistant" : {
 
     },
     "AI Builder 暂时无法回复：%@" : {
@@ -761,19 +770,19 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Builder is temporarily unable to reply: %@"
+            "value" : "Aether is temporarily unable to reply: %@"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Builder 暂时无法回复：%@"
+            "value" : "以太暂时无法回复：%@"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Builder 暫時無法回覆：%@"
+            "value" : "以太暫時無法回覆：%@"
           }
         }
       }
@@ -784,19 +793,19 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Builder returned no content; please retry."
+            "value" : "Aether returned no content; please retry."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Builder 未返回内容，请重试。"
+            "value" : "以太未返回内容，请重试。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Builder 未返回內容，請重試。"
+            "value" : "以太未返回內容，請重試。"
           }
         }
       }
@@ -807,19 +816,19 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Builder User Feedback"
+            "value" : "Aether User Feedback"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Builder 用户反馈"
+            "value" : "以太用户反馈"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Builder 用戶反饋"
+            "value" : "以太用戶反饋"
           }
         }
       }
@@ -830,19 +839,19 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Builder is committed to protecting your privacy"
+            "value" : "Aether is committed to protecting your privacy"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Builder 致力于保护您的隐私"
+            "value" : "以太致力于保护您的隐私"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Builder 致力於保護您的隱私"
+            "value" : "以太致力於保護您的隱私"
           }
         }
       }
@@ -853,19 +862,19 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Builder Privacy Policy"
+            "value" : "Aether Privacy Policy"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Builder 隐私政策"
+            "value" : "以太隐私政策"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "AI Builder 隱私政策"
+            "value" : "以太隱私政策"
           }
         }
       }
@@ -1149,6 +1158,9 @@
         }
       }
     },
+    "DeepSeek 不支持知识库嵌入，请在设置中配置 Qwen API Key 或切换供应商为 Qwen" : {
+
+    },
     "embed 限流（每分钟）：%d" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1194,9 +1206,6 @@
           }
         }
       }
-    },
-    "LingShu · AI 对话助手" : {
-
     },
     "maxTokens：%d" : {
       "extractionState" : "manual",
@@ -1506,6 +1515,12 @@
         }
       }
     },
+    "下载源" : {
+
+    },
+    "下载超时，请检查网络后点击「继续下载」从断点继续" : {
+
+    },
     "不支持的模型量化格式，请选择 Q4_K_M 或更轻量版本" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1736,6 +1751,24 @@
         }
       }
     },
+    "以太" : {
+
+    },
+    "以太暂时无法回复：%@" : {
+
+    },
+    "以太未返回内容，请重试。" : {
+
+    },
+    "以太用户反馈" : {
+
+    },
+    "以太致力于保护您的隐私" : {
+
+    },
+    "以太隐私政策" : {
+
+    },
     "优质" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1788,19 +1821,19 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hello, I am AI Builder. Happy to assist you."
+            "value" : "Hello, I am Aether. Happy to assist you."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "你好,我是 AI Builder,很高兴为你服务。"
+            "value" : "你好,我是以太,很高兴为你服务。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "你好，我是 AI Builder，很高興為你服務。"
+            "value" : "你好，我是以太，很高興為你服務。"
           }
         }
       }
@@ -2864,6 +2897,29 @@
       }
     },
     "古之智者，枢机通灵" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无形，无处不在，智能"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无形，无处不在，智能"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無形，無處不在，智能"
+          }
+        }
+      }
+    },
+    "可用模型" : {
 
     },
     "向 AI Builder 发送问题并获取回复" : {
@@ -2872,19 +2928,19 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Send a question to AI Builder and get a reply"
+            "value" : "Send a question to Aether and get a reply"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "向 AI Builder 发送问题并获取回复"
+            "value" : "向以太发送问题并获取回复"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "向 AI Builder 傳送問題並取得回覆"
+            "value" : "向以太傳送問題並取得回覆"
           }
         }
       }
@@ -2895,19 +2951,19 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ask AI Builder"
+            "value" : "Ask Aether"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "向 AI Builder 提问"
+            "value" : "向以太提问"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "向 AI Builder 提問"
+            "value" : "向以太提問"
           }
         }
       }
@@ -3211,25 +3267,31 @@
         }
       }
     },
+    "国内（ModelScope）" : {
+
+    },
+    "国外（HuggingFace）" : {
+
+    },
     "在 AI Builder 中创建新对话" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Create a new conversation in AI Builder"
+            "value" : "Create a new conversation in Aether"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在 AI Builder 中创建新对话"
+            "value" : "在以太中创建新对话"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在 AI Builder 中建立新對話"
+            "value" : "在以太中建立新對話"
           }
         }
       }
@@ -3395,25 +3457,25 @@
         }
       }
     },
-    "如有任何隐私相关问题，请通过邮件联系：feedback@aibuilder.app" : {
+    "如有任何隐私相关问题，请通过邮件联系：feedback@aether.app" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "For any privacy-related questions, please contact us at feedback@aibuilder.app"
+            "value" : "For any privacy-related questions, please contact us at feedback@aether.app"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "如有任何隐私相关问题，请通过邮件联系：feedback@aibuilder.app"
+            "value" : "如有任何隐私相关问题，请通过邮件联系：feedback@aether.app"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "如有任何隱私相關問題，請透過郵件聯繫：feedback@aibuilder.app"
+            "value" : "如有任何隱私相關問題，請透過郵件聯繫：feedback@aether.app"
           }
         }
       }
@@ -3878,6 +3940,9 @@
         }
       }
     },
+    "已下载✓" : {
+
+    },
     "已复制" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3946,6 +4011,9 @@
           }
         }
       }
+    },
+    "已校验" : {
+
     },
     "已生成洞察" : {
       "extractionState" : "manual",
@@ -4985,6 +5053,9 @@
         }
       }
     },
+    "无形，无处不在，智能" : {
+
+    },
     "无效的 BFF embedding 请求" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5543,19 +5614,19 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "View AI Builder Privacy Policy"
+            "value" : "View Aether Privacy Policy"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "查看 AI Builder 隐私政策"
+            "value" : "查看以太隐私政策"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "查看 AI Builder 隱私政策"
+            "value" : "查看以太隱私政策"
           }
         }
       }
@@ -5836,6 +5907,9 @@
         }
       }
     },
+    "正在加载模型…" : {
+
+    },
     "正式" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6021,10 +6095,27 @@
       }
     },
     "灵" : {
-
-    },
-    "灵枢" : {
-
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A"
+          }
+        }
+      }
     },
     "点击关闭错误提示" : {
       "extractionState" : "manual",
@@ -6473,6 +6564,9 @@
         }
       }
     },
+    "确认删除「%@」？删除后需重新下载。" : {
+
+    },
     "立即上报" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6817,6 +6911,9 @@
           }
         }
       }
+    },
+    "约 %d MB" : {
+
     },
     "索引中…" : {
       "extractionState" : "manual",
