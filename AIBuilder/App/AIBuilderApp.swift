@@ -24,7 +24,7 @@ struct AIBuilderApp: App {
         #if os(macOS)
         .defaultSize(width: 1000, height: 700)
         #endif
-        .modelContainer(for: [Conversation.self, ChatMessage.self, DocumentChunk.self, MessageFeedback.self, HealthInsight.self])
+        .modelContainer(for: [Conversation.self, ChatMessage.self, DocumentChunk.self, MessageFeedback.self, HealthInsight.self, UserPreference.self])
         // Task 4: macOS 菜单栏 —— 新建对话 / 搜索会话 / 设置
         .commands {
             // File → 新建对话 (Cmd+N)
@@ -122,7 +122,7 @@ struct AIBuilderApp: App {
             let config = ModelConfiguration(isStoredInMemoryOnly: false)
             let container = try ModelContainer(
                 for: Conversation.self, ChatMessage.self, DocumentChunk.self,
-                    MessageFeedback.self, HealthInsight.self,
+                    MessageFeedback.self, HealthInsight.self, UserPreference.self,
                 configurations: config
             )
             let context = ModelContext(container)

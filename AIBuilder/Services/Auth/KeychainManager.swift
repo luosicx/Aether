@@ -19,12 +19,65 @@ enum AppError: LocalizedError {
     }
 }
 
+/// Keychain 底层存储后端协议（便于测试注入）
+protocol KeychainBackend {
+    func secItemAdd(_ query: CFDictionary) -> OSStatus
+    func secItemDelete(_ query: CFDictionary) -> OSStatus
+    func secItemCopyMatching(_ query: CFDictionary, _ result: UnsafeMutablePointer<CFTypeRef?>) -> OSStatus
+}
+
+/// 真实系统 Keychain 后端
+struct SystemKeychainBackend: KeychainBackend {
+    func secItemAdd(_ query: CFDictionary) -> OSStatus { SecItemAdd(query, nil) }
+    func secItemDelete(_ query: CFDictionary) -> OSStatus { SecItemDelete(query) }
+    func secItemCopyMatching(_ query: CFDictionary, _ result: UnsafeMutablePointer<CFTypeRef?>) -> OSStatus {
+        SecItemCopyMatching(query, result)
+    }
+}
+
+/// 内存 Keychain 后端（测试用，不依赖真实 Keychain）
+final class InMemoryKeychainBackend: KeychainBackend {
+    private var storage: [String: Data] = [:]
+
+    private func key(for query: CFDictionary) -> String? {
+        // 从 query dict 提取 service + account 作为存储 key
+        guard let dict = query as? [String: Any] else { return nil }
+        let service = dict[kSecAttrService as String] as? String ?? ""
+        let account = dict[kSecAttrAccount as String] as? String ?? ""
+        return "\(service):\(account)"
+    }
+
+    func secItemAdd(_ query: CFDictionary) -> OSStatus {
+        guard let key = key(for: query) else { return errSecParam }
+        guard let dict = query as? [String: Any] else { return errSecParam }
+        storage[key] = dict[kSecValueData as String] as? Data
+        return errSecSuccess
+    }
+
+    func secItemDelete(_ query: CFDictionary) -> OSStatus {
+        guard let key = key(for: query) else { return errSecParam }
+        storage.removeValue(forKey: key)
+        return errSecSuccess
+    }
+
+    func secItemCopyMatching(_ query: CFDictionary, _ result: UnsafeMutablePointer<CFTypeRef?>) -> OSStatus {
+        guard let key = key(for: query) else { return errSecParam }
+        if let data = storage[key] {
+            result.pointee = data as CFTypeRef
+            return errSecSuccess
+        }
+        return errSecItemNotFound
+    }
+}
+
 /// Keychain 单例管理 API Key 的增删改查
 final class KeychainManager {
     /// 单例
     static let shared = KeychainManager()
     /// Keychain service 标识 "com.aibuilder.apikey"
     private let service = "com.aibuilder.apikey"
+    /// 底层存储后端（生产用 SystemKeychainBackend，测试可注入 InMemoryKeychainBackend）
+    internal var backend: KeychainBackend = SystemKeychainBackend()
 
     /// 私有初始化，外部只能用 shared
     private init() {}
@@ -59,8 +112,8 @@ final class KeychainManager {
             kSecValueData as String: data
         ]
         // 先删后加：幂等保存，避免重复 key 报 errSecDuplicateItem
-        SecItemDelete(query as CFDictionary)
-        let status = SecItemAdd(query as CFDictionary, nil)
+        _ = backend.secItemDelete(query as CFDictionary)
+        let status = backend.secItemAdd(query as CFDictionary)
         guard status == errSecSuccess else {
             throw AppError.keychainError("保存失败: \(status)")
         }
@@ -75,8 +128,8 @@ final class KeychainManager {
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne
         ]
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        var result: CFTypeRef?
+        let status = backend.secItemCopyMatching(query as CFDictionary, &result)
         guard status == errSecSuccess, let data = result as? Data else { return nil }
         return String(data: data, encoding: .utf8)
     }
@@ -88,6 +141,6 @@ final class KeychainManager {
             kSecAttrService as String: service,
             kSecAttrAccount as String: provider.keychainAccount
         ]
-        SecItemDelete(query as CFDictionary)
+        _ = backend.secItemDelete(query as CFDictionary)
     }
 }

@@ -8,33 +8,28 @@ final class KeychainManagerTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
+        // 注入内存 Keychain 后端，避免依赖真实系统 Keychain
+        KeychainManager.shared.backend = InMemoryKeychainBackend()
         // 清理可能残留的测试 key
         manager.deleteAPIKey()
     }
 
     override func tearDown() {
         manager.deleteAPIKey()
+        KeychainManager.shared.backend = SystemKeychainBackend()
         super.tearDown()
     }
 
     /// save 后 get 应返回相同字符串
     func testSaveAndGetRoundTrip() throws {
-        do {
-            try manager.saveAPIKey("test-key-123")
-        } catch {
-            throw XCTSkip("Keychain 不可用：\(error)")
-        }
+        try manager.saveAPIKey("test-key-123")
         XCTAssertEqual(manager.getAPIKey(), "test-key-123", "保存后应能读回相同 API Key")
     }
 
     /// 重复 save（内部先 Delete 再 Add）不应抛错
     func testSaveTwiceDoesNotError() throws {
-        do {
-            try manager.saveAPIKey("first-key")
-            try manager.saveAPIKey("second-key")
-        } catch {
-            throw XCTSkip("Keychain 不可用：\(error)")
-        }
+        try manager.saveAPIKey("first-key")
+        try manager.saveAPIKey("second-key")
         XCTAssertEqual(manager.getAPIKey(), "second-key", "重复 save 后应保留最后一次的值")
     }
 

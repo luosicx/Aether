@@ -26,18 +26,21 @@ final class DocumentChunkerTests: XCTestCase {
     }
 
     func testOverlapStitching() {
-        // 每个词唯一，避免重复文本造成假阳性：overlap 仅在拼接机制生效时才匹配
+        // 使用中文长句（NLTokenizer 对中文句号「。」分句更可靠），
+        // 每句内嵌足够多的空格分词英文 token（≥60 词 → ~78 estimatedTokens），
+        // 确保累积 token 超过 maxTokens(512) 触发切分。
+        // 注：estimatedTokens 按空格分词，纯中文无空格文本会被估为 1 token，
+        // 故需混入空格分词的英文词汇。
         let sentences = (0..<20).map { i in
-            (0..<60).map { j in "token\(i)_\(j)" }.joined(separator: " ") + "."
+            "第\(i)段这是用于测试文档分块重叠机制的中文长句子，"
+                + "包含以下词汇用于增加 token 数量："
+                + (0..<60).map { j in "token\(i)_\(j)" }.joined(separator: " ")
+                + "。"
         }
-        let text = sentences.joined(separator: " ")
+        let text = sentences.joined(separator: "")
         let chunks = chunker.chunkDocument(text, source: "overlap.txt")
-        // NLTokenizer 在 iOS 模拟器上分句行为可能不切分重复英文文本，
-        // 若未切分出多块则跳过 overlap 验证，避免 index out of range crash。
-        guard chunks.count >= 2 else {
-            XCTSkip("NLTokenizer 未切分多块，无法验证 overlap")
-            return
-        }
+        // 长文本应切分出多块
+        XCTAssertGreaterThanOrEqual(chunks.count, 2, "长文本应切分出至少 2 块，实际：\(chunks.count)")
 
         // 计算第 N 块末尾与第 N+1 块开头最长公共重叠长度
         let overlap = longestSuffixPrefixOverlap(chunks[0].content, chunks[1].content)

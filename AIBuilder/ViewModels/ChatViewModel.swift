@@ -399,6 +399,16 @@ final class ChatViewModel {
             return
         }
 
+        // UIT 测试模式：强制注入 LLM 错误，驱动 ErrorBanner 出现
+        // 说明：避免依赖真实网络/Keychain 时序，保证错误条用例确定性
+        if ProcessInfo.processInfo.arguments.contains("UITEST_FORCE_LLM_ERROR") {
+            errorMessage = "请先在设置中配置 API Key"
+            isLoading = false
+            streamingText = ""
+            endLiveActivity()
+            return
+        }
+
         // Day 13: 用工厂构造 LLMProvider（生产侧 FallbackLLMProvider 装饰，测试侧注入优先）
         let llmClient = makeLLMProvider()
         // Day 13: 初值为主 provider（若未触发降级，最终值即此）。缓存命中路径不走 LLMProvider 也要保证已设置。

@@ -37,6 +37,11 @@ final class VoiceService: NSObject, AVSpeechSynthesizerDelegate {
     private var cachedVoice: AVSpeechSynthesisVoice?
     /// cachedVoice 对应的 voiceIdentifier（nil 表示尚未缓存）
     private var cachedVoiceIdentifier: String?
+    /// 识别器可用性检查（测试可注入；默认使用真实 SFSpeechRecognizer）
+    internal var recognizerAvailabilityCheck: () -> Bool = {
+        let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "zh-CN"))
+        return recognizer?.isAvailable ?? false
+    }
 
     /// 初始化合成器和 delegate
     override init() {
@@ -58,7 +63,10 @@ final class VoiceService: NSObject, AVSpeechSynthesizerDelegate {
     /// 未激活时 inputNode.outputFormat 返回 sampleRate=0/channelCount=0 无效格式，installTab 会崩
     /// IsFormatSampleRateAndChannelCountValid）；3) 创建识别请求；4) installTap 接收音频；5) 启动 audioEngine。
     func startRecording() throws {
-        guard let recognizer = speechRecognizer, recognizer.isAvailable else {
+        guard recognizerAvailabilityCheck() else {
+            throw NSError(domain: "VoiceService", code: -1, userInfo: [NSLocalizedDescriptionKey: "语音识别器不可用"])
+        }
+        guard let recognizer = speechRecognizer else {
             throw NSError(domain: "VoiceService", code: -1, userInfo: [NSLocalizedDescriptionKey: "语音识别器不可用"])
         }
         // 1) 激活 AVAudioSession — 必须在取 outputFormat / installTap 之前完成，

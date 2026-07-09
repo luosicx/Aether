@@ -13,15 +13,14 @@ final class VoiceServiceTests: XCTestCase {
         XCTAssertFalse(service.isRecording, "未开始录音时 isRecording 应为 false")
     }
 
-    /// SFSpeechRecognizer 不可用时 startRecording 应抛错；
-    /// 若识别器可用（模拟器通常可用），跳过此用例
+    /// SFSpeechRecognizer 不可用时 startRecording 应抛错。
+    /// 通过注入 recognizerAvailabilityCheck 返回 false 模拟识别器不可用，
+    /// 不再依赖真实 SFSpeechRecognizer 环境状态。
     func testStartRecordingWhenRecognizerUnavailable() throws {
-        // VoiceService 内部使用 zh-CN 识别器；此处镜像构造以判断可用性
-        let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "zh-CN"))
-        // 仅在识别器不可用时继续；可用则跳过（无法测试不可用分支）
-        try XCTSkipUnless(recognizer?.isAvailable != true,
-                          "zh-CN SFSpeechRecognizer 可用，跳过不可用分支测试")
         let service = VoiceService()
+        // 注入：识别器不可用
+        service.recognizerAvailabilityCheck = { false }
+
         XCTAssertThrowsError(try service.startRecording(),
                              "识别器不可用时 startRecording 应抛错") { error in
             let nserror = error as NSError
