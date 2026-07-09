@@ -90,8 +90,8 @@ struct MessageListView: View {
                             }
                         )
                             .id(message.id.uuidString)
-                            .transition(.asymmetric(
-                                insertion: .opacity.combined(with: .move(edge: .bottom)),
+                            .transition(reduceMotion ? .opacity : .asymmetric(
+                                insertion: .move(edge: .bottom).combined(with: .opacity),
                                 removal: .opacity
                             ))
                     }
@@ -118,7 +118,7 @@ struct MessageListView: View {
                                 CitationCard(citation: chunk, index: idx)
                             }
                         }
-                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                        .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .bottom)))
                     }
                     if !viewModel.currentToolSteps.isEmpty {
                         HStack(spacing: 6) {
@@ -161,7 +161,7 @@ struct MessageListView: View {
                         proxy.scrollTo("streaming", anchor: .bottom)
                     }
                 } else {
-                    withAnimation(.easeOut(duration: 0.2)) {
+                    withAnimation(AnimationTokens.messageAppear) {
                         if let lastId = viewModel.messages.last?.id {
                             proxy.scrollTo(lastId.uuidString, anchor: .bottom)
                         } else {
@@ -183,10 +183,10 @@ struct MessageListView: View {
                         .background(Color.black.opacity(0.75))
                         .clipShape(Capsule())
                         .padding(.bottom, 8)
-                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                        .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .bottom)))
                 }
             }
-            .animation(.easeInOut(duration: 0.25), value: viewModel.feedbackToast)
+            .animation(reduceMotion ? nil : AnimationTokens.transition, value: viewModel.feedbackToast)
         }
     }
 
