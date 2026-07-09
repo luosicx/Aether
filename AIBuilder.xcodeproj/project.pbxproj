@@ -83,6 +83,7 @@
 		5E4B54718D730FB6B95A9108 /* TTSVoicePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 952D9E0A4EA04301E9214147 /* TTSVoicePickerView.swift */; };
 		5F2F600936D0BABAB0059B4A /* HealthKitServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B1E31D59E0D831DD494350E /* HealthKitServiceTests.swift */; };
 		623AFDAA2AED10E1055F2D44 /* VoiceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8DB28D8FFBC3A0CF4F73E9 /* VoiceService.swift */; };
+		D1E2F3A4B5C6D7E8F9A0B1C2 /* LanguageManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3F4A5B6C7D8E9F0A1B2C3D4 /* LanguageManager.swift */; };
 		630EA4F5FE2C6D02501F8D5F /* ConversationModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 759418AD61EB1A7B9032B689 /* ConversationModelTests.swift */; };
 		64A08E0694C45B5C7D57AA40 /* OnDeviceModelDownloader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32CF7DEBCDA67603FA06F82A /* OnDeviceModelDownloader.swift */; };
 		652192152261FD2D110CC625 /* Conversation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B387B391B8EB8B670A86B24 /* Conversation.swift */; };
@@ -371,6 +372,7 @@
 		CA001A96C96D5997BD2BBD57 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = "<group>"; };
 		CC000000000000000000C001 /* KnowledgeBaseView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KnowledgeBaseView.swift; sourceTree = "<group>"; };
 		CE8DB28D8FFBC3A0CF4F73E9 /* VoiceService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VoiceService.swift; sourceTree = "<group>"; };
+		E3F4A5B6C7D8E9F0A1B2C3D4 /* LanguageManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LanguageManager.swift; sourceTree = "<group>"; };
 		CED557122621DA94FAFFDB35 /* PrivacyPolicyView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PrivacyPolicyView.swift; sourceTree = "<group>"; };
 		D0B6C104ED230D48DEED63A5 /* NaturalLanguage.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = NaturalLanguage.framework; path = System/Library/Frameworks/NaturalLanguage.framework; sourceTree = "<group>"; };
 		D4C460DB51E05D323191DFB2 /* InputAutomationToolTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InputAutomationToolTests.swift; sourceTree = "<group>"; };
@@ -557,9 +559,18 @@
 				2E5F9E8896772C1FC9036608 /* Performance */,
 				09BC29E459BEE2ACF9F29957 /* Feedback */,
 				C1BF41DA3447C8E450F8C8DF /* Crash */,
+				F5E6A7B8C9D0E1F2A3B4C5D6 /* Language */,
 			);
 			name = Services;
 			path = Services;
+			sourceTree = "<group>";
+		};
+		F5E6A7B8C9D0E1F2A3B4C5D6 /* Language */ = {
+			isa = PBXGroup;
+			children = (
+				E3F4A5B6C7D8E9F0A1B2C3D4 /* LanguageManager.swift */,
+			);
+			path = Language;
 			sourceTree = "<group>";
 		};
 		2E2AF97BF7D132981AC65F6D /* Chat */ = {
@@ -1122,6 +1133,7 @@
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				"zh-Hans",
+				"zh-Hant",
 				en,
 				Base,
 			);
@@ -1277,6 +1289,7 @@
 				2A7C0992E5969892F4820922 /* ReminderTool.swift in Sources */,
 				241AD3CA88776634B0AEC49E /* ToolRegistry.swift in Sources */,
 				623AFDAA2AED10E1055F2D44 /* VoiceService.swift in Sources */,
+				D1E2F3A4B5C6D7E8F9A0B1C2 /* LanguageManager.swift in Sources */,
 				FA4FCF1ADBD84B44A1993123 /* SemanticCache.swift in Sources */,
 				21EFCE26DEE53DBFCAC10099 /* ChatViewModel.swift in Sources */,
 				03D60552812509B4BF1EB48B /* ConversationListVM.swift in Sources */,

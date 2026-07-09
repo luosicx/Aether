@@ -47,7 +47,8 @@
 
 ### 工程质量强化
 
-- **国际化基础设施**：String Catalog（`Localizable.xcstrings`，zh-Hans 源 + en 翻译，50 核心 key），`developmentRegion = zh-Hans`，SwiftUI 字面量自动提取
+- **国际化基础设施**：String Catalog（`Localizable.xcstrings`，zh-Hans 源 + zh-Hant 繁体 + en 翻译，55 核心 key），`developmentRegion = zh-Hans`，SwiftUI 字面量自动提取
+- **App 内语言切换**：`LanguageManager` + 设置页「语言」Section，支持跟随系统 / 简体中文 / 繁体中文 / 英文四选项，切换后写入 `AppleLanguages` 并提示重启
 - **macOS 应用图标**：16/32/64/128/256/512 + @2x 全套 macOS iconset
 - **无障碍支持**：13 个视图新增 `accessibilityLabel`/`accessibilityHint`/`accessibilityElement`，13 个关键交互元素新增 `accessibilityIdentifier`（UITest 可靠性提升）
 - **潜在问题修复**：BGTaskScheduler 3 处 `as!` 强制向下转型改为 `guard let ... as?` 安全转型

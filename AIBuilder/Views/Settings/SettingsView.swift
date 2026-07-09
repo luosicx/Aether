@@ -52,6 +52,10 @@ struct SettingsView: View {
     @Environment(\.openURL) private var openURL
     // iPad/macOS 双栏:size class 判断
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    // 语言切换管理器
+    @StateObject private var languageManager = LanguageManager.shared
+    // 语言切换后是否需要提示重启
+    @State private var showRestartAlert = false
 
     // Day 9: 用户偏好本地状态
     @State private var preferredTone: String = "默认"
@@ -80,6 +84,11 @@ struct SettingsView: View {
         }
         .onAppear { handleAppear() }
         .onDisappear { handleDisappear() }
+        .alert("语言", isPresented: $showRestartAlert) {
+            Button("完成") {}
+        } message: {
+            Text("重启 App 以应用语言更改")
+        }
         .sheet(isPresented: $showDebugPanel) {
             DebugPanelView(chatViewModel: chatViewModel)
         }
@@ -99,6 +108,7 @@ struct SettingsView: View {
     private var compactLayout: some View {
         NavigationStack {
             Form {
+                languageSection
                 providerSection
                 fallbackSection
                 bffSection
@@ -183,6 +193,7 @@ struct SettingsView: View {
     private func sectionContent(for section: SettingsSection) -> some View {
         switch section {
         case .provider:
+            languageSection
             providerSection
             fallbackSection
             apiConfigSection
@@ -219,6 +230,36 @@ struct SettingsView: View {
             isPresented = false
         }
         .fontWeight(.medium)
+    }
+
+    // MARK: - Section: 语言切换
+
+    @ViewBuilder
+    private var languageSection: some View {
+        Section {
+            // Picker 选择语言，选中后立即写入 AppleLanguages
+            Picker("语言", selection: Binding(
+                get: { languageManager.current },
+                set: { newValue in
+                    languageManager.current = newValue
+                    showRestartAlert = true
+                }
+            )) {
+                ForEach(LanguageManager.AppLanguage.allCases) { language in
+                    Label(language.displayName, systemImage: language.icon)
+                        .tag(language)
+                }
+            }
+            .pickerStyle(.menu)
+            .accessibilityLabel("语言")
+            .accessibilityHint("选择 App 界面语言，切换后需重启 App 生效")
+            .accessibilityIdentifier("languagePicker")
+        } header: {
+            Text("语言")
+        } footer: {
+            Text("切换语言后需重启 App 生效。选择「跟随系统」将使用设备系统语言。")
+                .font(.caption2)
+        }
     }
 
     // MARK: - Section: 供应商

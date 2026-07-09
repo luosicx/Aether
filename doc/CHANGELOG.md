@@ -7,7 +7,8 @@
 ## [Unreleased]
 
 ### Added
-- **国际化基础设施**：新增 `Localizable.xcstrings` String Catalog（zh-Hans 源语言 + en 英文翻译，50 个核心 key）；`developmentRegion` 更新为 `zh-Hans`，`knownRegions` 新增 `zh-Hans`/`en`；SwiftUI `Text`/`Button`/`TextField`/`accessibilityLabel` 字面量由 Xcode 自动提取
+- **国际化基础设施**：新增 `Localizable.xcstrings` String Catalog（zh-Hans 源语言 + zh-Hant 繁体中文 + en 英文翻译，55 个核心 key）；`developmentRegion` 更新为 `zh-Hans`，`knownRegions` 新增 `zh-Hans`/`zh-Hant`/`en`；SwiftUI `Text`/`Button`/`TextField`/`accessibilityLabel` 字面量由 Xcode 自动提取
+- **App 内语言切换**：新增 `LanguageManager`（ObservableObject）与设置页「语言」Section，支持跟随系统 / 简体中文 / 繁体中文 / 英文 四选项，切换后写入 `AppleLanguages` UserDefaults 并提示重启 App 生效
 - **macOS 应用图标**：基于 1024x1024 源图，通过 `sips` 生成 16/32/64/128/256/512 + @2x 全套 macOS 图标，`AppIcon.appiconset/Contents.json` 新增 10 个 `idiom: "mac"` 条目
 - **无障碍支持强化**：13 个缺失视图新增 `accessibilityLabel`/`accessibilityHint`/`accessibilityElement(children:)`（MarkdownText / CodeBlockView / MarkdownTableView / HeadingView / ErrorOverlay / CitationCard / ConversationRow / OnDeviceModelView / KnowledgeBaseView / HealthSettingsView / PrivacyPolicyView / DocumentPickerView / PresetPrompts）；关键交互元素新增 `accessibilityIdentifier`（sendButton / messageInputField / voiceInputButton / knowledgeBaseButton / settingsButton / conversationListButton / newConversationButton / importDocumentButton / downloadModelButton / deleteModelButton / requestHealthAuthButton / thumbsUpButton / thumbsDownButton），VoiceOver 与 UITest 可靠性提升
 - **截图目录**：新增 `screenshots/` 目录与 `README.md` 占位（含截图清单、截图方法、注意事项）
