@@ -33,32 +33,13 @@ struct ConversationList: View {
         NavigationStack {
             Group {
                 if conversationListVM.conversations.isEmpty {
-                    VStack(spacing: 20) {
-                        ZStack {
-                            Circle()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [Color.accentColor.opacity(0.12), Color.accentColor.opacity(0.04)],
-                                        startPoint: .top,
-                                        endPoint: .bottom
-                                    )
-                                )
-                                .frame(width: 88, height: 88)
-                            Image(systemName: "bubble.left.and.bubble.right")
-                                .font(.system(size: 34, weight: .light))
-                                .foregroundStyle(Color.accentColor.opacity(0.7))
-                        }
-
-                        VStack(spacing: 6) {
-                            Text("还没有对话")
-                                .font(.title3.weight(.semibold))
-                                .foregroundStyle(.primary)
-                            Text("点击右上角加号开始第一段对话")
-                                .font(.callout)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    EmptyStateView(
+                        systemImage: "bubble.left.and.bubble.right",
+                        title: "还没有对话",
+                        message: "点击右上角新建对话开始聊天",
+                        primaryButtonTitle: "新建对话",
+                        primaryAction: { onCreate() }
+                    )
                 } else {
                     List {
                         // Day 9: 搜索框

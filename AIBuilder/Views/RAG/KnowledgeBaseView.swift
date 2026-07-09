@@ -122,34 +122,13 @@ struct KnowledgeBaseView: View {
     // MARK: - 空状态
 
     private var emptyState: some View {
-        VStack(spacing: 20) {
-            ZStack {
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [Color.accentColor.opacity(0.12), Color.accentColor.opacity(0.04)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .frame(width: 88, height: 88)
-                Image(systemName: "book.closed")
-                    .font(.system(size: 34, weight: .light))
-                    .foregroundStyle(Color.accentColor.opacity(0.7))
-            }
-
-            VStack(spacing: 6) {
-                Text("知识库为空")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(.primary)
-                Text("导入 PDF 或文本文档，让 AI 基于你的资料回答")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        EmptyStateView(
+            systemImage: "doc.text",
+            title: "暂无文档",
+            message: "导入文档以启用 RAG 知识库",
+            primaryButtonTitle: "导入文档",
+            primaryAction: { showPicker = true }
+        )
     }
 
     // MARK: - 文档列表 (Compact)
