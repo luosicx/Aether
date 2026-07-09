@@ -163,7 +163,7 @@
 - [ ] 预期输出包含：`Executed 248 tests, with 0 failures, 0 skipped`
 
 ### UI 测试（UIT）
-- [ ] UIT 用例数 = 13（11 pass / 2 skip / 0 failures）
+- [ ] UIT 用例数 = 13（13 pass / 0 skip / 0 failures）
 - [ ] UIT 文件数 = 2
 - [ ] 验证命令：
   ```bash
@@ -174,7 +174,7 @@
     -only-testing:AIBuilderUITests \
     CODE_SIGNING_ALLOWED=NO 2>&1 | tail -5
   ```
-- [ ] 预期输出包含：`Executed 13 tests, with 0 failures, 2 skipped`
+- [ ] 预期输出包含：`Executed 13 tests, with 0 failures, 0 skipped`
 
 ## 4.13 文档完整性审计
 

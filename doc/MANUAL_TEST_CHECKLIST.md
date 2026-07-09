@@ -1103,7 +1103,7 @@
 - [ ] ReleaseChecklist 完成
   - **前置条件**：发布前
   - **操作步骤**：
-    1. 参照 [ReleaseChecklist.md](file:///Users/xuchen/Documents/AIBuiler/doc/ReleaseChecklist.md) 完成最终检查
+    1. 参照 [ReleaseChecklist.md](ReleaseChecklist.md) 完成最终检查
   - **预期结果**：参照 ReleaseChecklist.md 完成最终检查
   - **失败排查**：查看 ReleaseChecklist 各项
 

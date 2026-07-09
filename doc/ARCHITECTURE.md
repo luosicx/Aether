@@ -1109,7 +1109,7 @@ stateDiagram-v2
 | PerformanceMonitor | `Services/Performance/PerformanceMonitor.swift` | iOS 17.0+ / macOS 14.0+ |
 | PrivacyInfo.xcprivacy | `Resources/PrivacyInfo.xcprivacy` | iOS 17.0+ / macOS 14.0+ / Xcode 16+（App Store 审核要求） |
 | AttributedString（Markdown） | `Views/Chat/Markdown*.swift` / `CodeSyntaxHighlighter.swift` | iOS 17.0+ / macOS 14.0+ / Foundation |
-| XCTest | `AIBuilderTests/` 69 文件（249 用例） | Xcode 16+ / Swift 5.9+ |
+| XCTest | `AIBuilderTests/` 69 文件（248 用例） | Xcode 16+ / Swift 5.9+ |
 | XCUITest | `AIBuilderUITests/` 2 文件（13 用例） | Xcode 16+ / Swift 5.9+ |
 | GitHub Actions | `.github/workflows/ci.yml` | macos-14 runner / Xcode 16+ |
 | CoreLocation | CLLocationManager + CLGeocoder | LocationTool 定位与反地理编码 | iOS 17.0+ / macOS 14.0+ / CoreLocation.framework |
@@ -1128,7 +1128,7 @@ stateDiagram-v2
 ### 7.1 单元测试（UT）
 
 - **Target**：`AIBuilderTests`
-- **规模**：69 个测试文件，249 用例（246 pass / 3 skip / 0 failures）
+- **规模**：69 个测试文件，248 用例（248 pass / 0 skip / 0 failures）
 - **分层覆盖**：
 
 | 层级 | 测试文件 | 文件数 | 核心断言数（约） | skip 原因 |
@@ -1207,7 +1207,7 @@ stateDiagram-v2
 ### 7.2 UI 测试（UIT）
 
 - **Target**：`AIBuilderUITests`
-- **规模**：2 个测试文件，13 用例（11 pass / 2 skip / 0 failures）
+- **规模**：2 个测试文件，13 用例（13 pass / 0 skip / 0 failures）
 - **文件拆分**：
 
 | 文件 | 用例数 | 核心断言数（约） | skip 原因 | 覆盖端到端流 |
@@ -1408,7 +1408,7 @@ CloudflareWorkers/               # BFF 代理网关
 ├── worker.js
 └── wrangler.toml
 
-AIBuilderTests/                  # 69 个 UT 文件 / 249 用例
+AIBuilderTests/                  # 69 个 UT 文件 / 248 用例
 ├── APIConfigTests.swift
 ├── AlarmToolTests.swift
 ├── BFFProxyClientTests.swift
