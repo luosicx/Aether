@@ -17,9 +17,16 @@
 - USAGE.md 新增 macOS 系统集成与性能监控章节
 - MANUAL_TEST_CHECKLIST.md 手测项四字段结构化（前置条件 / 操作步骤 / 预期结果 / 失败排查）
 - ReleaseChecklist.md 新增 4.4-4.7 审计项（多平台构建 / 工具数 / 测试规模 / 文档完整性）
+- **完整国际化补全**：`Localizable.xcstrings` 从 55 核心 key 扩展至 385 keys，覆盖 Views / ViewModels / Services / AppIntents / Core；新增 `scripts/` 提取/翻译/合并工具链
+- **无障碍全面增强**：7 个核心视图新增约 75 个 `accessibilityLabel` / `accessibilityHint` / `accessibilityIdentifier`
+- **项目截图**：`screenshots/` 新增 8 张 iOS / macOS 核心页面截图
+- **后续规划文档**：新增 `doc/ROADMAP.md`、`doc/OPTIMIZATION.md`、`doc/DESIGN_UPDATE.md`
 
 ### Fixed
 - **BGTaskScheduler 强制向下转型崩溃风险修复**：`AIBuilderApp.swift` 中 3 处 `task as! BGAppRefreshTask` 改为 `guard let refreshTask = task as? BGAppRefreshTask else { task.setTaskCompleted(success: false); return }`，任务类型不匹配时安全退出而非崩溃
+- **UT/UIT 全部 0 skip**：修复 `testUserPreferencePersistence` 根因（`UserPreference` @Model 未注册到 App `ModelContainer` schema）；修复 7 处 `XCTSkip`
+- **Swift 6 并发警告**：修复 `VoiceService` / `ChatViewModel` / `ConversationListVM` / `ClipboardTool` / `OpenURLTool` / `LocationTool` / `SSEParser` 等 7 类警告
+- **macOS AppIcon 警告**：清理 3 个未分配子图标
 
 （详见 spec：[enhance-docs-architecture-diagrams](../.trae/specs/enhance-docs-architecture-diagrams/spec.md)）
 
