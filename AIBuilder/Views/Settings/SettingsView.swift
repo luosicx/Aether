@@ -230,6 +230,9 @@ struct SettingsView: View {
             isPresented = false
         }
         .fontWeight(.medium)
+        .accessibilityLabel("完成")
+        .accessibilityHint("保存设置并关闭")
+        .accessibilityIdentifier("settingsDoneButton")
     }
 
     // MARK: - Section: 语言切换
@@ -274,7 +277,9 @@ struct SettingsView: View {
                 }
             }
             .pickerStyle(.segmented)
+            .accessibilityLabel("供应商")
             .accessibilityHint("选择 LLM 供应商")
+            .accessibilityIdentifier("providerPicker")
         } header: {
             Text("供应商")
         } footer: {
@@ -290,7 +295,9 @@ struct SettingsView: View {
         // Day 13: 自动降级开关
         Section {
             Toggle("启用自动降级", isOn: $settingsVM.enableFallback)
+                .accessibilityLabel("启用自动降级")
                 .accessibilityHint("主供应商失败时自动切换备用供应商")
+                .accessibilityIdentifier("fallbackToggle")
         } header: {
             Text("自动降级")
         } footer: {
@@ -306,6 +313,9 @@ struct SettingsView: View {
         // Day 15: BFF 代理配置
         Section {
             Toggle("启用 BFF 代理", isOn: $settingsVM.bffConfig.enabled)
+                .accessibilityLabel("启用 BFF 代理")
+                .accessibilityHint("启用后端代理转发 API 请求")
+                .accessibilityIdentifier("bffToggle")
             TextField("BFF endpoint", text: Binding(
                 get: { settingsVM.bffConfig.endpointURL.absoluteString },
                 set: { newValue in
@@ -320,14 +330,26 @@ struct SettingsView: View {
             .textInputAutocapitalization(.never)
             #endif
             .autocorrectionDisabled()
+            .accessibilityLabel("BFF endpoint")
+            .accessibilityHint("输入 BFF 服务地址")
+            .accessibilityIdentifier("bffEndpointTextField")
             SecureField("BFF Token", text: $settingsVM.bffConfig.userToken)
                 .textContentType(.password)
+                .accessibilityLabel("BFF Token")
+                .accessibilityHint("输入 BFF 访问令牌")
+                .accessibilityIdentifier("bffTokenSecureField")
             Stepper(String(format: NSLocalizedString("chat 限流（每分钟）：%d", comment: ""), settingsVM.bffConfig.chatRateLimitPerMin),
                     value: $settingsVM.bffConfig.chatRateLimitPerMin,
                     in: 5...60)
+                .accessibilityLabel("chat 限流")
+                .accessibilityHint("设置 chat 接口每分钟最大请求数")
+                .accessibilityIdentifier("bffChatRateLimitStepper")
             Stepper(String(format: NSLocalizedString("embed 限流（每分钟）：%d", comment: ""), settingsVM.bffConfig.embedRateLimitPerMin),
                     value: $settingsVM.bffConfig.embedRateLimitPerMin,
                     in: 5...30)
+                .accessibilityLabel("embed 限流")
+                .accessibilityHint("设置 embed 接口每分钟最大请求数")
+                .accessibilityIdentifier("bffEmbedRateLimitStepper")
         } header: {
             Text("BFF 代理")
         } footer: {
@@ -343,18 +365,31 @@ struct SettingsView: View {
         // Day 16: 端侧推理配置
         Section {
             Toggle("启用端侧推理", isOn: $settingsVM.onDeviceConfig.enabled)
+                .accessibilityLabel("启用端侧推理")
                 .accessibilityHint("启用后在断网时使用本地模型推理")
+                .accessibilityIdentifier("onDeviceToggle")
             NavigationLink("管理端侧模型") {
                 OnDeviceModelView(settingsVM: settingsVM)
             }
+            .accessibilityLabel("管理端侧模型")
+            .accessibilityHint("下载或删除本地端侧模型")
+            .accessibilityIdentifier("manageOnDeviceModelsLink")
             Toggle("断网自动切换", isOn: $settingsVM.onDeviceConfig.autoSwitchOnNetworkLoss)
+                .accessibilityLabel("断网自动切换")
                 .accessibilityHint("断网时自动切换到端侧推理，联网后切回")
+                .accessibilityIdentifier("autoSwitchOnNetworkLossToggle")
             Stepper(String(format: NSLocalizedString("maxTokens：%d", comment: ""), settingsVM.onDeviceConfig.maxTokens),
                     value: $settingsVM.onDeviceConfig.maxTokens,
                     in: 128...2048)
+                .accessibilityLabel("maxTokens")
+                .accessibilityHint("设置端侧模型最大生成 token 数")
+                .accessibilityIdentifier("onDeviceMaxTokensStepper")
             VStack(alignment: .leading) {
                 Text(String(format: NSLocalizedString("temperature：%.1f", comment: ""), settingsVM.onDeviceConfig.temperature))
                 Slider(value: $settingsVM.onDeviceConfig.temperature, in: 0.0...1.0)
+                    .accessibilityLabel("temperature")
+                    .accessibilityHint("调整模型生成随机程度")
+                    .accessibilityIdentifier("onDeviceTemperatureSlider")
             }
         } header: {
             Text("端侧推理")
@@ -382,6 +417,9 @@ struct SettingsView: View {
                         .font(.caption)
                 }
             }
+            .accessibilityLabel("健康管理")
+            .accessibilityHint("管理 HealthKit 授权与健康洞察")
+            .accessibilityIdentifier("healthManagementLink")
             HStack {
                 Text("已生成洞察")
                 Spacer()
@@ -414,7 +452,9 @@ struct SettingsView: View {
                         .font(.caption)
                 }
             }
+            .accessibilityLabel("音色")
             .accessibilityHint("选择系统内置 TTS 音色")
+            .accessibilityIdentifier("voicePickerLink")
 
             VStack(alignment: .leading) {
                 Text(String(format: NSLocalizedString("语速：%d%%", comment: ""), Int(settingsVM.ttsConfig.rate * 100)))
@@ -422,6 +462,8 @@ struct SettingsView: View {
                     syncTTSConfigToChatViewModel()
                 }
                 .accessibilityValue(Text(String(format: NSLocalizedString("%d%%", comment: ""), Int(settingsVM.ttsConfig.rate * 100))))
+                .accessibilityHint("调整朗读语速")
+                .accessibilityIdentifier("ttsRateSlider")
             }
             .accessibilityLabel("语速")
 
@@ -431,6 +473,8 @@ struct SettingsView: View {
                     syncTTSConfigToChatViewModel()
                 }
                 .accessibilityValue(Text(String(format: NSLocalizedString("%.1f", comment: ""), settingsVM.ttsConfig.pitchMultiplier)))
+                .accessibilityHint("调整朗读音调")
+                .accessibilityIdentifier("ttsPitchSlider")
             }
             .accessibilityLabel("音调")
 
@@ -440,6 +484,8 @@ struct SettingsView: View {
                     syncTTSConfigToChatViewModel()
                 }
                 .accessibilityValue(Text(String(format: NSLocalizedString("%d%%", comment: ""), Int(settingsVM.ttsConfig.volume * 100))))
+                .accessibilityHint("调整朗读音量")
+                .accessibilityIdentifier("ttsVolumeSlider")
             }
             .accessibilityLabel("音量")
 
@@ -458,7 +504,9 @@ struct SettingsView: View {
                     systemImage: chatViewModel.voiceService.isPreviewing ? "stop.fill" : "play.fill"
                 )
             }
+            .accessibilityLabel(chatViewModel.voiceService.isPreviewing ? "停止试听" : "试听示例")
             .accessibilityHint(chatViewModel.voiceService.isPreviewing ? "停止试听" : "用当前音色朗读示例句")
+            .accessibilityIdentifier("previewVoiceButton")
         } header: {
             Text("语音朗读")
         } footer: {
@@ -478,17 +526,35 @@ struct SettingsView: View {
                 case .deepseek:
                     SecureField("DeepSeek API Key", text: $settingsVM.deepseekAPIKey)
                         .textContentType(.password)
+                        .accessibilityLabel("DeepSeek API Key")
+                        .accessibilityHint("输入 DeepSeek API 密钥")
+                        .accessibilityIdentifier("deepseekAPIKeySecureField")
                     Button("保存 API Key") { settingsVM.saveAPIKey(for: .deepseek) }
+                        .accessibilityLabel("保存 API Key")
+                        .accessibilityHint("保存当前供应商的 API Key 到系统钥匙串")
+                        .accessibilityIdentifier("saveAPIKeyButton")
                     Button("删除 API Key", role: .destructive) {
                         showDeleteAPIKeyConfirm = true
                     }
+                    .accessibilityLabel("删除 API Key")
+                    .accessibilityHint("删除当前供应商已保存的 API Key")
+                    .accessibilityIdentifier("deleteAPIKeyButton")
                 case .qwen:
                     SecureField("Qwen API Key", text: $settingsVM.qwenAPIKey)
                         .textContentType(.password)
+                        .accessibilityLabel("Qwen API Key")
+                        .accessibilityHint("输入 Qwen API 密钥")
+                        .accessibilityIdentifier("qwenAPIKeySecureField")
                     Button("保存 API Key") { settingsVM.saveAPIKey(for: .qwen) }
+                        .accessibilityLabel("保存 API Key")
+                        .accessibilityHint("保存当前供应商的 API Key 到系统钥匙串")
+                        .accessibilityIdentifier("saveAPIKeyButton")
                     Button("删除 API Key", role: .destructive) {
                         showDeleteAPIKeyConfirm = true
                     }
+                    .accessibilityLabel("删除 API Key")
+                    .accessibilityHint("删除当前供应商已保存的 API Key")
+                    .accessibilityIdentifier("deleteAPIKeyButton")
                 case .onDevice:
                     // 端侧推理无需 API Key，提示用户
                     Text("端侧推理无需 API Key，模型在本地运行。")
@@ -523,7 +589,9 @@ struct SettingsView: View {
                 Text("Reasoner").tag("deepseek-reasoner")
             }
             .pickerStyle(.segmented)
+            .accessibilityLabel("模型")
             .accessibilityHint("选自动时智能路由，选具体模型则固定使用")
+            .accessibilityIdentifier("modelPicker")
         } header: {
             Text("模型")
         } footer: {
@@ -538,9 +606,13 @@ struct SettingsView: View {
     private var featuresSection: some View {
         Section {
             Toggle("启用 RAG 知识库", isOn: $chatViewModel.ragEnabled)
+                .accessibilityLabel("启用 RAG 知识库")
                 .accessibilityHint("发送消息前检索本地知识库增强上下文")
+                .accessibilityIdentifier("ragToggle")
             Toggle("启用工具调用", isOn: $chatViewModel.toolsEnabled)
+                .accessibilityLabel("启用工具调用")
                 .accessibilityHint("启用后进入 ReAct 循环调用工具")
+                .accessibilityIdentifier("toolsToggle")
         } header: {
             Text("功能开关")
         } footer: {
@@ -565,10 +637,15 @@ struct SettingsView: View {
                         }
                     }
                 }
+                .accessibilityLabel("选择角色")
+                .accessibilityHint("选择预设系统提示词角色")
+                .accessibilityIdentifier("presetRoleMenu")
             }
             TextEditor(text: $settingsVM.systemPrompt)
                 .frame(minHeight: 120)
                 .accessibilityLabel("系统提示词")
+                .accessibilityHint("输入系统提示词以定义 AI 行为")
+                .accessibilityIdentifier("systemPromptTextEditor")
         } header: {
             Text("系统提示词")
         } footer: {
@@ -599,6 +676,9 @@ struct SettingsView: View {
                 Text("正式").tag("正式")
                 Text("轻松").tag("轻松")
             }
+            .accessibilityLabel("语气")
+            .accessibilityHint("选择 AI 回复的语气风格")
+            .accessibilityIdentifier("tonePicker")
 
             // 偏好工具多选：从 ToolRegistry 取所有工具名，Toggle 多选
             ForEach(ToolRegistry.shared.allToolDefs, id: \.function.name) { toolDef in
@@ -613,11 +693,17 @@ struct SettingsView: View {
                         }
                     }
                 ))
+                .accessibilityLabel(toolDef.function.description)
+                .accessibilityHint("启用或禁用此工具")
+                .accessibilityIdentifier("toolToggle_\(name)")
             }
 
             // 自定义事实多行输入，placeholder 用 overlay 实现
             TextEditor(text: $customFact)
                 .frame(minHeight: 60)
+                .accessibilityLabel("自定义事实")
+                .accessibilityHint("输入 AI 需要了解的个性化事实")
+                .accessibilityIdentifier("customFactTextEditor")
                 .overlay(alignment: .topLeading) {
                     if customFact.isEmpty {
                         Text("如：我是素食者…")
@@ -644,6 +730,9 @@ struct SettingsView: View {
             Button("查看调试信息") {
                 showDebugPanel = true
             }
+            .accessibilityLabel("查看调试信息")
+            .accessibilityHint("打开调试信息面板")
+            .accessibilityIdentifier("openDebugPanelButton")
         } header: {
             Text("调试面板")
         } footer: {
@@ -667,7 +756,9 @@ struct SettingsView: View {
                     Spacer()
                 }
             }
+            .accessibilityLabel("隐私政策")
             .accessibilityHint("查看 AI Builder 隐私政策")
+            .accessibilityIdentifier("privacyPolicyLink")
 
             // 投诉反馈：优先使用系统邮件 composer，不可用时降级 mailto:
             Button {
@@ -690,7 +781,9 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            .accessibilityLabel("投诉反馈")
             .accessibilityHint("通过邮件反馈问题或投诉")
+            .accessibilityIdentifier("feedbackButton")
 
             // App 版本号
             HStack {
@@ -824,6 +917,9 @@ struct DebugPanelView: View {
                             performanceMetrics = await PerformanceMonitor.shared.getMetrics()
                         }
                     }
+                    .accessibilityLabel("清除性能指标")
+                    .accessibilityHint("清空本地记录的性能指标数据")
+                    .accessibilityIdentifier("clearPerformanceMetricsButton")
                 }
 
                 // Day 14: 远程配置 / 遥测
@@ -870,12 +966,18 @@ struct DebugPanelView: View {
                             await refreshTelemetry()
                         }
                     }
+                    .accessibilityLabel("立即上报")
+                    .accessibilityHint("立即上传缓存的遥测日志")
+                    .accessibilityIdentifier("uploadTelemetryButton")
                     Button("重新拉取配置") {
                         Task {
                             await RemoteConfigService.shared.fetch()
                             await refreshConfig()
                         }
                     }
+                    .accessibilityLabel("重新拉取配置")
+                    .accessibilityHint("从服务器获取最新远程配置")
+                    .accessibilityIdentifier("refreshRemoteConfigButton")
                 }
 
                 // Day 13: 供应商 / 模型 / 降级信息

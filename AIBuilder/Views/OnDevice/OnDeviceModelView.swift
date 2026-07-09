@@ -72,6 +72,9 @@ struct OnDeviceModelView: View {
                     Button("取消下载", role: .destructive) {
                         Task { await cancelDownload() }
                     }
+                    .accessibilityLabel("取消下载")
+                    .accessibilityHint("取消当前模型下载")
+                    .accessibilityIdentifier("cancelDownloadButton")
                 } else {
                     Button("下载模型") {
                         Task { await startDownload() }
@@ -114,6 +117,9 @@ struct OnDeviceModelView: View {
                         Text(name).tag(name)
                     }
                 }
+                .accessibilityLabel("选择模型")
+                .accessibilityHint("切换要使用的端侧模型")
+                .accessibilityIdentifier("onDeviceModelPicker")
             }
         }
         .navigationTitle("端侧模型管理")

@@ -69,6 +69,9 @@ struct KnowledgeBaseView: View {
                 }
                 ToolbarItem(placement: .topBarLeading) {
                     Button("完成") { dismiss() }
+                        .accessibilityLabel("完成")
+                        .accessibilityHint("关闭知识库")
+                        .accessibilityIdentifier("knowledgeBaseDoneButton")
                 }
             }
             #endif
@@ -102,6 +105,9 @@ struct KnowledgeBaseView: View {
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("完成") { dismiss() }
+                        .accessibilityLabel("完成")
+                        .accessibilityHint("关闭知识库")
+                        .accessibilityIdentifier("knowledgeBaseDoneButton")
                 }
             }
         } detail: {
@@ -165,12 +171,19 @@ struct KnowledgeBaseView: View {
                     }
                 }
                 .padding(.vertical, 4)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(doc.source)
+                .accessibilityHint("查看文档分块")
+                .accessibilityIdentifier("documentRow_\(doc.id)")
                 .swipeActions(edge: .trailing) {
                     Button(role: .destructive) {
                         vm.deleteDocument(source: doc.source, modelContext: modelContext)
                     } label: {
                         Label("删除", systemImage: "trash")
                     }
+                    .accessibilityLabel("删除")
+                    .accessibilityHint("从知识库删除此文档")
+                    .accessibilityIdentifier("deleteDocumentButton")
                 }
             }
         }
@@ -199,6 +212,10 @@ struct KnowledgeBaseView: View {
                 }
                 .tag(doc)
                 .padding(.vertical, 4)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(doc.source)
+                .accessibilityHint("查看文档分块")
+                .accessibilityIdentifier("documentRow_\(doc.id)")
                 .swipeActions(edge: .trailing) {
                     Button(role: .destructive) {
                         if selectedDocument == doc {
@@ -208,6 +225,9 @@ struct KnowledgeBaseView: View {
                     } label: {
                         Label("删除", systemImage: "trash")
                     }
+                    .accessibilityLabel("删除")
+                    .accessibilityHint("从知识库删除此文档")
+                    .accessibilityIdentifier("deleteDocumentButton")
                 }
             }
         }

@@ -46,5 +46,6 @@ struct ConversationRow: View {
         .accessibilityLabel(Text(String(format: NSLocalizedString("%@，最后消息：%@", comment: ""), conversation.title, lastMessage?.content ?? NSLocalizedString("无", comment: ""))))
         .accessibilityHint("打开此会话")
         .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier("conversationRow_\(conversation.id.uuidString)")
     }
 }

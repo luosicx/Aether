@@ -46,12 +46,18 @@ struct HealthSettingsView: View {
                         UIApplication.shared.open(url)
                     }
                 }
+                .accessibilityLabel("跳转系统设置")
+                .accessibilityHint("前往系统设置中修改健康数据权限")
+                .accessibilityIdentifier("openHealthSettingsButton")
                 #endif
             }
 
             // MARK: - 健康上下文
             Section {
                 Toggle("注入健康上下文", isOn: $chatViewModel.injectHealthContext)
+                    .accessibilityLabel("注入健康上下文")
+                    .accessibilityHint("发送消息时注入最近健康数据")
+                    .accessibilityIdentifier("injectHealthContextToggle")
             } header: {
                 Text("健康上下文")
             } footer: {
@@ -65,6 +71,9 @@ struct HealthSettingsView: View {
                     Task { await generateInsight() }
                 }
                 .disabled(isGenerating)
+                .accessibilityLabel("立即生成洞察")
+                .accessibilityHint("基于最近健康数据生成洞察")
+                .accessibilityIdentifier("generateHealthInsightButton")
 
                 if isGenerating {
                     HStack {

@@ -58,6 +58,7 @@ struct ChatView: View {
                         .fontWeight(.medium)
                 }
                 .accessibilityLabel("新建对话")
+                .accessibilityHint("创建新对话")
                 .accessibilityIdentifier("newConversationButton")
             }
         }
@@ -121,6 +122,7 @@ struct ChatView: View {
                                 .foregroundStyle(.secondary)
                         }
                         .accessibilityLabel("会话列表")
+                        .accessibilityHint("打开会话列表")
                         .accessibilityIdentifier("conversationListButton")
                     }
                 }
@@ -133,6 +135,7 @@ struct ChatView: View {
                             .foregroundStyle(.secondary)
                     }
                     .accessibilityLabel("知识库")
+                    .accessibilityHint("打开知识库管理")
                     .accessibilityIdentifier("knowledgeBaseToolbarButton")
                     Button { showSettings = true } label: {
                         Image(systemName: "gearshape")
@@ -140,6 +143,7 @@ struct ChatView: View {
                             .foregroundStyle(.secondary)
                     }
                     .accessibilityLabel("设置")
+                    .accessibilityHint("打开设置")
                     .accessibilityIdentifier("settingsButton")
                 }
             }

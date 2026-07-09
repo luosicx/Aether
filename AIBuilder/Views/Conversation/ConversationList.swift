@@ -71,6 +71,9 @@ struct ConversationList: View {
                                     .textInputAutocapitalization(.never)
                                     #endif
                                     .autocorrectionDisabled()
+                                    .accessibilityLabel("搜索会话")
+                                    .accessibilityHint("输入关键词过滤会话标题")
+                                    .accessibilityIdentifier("conversationSearchField")
                                 if !searchText.isEmpty {
                                     Button {
                                         searchText = ""
@@ -80,6 +83,8 @@ struct ConversationList: View {
                                     }
                                     .buttonStyle(.plain)
                                     .accessibilityLabel("清除搜索")
+                                    .accessibilityHint("清空搜索关键词")
+                                    .accessibilityIdentifier("clearSearchButton")
                                 }
                             }
                         }
@@ -111,6 +116,9 @@ struct ConversationList: View {
                                 } label: {
                                     Label("重命名", systemImage: "pencil")
                                 }
+                                .accessibilityLabel("重命名")
+                                .accessibilityHint("重命名此会话")
+                                .accessibilityIdentifier("renameContextMenuButton")
                                 // Day 9: 置顶 / 取消置顶（根据当前状态切换文案）
                                 Button {
                                     conversationListVM.togglePin(conversation)
@@ -120,11 +128,17 @@ struct ConversationList: View {
                                         systemImage: conversation.isPinned ? "pin.slash" : "pin"
                                     )
                                 }
+                                .accessibilityLabel(conversation.isPinned ? "取消置顶" : "置顶")
+                                .accessibilityHint(conversation.isPinned ? "取消置顶此会话" : "将此会话置顶")
+                                .accessibilityIdentifier("togglePinContextMenuButton")
                                 Button(role: .destructive) {
                                     conversationListVM.deleteConversation(conversation)
                                 } label: {
                                     Label("删除", systemImage: "trash")
                                 }
+                                .accessibilityLabel("删除")
+                                .accessibilityHint("删除此会话")
+                                .accessibilityIdentifier("deleteContextMenuButton")
                             }
                         }
                         .onDelete { indexSet in
@@ -157,6 +171,9 @@ struct ConversationList: View {
                                     )
                                     .font(.callout)
                                 }
+                                .accessibilityLabel(allFilteredSelected ? "取消全选" : "全选")
+                                .accessibilityHint(allFilteredSelected ? "取消所有选中会话" : "选中所有过滤后的会话")
+                                .accessibilityIdentifier("selectAllConversationsButton")
                                 Spacer()
                                 Button(role: .destructive) {
                                     if !selectedConversations.isEmpty {
@@ -167,6 +184,9 @@ struct ConversationList: View {
                                         .font(.callout.weight(.medium))
                                 }
                                 .disabled(selectedConversations.isEmpty)
+                                .accessibilityLabel("删除选中")
+                                .accessibilityHint(String(format: "删除选中的 %d 个会话", selectedConversations.count))
+                                .accessibilityIdentifier("deleteSelectedConversationsButton")
                             }
                             .padding(.horizontal)
                             .padding(.vertical, 10)
@@ -183,13 +203,16 @@ struct ConversationList: View {
                 ToolbarItem(placement: .topBarLeadingCompat) {
                     if !conversationListVM.conversations.isEmpty {
                         Button {
-                            isEditMode.toggle()
-                            if !isEditMode {
-                                selectedConversations.removeAll()
-                            }
-                        } label: {
-                            Text(isEditMode ? "完成" : "编辑")
+                        isEditMode.toggle()
+                        if !isEditMode {
+                            selectedConversations.removeAll()
                         }
+                    } label: {
+                        Text(isEditMode ? "完成" : "编辑")
+                    }
+                    .accessibilityLabel(isEditMode ? "完成" : "编辑")
+                    .accessibilityHint(isEditMode ? "退出批量编辑模式" : "进入批量编辑模式")
+                    .accessibilityIdentifier("editConversationsButton")
                     }
                 }
                 ToolbarItem(placement: .topBarTrailingCompat) {
@@ -201,6 +224,8 @@ struct ConversationList: View {
                                 .fontWeight(.medium)
                         }
                         .accessibilityLabel("新建对话")
+                        .accessibilityHint("创建新对话")
+                        .accessibilityIdentifier("newConversationButton")
                     }
                 }
             }
