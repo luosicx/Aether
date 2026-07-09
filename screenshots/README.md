@@ -6,14 +6,14 @@
 
 | 文件名 | 平台 | 内容 | 状态 |
 |--------|------|------|------|
-| `ios_chat_main.png` | iOS | 主对话页（流式回复 + Markdown 渲染） | 待补充 |
-| `ios_settings.png` | iOS | 设置页（API Key / 模型选择 / 系统提示词） | 待补充 |
-| `ios_knowledge_base.png` | iOS | 知识库（文档导入 + 分块预览） | 待补充 |
-| `ios_health_insight.png` | iOS | 健康洞察（授权 + 洞察列表） | 待补充 |
-| `ios_ondevice_model.png` | iOS | 端侧推理（模型下载与管理） | 待补充 |
-| `ios_preset_prompts.png` | iOS | 预设提示词（11 个角色选择） | 待补充 |
-| `macos_chat.png` | macOS | 主对话页（NavigationSplitView 双栏） | 待补充 |
-| `macos_settings.png` | macOS | 设置页 | 待补充 |
+| `ios_chat_main.png` | iOS | 主对话页（流式回复 + Markdown 渲染） | 已补充 |
+| `ios_settings.png` | iOS | 设置页（API Key / 模型选择 / 系统提示词） | 已补充 |
+| `ios_knowledge_base.png` | iOS | 知识库（文档导入 + 分块预览） | 已补充 |
+| `ios_health_insight.png` | iOS | 健康洞察（授权 + 洞察列表） | 已补充 |
+| `ios_ondevice_model.png` | iOS | 端侧推理（模型下载与管理） | 已补充 |
+| `ios_preset_prompts.png` | iOS | 预设提示词（11 个角色选择） | 已补充 |
+| `macos_chat.png` | macOS | 主对话页（NavigationSplitView 双栏） | 已补充 |
+| `macos_settings.png` | macOS | 设置页 | 已补充 |
 
 ## 截图方法
 
