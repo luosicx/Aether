@@ -70,7 +70,7 @@ AIBuilder 采用 7 层分层架构，依赖方向自上而下单向流动。下�
 ```mermaid
 flowchart TD
     subgraph Tests["Tests 层"]
-        T1["AIBuilderTests<br/>69 文件 / 249 用例"]
+        T1["AIBuilderTests<br/>69 文件 / 248 用例"]
         T2["AIBuilderUITests<br/>2 文件 / 13 用例"]
     end
 
@@ -137,7 +137,7 @@ flowchart TD
 | Services | 19 个子模块业务实现（Auth / Cache / Connectivity / Crash / Feedback / Health / Intents / LLM / Network / OnDevice / Performance / RAG / RemoteConfig / Routing / Search / Storage / Telemetry / Tools / Voice） | 53 |
 | ViewModels | `@Observable` 状态管理 + 业务编排（含 TTS / BFF / OnDevice / Health 等字段） | 4 |
 | Views | SwiftUI 视图，6 个子模块（Chat / Components / Conversation / OnDevice / RAG / Settings） | 28 |
-| Tests | UT 69 文件（249 用例，允许 skipped）+ UIT 2 文件（13 用例） | 71 |
+| Tests | UT 69 文件（248 用例，0 skipped）+ UIT 2 文件（13 用例，0 skipped） | 71 |
 
 ---
 
@@ -1064,6 +1064,12 @@ stateDiagram-v2
 - **MarkdownText parseBlocks 缓存**：用 NSCache（countLimit=200）缓存 parseBlocks 结果，解决语音朗读时反复重渲染卡顿。
 - **VoiceService 兜底**：加 `@MainActor` 隔离、`didCancel` 兜底清理（解决按钮卡死）、voice nil 降级（不崩）、移除 `spokenText` 死状态。
 - **影响范围**：`Views/Settings/SettingsView.swift` + `Views/Chat/MessageBubble.swift` + `Views/Chat/MarkdownText.swift` + `Services/Voice/VoiceService.swift`
+
+### 5.7 国际化与无障碍
+
+- **String Catalog 统一源语言**：`Localizable.xcstrings` 以 `zh-Hans` 为源语言，`zh-Hant` / `en` 完整翻译，共 385 keys；SwiftUI 字面量自动提取，动态文本使用 `NSLocalizedString`。
+- **accessibility 工程化**：13+ 视图补充 `accessibilityLabel` / `accessibilityHint` / `accessibilityIdentifier`，关键交互控件全部可访问，同时为 UITest 提供稳定定位符。
+- **截图资产规范化**：`screenshots/` 目录按 iOS / macOS 分类，8 张核心页面截图用于 README 与 App Store 元数据。
 
 ---
 
