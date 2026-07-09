@@ -51,8 +51,8 @@ final class AIBuilderUITests: XCTestCase {
         let app = makeApp()
         app.launch()
 
-        XCTAssertTrue(app.staticTexts["AI Builder"].waitForExistence(timeout: 10),
-                      "emptyState 应显示「AI Builder」标题")
+        XCTAssertTrue(app.staticTexts["灵枢"].waitForExistence(timeout: 10),
+                      "emptyState 应显示「灵枢」标题")
         XCTAssertTrue(inputField(in: app).exists, "应显示输入框 placeholder「输入消息…」")
 
         let sendButton = app.buttons["发送"]
@@ -202,8 +202,8 @@ final class AIBuilderUITests: XCTestCase {
         // Day 13: RAG tap 后 Form 可能自动滚动导致 Tools Toggle 位置漂移，
         // 先滚动 Form 让 Tools Toggle 完全可见，再读取 frame 后用 coordinate.tap() 命中把手
         let toolsToggle = app.switches["启用工具调用"]
-        XCTAssertTrue(toolsToggle.waitForExistence(timeout: 3), "应存在工具调用开关")
         scrollToElement(toolsToggle, in: app)
+        XCTAssertTrue(toolsToggle.waitForExistence(timeout: 5), "应存在工具调用开关")
         Thread.sleep(forTimeInterval: 0.5)
         let toolsBefore = toolsToggle.value as? String
         var toolsAfter = toolsBefore
