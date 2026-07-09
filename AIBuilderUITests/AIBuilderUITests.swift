@@ -83,7 +83,7 @@ final class AIBuilderUITests: XCTestCase {
         app.launch()
 
         app.buttons["会话列表"].tap()
-        app.buttons["新建对话"].tap()
+        app.buttons["新建对话"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["新对话"].waitForExistence(timeout: 3),
                       "创建后应出现「新对话」行")
     }
@@ -395,7 +395,7 @@ final class AIBuilderUITests: XCTestCase {
         app.launch()
 
         app.buttons["会话列表"].tap()
-        app.buttons["新建对话"].tap()
+        app.buttons["新建对话"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["新对话"].waitForExistence(timeout: 3))
 
         let row = app.cells.firstMatch
@@ -422,7 +422,7 @@ final class AIBuilderUITests: XCTestCase {
         app.launch()
 
         app.buttons["会话列表"].tap()
-        app.buttons["新建对话"].tap()
+        app.buttons["新建对话"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["新对话"].waitForExistence(timeout: 3))
 
         // 搜索匹配关键词
