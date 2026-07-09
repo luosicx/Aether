@@ -13,19 +13,25 @@ struct ChatView: View {
     @State private var showSettings = false
     @State private var showDocumentPicker = false
     @State private var showKnowledgeBase = false
+    // 统一 Toast：操作成功/复制/撤销反馈
+    @State private var showToast = false
+    @State private var toastMessage = ""
 
     var body: some View {
-        if horizontalSizeClass == .regular {
-            // Day 19: iPad regular——侧栏会话列表 + 主区对话
-            NavigationSplitView {
-                conversationSidebar
-            } detail: {
+        Group {
+            if horizontalSizeClass == .regular {
+                // Day 19: iPad regular——侧栏会话列表 + 主区对话
+                NavigationSplitView {
+                    conversationSidebar
+                } detail: {
+                    chatDetail
+                }
+            } else {
+                // compact——保持现有 NavigationStack 单列布局
                 chatDetail
             }
-        } else {
-            // compact——保持现有 NavigationStack 单列布局
-            chatDetail
         }
+        .toast(isPresented: $showToast, message: toastMessage)
     }
 
     /// Day 19: iPad 侧栏会话列表（regular 时内联展示，替代 sheet）
