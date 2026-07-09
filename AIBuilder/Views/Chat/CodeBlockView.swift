@@ -1,15 +1,28 @@
 import SwiftUI
 
-/// 代码块视图：深色背景 / 语法高亮 / 等宽字体 / 圆角 / 横向滚动
+/// 代码块视图：深浅色双主题 / 语法高亮 / 等宽字体 / 圆角 / 横向滚动
 struct CodeBlockView: View {
     let code: String
     let language: String?
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    /// 当前主题（跟随系统深浅色）
+    private var theme: SyntaxTheme {
+        colorScheme == .dark ? .dark : .light
+    }
+
+    /// 代码块背景（跟随系统深浅色）
+    private var background: Color {
+        colorScheme == .dark ? Color.codeBackgroundDark : Color.codeBackgroundLight
+    }
 
     /// 语法高亮后的属性字符串
     private var highlightedText: AttributedString {
         CodeSyntaxHighlighter.highlight(
             code.trimmingCharacters(in: .whitespacesAndNewlines),
-            language: language
+            language: language,
+            theme: theme
         )
     }
 
@@ -25,7 +38,7 @@ struct CodeBlockView: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(Color(red: 0.16, green: 0.17, blue: 0.19))
+                .background(background)
             }
             // 代码内容
             ScrollView(.horizontal, showsIndicators: false) {
