@@ -90,8 +90,14 @@ class MyService {
 
 - 单元测试（UT）放 `AIBuilderTests/`，命名 `<ClassName>Tests.swift`
 - UI 测试（UIT）放 `AIBuilderUITests/`，避免依赖真实网络（用 `UITEST_DISABLE_NETWORK` 启动参数桩回复）
-- 测试用例数：UT 249 / UIT 13（每新增功能需补对应测试）
-- skip 场景用 `XCTSkip` / `XCTSkipUnless` 兜底
+- 测试用例数：UT 248 / UIT 13（每新增功能需补对应测试）
+- 当前目标：0 skip；若必须跳过，需写明原因并在 Issue 跟踪
+
+### 2.6 国际化规范
+
+- 用户可见文本必须进入 `AIBuilder/Resources/Localizable.xcstrings`。
+- SwiftUI 控件直接传字符串字面量即可自动提取；动态拼接文本使用 `String(format: NSLocalizedString(...), ...)`。
+- 新增字符串后运行 `python3 scripts/extract_strings.py` 检查遗漏，并补充 `en` / `zh-Hant` 翻译。
 
 ## 3. 提交规范
 
@@ -178,7 +184,7 @@ Closes #123
   - **Why**：变更动机（解决什么问题 / 满足什么需求）
   - **How to test**：测试步骤
   - **Checklist**：
-    - [ ] 已通过本地 UT (249 用例)
+    - [ ] 已通过本地 UT (248 用例)
     - [ ] 已通过本地 UIT (13 用例)
     - [ ] 已更新相关文档（如有用户可见变更）
     - [ ] 已补充测试用例（如有新功能）
