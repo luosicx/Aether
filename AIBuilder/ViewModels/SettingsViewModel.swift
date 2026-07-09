@@ -42,7 +42,7 @@ final class SettingsViewModel {
     @ObservationIgnored private var isLoadingFromRemote = false
 
     /// 默认人设（新建对话时使用，不与具体会话绑定）
-    static let defaultSystemPrompt = "你是一个有帮助的AI助手。"
+    nonisolated static let defaultSystemPrompt = "你是一个有帮助的AI助手。"
 
     /// 可选模型列表 ["deepseek-chat", "deepseek-reasoner"]
     let availableModels = ["deepseek-chat", "deepseek-reasoner"]

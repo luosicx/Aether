@@ -108,7 +108,7 @@ final class LocationTool: ToolProtocol {
 /// CLLocationManager 的 async 封装。通过 CheckedContinuation 把基于 delegate 的定位
 /// 转为 async 调用，并附带 10 秒超时。所有对 continuation 与 manager 的访问均在主线程进行，
 /// 与 CLLocationManagerDelegate 回调线程一致，避免数据竞争。
-private final class LocationFetcher: NSObject, CLLocationManagerDelegate {
+private final class LocationFetcher: NSObject, CLLocationManagerDelegate, @unchecked Sendable {
     private let manager = CLLocationManager()
     private var continuation: CheckedContinuation<CLLocation, Error>?
 

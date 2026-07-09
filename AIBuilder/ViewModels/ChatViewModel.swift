@@ -4,6 +4,11 @@ import SwiftData
 import ActivityKit
 #endif
 
+/// 非隔离的通知观察者持有者，用于在 deinit 中安全移除观察者。
+private final class ErrorObserver: @unchecked Sendable {
+    var token: NSObjectProtocol?
+}
+
 /// 核心 ViewModel，管理聊天消息、流式输出、工具调用、RAG 检索、语音输入输出、灵动岛 Live Activity。
 /// 使用 @Observable + @MainActor 隔离。
 @Observable
@@ -97,8 +102,8 @@ final class ChatViewModel {
     private let maxReActLoops = 5
     /// Day 8: 单工具执行超时（秒）。超时不中断 ReAct 循环，标记失败后继续下一轮。
     private let toolTimeout: TimeInterval = 15
-    /// Day 10: 用 nonisolated(unsafe) 让 deinit 能访问
-    nonisolated(unsafe) private var errorObserver: NSObjectProtocol?
+    /// Day 10: 通知中心观察者，deinit 中移除
+    nonisolated private let errorObserver = ErrorObserver()
     /// 补充 D：灵动岛 Live Activity 引用
     #if os(iOS)
     private var liveActivity: Activity<TimerActivityAttributes>?
@@ -133,7 +138,7 @@ final class ChatViewModel {
         self.client = client ?? DeepSeekClient()
         self.cache = cache ?? SemanticCache()
         self.injectedClientUsed = client != nil   // Day 13: 标记是否注入
-        errorObserver = NotificationCenter.default.addObserver(
+        errorObserver.token = NotificationCenter.default.addObserver(
             forName: .llmErrorOccurred,
             object: nil,
             queue: OperationQueue()  // 改为后台 OperationQueue，避免主线程同步回调
@@ -185,7 +190,7 @@ final class ChatViewModel {
     deinit {
         // Day 10: 释放 errorObserver，避免泄漏
         // streamingTask 通过 .cancel() 在 switchTo / 新消息发送时已处理
-        if let observer = errorObserver {
+        if let observer = errorObserver.token {
             NotificationCenter.default.removeObserver(observer)
         }
     }

@@ -1,11 +1,11 @@
 import Foundation
 import Speech
-import AVFoundation
+@preconcurrency import AVFoundation
 
 /// 语音服务，封装 SFSpeechRecognizer 语音识别和 AVSpeechSynthesizer 语音合成。@Observable 支持 UI 绑定。
 @MainActor
 @Observable
-final class VoiceService: NSObject, AVSpeechSynthesizerDelegate {
+final class VoiceService: NSObject {
     /// 是否正在录音
     var isRecording = false
     /// 当前识别结果文本（实时更新）
@@ -212,8 +212,12 @@ final class VoiceService: NSObject, AVSpeechSynthesizerDelegate {
         #endif
     }
 
-    // MARK: - AVSpeechSynthesizerDelegate
+}
 
+// MARK: - AVSpeechSynthesizerDelegate
+
+@MainActor
+extension VoiceService: @preconcurrency AVSpeechSynthesizerDelegate {
     /// 自然结束才触发 onSpeakFinished。试听结束不触发回调。
     func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
         Task { @MainActor [weak self] in
