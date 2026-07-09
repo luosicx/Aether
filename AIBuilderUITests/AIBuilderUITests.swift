@@ -205,8 +205,12 @@ final class AIBuilderUITests: XCTestCase {
         // Day 18: Form 滚动后 coordinate.tap() 偶发落空（坐标偏移），失败时重试确保开关翻转
         var toolsAfter = toolsBefore
         var tapAttempts = 0
-        while toolsAfter == toolsBefore && tapAttempts < 3 {
-            toolsToggle.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        while toolsAfter == toolsBefore && tapAttempts < 5 {
+            if tapAttempts == 0 {
+                toolsToggle.tap()
+            } else {
+                toolsToggle.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+            }
             Thread.sleep(forTimeInterval: 0.5)
             toolsAfter = toolsToggle.value as? String
             tapAttempts += 1
