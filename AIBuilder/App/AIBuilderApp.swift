@@ -277,7 +277,7 @@ extension Notification.Name {
 
 /// 根视图：在 ChatView 之上叠加品牌 Splash，开屏展示后淡出。
 struct RootView: View {
-    @State private var showSplash = true
+    @State private var showSplash = !ProcessInfo.processInfo.arguments.contains("UITEST_DISABLE_SPLASH")
 
     var body: some View {
         ChatView()

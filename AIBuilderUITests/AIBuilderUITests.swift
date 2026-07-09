@@ -11,7 +11,7 @@ final class AIBuilderUITests: XCTestCase {
     /// UITEST_RESET_DATA 触发 App 启动时清空 SwiftData 所有数据，保证每个测试从干净状态开始
     private func makeApp() -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments += ["UITEST_DISABLE_NETWORK", "UITEST_RESET_DATA"]
+        app.launchArguments += ["UITEST_DISABLE_NETWORK", "UITEST_RESET_DATA", "UITEST_DISABLE_SPLASH"]
         return app
     }
 
@@ -339,7 +339,7 @@ final class AIBuilderUITests: XCTestCase {
         // terminate + launch 模拟重进 App，验证 SwiftData 持久化
         // 复用同一 app 实例并覆盖 launchArguments：去掉 UITEST_RESET_DATA，避免清空刚保存的偏好
         app.terminate()
-        app.launchArguments = ["UITEST_DISABLE_NETWORK"]
+        app.launchArguments = ["UITEST_DISABLE_NETWORK", "UITEST_DISABLE_SPLASH"]
         app.launch()
         // 等待 SwiftData 初始化与偏好加载完成，避免 onAppear 时机竞争
         Thread.sleep(forTimeInterval: 1.5)
@@ -460,7 +460,7 @@ final class AIBuilderUITests: XCTestCase {
         // 使用 UITEST_FORCE_LLM_ERROR 启动参数：processMessage 直接注入错误，
         // 保证 ErrorBanner 确定出现（避免依赖真实网络/Keychain 时序）
         let app = XCUIApplication()
-        app.launchArguments += ["UITEST_RESET_DATA", "UITEST_FORCE_LLM_ERROR"]
+        app.launchArguments += ["UITEST_RESET_DATA", "UITEST_FORCE_LLM_ERROR", "UITEST_DISABLE_SPLASH"]
         app.launch()
 
         // 直接发消息触发错误条
