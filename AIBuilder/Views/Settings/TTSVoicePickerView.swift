@@ -64,11 +64,11 @@ struct TTSVoicePickerView: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(name)
-                        .font(.body)
+                        .font(.bodyAI)
                     qualityTag(quality)
                     if !isDownloaded && !identifier.isEmpty {
                         Text("需下载")
-                            .font(.caption2)
+                            .font(.captionAI)
                             .foregroundStyle(.orange)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
@@ -77,7 +77,7 @@ struct TTSVoicePickerView: View {
                     }
                 }
                 Text(languageDisplay(language))
-                    .font(.caption)
+                    .font(.captionAI)
                     .foregroundStyle(.secondary)
             }
             Spacer()
@@ -105,7 +105,7 @@ struct TTSVoicePickerView: View {
     private func qualityTag(_ quality: TTSVoice.Quality) -> some View {
         let (text, color) = qualityStyling(quality)
         Text(text)
-            .font(.caption2)
+            .font(.captionAI)
             .foregroundStyle(color)
             .padding(.horizontal, 6)
             .padding(.vertical, 2)

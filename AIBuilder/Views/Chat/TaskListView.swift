@@ -14,9 +14,9 @@ struct TaskListView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             ForEach(items) { item in
-                HStack(alignment: .top, spacing: 8) {
+                HStack(alignment: .top, spacing: Spacing.md) {
                     Image(systemName: item.isCompleted ? "checkmark.circle.fill" : "circle")
-                        .font(.body)
+                        .font(.bodyAI)
                         .foregroundColor(item.isCompleted ? .accentColor : .secondary)
                         .accessibilityHidden(true)
 
@@ -25,11 +25,11 @@ struct TaskListView: View {
                         options: AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnly)
                     ) {
                         Text(attributed)
-                            .font(.body)
+                            .font(.bodyAI)
                             .strikethrough(item.isCompleted, color: .secondary)
                     } else {
                         Text(item.text)
-                            .font(.body)
+                            .font(.bodyAI)
                             .strikethrough(item.isCompleted, color: .secondary)
                     }
                 }

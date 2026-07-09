@@ -21,7 +21,7 @@ struct ErrorBanner: View {
             }
             .accessibilityLabel("关闭")
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, Spacing.lg)
         .padding(.vertical, 12)
         .background(.regularMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 12))

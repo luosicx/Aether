@@ -5,7 +5,7 @@ import SwiftUI
 struct StreamingBubbleView: View {
     let text: String
 
-    private var bubbleBackground: Color { Color(.systemGray5) }
+    private var bubbleBackground: Color { Color.backgroundSecondary }
     private var bubbleShape: some Shape {
         #if os(iOS)
         return RoundedCornerShape(radius: 16, corners: [.topLeft, .topRight, .bottomRight])
@@ -18,16 +18,16 @@ struct StreamingBubbleView: View {
 
     var body: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: Spacing.sm) {
                 HStack(spacing: 0) {
                     Text(text)
                     Text("▍")
                         .foregroundStyle(.tertiary)
                         .modifier(BlinkingCursor())
                 }
-                .font(.body)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
+                .font(.bodyAI)
+                .padding(.horizontal, Spacing.lg)
+                .padding(.vertical, Spacing.md)
                 .background(bubbleBackground)
                 .clipShape(bubbleShape)
             }
@@ -102,13 +102,13 @@ struct MessageListView: View {
                             .id("streaming")
                     }
                     if !viewModel.currentCitations.isEmpty {
-                        VStack(spacing: 8) {
+                        VStack(spacing: Spacing.md) {
                             HStack(spacing: 6) {
                                 Image(systemName: "text.quote")
-                                    .font(.caption2)
+                                    .font(.captionAI)
                                     .foregroundStyle(.tertiary)
                                 Text("引用来源")
-                                    .font(.caption.weight(.medium))
+                                    .font(.toolLabel)
                                     .foregroundStyle(.tertiary)
                                 Spacer()
                             }
@@ -123,10 +123,10 @@ struct MessageListView: View {
                     if !viewModel.currentToolSteps.isEmpty {
                         HStack(spacing: 6) {
                             Image(systemName: "wrench.and.screwdriver")
-                                .font(.caption2)
+                                .font(.captionAI)
                                 .foregroundStyle(.tertiary)
                             Text("工具调用流程")
-                                .font(.caption.weight(.medium))
+                                .font(.toolLabel)
                                 .foregroundStyle(.tertiary)
                             Spacer()
                         }
@@ -179,7 +179,7 @@ struct MessageListView: View {
                         .font(.callout.weight(.medium))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
+                        .padding(.vertical, Spacing.md)
                         .background(Color.black.opacity(0.75))
                         .clipShape(Capsule())
                         .padding(.bottom, 8)
@@ -208,12 +208,12 @@ struct MessageListView: View {
                     .foregroundStyle(Color.accentColor.opacity(0.8))
             }
 
-            VStack(spacing: 8) {
+            VStack(spacing: Spacing.md) {
                 Text("AI Builder")
                     .font(.system(.largeTitle, design: .rounded).weight(.bold))
                     .foregroundStyle(.primary)
                 Text("你的智能助手")
-                    .font(.body)
+                    .font(.bodyAI)
                     .foregroundStyle(.secondary)
             }
 
@@ -221,7 +221,7 @@ struct MessageListView: View {
                 .font(.callout)
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, 32)
+                .padding(.horizontal, Spacing.xxxl)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.top, 40)

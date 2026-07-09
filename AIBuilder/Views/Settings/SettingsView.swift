@@ -261,7 +261,7 @@ struct SettingsView: View {
             Text("语言")
         } footer: {
             Text("切换语言后需重启 App 生效。选择「跟随系统」将使用设备系统语言。")
-                .font(.caption2)
+                .font(.captionAI)
         }
     }
 
@@ -284,7 +284,7 @@ struct SettingsView: View {
             Text("供应商")
         } footer: {
             Text("选择 LLM 供应商。不同供应商的 API Key 独立存储。")
-                .font(.caption2)
+                .font(.captionAI)
         }
     }
 
@@ -302,7 +302,7 @@ struct SettingsView: View {
             Text("自动降级")
         } footer: {
             Text("主供应商失败时自动切换到备用供应商重试一次。")
-                .font(.caption2)
+                .font(.captionAI)
         }
     }
 
@@ -354,7 +354,7 @@ struct SettingsView: View {
             Text("BFF 代理")
         } footer: {
             Text("启用后 API Key 由服务端保护，设备只持有 BFF Token。")
-                .font(.caption2)
+                .font(.captionAI)
         }
     }
 
@@ -395,7 +395,7 @@ struct SettingsView: View {
             Text("端侧推理")
         } footer: {
             Text("端侧推理在断网时自动启用，模型文件约 700MB。")
-                .font(.caption2)
+                .font(.captionAI)
         }
     }
 
@@ -414,7 +414,7 @@ struct SettingsView: View {
                     Spacer()
                     Text(healthAuthorizationStatus)
                         .foregroundStyle(healthAuthorizationStatus == "已授权" ? .green : .secondary)
-                        .font(.caption)
+                        .font(.captionAI)
                 }
             }
             .accessibilityLabel("健康管理")
@@ -430,7 +430,7 @@ struct SettingsView: View {
             Text("健康")
         } footer: {
             Text("接入 HealthKit 后 AI 可基于健康数据给出针对性建议。")
-                .font(.caption2)
+                .font(.captionAI)
         }
     }
     #endif
@@ -449,7 +449,7 @@ struct SettingsView: View {
                     Spacer()
                     Text(currentVoiceDisplayName)
                         .foregroundStyle(.secondary)
-                        .font(.caption)
+                        .font(.captionAI)
                 }
             }
             .accessibilityLabel("音色")
@@ -511,7 +511,7 @@ struct SettingsView: View {
             Text("语音朗读")
         } footer: {
             Text("选择朗读音色、语速、音调与音量。增强/优质音色首次使用时系统会自动下载。")
-                .font(.caption2)
+                .font(.captionAI)
         }
     }
 
@@ -574,7 +574,7 @@ struct SettingsView: View {
             Text("API 配置")
         } footer: {
             Text("API Key 存储在系统 Keychain,不会离开本设备。")
-                .font(.caption2)
+                .font(.captionAI)
         }
     }
 
@@ -596,7 +596,7 @@ struct SettingsView: View {
             Text("模型")
         } footer: {
             Text("选「自动」时由智能路由根据消息特征决定；选具体模型时禁用智能路由。")
-                .font(.caption2)
+                .font(.captionAI)
         }
     }
 
@@ -617,7 +617,7 @@ struct SettingsView: View {
             Text("功能开关")
         } footer: {
             Text("RAG 启用后会在发送消息前检索本地知识库；工具调用启用后会进入 ReAct 循环。")
-                .font(.caption2)
+                .font(.captionAI)
         }
     }
 
@@ -650,7 +650,7 @@ struct SettingsView: View {
             Text("系统提示词")
         } footer: {
             Text("当前会话生效。新建对话沿用此值。")
-                .font(.caption2)
+                .font(.captionAI)
         }
     }
 
@@ -717,7 +717,7 @@ struct SettingsView: View {
             Text("用户偏好")
         } footer: {
             Text("这些偏好会被注入到系统提示词，影响 AI 回复风格与工具选择。")
-                .font(.caption2)
+                .font(.captionAI)
         }
     }
 
@@ -737,7 +737,7 @@ struct SettingsView: View {
             Text("调试面板")
         } footer: {
             Text("展示最近一次发送的 prompt、API 响应、embedding 维度与工具调用。")
-                .font(.caption2)
+                .font(.captionAI)
         }
     }
 
@@ -797,7 +797,7 @@ struct SettingsView: View {
             Text("关于")
         } footer: {
             Text("AI Builder 致力于保护您的隐私")
-                .font(.caption2)
+                .font(.captionAI)
         }
     }
 
@@ -1039,12 +1039,12 @@ struct DebugPanelView: View {
                         ForEach(calls) { call in
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(call.toolName)
-                                    .font(.headline)
+                                    .font(.headlineAI)
                                 Text(String(format: NSLocalizedString("参数：%@", comment: ""), call.arguments))
-                                    .font(.caption)
+                                    .font(.captionAI)
                                     .foregroundStyle(.secondary)
                                 Text(String(format: NSLocalizedString("返回：%@", comment: ""), call.result))
-                                    .font(.caption)
+                                    .font(.captionAI)
                                     .foregroundStyle(.secondary)
                             }
                         }

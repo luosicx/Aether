@@ -15,7 +15,7 @@ struct MarkdownTableView: View {
                             .frame(minWidth: 80)
                     }
                 }
-                .background(Color(.systemGray5))
+                .background(Color.backgroundSecondary)
 
                 // 数据行
                 ForEach(Array(table.rows.enumerated()), id: \.offset) { rowIndex, row in
@@ -26,13 +26,13 @@ struct MarkdownTableView: View {
                                 .frame(minWidth: 80)
                         }
                     }
-                    .background(rowIndex % 2 == 0 ? Color.clear : Color(.systemGray6).opacity(0.5))
+                    .background(rowIndex % 2 == 0 ? Color.clear : Color.backgroundTertiary.opacity(0.5))
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color(.separator).opacity(0.3), lineWidth: 0.5)
+                    .stroke(Color.separator, lineWidth: 0.5)
             )
         }
         .accessibilityElement(children: .contain)
@@ -55,13 +55,13 @@ struct MarkdownTableView: View {
             options: AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnly)
         ) {
             Text(attributed)
-                .font(isHeader ? .caption.weight(.semibold) : .caption)
+                .font(isHeader ? .caption.weight(.semibold) : .captionAI)
                 .frame(maxWidth: .infinity, alignment: frameAlignment)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)
         } else {
             Text(text)
-                .font(isHeader ? .caption.weight(.semibold) : .caption)
+                .font(isHeader ? .caption.weight(.semibold) : .captionAI)
                 .frame(maxWidth: .infinity, alignment: frameAlignment)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 8)

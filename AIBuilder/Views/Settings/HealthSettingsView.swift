@@ -62,7 +62,7 @@ struct HealthSettingsView: View {
                 Text("健康上下文")
             } footer: {
                 Text("开启后发送消息时会注入最近 24 小时的睡眠/心率/步数数据，AI 将给出针对性建议。")
-                    .font(.caption2)
+                    .font(.captionAI)
             }
 
             // MARK: - 洞察
@@ -85,26 +85,26 @@ struct HealthSettingsView: View {
 
                 if let msg = generateMessage {
                     Text(msg)
-                        .font(.caption)
+                        .font(.captionAI)
                         .foregroundStyle(msg.contains("失败") ? .red : .green)
                 }
 
                 ForEach(insights) { insight in
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: Spacing.sm) {
                         HStack {
                             Text(insight.insightType)
-                                .font(.caption)
+                                .font(.captionAI)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
                                 .background(Color.blue.opacity(0.15))
                                 .cornerRadius(4)
                             Spacer()
                             Text(insight.timestamp.formatted(.dateTime.month().day().hour().minute()))
-                                .font(.caption2)
+                                .font(.captionAI)
                                 .foregroundStyle(.secondary)
                         }
                         Text(insight.content)
-                            .font(.caption)
+                            .font(.captionAI)
                             .lineLimit(5)
                     }
                 }
@@ -112,7 +112,7 @@ struct HealthSettingsView: View {
                 Text("洞察")
             } footer: {
                 Text("每天 09:00 自动生成一次，也可手动触发。")
-                    .font(.caption2)
+                    .font(.captionAI)
             }
         }
         .navigationTitle("健康管理")

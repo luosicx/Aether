@@ -76,7 +76,7 @@ struct ChatView: View {
             VStack(spacing: 0) {
                 MessageListView(viewModel: viewModel, conversation: currentConversation)
                 Rectangle()
-                    .fill(Color(.separator).opacity(0.3))
+                    .fill(Color.separator)
                     .frame(height: 0.5)
                 ChatInputBar(
                     inputText: $viewModel.inputText,
@@ -124,7 +124,7 @@ struct ChatView: View {
                     if horizontalSizeClass != .regular {
                         Button { showConversationList = true } label: {
                             Image(systemName: "list.bullet")
-                                .font(.title2)
+                                .font(.titleAI)
                                 .foregroundStyle(.secondary)
                         }
                         .accessibilityLabel("会话列表")
@@ -137,7 +137,7 @@ struct ChatView: View {
                         showKnowledgeBase = true
                     } label: {
                         Image(systemName: "folder.badge.plus")
-                            .font(.title2)
+                            .font(.titleAI)
                             .foregroundStyle(.secondary)
                     }
                     .accessibilityLabel("知识库")
@@ -145,7 +145,7 @@ struct ChatView: View {
                     .accessibilityIdentifier("knowledgeBaseToolbarButton")
                     Button { showSettings = true } label: {
                         Image(systemName: "gearshape")
-                            .font(.title2)
+                            .font(.titleAI)
                             .foregroundStyle(.secondary)
                     }
                     .accessibilityLabel("设置")

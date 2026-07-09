@@ -84,17 +84,17 @@ struct OnDeviceModelView: View {
                     .accessibilityIdentifier("downloadModelButton")
                     if isModelDownloaded {
                         Text("模型已就绪，约 700MB")
-                            .font(.caption)
+                            .font(.captionAI)
                             .foregroundStyle(.secondary)
                     } else {
                         Text("模型文件约 700MB，建议在 Wi-Fi 下下载")
-                            .font(.caption)
+                            .font(.captionAI)
                             .foregroundStyle(.secondary)
                     }
                 }
                 if let msg = errorMessage {
                     Text(msg)
-                        .font(.caption)
+                        .font(.captionAI)
                         .foregroundStyle(.red)
                 }
             }

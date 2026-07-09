@@ -46,7 +46,7 @@ struct ChatInputBar: View {
                 .lineLimit(1...5)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .background(Color(.systemGray6))
+                .background(Color.backgroundTertiary)
                 .clipShape(RoundedRectangle(cornerRadius: 20))
                 .focused($isFocused)
                 .accessibilityLabel("消息输入框")
@@ -91,7 +91,7 @@ struct ChatInputBar: View {
         .background(.bar)
         .overlay(alignment: .top) {
             Rectangle()
-                .fill(Color(.separator).opacity(0.3))
+                .fill(Color.separator)
                 .frame(height: 0.5)
         }
     }
