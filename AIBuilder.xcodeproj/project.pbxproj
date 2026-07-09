@@ -542,14 +542,6 @@
 			path = Routing;
 			sourceTree = "<group>";
 		};
-		18CF40A8AF00D9821BB405CB /* AIBuilderTests */ = {
-			isa = PBXGroup;
-			children = (
-				770A9665430D71E21A9B1CF8 /* EmptyStateViewTests.swift */,
-			);
-			name = AIBuilderTests;
-			sourceTree = "<group>";
-		};
 		1FA22211D782A4FDEB47DC29 /* iOS */ = {
 			isa = PBXGroup;
 			children = (
@@ -643,7 +635,6 @@
 				BACA63852F4908DC131BD174 /* Resources */,
 				6A05E4495E06A02A87FCB5D4 /* AppIntents */,
 				2EF0A2A8EA5E374B21213D35 /* DesignSystem */,
-				18CF40A8AF00D9821BB405CB /* AIBuilderTests */,
 			);
 			name = AIBuilder;
 			path = AIBuilder;
@@ -914,6 +905,7 @@
 				C784EE41624B5D30751AE3C1 /* ShortcutsToolTests.swift */,
 				4F39630C03DDA73E1AEA3EF8 /* PresetPromptsTests.swift */,
 				ABBA08145D383109918F8AF7 /* DesignTokensTests.swift */,
+				770A9665430D71E21A9B1CF8 /* EmptyStateViewTests.swift */,
 			);
 			name = AIBuilderTests;
 			path = AIBuilderTests;
