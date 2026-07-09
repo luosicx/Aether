@@ -35,8 +35,7 @@ struct CodeBlockView: View {
                     .padding(12)
             }
         }
-        .background(Color(red: 0.12, green: 0.13, blue: 0.15))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .cardStyle(background: Color.backgroundTertiary, cornerRadius: CornerRadius.medium, padding: Spacing.md)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(Text(language.map { String(format: NSLocalizedString("%@ 代码块", comment: ""), $0.capitalized) } ?? NSLocalizedString("代码块", comment: "")))
         .accessibilityValue(code)

@@ -104,13 +104,7 @@ struct StepCardView: View {
                 }
             }
         }
-        .padding(12)
-        .background(.ultraThinMaterial)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(step.status == .failed ? Color.red.opacity(0.4) : Color(.separator).opacity(0.3), lineWidth: 0.5)
-        )
+        .cardStyle(background: step.status == .failed ? Color.red.opacity(0.1) : .backgroundSecondary)
         // Day 19: 无障碍——标注工具步骤名称与状态，提示可查看详情
         .accessibilityElement(children: .contain)
         .accessibilityLabel(Text(String(format: NSLocalizedString("工具步骤：%@", comment: ""), step.toolName)))

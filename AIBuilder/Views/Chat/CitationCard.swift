@@ -29,14 +29,7 @@ struct CitationCard: View {
                 .foregroundStyle(.primary)
                 .lineLimit(3)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(Color(.systemGray5))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(Color(.separator).opacity(0.3), lineWidth: 0.5)
-        )
+        .cardStyle()
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(Text(String(format: NSLocalizedString("引用 %d，来源 %@", comment: ""), index + 1, citation.source)))
