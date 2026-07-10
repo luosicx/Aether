@@ -33,12 +33,16 @@ jobs:
                       print(d['udid'])
                       sys.exit(0)
           ")
-          SIM_DOMAIN="$HOME/Library/Developer/CoreSimulator/Devices/$UDID/data/Library/Preferences/.GlobalPreferences"
-          defaults delete "$SIM_DOMAIN" AppleLanguages 2>/dev/null || true
-          defaults write "$SIM_DOMAIN" AppleLanguages -array "zh-Hans"
-          defaults delete "$SIM_DOMAIN" AppleLocale 2>/dev/null || true
-          defaults write "$SIM_DOMAIN" AppleLocale -string "zh_Hans_CN"
+          PREFS="$HOME/Library/Developer/CoreSimulator/Devices/$UDID/data/Library/Preferences/.GlobalPreferences.plist"
+          /usr/libexec/PlistBuddy -c "Delete :AppleLanguages" "$PREFS" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :AppleLanguages array" "$PREFS"
+          /usr/libexec/PlistBuddy -c "Add :AppleLanguages:0 string zh-Hans" "$PREFS"
+          /usr/libexec/PlistBuddy -c "Delete :AppleLocale" "$PREFS" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :AppleLocale string zh_Hans_CN" "$PREFS"
           echo "Simulator language set to zh-Hans (UDID: $UDID)"
+          # Verify
+          /usr/libexec/PlistBuddy -c "Print :AppleLanguages" "$PREFS"
+          /usr/libexec/PlistBuddy -c "Print :AppleLocale" "$PREFS"
 
       - name: Build
         run: |
