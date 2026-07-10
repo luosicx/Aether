@@ -23,7 +23,7 @@ jobs:
           xcodebuild build \
             -project Aether.xcodeproj \
             -scheme Aether \
-            -destination 'platform=iOS Simulator,name=iPhone 17' \
+            -destination 'platform=iOS Simulator,name=iPhone 17,arch=arm64' \
             -configuration Debug \
             CODE_SIGNING_ALLOWED=NO
 
@@ -32,13 +32,12 @@ jobs:
           xcodebuild test \
             -project Aether.xcodeproj \
             -scheme Aether \
-            -destination 'platform=iOS Simulator,name=iPhone 17' \
+            -destination 'platform=iOS Simulator,name=iPhone 17,arch=arm64' \
             -configuration Debug \
             -skip-testing:AetherUITests \
             -test-timeouts-enabled YES \
-            -default-test-execution-time-allowance 600 \
-            -parallel-testing-enabled YES \
-            -parallel-testing-worker-count 4 \
+            -default-test-execution-time-allowance 120 \
+            -parallel-testing-enabled NO \
             -resultBundlePath TestResults.xcresult \
             CODE_SIGNING_ALLOWED=NO
 
