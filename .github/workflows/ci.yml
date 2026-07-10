@@ -18,6 +18,33 @@ jobs:
         with:
           xcode-version: '26.3'
 
+      - name: Setup iOS Simulator
+        run: |
+          # Check if iPhone 17 simulator exists
+          if ! xcrun simctl list devices available | grep -q "iPhone 17"; then
+            # Get latest iOS runtime
+            RUNTIME=$(xcrun simctl list runtimes -j | python3 -c "
+            import json, sys
+            data = json.load(sys.stdin)
+            for r in data['runtimes']:
+                if 'iOS' in r['name'] and r['isAvailable']:
+                    print(r['identifier'])
+            " | tail -1)
+            # Get iPhone device type (prefer iPhone 17, fallback to others)
+            DEVTYPE=$(xcrun simctl list devicetypes -j | python3 -c "
+            import json, sys
+            data = json.load(sys.stdin)
+            for name in ['iPhone 17', 'iPhone 16 Pro', 'iPhone 16', 'iPhone 15 Pro', 'iPhone 15']:
+                for d in data['devicetypes']:
+                    if d['name'] == name:
+                        print(d['identifier'])
+                        sys.exit(0)
+            ")
+            echo "Creating iPhone 17 simulator with device type: $DEVTYPE, runtime: $RUNTIME"
+            xcrun simctl create "iPhone 17" "$DEVTYPE" "$RUNTIME"
+          fi
+          xcrun simctl list devices available | grep iPhone
+
       - name: Build
         run: |
           xcodebuild build \
