@@ -1,6 +1,6 @@
 # API 契约文档
 
-本文档描述 AIBuilder 项目的核心 API 契约：LLMProvider 协议、ToolProtocol 协议、ToolDefinition JSON Schema、SSE 响应格式，以及 DeepSeek / Qwen / BFF 三种 endpoint 的请求示例。所有方法签名与 endpoint 均取自源码，如代码演进请同步更新本文档。
+本文档描述 Aether 项目的核心 API 契约：LLMProvider 协议、ToolProtocol 协议、ToolDefinition JSON Schema、SSE 响应格式，以及 DeepSeek / Qwen / BFF 三种 endpoint 的请求示例。所有方法签名与 endpoint 均取自源码，如代码演进请同步更新本文档。
 
 ---
 
@@ -43,7 +43,7 @@ protocol LLMProvider {
 | `OfflineLLMProvider` | 本地 MLX 推理（不走 HTTP） | 端侧推理，断网可用；`baseURL` 为空字符串 |
 | `FallbackLLMProvider` | 包装 primary + fallback | `init(primary:fallback:primaryProvider:fallbackProvider:)`；primary 失败自动切 fallback |
 
-`BFFProxyClient` 的 chat 路径通过 `config.endpointURL.appending(path: "v1/chat/completions")` 构造，默认 `endpointURL` 为占位地址 `https://aibuilder-bff.example.com`，部署后替换为真实域名。
+`BFFProxyClient` 的 chat 路径通过 `config.endpointURL.appending(path: "v1/chat/completions")` 构造，默认 `endpointURL` 为占位地址 `https://aether-bff.example.com`，部署后替换为真实域名。
 
 ### 1.4 ParsedChunk 与相关结构
 
@@ -401,7 +401,7 @@ curl -X POST https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions 
 ### 5.3 BFF 代理
 
 ```bash
-curl -X POST https://aibuilder-bff.<your-subdomain>.workers.dev/v1/chat/completions \
+curl -X POST https://aether-bff.<your-subdomain>.workers.dev/v1/chat/completions \
   -H "X-BFF-Token: $BFF_USER_TOKEN" \
   -H "X-Provider: deepseek" \
   -H "Content-Type: application/json" \
@@ -416,7 +416,7 @@ curl -X POST https://aibuilder-bff.<your-subdomain>.workers.dev/v1/chat/completi
 
 - 路径由 `config.endpointURL.appending(path: "v1/chat/completions")` 构造，即 `<endpointURL>/v1/chat/completions`
 - embedding 路径：`<endpointURL>/v1/embeddings`
-- 默认 `endpointURL` 为占位地址 `https://aibuilder-bff.example.com`，部署后替换
+- 默认 `endpointURL` 为占位地址 `https://aether-bff.example.com`，部署后替换
 - `X-Provider` 取 `ModelProvider.rawValue`：`deepseek` / `qwen` / `onDevice`
 - BFF 模式下 `apiKey` 参数不使用（服务端从 Workers secrets 注入上游 key）
 

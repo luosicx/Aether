@@ -1,6 +1,6 @@
-# AIBuilder 设计更新计划
+# Aether 设计更新计划
 
-> 描述 AIBuilder UI/UX 的下一阶段演进目标、设计原则与具体改动清单。
+> 描述 Aether UI/UX 的下一阶段演进目标、设计原则与具体改动清单。
 
 ---
 
@@ -13,13 +13,13 @@
 
 ---
 
-## 1. Design System Token 化
+## 1. Design System Token 化（已落地）
 
-- 将当前硬编码颜色 / 字体 / 间距迁移到 `Assets.xcassets` 颜色集与 `Font` 扩展常量。
-- 新增 `DesignTokens.swift`：
-  - `Color.backgroundPrimary`, `Color.backgroundSecondary`
-  - `Font.bodyAI`, `Font.captionAI`
-  - `Spacing.small`, `Spacing.medium`, `Spacing.large`
+> 已完成：颜色 / 字体 / 间距 / 圆角 / 动画 token 已统一收敛到 `Aether/DesignSystem/` 目录，所有视图直接引用语义 token，不硬编码原生颜色。
+
+- `ColorTokens.swift`：定义 Aether 品牌色（`deepSpace` / `aetherPurple` / `electricBlue` / `liquidGlass` / `nebulaGlow` / `starlight` / `duskGray`）与 `aetherGradient` 渐变，气泡色 `bubbleUser` / `bubbleAI`，背景 `backgroundPrimary` / `backgroundSecondary` / `backgroundTertiary`，文字 `textPrimary` / `textSecondary` / `textTertiary`。
+- `TypographyTokens.swift`：定义 Aether 品牌字体（`aetherTitle` 28pt / `aetherDisplay` 48pt / `aetherBody` 16pt）与对话字体（`bodyAI` / `subheadlineAI` / `captionAI` / `headlineAI` / `titleAI` / `monoAI` / `toolLabel`）。
+- `DesignTokens.swift`：定义间距 `Spacing`（xs 2 / sm 4 / md 8 / lg 12 / xl 16 / xxl 24 / xxxl 32）、圆角 `CornerRadius`（small 12 / medium 16 / large 24 / pill 999）、动画 `AnimationTokens`（transition / messageAppear / buttonPress / skeleton / blink）。
 
 ## 2. 深色模式全面适配
 

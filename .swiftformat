@@ -1,0 +1,13 @@
+# SwiftFormat 配置文件 for Aether 项目
+# 详见: https://github.com/nicklockwood/SwiftFormat
+
+--swiftversion 5.9
+--indent 4
+--allman false
+--enable redundantReturn
+--disable wrapSingleGuards
+--disable wrapArguments
+--disable redundantParens
+--options prefix: Aether
+--exclude Pods,DerivedData,.build,Aether.xcodeproj
+--strip-unused-imports false

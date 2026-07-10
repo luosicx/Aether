@@ -1,0 +1,80 @@
+@startuml architecture-overview
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam packageStyle rectangle
+skinparam componentStyle rectangle
+skinparam defaultFontName "Helvetica Neue"
+skinparam shadowing false
+skinparam roundCorner 8
+skinparam ArrowColor #555555
+
+title Aether 分层架构总览
+
+' ===== 表现层 =====
+package "表现层 (Views)" as Presentation #E8F0FE {
+    class ChatView
+    class ConversationList
+    class SettingsView
+    class KnowledgeBaseView
+    class OnDeviceModelView
+}
+
+' ===== 领域层 =====
+package "领域层 (ViewModels)" as Domain #FFF3E0 {
+    class ChatViewModel
+    class SettingsViewModel
+    class ConversationListVM
+    class KnowledgeBaseVM
+}
+
+' ===== 服务层 =====
+package "服务层 (Services)" as Services #E8F5E9 {
+    class LLMProvider as "LLMProvider\n(DeepSeek/Qwen/BFF/OnDevice)"
+    class RAGService
+    class ToolRegistry as "ToolRegistry\n(14+11 tools)"
+    class SemanticCache
+    class SmartRouter
+    class VoiceService
+    class RemoteConfigService as "RemoteConfigService"
+    class TelemetryService as "TelemetryService"
+}
+
+' ===== 数据层 =====
+package "数据层 (Models / Storage)" as Data #F3E5F5 {
+    class SwiftData as "SwiftData\n(Conversation / ChatMessage\nDocumentChunk / MessageFeedback\nHealthInsight / UserPreference)"
+    class KeychainManager as "KeychainManager\n(API Keys)"
+    class UserDefaults as "UserDefaults\n(Settings / Cache)"
+}
+
+' ===== 表现层 → 领域层 依赖 =====
+ChatView --> ChatViewModel
+ConversationList --> ConversationListVM
+SettingsView --> SettingsViewModel
+KnowledgeBaseView --> KnowledgeBaseVM
+OnDeviceModelView --> SettingsViewModel
+
+' ===== 领域层 → 服务层 依赖 =====
+ChatViewModel --> LLMProvider
+ChatViewModel --> RAGService
+ChatViewModel --> ToolRegistry
+ChatViewModel --> SemanticCache
+ChatViewModel --> SmartRouter
+ChatViewModel --> VoiceService
+SettingsViewModel --> RemoteConfigService
+ChatViewModel --> TelemetryService
+
+' ===== 服务层 → 数据层 依赖 =====
+LLMProvider --> KeychainManager
+RAGService --> SwiftData
+ToolRegistry --> SwiftData
+SemanticCache --> UserDefaults
+RemoteConfigService --> UserDefaults
+TelemetryService --> UserDefaults
+
+note bottom of Services
+  依赖方向自上而下单向流动
+  表现层不直接访问数据层
+  服务层持有数据层的持久化与密钥存储
+end note
+
+@enduml

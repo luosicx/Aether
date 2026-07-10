@@ -1,0 +1,102 @@
+@startuml rag-dataflow
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam defaultFontName "Helvetica Neue"
+skinparam ActivityBackgroundColor #E8F5E9
+skinparam ActivityBorderColor #4CAF50
+skinparam ActivityDiamondBackgroundColor #FFF8E1
+skinparam ActivityDiamondBorderColor #FFA000
+skinparam ArrowColor #555555
+
+title Aether RAG 知识库数据流图
+
+|文档索引流程|
+
+start
+
+:文档导入 (PDF / 文本);
+
+:PDFExtractor 提取文本;
+note right
+  PDF: PDFKit 提取纯文本
+  文本: 直接使用
+end note
+
+:DocumentChunker 分块;
+note right
+  按段落与长度切分
+  生成 DocumentChunk @Model
+end note
+
+:EmbeddingService 批量嵌入;
+note right
+  调用 LLMProvider.embed(texts:)
+  返回 [[Float]] 向量数组
+  DeepSeek 不支持 → 降级 Qwen
+end note
+
+:存储到 DocumentChunk @Model;
+note right
+  chunk.embedding = embeddings[i]
+  chunk.weight = 1.0 (默认)
+  SwiftData 持久化
+end note
+
+:SwiftData modelContext.save();
+
+stop
+
+|查询检索流程|
+
+start
+
+:用户查询 query;
+
+:计算 query embedding;
+note right
+  EmbeddingService.embed([query])
+  复用避免重复调用
+end note
+
+if (embedding 为空?) then (是)
+  :返回空结果;
+  stop
+else (否)
+endif
+
+:fetch 全部 DocumentChunk;
+
+:计算余弦相似度;
+note right
+  cosineSimilarity(queryEmb, chunkEmb)
+  最终得分 = 相似度 * chunk.weight
+  反馈闭环：踩 *= 0.8 / 赞 /= 0.8
+end note
+
+:降序排序 取 topK=5;
+
+if (有相关分块?) then (否)
+  :返回 ("", [], embedding);
+  stop
+else (是)
+endif
+
+:拼接 [1] [2] 编号 prompt;
+note right
+  格式："以下是与问题相关的参考信息：\n
+  [1] chunk1 内容\n\n
+  [2] chunk2 内容\n\n
+  请基于以上信息回答问题。"
+end note
+
+:注入 system role 消息 (at index 1);
+
+:返回 (context, citations, queryEmbedding);
+note right
+  citations: 用于 UI 展示引用卡片
+  queryEmbedding: 供语义缓存复用
+end note
+
+stop
+
+@enduml

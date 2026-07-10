@@ -1,6 +1,6 @@
 # 贡献指南
 
-感谢你对 AIBuilder 项目的兴趣！本文档描述如何参与项目开发，包括环境搭建、代码规范、提交规范与 PR 流程。
+感谢你对 Aether 项目的兴趣！本文档描述如何参与项目开发，包括环境搭建、代码规范、提交规范与 PR 流程。
 
 ## 1. 开发环境搭建
 
@@ -20,7 +20,7 @@
 ```bash
 git clone <your-fork-url>
 cd AIBuiler
-open AIBuilder.xcodeproj
+open Aether.xcodeproj
 ```
 
 ### 1.3 安装依赖
@@ -31,7 +31,7 @@ open AIBuilder.xcodeproj
 
 ### 1.4 首次运行
 
-1. Xcode 顶部 Scheme 选择 `AIBuilder`
+1. Xcode 顶部 Scheme 选择 `Aether`
 2. 目标设备选择 **iPhone 17 模拟器**（iOS 测试）或 **My Mac**（macOS 测试）
 3. 按 `Cmd + R` 运行
 4. App 启动后进入设置填入 DeepSeek API Key（https://platform.deepseek.com 申请）
@@ -56,7 +56,7 @@ open AIBuilder.xcodeproj
 
 - 持久化实体用 `@Model` 宏：`@Model final class Conversation { ... }`
 - 关系用 `@Relationship` 并指定 `deleteRule`：`@Relationship(deleteRule: .cascade) var messages: [ChatMessage]`
-- Schema 注册在 `AIBuilderApp` 的 `ModelContainer`：`Schema([Conversation.self, ChatMessage.self, ...])`
+- Schema 注册在 `AetherApp` 的 `ModelContainer`：`Schema([Conversation.self, ChatMessage.self, ...])`
 - 不直接操作 CoreData，所有读写经 `ChatStorage` 服务封装
 
 ### 2.4 多平台条件编译规范
@@ -88,16 +88,67 @@ class MyService {
 
 ### 2.5 测试规范
 
-- 单元测试（UT）放 `AIBuilderTests/`，命名 `<ClassName>Tests.swift`
-- UI 测试（UIT）放 `AIBuilderUITests/`，避免依赖真实网络（用 `UITEST_DISABLE_NETWORK` 启动参数桩回复）
+- 单元测试（UT）放 `AetherTests/`，命名 `<ClassName>Tests.swift`
+- UI 测试（UIT）放 `AetherUITests/`，避免依赖真实网络（用 `UITEST_DISABLE_NETWORK` 启动参数桩回复）
 - 测试用例数：UT 248 / UIT 13（每新增功能需补对应测试）
 - 当前目标：0 skip；若必须跳过，需写明原因并在 Issue 跟踪
 
 ### 2.6 国际化规范
 
-- 用户可见文本必须进入 `AIBuilder/Resources/Localizable.xcstrings`。
+- 用户可见文本必须进入 `Aether/Resources/Localizable.xcstrings`。
 - SwiftUI 控件直接传字符串字面量即可自动提取；动态拼接文本使用 `String(format: NSLocalizedString(...), ...)`。
 - 新增字符串后运行 `python3 scripts/extract_strings.py` 检查遗漏，并补充 `en` / `zh-Hant` 翻译。
+
+### 2.7 代码风格强制规则
+
+以下规则通过 SwiftLint 强制执行（`.swiftlint.yml` 已配置），提交前必须通过检查：
+
+| 规则 | 严重级别 | 说明 |
+|------|----------|------|
+| `force_unwrapping` | warning | 禁止强制解包 `!`（如 `value!`），应使用 `guard let` / `if let` 安全解包 |
+| `force_cast` | warning | 禁止强制类型转换 `as!`，应使用 `as?` + 可选绑定 |
+| `force_try` | warning | 禁止 `try!` 强制try，应使用 `try` + `do-catch` 或 `try?` |
+| `implicitly_unwrapped_optional` | warning | 谨慎使用隐式解包可选类型 `var x: String!`，仅限 IB Outlet 等场景 |
+| `empty_count` / `empty_string` | warning | 空集合用 `.isEmpty`，空字符串用 `.isEmpty` 而非 `== ""` |
+| `explicit_init` | warning | 避免冗余的 `init` 调用（如 `String(s)` → `s`） |
+
+> **例外**：UT 中为简化测试可酌情使用 `!`，但建议尽量遵循规则。CI 中 SwiftLint error 会阻断合并，warning 不阻断但建议修复。
+
+### 2.8 SwiftLint 与 SwiftFormat 配置
+
+#### SwiftLint
+
+项目根目录已配置 `.swiftlint.yml`，定义了检查目录、启用规则、禁用规则与参数阈值。
+
+**本地检查**：
+
+```bash
+# 运行 SwiftLint 检查（未安装时脚本会提示安装方法并跳过，不报错）
+scripts/run_swiftlint.sh
+```
+
+**配置要点**：
+- 检查目录：`Aether` / `AetherTests` / `AetherUITests`
+- 排除目录：`Pods` / `DerivedData` / `.build` / `Aether.xcodeproj`
+- opt-in 规则：`force_unwrapping` / `implicitly_unwrapped_optional` / `empty_count` / `empty_string` / `explicit_init`
+- 禁用规则：`trailing_newline` / `leading_whitespace` / `todo` / `identifier_name` / `type_name`（与 SwiftUI 风格不兼容）
+- 行长度：warning 200 / error 300
+- 函数体长度：warning 150 / error 300
+- 圈复杂度：warning 20 / error 40
+
+> **安装**：`brew install swiftlint`
+
+#### SwiftFormat
+
+项目根目录已配置 `.swiftformat`，统一代码格式化。
+
+**配置要点**：
+- Swift 版本：5.9
+- 缩进：4 空格
+- Allman 风格：关闭（`--allman false`）
+- 禁用：`wrapSingleGuards` / `wrapArguments` / `redundantParens`
+
+> **安装**：`brew install swiftformat`
 
 ## 3. 提交规范
 
@@ -146,9 +197,9 @@ Closes #123
 1. Fork 本仓库到个人 GitHub 账号
 2. 本地 clone fork：
    ```bash
-   git clone https://github.com/<your-name>/AIBuilder.git
-   cd AIBuilder
-   git remote add upstream https://github.com/luosicx/AIBuilder.git
+   git clone https://github.com/<your-name>/Aether.git
+   cd Aether
+   git remote add upstream https://github.com/luosicx/Aether.git
    ```
 3. 创建特性分支：
    ```bash
@@ -156,8 +207,19 @@ Closes #123
    ```
 4. 编写代码 + 补充测试，确保本地通过：
    ```bash
-   xcodebuild test -project AIBuilder.xcodeproj -scheme AIBuilder \
+   # 4.1 运行 SwiftLint 检查（必须 0 error，warning 建议修复）
+   scripts/run_swiftlint.sh
+
+   # 4.2 运行 UT（248 用例，0 skip）
+   xcodebuild test -project Aether.xcodeproj -scheme Aether \
      -destination 'platform=iOS Simulator,name=iPhone 17' \
+     -only-testing:AetherTests \
+     -configuration Debug CODE_SIGNING_ALLOWED=NO
+
+   # 4.3 运行 UIT（13 用例，0 skip）
+   xcodebuild test -project Aether.xcodeproj -scheme Aether \
+     -destination 'platform=iOS Simulator,name=iPhone 17' \
+     -only-testing:AetherUITests \
      -configuration Debug CODE_SIGNING_ALLOWED=NO
    ```
 5. 提交（按 Conventional Commits）：
@@ -174,7 +236,7 @@ Closes #123
    ```bash
    git push origin feat/<short-description>
    ```
-8. 在 GitHub 上发起 PR：`<your-branch>` → `luosicx/AIBuilder:main`
+8. 在 GitHub 上发起 PR：`<your-branch>` → `luosicx/Aether:main`
 
 ### 4.2 PR 标题与描述要求
 
@@ -184,6 +246,7 @@ Closes #123
   - **Why**：变更动机（解决什么问题 / 满足什么需求）
   - **How to test**：测试步骤
   - **Checklist**：
+    - [ ] 已通过 SwiftLint 检查（`scripts/run_swiftlint.sh`，0 error）
     - [ ] 已通过本地 UT (248 用例)
     - [ ] 已通过本地 UIT (13 用例)
     - [ ] 已更新相关文档（如有用户可见变更）
@@ -193,6 +256,7 @@ Closes #123
 
 - PR 自动触发 GitHub Actions CI（`.github/workflows/ci.yml`）
 - 必须 **Build 成功** + **Test 0 failures**
+- CI 集成 SwiftLint 检查脚本（`scripts/run_swiftlint.sh`），存在 error 会阻断合并
 - Reviewer 审核通过后合并
 
 ## 5. spec 驱动开发说明
@@ -229,8 +293,8 @@ Closes #123
 
 ## 6. 联系
 
-- Issue：https://github.com/luosicx/AIBuilder/issues
-- Discussion：https://github.com/luosicx/AIBuilder/discussions
+- Issue：https://github.com/luosicx/Aether/issues
+- Discussion：https://github.com/luosicx/Aether/discussions
 
 ---
 
