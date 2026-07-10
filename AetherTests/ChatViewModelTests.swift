@@ -183,8 +183,16 @@ final class ChatViewModelTests: XCTestCase {
         vm.voiceService.recognizerAvailabilityCheck = { false }
 
         vm.toggleVoiceInput()
-        // toggleVoiceInput 内部 Task 异步执行，等待其完成
-        try await Task.sleep(nanoseconds: 3_000_000_000)
+        // 轮询等待 errorMessage 被设置（替代固定 Task.sleep）
+        let expectation = XCTestExpectation(description: "errorMessage 被设置")
+        for _ in 0..<50 {
+            if vm.errorMessage != nil {
+                expectation.fulfill()
+                break
+            }
+            try await Task.sleep(nanoseconds: 100_000_000) // 0.1s
+        }
+        await fulfillment(of: [expectation], timeout: 5.0)
 
         // 权限已授予时走 startRecording 抛错分支（errorMessage 含「录音启动失败」）；
         // 权限未授予时走权限拒绝分支（errorMessage 为「需要语音识别权限」）。

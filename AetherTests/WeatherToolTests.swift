@@ -46,6 +46,8 @@ final class WeatherToolTests: XCTestCase {
 
     /// execute 无参调用：走定位流程，可能返回天气或定位错误，仅校验返回非空字符串
     func testExecuteMissingCityReturnsLocationOrError() async throws {
+        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
+                      "跳过：模拟器/CI 环境下 CLLocationManager 定位耗时过长")
         let result = try await tool.execute(arguments: [:])
         XCTAssertFalse(result.isEmpty, "无参应返回非空字符串（天气或定位相关错误提示）")
     }

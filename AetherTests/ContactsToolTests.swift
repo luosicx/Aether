@@ -16,6 +16,8 @@ final class ContactsToolTests: XCTestCase {
     }
 
     func testExecuteReturnsString() async throws {
+        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
+                      "跳过：模拟器/CI 环境通讯录权限不可用")
         let result = try await tool.execute(arguments: ["query": "张"])
         XCTAssertFalse(result.isEmpty)
     }

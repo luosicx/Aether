@@ -105,16 +105,17 @@ final class AetherUITests: XCTestCase {
         // 改为在 secureField 上 swipeUp 滚动 Form 让保存按钮进入可见区域，
         // tap 保存按钮会自动收起键盘
         secureField.swipeUp()
-        Thread.sleep(forTimeInterval: 0.5)
         let saveButton = app.buttons["保存 API Key"]
-        if !saveButton.exists {
+        // 滚动后等待保存按钮出现在无障碍树中
+        if !saveButton.waitForExistence(timeout: 0.5) {
             secureField.swipeUp()
-            Thread.sleep(forTimeInterval: 0.3)
+            _ = saveButton.waitForExistence(timeout: 0.3)
         }
         XCTAssertTrue(saveButton.waitForExistence(timeout: 5), "保存按钮应存在")
         saveButton.tap()
         // UIT 中 Keychain 可能因 entitlement 不可用，saveMessage 不一定出现
         // 验证保存按钮点击不 crash + 仍在设置页（用导航栏标题验证，比按钮 exists 更稳定）
+        // 固定等待：Keychain 保存为同步调用，需等待保存完成后再验证 UI 状态
         Thread.sleep(forTimeInterval: 0.5)
         XCTAssertTrue(app.navigationBars["设置"].waitForExistence(timeout: 3),
                       "保存后应仍在设置页")
@@ -134,15 +135,15 @@ final class AetherUITests: XCTestCase {
         secureField.typeText("sk-test")
         // Day 17: dismissKeyboard 不可靠，改为 swipeUp 滚动 Form 让保存按钮可见
         secureField.swipeUp()
-        Thread.sleep(forTimeInterval: 0.5)
         let saveButton = app.buttons["保存 API Key"]
-        if !saveButton.exists {
+        // 滚动后等待保存按钮出现在无障碍树中
+        if !saveButton.waitForExistence(timeout: 0.5) {
             secureField.swipeUp()
-            Thread.sleep(forTimeInterval: 0.3)
+            _ = saveButton.waitForExistence(timeout: 0.3)
         }
         XCTAssertTrue(saveButton.waitForExistence(timeout: 5), "保存按钮应存在")
         saveButton.tap()
-        // 等待保存完成，避免按钮状态时序问题
+        // 固定等待：Keychain 保存为同步调用，需等待保存完成后再触发删除流程
         Thread.sleep(forTimeInterval: 0.5)
 
         // 再删除（触发 alert）
@@ -193,6 +194,7 @@ final class AetherUITests: XCTestCase {
             case 2: ragToggle.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5)).tap()
             default: ragToggle.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
             }
+            // 固定等待：Toggle 动画完成后再读取 value，避免读到过渡态旧值
             Thread.sleep(forTimeInterval: 0.5)
             ragAfter = ragToggle.value as? String
             ragTapAttempts += 1
@@ -204,6 +206,7 @@ final class AetherUITests: XCTestCase {
         let toolsToggle = app.switches["启用工具调用"]
         scrollToElement(toolsToggle, in: app)
         XCTAssertTrue(toolsToggle.waitForExistence(timeout: 5), "应存在工具调用开关")
+        // 固定等待：scrollToElement 后 Form 可能仍在滚动惯性中，等待动画完成再读取 value
         Thread.sleep(forTimeInterval: 0.5)
         let toolsBefore = toolsToggle.value as? String
         var toolsAfter = toolsBefore
@@ -216,11 +219,13 @@ final class AetherUITests: XCTestCase {
             case 2: toolsToggle.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5)).tap()
             default: toolsToggle.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
             }
+            // 固定等待：Toggle 动画完成后再读取 value，避免读到过渡态旧值
             Thread.sleep(forTimeInterval: 0.5)
             toolsAfter = toolsToggle.value as? String
             tapAttempts += 1
             if toolsAfter == toolsBefore {
                 scrollToElement(toolsToggle, in: app)
+                // 固定等待：滚动后等待动画完成，再重试 tap
                 Thread.sleep(forTimeInterval: 0.3)
             }
         }
@@ -246,6 +251,7 @@ final class AetherUITests: XCTestCase {
         XCTAssertTrue(reasonerSeg.exists, "应存在「Reasoner」段")
 
         reasonerSeg.tap()
+        // 固定等待：segmented Picker 切换动画完成后再读取 value
         Thread.sleep(forTimeInterval: 0.3)
         // SwiftUI segmented Picker 的 button.value 在某些 iOS 版本下可能为 nil/""
         let reasonerValue = reasonerSeg.value as? String
@@ -333,6 +339,7 @@ final class AetherUITests: XCTestCase {
         } else {
             formalOption.tap()
         }
+        // 固定等待：Picker 选项选择后导航返回动画完成，再滚动查找工具开关
         Thread.sleep(forTimeInterval: 0.3)
 
         // 工具 Toggle：勾选 calculate（可能在 toneRow 下方，需要再滚动一点）
@@ -344,6 +351,7 @@ final class AetherUITests: XCTestCase {
         var enableAttempts = 0
         while (calcToggle.value as? String) == "0" && enableAttempts < 4 {
             calcToggle.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+            // 固定等待：Toggle 动画完成后再读取 value，避免读到过渡态旧值
             Thread.sleep(forTimeInterval: 0.4)
             enableAttempts += 1
         }
@@ -351,7 +359,7 @@ final class AetherUITests: XCTestCase {
 
         // 完成 → 触发 onDisappear 持久化到 SwiftData
         app.buttons["完成"].tap()
-        // 等待 sheet 关闭动画 + onDisappear 持久化落盘，避免 terminate 中断保存
+        // 固定等待：sheet 关闭动画 + onDisappear 持久化落盘，避免 terminate 中断保存
         Thread.sleep(forTimeInterval: 2.0)
 
         // terminate + launch 模拟重进 App，验证 SwiftData 持久化
@@ -359,7 +367,7 @@ final class AetherUITests: XCTestCase {
         app.terminate()
         app.launchArguments = ["UITEST_DISABLE_NETWORK", "UITEST_DISABLE_SPLASH"]
         app.launch()
-        // 等待 SwiftData 初始化与偏好加载完成，避免 onAppear 时机竞争
+        // 固定等待：SwiftData 初始化与偏好加载完成，避免 onAppear 时机竞争
         Thread.sleep(forTimeInterval: 1.5)
         XCTAssertTrue(app.buttons["设置"].waitForExistence(timeout: 5), "重进后应回到主界面")
         app.buttons["设置"].tap()
@@ -385,6 +393,7 @@ final class AetherUITests: XCTestCase {
         let backButton = app.navigationBars.buttons.firstMatch
         if backButton.waitForExistence(timeout: 2) {
             backButton.tap()
+            // 固定等待：导航返回动画完成，再滚动查找工具开关
             Thread.sleep(forTimeInterval: 0.3)
         }
 
@@ -397,6 +406,7 @@ final class AetherUITests: XCTestCase {
         var calcValue = calcToggle2.value as? String
         var valueRetry = 0
         while calcValue != "1" && valueRetry < 8 {
+            // 固定等待：SwiftData 持久化与 onAppear 加载存在时机差异，轮询读取开关值
             Thread.sleep(forTimeInterval: 0.5)
             calcValue = calcToggle2.value as? String
             valueRetry += 1
@@ -457,6 +467,7 @@ final class AetherUITests: XCTestCase {
         // 清除搜索后输入不匹配关键词
         let clearBtn = app.buttons["清除搜索"]
         if clearBtn.exists { clearBtn.tap() }
+        // 固定等待：清除搜索后列表过滤刷新，再输入新的搜索词
         Thread.sleep(forTimeInterval: 0.3)
         searchField.tap()
         searchField.typeText("不存在的关键词XYZ")

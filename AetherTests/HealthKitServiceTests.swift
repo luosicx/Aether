@@ -41,7 +41,8 @@ final class HealthKitServiceTests: XCTestCase {
     }
 
     /// 测试 4: 模拟授权失败（模拟器无 HealthKit），验证抛错或 isAuthorized 保持 false
-    func testRequestAuthorizationFailure() async {
+    func testRequestAuthorizationFailure() async throws {
+        try XCTSkipIf(ProcessInfo.processInfo.environment["CI"] != nil, "跳过：CI 环境无法处理 HealthKit 权限弹窗")
         let service = HealthKitService()
         do {
             try await service.requestAuthorization()

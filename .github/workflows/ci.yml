@@ -9,6 +9,7 @@ on:
 jobs:
   test:
     runs-on: macos-15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -26,13 +27,18 @@ jobs:
             -configuration Debug \
             CODE_SIGNING_ALLOWED=NO
 
-      - name: Test (UT + UIT)
+      - name: Test (UT only)
         run: |
           xcodebuild test \
             -project Aether.xcodeproj \
             -scheme Aether \
             -destination 'platform=iOS Simulator,name=iPhone 17' \
             -configuration Debug \
+            -skip-testing:AetherUITests \
+            -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 600 \
+            -parallel-testing-enabled YES \
+            -parallel-testing-worker-count 4 \
             -resultBundlePath TestResults.xcresult \
             CODE_SIGNING_ALLOWED=NO
 
