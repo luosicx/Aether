@@ -127,7 +127,7 @@ final class ChatViewModelTests: XCTestCase {
         let resultA = vm.buildEffectiveSystemPrompt(base: "你是助手", preference: pref)
         XCTAssertTrue(resultA.contains("【用户偏好】"),
                        "非默认 tone 应注入「【用户偏好】」前缀")
-        XCTAssertTrue(resultA.contains("语气：正式"),
+        XCTAssertTrue(resultA.contains(String(format: NSLocalizedString("语气：%@", comment: ""), "正式")),
                        "注入内容应包含「语气：正式」")
         XCTAssertTrue(resultA.hasPrefix("你是助手"),
                        "原 systemPrompt 应作为前缀保留")

@@ -40,7 +40,7 @@ final class SettingsViewModelTests: XCTestCase {
         vm.saveAPIKey()  // 内部 do/catch，不抛出
 
         XCTAssertNotNil(vm.saveMessage, "saveAPIKey 后 saveMessage 应非 nil")
-        XCTAssertTrue(vm.saveMessage?.contains("已保存") == true,
+        XCTAssertTrue(vm.saveMessage?.contains(String(format: NSLocalizedString("%@ API Key 已保存", comment: ""), ModelProvider.deepseek.displayName)) == true,
                        "saveMessage 应含「已保存」，实际：\(vm.saveMessage ?? "nil")")
         // 验证确实写入 Keychain
         XCTAssertEqual(KeychainManager.shared.getAPIKey(), "new-key-123")
@@ -56,7 +56,7 @@ final class SettingsViewModelTests: XCTestCase {
 
         XCTAssertEqual(vm.apiKey, "", "deleteAPIKey 后 apiKey 应清空")
         XCTAssertNotNil(vm.saveMessage, "deleteAPIKey 后 saveMessage 应非 nil")
-        XCTAssertTrue(vm.saveMessage?.contains("已删除") == true,
+        XCTAssertTrue(vm.saveMessage?.contains(String(format: NSLocalizedString("%@ API Key 已删除", comment: ""), ModelProvider.deepseek.displayName)) == true,
                        "saveMessage 应含「已删除」，实际：\(vm.saveMessage ?? "nil")")
         XCTAssertNil(KeychainManager.shared.getAPIKey(),
                      "Keychain 中应已删除该 key")

@@ -42,7 +42,7 @@ final class TTSVoiceCatalogTests: XCTestCase {
 
     func testDisplayNameReturnsUnknownForInvalidIdentifier() {
         let name = TTSVoiceCatalog.displayName(for: "com.invalid.nonexistent.voice")
-        XCTAssertEqual(name, "(未知音色)")
+        XCTAssertEqual(name, NSLocalizedString("(未知音色)", comment: ""))
     }
 
     // MARK: - voice

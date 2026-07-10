@@ -162,7 +162,7 @@ final class BFFProxyClientTests: XCTestCase {
             XCTFail("期望 .llmErrorOccurred，实际：\(String(describing: capturedError))")
             return
         }
-        XCTAssertTrue(msg.contains("BFF Token 无效"), "userMessage 应含 'BFF Token 无效'，实际：\(msg)")
+        XCTAssertTrue(msg.contains(NSLocalizedString("BFF Token 无效", comment: "")), "userMessage 应含 'BFF Token 无效'，实际：\(msg)")
     }
 
     // MARK: - 6. 429 + Retry-After: 60 → LLMError.rateLimited(retryAfter: 60)
@@ -218,6 +218,6 @@ final class BFFProxyClientTests: XCTestCase {
             XCTFail("期望 .llmErrorOccurred，实际：\(String(describing: capturedError))")
             return
         }
-        XCTAssertTrue(msg.contains("BFF 服务异常"), "userMessage 应含 'BFF 服务异常'，实际：\(msg)")
+        XCTAssertTrue(msg.contains(NSLocalizedString("BFF 服务异常", comment: "")), "userMessage 应含 'BFF 服务异常'，实际：\(msg)")
     }
 }

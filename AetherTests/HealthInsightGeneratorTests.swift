@@ -76,7 +76,7 @@ final class HealthInsightGeneratorTests: XCTestCase {
         let insight = try await generator.generateInsight(days: 7)
 
         XCTAssertTrue(insight.content.contains("test insight"), "洞察内容应包含 LLM 返回的文本")
-        XCTAssertTrue(insight.content.contains("⚠️ 以上内容由 AI 生成"), "洞察内容应包含免责声明")
+        XCTAssertTrue(insight.content.contains(NSLocalizedString("⚠️ 以上内容由 AI 生成，仅供参考，非医疗建议。如有健康问题请咨询医生。", comment: "")), "洞察内容应包含免责声明")
     }
 
     /// 测试 2: 验证 LLMProvider.chat 被调用
@@ -119,7 +119,7 @@ final class HealthInsightGeneratorTests: XCTestCase {
 
         // 即使健康数据为空，也应生成洞察（含免责声明）
         XCTAssertFalse(insight.content.isEmpty, "空健康数据时仍应生成洞察文本")
-        XCTAssertTrue(insight.content.contains("⚠️ 以上内容由 AI 生成"), "应包含免责声明")
+        XCTAssertTrue(insight.content.contains(NSLocalizedString("⚠️ 以上内容由 AI 生成，仅供参考，非医疗建议。如有健康问题请咨询医生。", comment: "")), "应包含免责声明")
         // relatedMetrics 中 avgHeartRate 应为 0（空数据时）
         XCTAssertEqual(insight.relatedMetrics["avgHeartRate"], 0, "空数据时 avgHeartRate 应为 0")
     }

@@ -18,32 +18,6 @@ jobs:
         with:
           xcode-version: '26.3'
 
-      - name: Configure simulator language
-        run: |
-          # Boot and shutdown to ensure data directory exists
-          xcrun simctl boot "iPhone 17" 2>/dev/null || true
-          xcrun simctl shutdown "iPhone 17" 2>/dev/null || true
-          # Find the simulator UDID
-          UDID=$(xcrun simctl list devices -j | python3 -c "
-          import json, sys
-          data = json.load(sys.stdin)
-          for runtime, devices in data['devices'].items():
-              for d in devices:
-                  if d['name'] == 'iPhone 17' and d['isAvailable']:
-                      print(d['udid'])
-                      sys.exit(0)
-          ")
-          PREFS="$HOME/Library/Developer/CoreSimulator/Devices/$UDID/data/Library/Preferences/.GlobalPreferences.plist"
-          /usr/libexec/PlistBuddy -c "Delete :AppleLanguages" "$PREFS" 2>/dev/null || true
-          /usr/libexec/PlistBuddy -c "Add :AppleLanguages array" "$PREFS"
-          /usr/libexec/PlistBuddy -c "Add :AppleLanguages:0 string zh-Hans" "$PREFS"
-          /usr/libexec/PlistBuddy -c "Delete :AppleLocale" "$PREFS" 2>/dev/null || true
-          /usr/libexec/PlistBuddy -c "Add :AppleLocale string zh_Hans_CN" "$PREFS"
-          echo "Simulator language set to zh-Hans (UDID: $UDID)"
-          # Verify
-          /usr/libexec/PlistBuddy -c "Print :AppleLanguages" "$PREFS"
-          /usr/libexec/PlistBuddy -c "Print :AppleLocale" "$PREFS"
-
       - name: Build
         run: |
           xcodebuild build \

@@ -24,7 +24,7 @@ final class OfflineLLMProviderTests: XCTestCase {
 
         XCTAssertFalse(tokens.isEmpty, "占位模式应至少收到一个 token")
         XCTAssertTrue(
-            tokens.joined().contains("mlx-swift 未集成"),
+            tokens.joined().contains(NSLocalizedString("[端侧推理不可用：mlx-swift 未集成]", comment: "")),
             "占位模式应返回 mlx-swift 未集成提示，实际：\(tokens.joined())"
         )
     }
@@ -65,7 +65,7 @@ final class OfflineLLMProviderTests: XCTestCase {
             return
         }
         XCTAssertTrue(
-            msg.contains("端侧模型不支持工具调用"),
+            msg.contains(NSLocalizedString("端侧模型不支持工具调用，已自动切换到云端", comment: "")),
             "通知消息应含 '端侧模型不支持工具调用'，实际：\(msg)"
         )
     }

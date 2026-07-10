@@ -38,7 +38,7 @@ final class OnDeviceConfigTests: XCTestCase {
     func testModelProviderOnDeviceCase() {
         let provider = ModelProvider.onDevice
 
-        XCTAssertEqual(provider.displayName, "端侧推理", "displayName 应为 '端侧推理'")
+        XCTAssertEqual(provider.displayName, NSLocalizedString("端侧推理", comment: ""), "displayName 应为 '端侧推理'")
         XCTAssertEqual(provider.defaultChatModel, "llama-3.2-1b-instruct", "defaultChatModel 应为 'llama-3.2-1b-instruct'")
         XCTAssertEqual(provider.keychainAccount, "apikey-ondevice", "keychainAccount 应为 'apikey-ondevice'")
     }
