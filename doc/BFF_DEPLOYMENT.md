@@ -14,7 +14,7 @@ flowchart LR
     B -.->|SSE 转发| A
 ```
 
-- 设备端：`BFFProxyClient`（`AIBuilder/Services/LLM/BFFProxyClient.swift`）将请求发往 BFF endpoint，附带 `X-BFF-Token` 与 `X-Provider`，**不携带上游 API Key**。
+- 设备端：`BFFProxyClient`（`Aether/Services/LLM/BFFProxyClient.swift`）将请求发往 BFF endpoint，附带 `X-BFF-Token` 与 `X-Provider`，**不携带上游 API Key**。
 - BFF：`CloudflareWorkers/worker.js` 校验 token、按 provider 路由、注入上游 key、流式转发 SSE 响应。
 - 上游：DeepSeek（`https://api.deepseek.com`）与 Qwen（`https://dashscope.aliyuncs.com/compatible-mode/v1`）。
 
@@ -42,7 +42,7 @@ cd CloudflareWorkers
 wrangler deploy
 ```
 
-部署成功后，wrangler 输出形如 `https://aibuilder-bff.<your-subdomain>.workers.dev` 的访问地址，即为 BFF endpoint。
+部署成功后，wrangler 输出形如 `https://aether-bff.<your-subdomain>.workers.dev` 的访问地址，即为 BFF endpoint。
 
 ## worker.js 关键代码段
 
@@ -127,7 +127,7 @@ if (upstreamResp.ok) {
 以下为 `CloudflareWorkers/wrangler.toml` 的完整内容（`id` 字段需替换为实际 KV namespace id）：
 
 ```toml
-name = "aibuilder-bff"
+name = "aether-bff"
 main = "worker.js"
 compatibility_date = "2026-07-01"
 
@@ -216,7 +216,7 @@ wrangler deploy
 在 App「设置 → BFF 代理」中：
 
 1. **启用 BFF 代理**：打开开关。
-2. **BFF endpoint**：填入部署地址，例如 `https://aibuilder-bff.your-subdomain.workers.dev` 或自定义域名 `https://bff.yourdomain.com`。
+2. **BFF endpoint**：填入部署地址，例如 `https://aether-bff.your-subdomain.workers.dev` 或自定义域名 `https://bff.yourdomain.com`。
 3. **BFF Token**：填入第 4 步生成的 token（如 `test-token-abc123`）。
 4. **限流参数**：按需调整 chat / embed 每分钟令牌数（默认 20 / 10）。
 5. 离开设置页时配置自动写入 UserDefaults（`bff_config_cache`）。

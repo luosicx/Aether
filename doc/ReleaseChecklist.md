@@ -4,7 +4,7 @@
 
 ## 1. Archive 检查
 
-- [ ] Xcode 中 Scheme 选择 `AIBuilder` → Destination 选 `Generic iOS Device`（Any iOS Simulator Device 亦可触发 Archive）
+- [ ] Xcode 中 Scheme 选择 `Aether` → Destination 选 `Generic iOS Device`（Any iOS Simulator Device 亦可触发 Archive）
 - [ ] Product → Archive，等待归档完成
 - [ ] 验证 Archive 过程中无 warning（特别注意：隐私清单缺失 / Info.plist 引用错误 / unused import）
 - [ ] 在 Xcode Organizer 中确认生成的 `.xcarchive` 文件有效
@@ -111,8 +111,8 @@
 - [ ] 执行命令构建 iOS Simulator 版本：
   ```bash
   xcodebuild build \
-    -project AIBuilder.xcodeproj \
-    -scheme AIBuilder \
+    -project Aether.xcodeproj \
+    -scheme Aether \
     -destination 'platform=iOS Simulator,name=iPhone 17' \
     -configuration Debug \
     CODE_SIGNING_ALLOWED=NO
@@ -124,8 +124,8 @@
 - [ ] 执行命令构建 macOS 版本：
   ```bash
   xcodebuild build \
-    -project AIBuilder.xcodeproj \
-    -scheme AIBuilder \
+    -project Aether.xcodeproj \
+    -scheme Aether \
     -destination 'platform=macOS' \
     -configuration Debug \
     CODE_SIGNING_ALLOWED=NO
@@ -154,10 +154,10 @@
 - [ ] 验证命令：
   ```bash
   xcodebuild test \
-    -project AIBuilder.xcodeproj \
-    -scheme AIBuilder \
+    -project Aether.xcodeproj \
+    -scheme Aether \
     -destination 'platform=iOS Simulator,name=iPhone 17' \
-    -only-testing:AIBuilderTests \
+    -only-testing:AetherTests \
     CODE_SIGNING_ALLOWED=NO 2>&1 | tail -5
   ```
 - [ ] 预期输出包含：`Executed 266 tests, with 0 failures, 0 skipped`
@@ -168,10 +168,10 @@
 - [ ] 验证命令：
   ```bash
   xcodebuild test \
-    -project AIBuilder.xcodeproj \
-    -scheme AIBuilder \
+    -project Aether.xcodeproj \
+    -scheme Aether \
     -destination 'platform=iOS Simulator,name=iPhone 17' \
-    -only-testing:AIBuilderUITests \
+    -only-testing:AetherUITests \
     CODE_SIGNING_ALLOWED=NO 2>&1 | tail -5
   ```
 - [ ] 预期输出包含：`Executed 13 tests, with 0 failures, 0 skipped`
@@ -198,7 +198,7 @@
 - [ ] 验证命令：
   ```bash
   # 构建后检查 .xcstrings 是否被编译为 .loctable
-  ls ~/Library/Developer/Xcode/DerivedData/AIBuilder-*/Build/Products/Debug-iphonesimulator/AIBuilder.app/*.lproj/
+  ls ~/Library/Developer/Xcode/DerivedData/Aether-*/Build/Products/Debug-iphonesimulator/Aether.app/*.lproj/
   ```
 
 ### 无障碍
@@ -212,7 +212,7 @@
 - [ ] `.swiftlint.yml` 配置文件存在于项目根目录
 - [ ] 执行 SwiftLint 检查：
   ```bash
-  swiftlint lint --path AIBuilder --reporter emoji
+  swiftlint lint --path Aether --reporter emoji
   ```
 - [ ] 预期输出：0 serious / 0 violations（或所有 warning 已审查并标记 `// swiftlint:disable`）
 - [ ] Xcode Build Phase 中 SwiftLint Run Script 已配置（构建时自动触发）

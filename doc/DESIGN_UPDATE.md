@@ -15,7 +15,7 @@
 
 ## 1. Design System Token 化（已落地）
 
-> 已完成：颜色 / 字体 / 间距 / 圆角 / 动画 token 已统一收敛到 `AIBuilder/DesignSystem/` 目录，所有视图直接引用语义 token，不硬编码原生颜色。
+> 已完成：颜色 / 字体 / 间距 / 圆角 / 动画 token 已统一收敛到 `Aether/DesignSystem/` 目录，所有视图直接引用语义 token，不硬编码原生颜色。
 
 - `ColorTokens.swift`：定义 Aether 品牌色（`deepSpace` / `aetherPurple` / `electricBlue` / `liquidGlass` / `nebulaGlow` / `starlight` / `duskGray`）与 `aetherGradient` 渐变，气泡色 `bubbleUser` / `bubbleAI`，背景 `backgroundPrimary` / `backgroundSecondary` / `backgroundTertiary`，文字 `textPrimary` / `textSecondary` / `textTertiary`。
 - `TypographyTokens.swift`：定义 Aether 品牌字体（`aetherTitle` 28pt / `aetherDisplay` 48pt / `aetherBody` 16pt）与对话字体（`bodyAI` / `subheadlineAI` / `captionAI` / `headlineAI` / `titleAI` / `monoAI` / `toolLabel`）。

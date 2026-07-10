@@ -15,8 +15,8 @@ jobs:
       - name: Build
         run: |
           xcodebuild build \
-            -project AIBuilder.xcodeproj \
-            -scheme AIBuilder \
+            -project Aether.xcodeproj \
+            -scheme Aether \
             -destination 'platform=iOS Simulator,name=iPhone 17' \
             -configuration Debug \
             CODE_SIGNING_ALLOWED=NO
@@ -24,8 +24,8 @@ jobs:
       - name: Test (UT + UIT)
         run: |
           xcodebuild test \
-            -project AIBuilder.xcodeproj \
-            -scheme AIBuilder \
+            -project Aether.xcodeproj \
+            -scheme Aether \
             -destination 'platform=iOS Simulator,name=iPhone 17' \
             -configuration Debug \
             -resultBundlePath TestResults.xcresult \

@@ -563,7 +563,7 @@
 
 ## 13. watchOS 扩展（Day 17）
 
-**注意：watchOS target 需在 Xcode 中手动创建并引用 AIBuilderWatch/ 目录下的文件。**
+**注意：watchOS target 需在 Xcode 中手动创建并引用 AetherWatch/ 目录下的文件。**
 
 - [ ] HealthKit 授权弹窗
   - **前置条件**：首次进入 HealthSettingsView，HealthKit 未授权
@@ -945,10 +945,10 @@
 ### 16.1 隐私清单与隐私政策
 
 - [ ] PrivacyInfo.xcprivacy 存在
-  - **前置条件**：Xcode 打开 AIBuilder 工程
+  - **前置条件**：Xcode 打开 Aether 工程
   - **操作步骤**：
-    1. 查看 AIBuilder target Resources
-  - **预期结果**：`PrivacyInfo.xcprivacy` 文件存在于 AIBuilder target Resources
+    1. 查看 Aether target Resources
+  - **预期结果**：`PrivacyInfo.xcprivacy` 文件存在于 Aether target Resources
   - **失败排查**：检查 Build Phases → Copy Bundle Resources；查看文件位置
 
 - [ ] NSPrivacyTracking = false
@@ -2077,7 +2077,7 @@
 ### 国际化基础设施
 
 - [ ] String Catalog 正确注册
-  - **前置条件**：Xcode 打开 AIBuilder.xcodeproj
+  - **前置条件**：Xcode 打开 Aether.xcodeproj
   - **操作步骤**：
     1. 在 Project navigator 中展开 Resources → 确认 `Localizable.xcstrings` 存在
     2. 选中 `Localizable.xcstrings`，确认右侧 Inspector 显示 sourceLanguage = `zh-Hans`

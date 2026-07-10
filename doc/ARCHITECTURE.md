@@ -35,7 +35,7 @@
 7. **用户偏好记忆**：UserPreference @Model 持久化语气偏好 / 偏好工具 / 自定义事实，注入 systemPrompt 末尾个性化 AI 回复。
 8. **调试面板**：DebugInfo 记录最近一次请求的 promptJSON / apiResponse / embeddingDimension / toolCalls，仅当前会话不持久化。
 9. **灵动岛 Live Activity**：ActivityKit TimerActivityAttributes，状态机「思考中 → 回复中 → 完成」，iOS 16.1+ 可用低版本静默降级。
-10. **BGTaskScheduler + 本地通知**：注册每日刷新后台任务（`com.aibuilder.daily-refresh`），UNUserNotificationCenter 在工具调用成功 / AI 回复完成等场景推送本地通知。BGTask `register` 在 `init` 中（系统要求），`schedule` 调度延迟到首次进入后台 `scenePhase == .background` 时懒执行，减少冷启动耗时。
+10. **BGTaskScheduler + 本地通知**：注册每日刷新后台任务（`com.aether.daily-refresh`），UNUserNotificationCenter 在工具调用成功 / AI 回复完成等场景推送本地通知。BGTask `register` 在 `init` 中（系统要求），`schedule` 调度延迟到首次进入后台 `scenePhase == .background` 时懒执行，减少冷启动耗时。
 
 ### Day 12–20 扩展能力
 
@@ -50,7 +50,7 @@
 19. **HealthKit 健康洞察**：`HealthKitService` 读取步数 / 心率 / 睡眠数据，`HealthInsightGenerator` 生成洞察文本并持久化到 `HealthInsight` @Model，`HealthSettingsView` 管理授权与展示。
 20. **App Intents / Shortcuts**：`AskAetherIntent` / `NewConversationIntent` / `SwitchConversationIntent` 三个 Intent，集成 Shortcuts / Spotlight / Siri，`IntentChatService` 处理 Intent 触发的会话路由。
 21. **Spotlight 索引**：`SpotlightIndexer` 为 Conversation 创建/更新 `CSSearchableItem`，支持系统搜索直达会话。
-22. **WatchConnectivity**：`WatchConnectivityService` 与 AIBuilderWatch watchOS App 双向通信，同步 Quick Chat 与健康洞察。
+22. **WatchConnectivity**：`WatchConnectivityService` 与 AetherWatch watchOS App 双向通信，同步 Quick Chat 与健康洞察。
 23. **远程配置与遥测**：`RemoteConfigService` 拉取远程开关/限流配置，`TelemetryService` 收集使用指标，`LogUploader` 上传脱敏日志。
 24. **崩溃监控**：`CrashReportService` 捕获未捕获异常与信号崩溃，落盘后在下次启动上报。
 25. **性能监控**：`PerformanceMonitor` 记录首屏渲染 / 流式首字 / 工具执行等关键耗时指标。
@@ -232,7 +232,7 @@ flowchart LR
 |--------|------|------|
 | Auth | `Services/Auth/KeychainManager.swift` | Keychain 单例，封装 API Key 的 save / load / delete，按 `ModelProvider.keychainAccount` 隔离存储。 |
 | Cache | `Services/Cache/SemanticCache.swift` | `@MainActor` 语义缓存，基于 embedding 余弦相似度（阈值 0.92）匹配历史 query，命中跳过 LLM 请求；FIFO 容量 100。 |
-| Connectivity | `Services/Connectivity/WatchConnectivityService.swift` | Day 17 WatchConnectivity 双向通信，与 AIBuilderWatch 同步 Quick Chat 与健康洞察。 |
+| Connectivity | `Services/Connectivity/WatchConnectivityService.swift` | Day 17 WatchConnectivity 双向通信，与 AetherWatch 同步 Quick Chat 与健康洞察。 |
 | Crash | `Services/Crash/CrashReportService.swift` | Day 14 崩溃监控：捕获未捕获异常与信号崩溃（SIGABRT/SIGSEGV），落盘到本地，下次启动时上报。 |
 | Feedback | `Services/Feedback/FeedbackService.swift` | Day 12 用户反馈/投诉：写入 `MessageFeedback` @Model，提供按会话查询与批量导出。 |
 | Health | `Services/Health/HealthKitService.swift` | Day 18 HealthKit 读取：步数 / 心率 / 睡眠 / 活动能量，按日期范围查询。 |
@@ -1071,7 +1071,7 @@ stateDiagram-v2
 | 5 | `nonisolated DeepSeekClient` 跨 actor | 允许从 `@MainActor` ViewModel 直接调用，避免 actor hop 开销；HTTP 请求本身在 URLSession 内部异步。 | `DeepSeekClient` 类声明 | DeepSeekClient / QwenClient / BFFProxyClient / OfflineLLMProvider |
 | 6 | `@MainActor Service` 线程安全 | `SemanticCache` / `RAGService` / `ToolRegistry` / `ChatStorage` 标 `@MainActor`，与 ViewModel 同 actor 避免 data race。 | 各 Service 文件 | SemanticCache / RAGService / ToolRegistry / ChatStorage |
 | 7 | `LLMProvider` 协议注入测试可替换 | `ChatViewModel.init(client:cache:)` 默认 `DeepSeekClient()` / `SemanticCache()` 兜底，测试可注入 mock。 | `ViewModels/ChatViewModel.swift` `init` | ChatViewModel + 全部 LLM Client 测试 |
-| 8 | `UITEST_DISABLE_NETWORK` 启动参数桩回复 | UIT 不触发真实 HTTP，避免 API Key 缺失 / 网络不稳导致 UIT 随机失败。 | `ChatViewModel.processMessage` 入口分支 | ChatViewModel + AIBuilderUITests |
+| 8 | `UITEST_DISABLE_NETWORK` 启动参数桩回复 | UIT 不触发真实 HTTP，避免 API Key 缺失 / 网络不稳导致 UIT 随机失败。 | `ChatViewModel.processMessage` 入口分支 | ChatViewModel + AetherUITests |
 
 ### Day 12–20 扩展决策
 
@@ -1081,7 +1081,7 @@ stateDiagram-v2
 | 10 | BFF Token 设备端不持上游 API Key | 设备端仅持 `userToken`，上游 Key 仅在 Cloudflare Workers secrets 中，避免 Key 泄露与配额盗用。 | `Core/Models/BFFConfig.swift` / `Services/LLM/BFFProxyClient.swift` | BFFConfig + BFFProxyClient + ModelProviderFactory + SettingsViewModel + CloudflareWorkers/ |
 | 11 | MLX 端侧模型断网自动切换 | `OnDeviceConfig.autoSwitchOnNetworkLoss` 默认 true，NetworkMonitor 检测断网即切端侧推理，网络恢复自动切回，保证离线可用。 | `Services/Network/NetworkMonitor.swift` / `Services/OnDevice/OfflineLLMProvider.swift` | NetworkMonitor + OfflineLLMProvider + MLXInferenceEngine + OnDeviceModelDownloader + ChatViewModel |
 | 12 | TTSConfig UserDefaults 持久化不用 SwiftData | TTS 配置为轻量键值，UserDefaults 比 SwiftData 更轻量，避免迁移复杂度。 | `Services/Voice/TTSConfig.swift` | TTSConfig + VoiceService + TTSVoicePickerView + SettingsViewModel |
-| 13 | `UITEST_RESET_DATA` 数据隔离 | UIT 启动时通过环境变量清理历史会话与缓存，保证用例独立可重复执行，避免脏数据干扰。 | `AetherApp.swift` 启动逻辑 | AetherApp + ChatStorage.wipeAllData + AIBuilderUITests |
+| 13 | `UITEST_RESET_DATA` 数据隔离 | UIT 启动时通过环境变量清理历史会话与缓存，保证用例独立可重复执行，避免脏数据干扰。 | `AetherApp.swift` 启动逻辑 | AetherApp + ChatStorage.wipeAllData + AetherUITests |
 | 14 | `batch cleanupEmptyConversations` 后台清理 | 后台任务批量清理空会话（无消息或仅 system prompt），控制 SwiftData 体积。 | `Services/Storage/ChatStorage.swift` `cleanupEmptyConversations` | ChatStorage + ConversationListVM + AetherApp BGTask |
 | 15 | Markdown 渲染自定义 AttributedString 不引第三方库 | 用 Foundation `AttributedString` + 自定义 parser，避免引入 Down / Ink 等第三方库，控制包体积与依赖。 | `Views/Chat/Markdown*.swift` / `CodeSyntaxHighlighter.swift` | MarkdownText / HeadingView / MarkdownTableParser / MarkdownTableView / TaskListView / CodeBlockView / CodeSyntaxHighlighter |
 | 16 | 隐私清单 PrivacyInfo.xcprivacy 显式声明 | App Store 审核要求显式声明 Required Reason API 使用（UserDefaults / FileTimestamp / SystemBootTime 等）。 | `Resources/PrivacyInfo.xcprivacy` | PrivacyInfo.xcprivacy + App Bundle |
@@ -1111,7 +1111,7 @@ stateDiagram-v2
 - **方案**：在 `systemPromptSection` 上方加 Menu 选择预设角色，选中后写入 `settingsVM.systemPrompt`（填入而非锁定 TextEditor），复用现有「完成」按钮回写逻辑。
 - **理由**：零侵入 ViewModel / Model 层，预设角色仅作为快捷输入入口，填入后仍可二次编辑，兼顾「开箱即用」与「灵活定制」。
 - **实现**：`PresetPrompts.swift` 用 `enum PresetPrompts` 暴露 `static let all: [PresetPrompt]`，每个 `PresetPrompt` 含 role + prompt（≥ 150 字），共 11 个角色覆盖开发者 / 学生 / 白领 / 管理者 / 产品经理 / 写作助手 / 技术面试官 / 学习导师 / 翻译官 / 健身教练等典型场景。
-- **影响范围**：`Views/Settings/PresetPrompts.swift` + `Views/Settings/SettingsView.swift` `systemPromptSection` + `AIBuilderTests/PresetPromptsTests.swift`
+- **影响范围**：`Views/Settings/PresetPrompts.swift` + `Views/Settings/SettingsView.swift` `systemPromptSection` + `AetherTests/PresetPromptsTests.swift`
 
 #### 决策：macOS 体验修复（Day 20 后）
 
@@ -1157,18 +1157,18 @@ stateDiagram-v2
 | HealthKit | `Services/Health/HealthKitService.swift` / `HealthInsightGenerator.swift` | iOS 17.0+（macOS 不支持） |
 | App Intents | `AppIntents/AskAetherIntent.swift` / `NewConversationIntent.swift` / `SwitchConversationIntent.swift` | iOS 16.0+ / macOS 13.0+ / Xcode 16+ |
 | Spotlight（CoreSpotlight） | `Services/Search/SpotlightIndexer.swift` | iOS 17.0+ / macOS 14.0+ / CoreSpotlight.framework |
-| Handoff（NSUserActivity） | `AIBuilderTests/ConversationActivityTests.swift` 覆盖的 NSUserActivity 恢复逻辑 | iOS 17.0+ / macOS 14.0+ / Foundation |
+| Handoff（NSUserActivity） | `AetherTests/ConversationActivityTests.swift` 覆盖的 NSUserActivity 恢复逻辑 | iOS 17.0+ / macOS 14.0+ / Foundation |
 | CrashReportService | `Services/Crash/CrashReportService.swift` | iOS 17.0+ / macOS 14.0+（Bugly SDK 可选） |
 | FeedbackService | `Services/Feedback/FeedbackService.swift` | iOS 17.0+（MFMailComposeViewController 仅 iOS）/ macOS 14.0+（mailto URL） |
-| WatchConnectivity | `Services/Connectivity/WatchConnectivityService.swift` + `AIBuilderWatch/` | iOS 17.0+（macOS 不支持）+ watchOS 10+ |
+| WatchConnectivity | `Services/Connectivity/WatchConnectivityService.swift` + `AetherWatch/` | iOS 17.0+（macOS 不支持）+ watchOS 10+ |
 | NWPathMonitor | `Services/Network/NetworkMonitor.swift` | iOS 17.0+ / macOS 14.0+ / Network.framework |
 | RemoteConfig | `Services/RemoteConfig/RemoteConfigService.swift` | iOS 17.0+ / macOS 14.0+（仅运行时网络） |
 | Telemetry | `Services/Telemetry/TelemetryService.swift` / `LogUploader.swift` | iOS 17.0+ / macOS 14.0+ |
 | PerformanceMonitor | `Services/Performance/PerformanceMonitor.swift` | iOS 17.0+ / macOS 14.0+ |
 | PrivacyInfo.xcprivacy | `Resources/PrivacyInfo.xcprivacy` | iOS 17.0+ / macOS 14.0+ / Xcode 16+（App Store 审核要求） |
 | AttributedString（Markdown） | `Views/Chat/Markdown*.swift` / `CodeSyntaxHighlighter.swift` | iOS 17.0+ / macOS 14.0+ / Foundation |
-| XCTest | `AIBuilderTests/` 73 文件（248 用例） | Xcode 16+ / Swift 5.9+ |
-| XCUITest | `AIBuilderUITests/` 2 文件（13 用例） | Xcode 16+ / Swift 5.9+ |
+| XCTest | `AetherTests/` 73 文件（248 用例） | Xcode 16+ / Swift 5.9+ |
+| XCUITest | `AetherUITests/` 2 文件（13 用例） | Xcode 16+ / Swift 5.9+ |
 | GitHub Actions | `.github/workflows/ci.yml` | macos-14 runner / Xcode 16+ |
 | CoreLocation | CLLocationManager + CLGeocoder | LocationTool 定位与反地理编码 | iOS 17.0+ / macOS 14.0+ / CoreLocation.framework |
 | Contacts | CNContactStore | ContactsTool 通讯录搜索 | iOS 17.0+ / macOS 14.0+ / Contacts.framework |
@@ -1185,7 +1185,7 @@ stateDiagram-v2
 
 ### 7.1 单元测试（UT）
 
-- **Target**：`AIBuilderTests`
+- **Target**：`AetherTests`
 - **规模**：73 个测试文件，248 用例（248 pass / 0 skip / 0 failures）
 - **分层覆盖**：
 
@@ -1264,7 +1264,7 @@ stateDiagram-v2
 
 ### 7.2 UI 测试（UIT）
 
-- **Target**：`AIBuilderUITests`
+- **Target**：`AetherUITests`
 - **规模**：2 个测试文件，13 用例（13 pass / 0 skip / 0 failures）
 - **文件拆分**：
 
@@ -1288,7 +1288,7 @@ stateDiagram-v2
 | 步骤 | 命令 | 版本要求 |
 |------|------|---------|
 | Checkout | `actions/checkout@v4` | GitHub Actions |
-| Build | `xcodebuild build -project AIBuilder.xcodeproj -scheme AIBuilder -destination 'platform=iOS Simulator,name=iPhone 17' -configuration Debug CODE_SIGNING_ALLOWED=NO` | Xcode 16+ / iPhone 17 Simulator |
+| Build | `xcodebuild build -project Aether.xcodeproj -scheme Aether -destination 'platform=iOS Simulator,name=iPhone 17' -configuration Debug CODE_SIGNING_ALLOWED=NO` | Xcode 16+ / iPhone 17 Simulator |
 | Test (UT + UIT) | `xcodebuild test ... -resultBundlePath TestResults.xcresult CODE_SIGNING_ALLOWED=NO` | Xcode 16+ |
 | Upload artifact | `actions/upload-artifact@v4`（`if: always()`，name: `test-results-xcresult`） | GitHub Actions |
 
@@ -1301,7 +1301,7 @@ stateDiagram-v2
 完整目录树，与磁盘一致：
 
 ```
-AIBuilder/
+Aether/
 ├── App/
 │   └── AetherApp.swift
 ├── AppIntents/
@@ -1456,7 +1456,7 @@ AIBuilder/
         ├── SettingsView.swift
         └── TTSVoicePickerView.swift
 
-AIBuilderWatch/                  # watchOS App
+AetherWatch/                  # watchOS App
 ├── Views/
 │   ├── WatchHealthInsightView.swift
 │   └── WatchQuickChatView.swift
@@ -1466,7 +1466,7 @@ CloudflareWorkers/               # BFF 代理网关
 ├── worker.js
 └── wrangler.toml
 
-AIBuilderTests/                  # 73 个 UT 文件 / 248 用例
+AetherTests/                  # 73 个 UT 文件 / 248 用例
 ├── APIConfigTests.swift
 ├── AlarmToolTests.swift
 ├── BFFProxyClientTests.swift
@@ -1519,12 +1519,12 @@ AIBuilderTests/                  # 73 个 UT 文件 / 248 用例
 ├── VoiceServiceTests.swift
 └── WatchConnectivityServiceTests.swift
 
-AIBuilderUITests/                # 2 个 UIT 文件 / 13 用例
+AetherUITests/                # 2 个 UIT 文件 / 13 用例
 ├── AetherUITests.swift
 ├── AetherUITestsLaunchUITests.swift
 └── Info.plist
 
-AIBuilder.xcodeproj/             # Xcode 工程文件
+Aether.xcodeproj/             # Xcode 工程文件
 doc/
 ├── ARCHITECTURE.md              # 本文件
 ├── USAGE.md

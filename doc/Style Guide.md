@@ -44,7 +44,7 @@
 *   **强调色**：使用**紫色**作为主要强调色，**电光蓝**用于可交互元素。
 *   **渐变**：在关键UI元素上使用**紫-蓝渐变**，体现Aether的能量感。
 
-> **Design Token 落地（`ColorTokens.swift`）**：以下语义颜色 token 已在 `AIBuilder/DesignSystem/ColorTokens.swift` 中统一定义，所有视图应直接引用这些 token，不硬编码 `Color.red` / `Color(.systemGray5)`。
+> **Design Token 落地（`ColorTokens.swift`）**：以下语义颜色 token 已在 `Aether/DesignSystem/ColorTokens.swift` 中统一定义，所有视图应直接引用这些 token，不硬编码 `Color.red` / `Color(.systemGray5)`。
 >
 > | Token | 说明 |
 > |------|------|
@@ -63,7 +63,7 @@
 *   **中文**：可搭配`苹方`或`思源黑体`，保持同样的现代感。
 *   **排版**：采用**大标题、强对比**的策略。
 
-> **字体 Token 落地（`TypographyTokens.swift`）**：以下 Aether 品牌字体 token 已在 `AIBuilder/DesignSystem/TypographyTokens.swift` 中统一定义，中文由系统 PingFang SC 自动 fallback，无需显式指定。
+> **字体 Token 落地（`TypographyTokens.swift`）**：以下 Aether 品牌字体 token 已在 `Aether/DesignSystem/TypographyTokens.swift` 中统一定义，中文由系统 PingFang SC 自动 fallback，无需显式指定。
 >
 > | Token | 说明 |
 > |------|------|
@@ -72,7 +72,7 @@
 > | `Font.aetherBody` | Aether 正文（16pt regular） |
 
 #### 圆角系统
-> **圆角 Token 落地（`DesignTokens.swift`）**：以下圆角 token 已在 `AIBuilder/DesignSystem/DesignTokens.swift` 的 `CornerRadius` 中统一定义，适配液态玻璃的圆润感。
+> **圆角 Token 落地（`DesignTokens.swift`）**：以下圆角 token 已在 `Aether/DesignSystem/DesignTokens.swift` 的 `CornerRadius` 中统一定义，适配液态玻璃的圆润感。
 >
 > | Token | 值 | 说明 |
 > |------|----|------|

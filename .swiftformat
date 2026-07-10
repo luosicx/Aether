@@ -9,5 +9,5 @@
 --disable wrapArguments
 --disable redundantParens
 --options prefix: Aether
---exclude Pods,DerivedData,.build,AIBuilder.xcodeproj
+--exclude Pods,DerivedData,.build,Aether.xcodeproj
 --strip-unused-imports false

@@ -39,7 +39,7 @@
 ## 快速开始
 
 1. clone 仓库
-2. 用 Xcode 16+ 打开 `AIBuilder.xcodeproj`
+2. 用 Xcode 16+ 打开 `Aether.xcodeproj`
 3. iOS 运行：选 iPhone 17 模拟器 → `Cmd + R`
 4. macOS 运行：选 My Mac 目标 → `Cmd + R`
 5. 运行后进入设置填入 DeepSeek API Key（https://platform.deepseek.com 申请）
@@ -49,7 +49,7 @@
 项目采用 MVVM + Service 分层架构，详见 [架构文档](doc/ARCHITECTURE.md)。简要结构：
 
 ```
-AIBuilder/
+Aether/
 ├── App/                    # App 入口（AetherApp.swift）
 ├── AppIntents/             # App Intents（AskAether / NewConversation / SwitchConversation）
 ├── Core/                   # 核心协议与常量（LLMProvider / ToolProtocol / APIConfig）

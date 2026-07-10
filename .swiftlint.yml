@@ -3,16 +3,16 @@
 
 # 检查的目录
 included:
-  - AIBuilder
-  - AIBuilderTests
-  - AIBuilderUITests
+  - Aether
+  - AetherTests
+  - AetherUITests
 
 # 排除的目录
 excluded:
   - Pods
   - DerivedData
   - .build
-  - AIBuilder.xcodeproj
+  - Aether.xcodeproj
 
 # 启用的 opt-in 规则（默认规则集之外需显式开启）
 opt_in_rules:
