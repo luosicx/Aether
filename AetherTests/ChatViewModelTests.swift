@@ -178,6 +178,7 @@ final class ChatViewModelTests: XCTestCase {
     /// 通过注入 recognizerAvailabilityCheck 返回 false 模拟识别器不可用，
     /// 不再依赖真实 SFSpeechRecognizer 权限状态。
     func testToggleVoiceInputWhenUnavailableSetsError() async throws {
+        try XCTSkipIf(ProcessInfo.processInfo.environment["CI"] != nil, "跳过：CI 环境下 SFSpeechRecognizer.requestAuthorization 永不返回")
         let vm = ChatViewModel()
         // 注入：识别器不可用，模拟 startRecording 抛错
         vm.voiceService.recognizerAvailabilityCheck = { false }

@@ -18,6 +18,26 @@ jobs:
         with:
           xcode-version: '26.3'
 
+      - name: Configure simulator language
+        run: |
+          # Boot and shutdown to ensure data directory exists
+          xcrun simctl boot "iPhone 17" 2>/dev/null || true
+          xcrun simctl shutdown "iPhone 17" 2>/dev/null || true
+          # Find the simulator UDID
+          UDID=$(xcrun simctl list devices -j | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          for runtime, devices in data['devices'].items():
+              for d in devices:
+                  if d['name'] == 'iPhone 17' and d['isAvailable']:
+                      print(d['udid'])
+                      sys.exit(0)
+          ")
+          PREFS="$HOME/Library/Developer/CoreSimulator/Devices/$UDID/data/Library/Preferences/.GlobalPreferences.plist"
+          plutil -replace AppleLanguages -array "zh-Hans" "$PREFS" 2>/dev/null || plutil -insert AppleLanguages -array "zh-Hans" "$PREFS"
+          plutil -replace AppleLocale -string "zh_Hans_CN" "$PREFS" 2>/dev/null || plutil -insert AppleLocale -string "zh_Hans_CN" "$PREFS"
+          echo "Simulator language set to zh-Hans (UDID: $UDID)"
+
       - name: Build
         run: |
           xcodebuild build \
