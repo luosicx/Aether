@@ -16,10 +16,11 @@ final class AetherUITests: XCTestCase {
     }
 
     /// 定位输入消息控件（TextField axis:.vertical 在 XCUI 中可能呈现为 textView 或 textField）
+    /// 通过 accessibilityIdentifier("messageInputField") 查找，不依赖中文 placeholder 文本
     private func inputField(in app: XCUIApplication) -> XCUIElement {
-        let tv = app.textViews["输入消息…"].firstMatch
+        let tv = app.textViews.matching(identifier: "messageInputField").firstMatch
         if tv.waitForExistence(timeout: 3) { return tv }
-        return app.textFields["输入消息…"].firstMatch
+        return app.textFields.matching(identifier: "messageInputField").firstMatch
     }
 
     /// 关闭键盘（点击窗口顶部导航栏区域，避免触发任何按钮）
