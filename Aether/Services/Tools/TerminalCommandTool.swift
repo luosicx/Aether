@@ -8,10 +8,18 @@ import Foundation
 
 /// macOS 命令行执行工具，执行 shell 命令并返回输出
 final class TerminalCommandTool: ToolProtocol {
-    /// 危险命令模式列表
+    /// 危险命令模式列表（作用于规范化后的命令）。
+    /// 包含常见绕过形式：多余空格、$HOME 引用、--no-preserve-root、引号包裹等。
     private let dangerousPatterns = [
         "rm -rf /",
+        "rm -rf /*",
+        "rm -rf --no-preserve-root /",
         "rm -rf ~",
+        "rm -rf ~/",
+        "rm -rf ~/*",
+        "rm -rf $HOME",
+        "rm -rf $HOME/",
+        "rm -rf $HOME/*",
         "mkfs",
         "dd if=",
         "shutdown",
@@ -47,9 +55,12 @@ final class TerminalCommandTool: ToolProtocol {
             return "错误：请提供要执行的命令"
         }
         // 危险命令防护：检测 rm -rf / / mkfs / dd if= / shutdown / reboot 等
-        for pattern in dangerousPatterns where command.contains(pattern) {
+        // 先对命令做规范化（折叠空白、去除引号），再匹配，防止简单绕过。
+        let normalized = Self.normalizeCommand(command)
+        for pattern in dangerousPatterns where normalized.contains(pattern) {
             return "错误：禁止执行危险命令"
         }
+
         // 用 Process 启动 /bin/bash 执行命令，stdout/stderr 分别接 Pipe
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/bash")
@@ -97,6 +108,17 @@ final class TerminalCommandTool: ToolProtocol {
                 continuation.resume(returning: output)
             }
         }
+    }
+
+    /// 规范化命令字符串：折叠连续空白并移除引号，便于统一匹配危险模式。
+    private static func normalizeCommand(_ command: String) -> String {
+        var normalized = command.trimmingCharacters(in: .whitespacesAndNewlines)
+        while normalized.contains("  ") {
+            normalized = normalized.replacingOccurrences(of: "  ", with: " ")
+        }
+        normalized = normalized.replacingOccurrences(of: "\"", with: "")
+        normalized = normalized.replacingOccurrences(of: "'", with: "")
+        return normalized
     }
 }
 #endif
