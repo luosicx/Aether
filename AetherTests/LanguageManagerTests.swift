@@ -84,7 +84,7 @@ final class LanguageManagerTests: XCTestCase {
         )
     }
 
-    // MARK: - 设置 current = .system 后 AppleLanguages key 被移除
+    // MARK: - 设置 current = .system 后 AppleLanguages 不再包含自定义语言
 
     func testSetCurrentSystemRemovesAppleLanguages() {
         // 前置：先设置一个非系统语言，确保 AppleLanguages 存在
@@ -94,12 +94,16 @@ final class LanguageManagerTests: XCTestCase {
             "前置：设置 .zhHans 后 AppleLanguages 应存在"
         )
 
-        // 切回 .system，AppleLanguages 应被移除
+        // 切回 .system，AppleLanguages 应被移除或回退为系统默认（不含自定义值）
+        // 注意：系统可能在 removeObject 后重新填充 AppleLanguages 为设备默认语言列表
         LanguageManager.shared.current = .system
-        XCTAssertNil(
-            UserDefaults.standard.array(forKey: appleLanguagesKey),
-            "设置 .system 后 AppleLanguages 应被移除"
-        )
+        let appleLangs = UserDefaults.standard.array(forKey: appleLanguagesKey)
+        if appleLangs != nil {
+            // 若仍存在，验证不包含我们设置的自定义语言
+            let contains = (appleLangs as? [String])?.contains("zh-Hans") ?? false
+            XCTAssertFalse(contains,
+                          "设置 .system 后 AppleLanguages 不应包含自定义语言 zh-Hans，实际：\(appleLangs ?? [])")
+        }
     }
 
     // MARK: - isSelected(_:) 判等
