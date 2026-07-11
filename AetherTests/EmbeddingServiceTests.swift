@@ -4,6 +4,15 @@ import XCTest
 /// Day 11: EmbeddingService 单元测试
 final class EmbeddingServiceTests: XCTestCase {
 
+    override func setUpWithError() throws {
+        // 隔离 Keychain：使用内存后端，避免依赖真实系统 Keychain（并行测试安全）
+        KeychainManager.shared.backend = InMemoryKeychainBackend()
+    }
+
+    override func tearDownWithError() throws {
+        KeychainManager.shared.backend = SystemKeychainBackend()
+    }
+
     // MARK: - 桩 EmbeddingService
 
     /// 桩子类：override `embed` 返回固定向量，记录每批输入以便验证分片顺序
