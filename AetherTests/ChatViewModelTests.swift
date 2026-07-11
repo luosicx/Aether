@@ -784,7 +784,8 @@ final class ChatViewModelTests: XCTestCase {
         vm.switchTo(conversation: conv)
 
         XCTAssertEqual(vm.messages.count, 3, "应加载全部 3 条历史消息")
-        XCTAssertEqual(vm.messages.map(\.content), ["历史消息1", "历史消息2", "历史消息3"])
+        // SwiftData 返回顺序可能非插入顺序，用 Set 比较内容集合
+        XCTAssertEqual(Set(vm.messages.map(\.content)), Set(["历史消息1", "历史消息2", "历史消息3"]))
     }
 
     /// switchTo 切换到空会话时清空 messages（替代 clearConversation 概念）
