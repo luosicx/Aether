@@ -16,35 +16,53 @@ final class TerminalCommandToolTests: XCTestCase {
         XCTAssertEqual(result, "错误：请提供要执行的命令")
     }
 
-    func testExecuteEchoCommand() async throws {
-        let result = try await tool.execute(arguments: ["command": "echo hello"])
-        XCTAssertEqual(result.trimmingCharacters(in: .whitespacesAndNewlines), "hello")
+    func testExecuteWhitelistedCommandPwd() async throws {
+        let result = try await tool.execute(arguments: ["command": "pwd"])
+        XCTAssertEqual(result, FileManager.default.currentDirectoryPath)
     }
 
-    func testExecuteDangerousCommand() async throws {
-        let result = try await tool.execute(arguments: ["command": "rm -rf /"])
-        XCTAssertEqual(result, "错误：禁止执行危险命令")
+    func testExecuteWhitelistedCommandGitStatus() async throws {
+        let result = try await tool.execute(arguments: ["command": "git status"])
+        XCTAssertFalse(result.hasPrefix("错误：不允许执行的命令"), "白名单命令不应被拦截，实际：\(result)")
+        XCTAssertFalse(result.isEmpty, "应有输出或错误信息")
     }
 
-    func testExecuteDangerousCommandBypasses() async throws {
-        let bypasses = [
-            "rm  -rf  /",           // 多余空格
-            "rm -rf --no-preserve-root /",
-            "rm -rf \"$HOME\"",     // 引号包裹
-            "rm -rf '$HOME'",
-            "rm -rf $HOME/",
-            "rm -rf ~/*",
-            "dd  if=/dev/zero",
-        ]
-        for command in bypasses {
-            let result = try await tool.execute(arguments: ["command": command])
-            XCTAssertEqual(result, "错误：禁止执行危险命令", "命令应被拦截: \(command)")
-        }
-    }
-
-    func testExecuteStderrCommand() async throws {
+    func testExecuteWhitelistedCommandStderr() async throws {
         let result = try await tool.execute(arguments: ["command": "ls /nonexistent"])
         XCTAssertTrue(result.contains("No such file"), "实际：\(result)")
+    }
+
+    func testExecuteNonWhitelistedCommand() async throws {
+        let result = try await tool.execute(arguments: ["command": "rm -rf /"])
+        XCTAssertEqual(result, "错误：不允许执行的命令: rm -rf /")
+    }
+
+    func testExecuteInjectionAttemptsAreBlocked() async throws {
+        let injections = [
+            "echo rm -rf / | bash",
+            "bash -c 'rm -rf /'",
+            "git status; rm -rf /",
+            "git status && rm -rf /"
+        ]
+
+        for command in injections {
+            let result = try await tool.execute(arguments: ["command": command])
+
+            switch command {
+            case "echo rm -rf / | bash":
+                XCTAssertEqual(result, "错误：不允许执行的命令: \(command)")
+            case "bash -c 'rm -rf /'":
+                XCTAssertEqual(result, "错误：不允许执行的命令: \(command)")
+            case "git status; rm -rf /":
+                XCTAssertTrue(result.contains("status;"), "注入应被阻止，实际：\(result)")
+            case "git status && rm -rf /":
+                XCTAssertTrue(result.contains("&&"), "注入应被阻止，实际：\(result)")
+            default:
+                break
+            }
+
+            XCTAssertFalse(result.contains("No such file"), "注入不应触发 rm 执行，实际：\(result)")
+        }
     }
 }
 #endif

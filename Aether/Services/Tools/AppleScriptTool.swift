@@ -8,6 +8,14 @@ import Foundation
 
 /// macOS AppleScript 执行工具
 final class AppleScriptTool: ToolProtocol {
+    var riskLevel: ToolRiskLevel { .dangerous }
+
+    /// 功能开关：是否启用 AppleScript 工具。默认关闭，需用户在设置中手动开启。
+    static var isEnabled: Bool {
+        get { UserDefaults.standard.bool(forKey: "com.aether.applescript.enabled") }
+        set { UserDefaults.standard.set(newValue, forKey: "com.aether.applescript.enabled") }
+    }
+
     /// 工具定义
     /// - name: `run_applescript`
     /// - parameters: `script`（必填，String）— 要执行的 AppleScript 脚本
@@ -31,6 +39,9 @@ final class AppleScriptTool: ToolProtocol {
     /// - Returns: 脚本执行输出，或错误信息字符串
     /// - Throws: 不抛异常，错误以字符串形式返回
     func execute(arguments: [String: Any]) async throws -> String {
+        guard AppleScriptTool.isEnabled else {
+            return "错误：AppleScript 工具未启用，请在设置中开启"
+        }
         guard let script = arguments["script"] as? String, !script.isEmpty else {
             return "错误：请提供 AppleScript 脚本"
         }

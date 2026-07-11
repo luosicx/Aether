@@ -4,6 +4,7 @@ import XCTest
 
 final class FileOperationToolTests: XCTestCase {
     private let tool = FileOperationTool()
+    private var tempDir: String { NSTemporaryDirectory() }
 
     func testDefinitionSchema() {
         XCTAssertEqual(tool.definition.name, "manage_file")
@@ -15,12 +16,12 @@ final class FileOperationToolTests: XCTestCase {
     }
 
     func testExecuteListDir() async throws {
-        let result = try await tool.execute(arguments: ["action": "list", "path": "/tmp"])
+        let result = try await tool.execute(arguments: ["action": "list", "path": tempDir])
         XCTAssertFalse(result.isEmpty)
     }
 
     func testExecuteFileInfo() async throws {
-        let result = try await tool.execute(arguments: ["action": "info", "path": "/tmp"])
+        let result = try await tool.execute(arguments: ["action": "info", "path": tempDir])
         XCTAssertTrue(result.contains("路径") || result.contains("错误"), "实际：\(result)")
     }
 
@@ -55,7 +56,7 @@ final class FileOperationToolTests: XCTestCase {
 
     /// list 不存在的目录应返回错误
     func testExecuteListNonExistentPath() async throws {
-        let result = try await tool.execute(arguments: ["action": "list", "path": "/nonexistent/path/12345"])
+        let result = try await tool.execute(arguments: ["action": "list", "path": tempDir + "/nonexistent/path/12345"])
         XCTAssertTrue(result.contains("错误"), "不存在的目录应返回错误：\(result)")
     }
 
@@ -69,13 +70,13 @@ final class FileOperationToolTests: XCTestCase {
 
     /// search 只提供 path 缺少 name 应返回错误
     func testExecuteSearchMissingName() async throws {
-        let result = try await tool.execute(arguments: ["action": "search", "path": "/tmp"])
+        let result = try await tool.execute(arguments: ["action": "search", "path": tempDir])
         XCTAssertEqual(result, "错误：请提供 path 和 name 参数")
     }
 
-    /// search 在 /tmp 下搜索应返回非空结果或未找到提示
+    /// search 在临时目录下搜索应返回非空结果或未找到提示
     func testExecuteSearchWithValidPath() async throws {
-        let result = try await tool.execute(arguments: ["action": "search", "path": "/tmp", "name": "*"])
+        let result = try await tool.execute(arguments: ["action": "search", "path": tempDir, "name": "*"])
         XCTAssertFalse(result.isEmpty, "搜索结果不应为空")
     }
 
@@ -89,19 +90,18 @@ final class FileOperationToolTests: XCTestCase {
 
     /// copy 只提供 src 缺少 dst 应返回错误
     func testExecuteCopyMissingDst() async throws {
-        let result = try await tool.execute(arguments: ["action": "copy", "src": "/tmp"])
+        let result = try await tool.execute(arguments: ["action": "copy", "src": tempDir])
         XCTAssertEqual(result, "错误：请提供 src 和 dst 参数")
     }
 
     /// copy 不存在的源文件应返回错误
     func testExecuteCopyNonExistentSrc() async throws {
-        let result = try await tool.execute(arguments: ["action": "copy", "src": "/nonexistent/src", "dst": "/tmp/dst"])
+        let result = try await tool.execute(arguments: ["action": "copy", "src": tempDir + "/nonexistent_src", "dst": tempDir + "/nonexistent_dst"])
         XCTAssertTrue(result.contains("错误"), "不存在的源文件应返回错误：\(result)")
     }
 
     /// copy 有效文件应返回"已复制"并实际复制
     func testExecuteCopyValidFile() async throws {
-        let tempDir = NSTemporaryDirectory()
         let srcFile = (tempDir as NSString).appendingPathComponent("aether_test_src.txt")
         let dstFile = (tempDir as NSString).appendingPathComponent("aether_test_dst.txt")
         try "test content".write(toFile: srcFile, atomically: true, encoding: .utf8)
@@ -109,6 +109,8 @@ final class FileOperationToolTests: XCTestCase {
             try? FileManager.default.removeItem(atPath: srcFile)
             try? FileManager.default.removeItem(atPath: dstFile)
         }
+        let tool = FileOperationTool()
+        tool.requiresDestructiveConfirmation = false
         let result = try await tool.execute(arguments: ["action": "copy", "src": srcFile, "dst": dstFile])
         XCTAssertEqual(result, "已复制")
         XCTAssertTrue(FileManager.default.fileExists(atPath: dstFile), "目标文件应存在")
@@ -124,13 +126,12 @@ final class FileOperationToolTests: XCTestCase {
 
     /// move 不存在的源文件应返回错误
     func testExecuteMoveNonExistentSrc() async throws {
-        let result = try await tool.execute(arguments: ["action": "move", "src": "/nonexistent/src", "dst": "/tmp/dst"])
+        let result = try await tool.execute(arguments: ["action": "move", "src": tempDir + "/nonexistent_src", "dst": tempDir + "/nonexistent_dst"])
         XCTAssertTrue(result.contains("错误"), "不存在的源文件应返回错误：\(result)")
     }
 
     /// move 有效文件应返回"已移动"并实际移动
     func testExecuteMoveValidFile() async throws {
-        let tempDir = NSTemporaryDirectory()
         let srcFile = (tempDir as NSString).appendingPathComponent("aether_move_src.txt")
         let dstFile = (tempDir as NSString).appendingPathComponent("aether_move_dst.txt")
         try "move content".write(toFile: srcFile, atomically: true, encoding: .utf8)
@@ -138,6 +139,8 @@ final class FileOperationToolTests: XCTestCase {
             try? FileManager.default.removeItem(atPath: srcFile)
             try? FileManager.default.removeItem(atPath: dstFile)
         }
+        let tool = FileOperationTool()
+        tool.requiresDestructiveConfirmation = false
         let result = try await tool.execute(arguments: ["action": "move", "src": srcFile, "dst": dstFile])
         XCTAssertEqual(result, "已移动")
         XCTAssertTrue(FileManager.default.fileExists(atPath: dstFile), "目标文件应存在")
@@ -154,13 +157,13 @@ final class FileOperationToolTests: XCTestCase {
 
     /// rename 只提供 path 缺少 name 应返回错误
     func testExecuteRenameMissingName() async throws {
-        let result = try await tool.execute(arguments: ["action": "rename", "path": "/tmp"])
+        let result = try await tool.execute(arguments: ["action": "rename", "path": tempDir])
         XCTAssertEqual(result, "错误：请提供 path 和 name 参数")
     }
 
     /// rename 不存在的文件应返回错误
     func testExecuteRenameNonExistentFile() async throws {
-        let result = try await tool.execute(arguments: ["action": "rename", "path": "/nonexistent/file.txt", "name": "newname.txt"])
+        let result = try await tool.execute(arguments: ["action": "rename", "path": tempDir + "/nonexistent_file.txt", "name": "newname.txt"])
         XCTAssertTrue(result.contains("错误"), "不存在的文件应返回错误：\(result)")
     }
 
@@ -174,7 +177,7 @@ final class FileOperationToolTests: XCTestCase {
 
     /// delete 不存在的文件应返回错误
     func testExecuteDeleteNonExistentFile() async throws {
-        let result = try await tool.execute(arguments: ["action": "delete", "path": "/nonexistent/file.txt"])
+        let result = try await tool.execute(arguments: ["action": "delete", "path": tempDir + "/nonexistent_file.txt"])
         XCTAssertTrue(result.contains("错误"), "不存在的文件应返回错误：\(result)")
     }
 
@@ -188,7 +191,7 @@ final class FileOperationToolTests: XCTestCase {
 
     /// info 不存在的文件应返回错误
     func testExecuteInfoNonExistentFile() async throws {
-        let result = try await tool.execute(arguments: ["action": "info", "path": "/nonexistent/file.txt"])
+        let result = try await tool.execute(arguments: ["action": "info", "path": tempDir + "/nonexistent_file.txt"])
         XCTAssertEqual(result, "错误：无法获取文件信息")
     }
 
@@ -204,6 +207,60 @@ final class FileOperationToolTests: XCTestCase {
     func testExecuteActionNotString() async throws {
         let result = try await tool.execute(arguments: ["action": 123])
         XCTAssertEqual(result, "错误：请提供 action 参数")
+    }
+
+    // MARK: - 沙盒安全
+
+    /// 路径遍历应被阻止
+    func testPathTraversalBlocked() async throws {
+        let result = try await tool.execute(arguments: ["action": "list", "path": "../../../etc/passwd"])
+        XCTAssertTrue(result.contains("路径超出允许范围"), "路径遍历应被阻止：\(result)")
+    }
+
+    /// 沙盒内的 list 操作应正常工作
+    func testSandboxedListWorks() async throws {
+        let result = try await tool.execute(arguments: ["action": "list", "path": tempDir])
+        XCTAssertFalse(result.contains("路径超出允许范围"), "临时目录应在沙盒内：\(result)")
+    }
+
+    // MARK: - 二次确认
+
+    /// 删除操作在 requiresDestructiveConfirmation 为 true 时应要求二次确认
+    func testDeleteRequiresSecondaryConfirmation() async throws {
+        let file = (tempDir as NSString).appendingPathComponent("aether_delete_confirm.txt")
+        try "delete me".write(toFile: file, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(atPath: file) }
+        let result = try await tool.execute(arguments: ["action": "delete", "path": file])
+        XCTAssertEqual(result, "错误：删除/覆盖操作需要二次确认（待实现 UI）")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: file), "未确认前不应删除文件")
+    }
+
+    /// 移动操作在 requiresDestructiveConfirmation 为 true 时应要求二次确认
+    func testMoveRequiresSecondaryConfirmation() async throws {
+        let srcFile = (tempDir as NSString).appendingPathComponent("aether_move_confirm_src.txt")
+        let dstFile = (tempDir as NSString).appendingPathComponent("aether_move_confirm_dst.txt")
+        try "move me".write(toFile: srcFile, atomically: true, encoding: .utf8)
+        defer {
+            try? FileManager.default.removeItem(atPath: srcFile)
+            try? FileManager.default.removeItem(atPath: dstFile)
+        }
+        let result = try await tool.execute(arguments: ["action": "move", "src": srcFile, "dst": dstFile])
+        XCTAssertEqual(result, "错误：删除/覆盖操作需要二次确认（待实现 UI）")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: srcFile), "未确认前不应移动源文件")
+    }
+
+    /// 复制覆盖操作在 requiresDestructiveConfirmation 为 true 时应要求二次确认
+    func testCopyOverwriteRequiresSecondaryConfirmation() async throws {
+        let srcFile = (tempDir as NSString).appendingPathComponent("aether_copy_confirm_src.txt")
+        let dstFile = (tempDir as NSString).appendingPathComponent("aether_copy_confirm_dst.txt")
+        try "source".write(toFile: srcFile, atomically: true, encoding: .utf8)
+        try "destination".write(toFile: dstFile, atomically: true, encoding: .utf8)
+        defer {
+            try? FileManager.default.removeItem(atPath: srcFile)
+            try? FileManager.default.removeItem(atPath: dstFile)
+        }
+        let result = try await tool.execute(arguments: ["action": "copy", "src": srcFile, "dst": dstFile])
+        XCTAssertEqual(result, "错误：删除/覆盖操作需要二次确认（待实现 UI）")
     }
 }
 #endif

@@ -15,9 +15,23 @@ final class ToolRegistry {
     static let shared = ToolRegistry()
     /// 工具字典，key 为工具名
     private var tools: [String: ToolProtocol] = [:]
+    /// 工具执行确认服务，可注入自定义实现（如 UI 确认）。
+    var confirmationService: ToolConfirmationService? = DefaultToolConfirmationService()
 
     /// 私有初始化，注册全部工具（跨平台 + macOS 独有条件注册）
     private init() {
+        registerAllTools()
+    }
+
+    /// 根据当前设置重新构建工具注册表。
+    /// 设置变更（如 AppleScript 开关）后调用，可动态增删工具。
+    func refreshRegisteredTools() {
+        tools.removeAll()
+        registerAllTools()
+    }
+
+    /// 注册全部工具，供 init 与 refreshRegisteredTools 复用。
+    private func registerAllTools() {
         // 原有 4 个工具
         register(tool: AlarmTool())
         register(tool: ReminderTool())
@@ -37,7 +51,9 @@ final class ToolRegistry {
         register(tool: CreateShortcutTool())
         // macOS 独有工具（11 个，条件注册）
         #if os(macOS)
-        register(tool: AppleScriptTool())
+        if AppleScriptTool.isEnabled {
+            register(tool: AppleScriptTool())
+        }
         register(tool: ScreenshotTool())
         register(tool: OCRTool())
         register(tool: TerminalCommandTool())
@@ -61,10 +77,19 @@ final class ToolRegistry {
         tools[name]
     }
 
-    /// 执行工具。未注册抛 NSError。返回工具执行结果字符串。
+    /// 执行工具。未注册抛 NSError；敏感/危险工具需经 confirmationService 确认。返回工具执行结果字符串。
     func execute(name: String, arguments: [String: Any]) async throws -> String {
         guard let tool = tools[name] else {
             throw NSError(domain: "ToolRegistry", code: 1, userInfo: [NSLocalizedDescriptionKey: "工具 \(name) 未注册"])
+        }
+        switch tool.riskLevel {
+        case .sensitive, .dangerous:
+            let confirmed = await confirmationService?.confirm(tool: tool, arguments: arguments) ?? false
+            guard confirmed else {
+                throw NSError(domain: "ToolRegistry", code: 2, userInfo: [NSLocalizedDescriptionKey: "用户取消了工具执行"])
+            }
+        default:
+            break
         }
         return try await tool.execute(arguments: arguments)
     }

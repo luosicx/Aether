@@ -34,6 +34,13 @@ final class SettingsViewModel {
     var isSaving = false
     /// 保存结果消息（成功/失败提示）
     var saveMessage: String?
+    #if os(macOS)
+    /// macOS AppleScript 工具开关，同步 AppleScriptTool.isEnabled
+    var isAppleScriptEnabled: Bool {
+        get { AppleScriptTool.isEnabled }
+        set { AppleScriptTool.isEnabled = newValue }
+    }
+    #endif
 
     // Day 14: 远程配置加载状态标记
     /// 用户是否手动切换过 provider（true 时 loadFromRemoteConfig 不覆盖 selectedProvider）

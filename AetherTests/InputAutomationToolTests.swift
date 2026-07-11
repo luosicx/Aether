@@ -74,6 +74,12 @@ final class InputAutomationToolTests: XCTestCase {
         XCTAssertEqual(result, "错误：请提供 x 和 y 参数")
     }
 
+    /// mouse_click 点击屏幕边缘附近应返回安全风险错误
+    func testExecuteMouseClickNearEdgeRejects() async throws {
+        let result = try await tool.execute(arguments: ["action": "mouse_click", "x": 10, "y": 10])
+        XCTAssertEqual(result, "错误：点击位置太靠近屏幕边缘，可能存在安全风险")
+    }
+
     // MARK: - mouse_drag 错误处理
 
     /// mouse_drag 缺少所有参数应返回错误
@@ -108,6 +114,24 @@ final class InputAutomationToolTests: XCTestCase {
     func testExecuteKeyComboUnknownKey() async throws {
         let result = try await tool.execute(arguments: ["action": "key_combo", "key": "unknown_key"])
         XCTAssertEqual(result, "错误：未知按键：unknown_key")
+    }
+
+    /// key_combo 使用系统级修饰键应被拒绝
+    func testExecuteKeyComboRejectsSystemModifier() async throws {
+        let result = try await tool.execute(arguments: ["action": "key_combo", "key": "a", "modifiers": ["command"]])
+        XCTAssertEqual(result, "错误：禁止模拟系统级修饰键组合")
+    }
+
+    /// key_combo 模拟系统键应被拒绝
+    func testExecuteKeyComboRejectsSystemKey() async throws {
+        let result = try await tool.execute(arguments: ["action": "key_combo", "key": "space"])
+        XCTAssertEqual(result, "错误：禁止模拟系统键: space")
+    }
+
+    /// key_combo 模拟普通按键应被允许
+    func testExecuteKeyComboAllowsPlainKey() async throws {
+        let result = try await tool.execute(arguments: ["action": "key_combo", "key": "a"])
+        XCTAssertEqual(result, "已执行快捷键：a")
     }
 
     // MARK: - scroll 错误处理

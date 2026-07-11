@@ -8,6 +8,8 @@ import Contacts
 
 /// 通讯录搜索工具，通过 Contacts 框架按姓名或电话号码搜索联系人
 final class ContactsTool: ToolProtocol {
+    var riskLevel: ToolRiskLevel { .sensitive }
+
     /// 工具定义（name/description/parameters）
     var definition: ToolDefinition {
         ToolDefinition(

@@ -625,6 +625,22 @@ struct SettingsView: View {
                 .accessibilityLabel("启用工具调用")
                 .accessibilityHint("启用后进入 ReAct 循环调用工具")
                 .accessibilityIdentifier("toolsToggle")
+            #if os(macOS)
+            Toggle(isOn: $settingsVM.isAppleScriptEnabled) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("启用 AppleScript 工具")
+                    Text("允许 AI 执行 AppleScript 可能存在安全风险")
+                        .font(.captionAI)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .onChange(of: settingsVM.isAppleScriptEnabled) { _, _ in
+                ToolRegistry.shared.refreshRegisteredTools()
+            }
+            .accessibilityLabel("启用 AppleScript 工具")
+            .accessibilityHint("允许 AI 执行 AppleScript 可能存在安全风险")
+            .accessibilityIdentifier("appleScriptToggle")
+            #endif
         } header: {
             Text("功能开关")
         } footer: {

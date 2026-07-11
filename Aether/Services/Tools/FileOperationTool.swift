@@ -8,8 +8,56 @@
 import Foundation
 import AppKit
 
+/// 文件操作沙盒：限制工具只能访问允许的根目录
+struct FileOperationSandbox {
+    let allowedRootDirectories: [URL]
+
+    /// 创建沙盒
+    /// - Parameter allowedRootDirectories: 允许的根目录；传 nil 时使用默认的文档目录和临时目录
+    init(allowedRootDirectories: [URL]? = nil) {
+        if let allowedRootDirectories = allowedRootDirectories {
+            self.allowedRootDirectories = allowedRootDirectories
+        } else {
+            var roots: [URL] = []
+            if let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+                roots.append(documents)
+            }
+            roots.append(URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true))
+            self.allowedRootDirectories = roots
+        }
+    }
+
+    /// 检查路径是否在允许范围内
+    /// - Parameter path: 待检查路径
+    /// - Returns: 是否允许访问
+    func isPathAllowed(_ path: String) -> Bool {
+        // 拒绝包含 .. 段的路径，防止路径遍历
+        let components = path.split(separator: "/")
+        if components.contains("..") {
+            return false
+        }
+
+        let url = URL(fileURLWithPath: path)
+        let resolved = url.resolvingSymlinksInPath()
+        let resolvedPath = resolved.path
+
+        return allowedRootDirectories.contains { root in
+            let resolvedRoot = root.resolvingSymlinksInPath()
+            let rootPath = resolvedRoot.path
+            return resolvedPath == rootPath || resolvedPath.hasPrefix(rootPath + "/")
+        }
+    }
+}
+
 /// macOS 文件操作工具
 final class FileOperationTool: ToolProtocol {
+    var riskLevel: ToolRiskLevel { .dangerous }
+
+    /// 文件操作沙盒
+    var sandbox: FileOperationSandbox = FileOperationSandbox()
+    /// 删除/覆盖操作是否需要二次确认
+    var requiresDestructiveConfirmation: Bool = true
+
     /// 工具定义
     /// - name: `manage_file`
     /// - parameters: `action`（必填，String）— 操作类型；`path`/`src`/`dst`/`name` 按需传入
@@ -54,11 +102,20 @@ final class FileOperationTool: ToolProtocol {
         }
     }
 
+    /// 验证单一路径是否在沙盒允许范围内
+    private func validatePath(_ path: String) -> String? {
+        guard sandbox.isPathAllowed(path) else {
+            return "错误：路径超出允许范围: \(path)"
+        }
+        return nil
+    }
+
     /// 列出指定目录下的所有条目名称
     private func listDir(_ arguments: [String: Any]) -> String {
         guard let path = arguments["path"] as? String else {
             return "错误：请提供 path 参数"
         }
+        if let error = validatePath(path) { return error }
         guard let items = try? fm.contentsOfDirectory(atPath: path) else {
             return "错误：无法读取目录：\(path)"
         }
@@ -72,6 +129,7 @@ final class FileOperationTool: ToolProtocol {
               let namePattern = arguments["name"] as? String else {
             return "错误：请提供 path 和 name 参数"
         }
+        if let error = validatePath(path) { return error }
         let url = URL(fileURLWithPath: path)
         var results: [String] = []
         // 用 FileManager enumerator 递归遍历目录树
@@ -90,6 +148,11 @@ final class FileOperationTool: ToolProtocol {
         guard let src = arguments["src"] as? String, let dst = arguments["dst"] as? String else {
             return "错误：请提供 src 和 dst 参数"
         }
+        if let error = validatePath(src) { return error }
+        if let error = validatePath(dst) { return error }
+        if requiresDestructiveConfirmation && fm.fileExists(atPath: dst) {
+            return "错误：删除/覆盖操作需要二次确认（待实现 UI）"
+        }
         do {
             try fm.copyItem(atPath: src, toPath: dst)
             return "已复制"
@@ -102,6 +165,11 @@ final class FileOperationTool: ToolProtocol {
     private func moveFile(_ arguments: [String: Any]) -> String {
         guard let src = arguments["src"] as? String, let dst = arguments["dst"] as? String else {
             return "错误：请提供 src 和 dst 参数"
+        }
+        if let error = validatePath(src) { return error }
+        if let error = validatePath(dst) { return error }
+        if requiresDestructiveConfirmation {
+            return "错误：删除/覆盖操作需要二次确认（待实现 UI）"
         }
         do {
             try fm.moveItem(atPath: src, toPath: dst)
@@ -116,9 +184,14 @@ final class FileOperationTool: ToolProtocol {
         guard let path = arguments["path"] as? String, let newName = arguments["name"] as? String else {
             return "错误：请提供 path 和 name 参数"
         }
+        if let error = validatePath(path) { return error }
         let srcURL = URL(fileURLWithPath: path)
         // 在原路径所在目录下拼接新文件名
         let dstURL = srcURL.deletingLastPathComponent().appendingPathComponent(newName)
+        if let error = validatePath(dstURL.path) { return error }
+        if requiresDestructiveConfirmation && fm.fileExists(atPath: dstURL.path) {
+            return "错误：删除/覆盖操作需要二次确认（待实现 UI）"
+        }
         do {
             try fm.moveItem(at: srcURL, to: dstURL)
             return "已重命名"
@@ -131,6 +204,10 @@ final class FileOperationTool: ToolProtocol {
     private func deleteFile(_ arguments: [String: Any]) -> String {
         guard let path = arguments["path"] as? String else {
             return "错误：请提供 path 参数"
+        }
+        if let error = validatePath(path) { return error }
+        if requiresDestructiveConfirmation {
+            return "错误：删除/覆盖操作需要二次确认（待实现 UI）"
         }
         let url = URL(fileURLWithPath: path)
         do {
@@ -148,6 +225,7 @@ final class FileOperationTool: ToolProtocol {
         guard let path = arguments["path"] as? String else {
             return "错误：请提供 path 参数"
         }
+        if let error = validatePath(path) { return error }
         guard let attrs = try? fm.attributesOfItem(atPath: path) else {
             return "错误：无法获取文件信息"
         }

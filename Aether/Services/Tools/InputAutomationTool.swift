@@ -10,6 +10,8 @@ import CoreGraphics
 
 /// macOS 输入自动化工具：模拟鼠标移动/点击/拖拽、键盘输入、滚轮滚动
 final class InputAutomationTool: ToolProtocol {
+    var riskLevel: ToolRiskLevel { .dangerous }
+
     /// 工具定义
     /// - name: `simulate_input`
     /// - parameters: `action`（必填，String）— 操作类型；坐标、文本、按键、修饰键等按需传入
@@ -67,10 +69,13 @@ final class InputAutomationTool: ToolProtocol {
         return "已移动鼠标到 (\(x), \(y))"
     }
 
-    /// 在指定坐标点击鼠标：依次 post 按下与抬起事件
+    /// 在指定坐标点击鼠标：校验安全区域后依次 post 按下与抬起事件
     private func mouseClick(_ arguments: [String: Any]) -> String {
         guard let x = arguments["x"] as? Int, let y = arguments["y"] as? Int else {
             return "错误：请提供 x 和 y 参数"
+        }
+        if !isPointInSafeArea(x: x, y: y) {
+            return "错误：点击位置太靠近屏幕边缘，可能存在安全风险"
         }
         let point = CGPoint(x: CGFloat(x), y: CGFloat(y))
         let downEvent = CGEvent(mouseEventSource: nil, mouseType: .leftMouseDown, mouseCursorPosition: point, mouseButton: .left)
@@ -80,11 +85,14 @@ final class InputAutomationTool: ToolProtocol {
         return "已在 (\(x), \(y)) 点击"
     }
 
-    /// 从起点拖拽到终点：按下 -> 拖拽 -> 抬起 三个事件
+    /// 从起点拖拽到终点：校验起止点安全区域后 post 三个事件
     private func mouseDrag(_ arguments: [String: Any]) -> String {
         guard let fromX = arguments["from_x"] as? Int, let fromY = arguments["from_y"] as? Int,
               let toX = arguments["to_x"] as? Int, let toY = arguments["to_y"] as? Int else {
             return "错误：请提供 from_x, from_y, to_x, to_y 参数"
+        }
+        if !isPointInSafeArea(x: fromX, y: fromY) || !isPointInSafeArea(x: toX, y: toY) {
+            return "错误：点击位置太靠近屏幕边缘，可能存在安全风险"
         }
         let startPoint = CGPoint(x: CGFloat(fromX), y: CGFloat(fromY))
         let endPoint = CGPoint(x: CGFloat(toX), y: CGFloat(toY))
@@ -95,6 +103,18 @@ final class InputAutomationTool: ToolProtocol {
         dragEvent?.post(tap: .cghidEventTap)
         upEvent?.post(tap: .cghidEventTap)
         return "已从 (\(fromX), \(fromY)) 拖拽到 (\(toX), \(toY))"
+    }
+
+    /// 校验坐标是否位于主屏安全区域（距离边缘至少 50 像素）
+    private func isPointInSafeArea(x: Int, y: Int) -> Bool {
+        let margin: CGFloat = 50
+        let bounds = CGDisplayBounds(CGMainDisplayID())
+        let point = CGPoint(x: CGFloat(x), y: CGFloat(y))
+        guard bounds.contains(point) else { return false }
+        return x >= Int(bounds.minX + margin)
+            && x <= Int(bounds.maxX - margin)
+            && y >= Int(bounds.minY + margin)
+            && y <= Int(bounds.maxY - margin)
     }
 
     /// 逐字符输入文本：每个字符查键码后 post 按下/抬起事件
@@ -118,13 +138,26 @@ final class InputAutomationTool: ToolProtocol {
         guard let key = arguments["key"] as? String else {
             return "错误：请提供 key 参数"
         }
+        let lowercasedKey = key.lowercased()
+        let forbiddenKeys: Set<String> = [
+            "space", "tab", "escape", "esc", "delete", "forwarddelete",
+            "return", "enter", "power", "eject", "volumeup", "volumedown", "mute"
+        ]
+        if forbiddenKeys.contains(lowercasedKey) {
+            return "错误：禁止模拟系统键: \(key)"
+        }
         guard let keyCode = stringToKeyCode(key) else {
             return "错误：未知按键：\(key)"
         }
         let modifiers = arguments["modifiers"] as? [String] ?? []
+        let lowercasedModifiers = modifiers.map { $0.lowercased() }
+        let forbiddenModifiers: Set<String> = ["command", "option", "control"]
+        if lowercasedModifiers.contains(where: { forbiddenModifiers.contains($0) }) {
+            return "错误：禁止模拟系统级修饰键组合"
+        }
         // 将修饰键名称列表合并为 CGEventFlags 位掩码
-        let flags = modifiers.reduce(CGEventFlags.maskNonCoalesced) { result, mod in
-            switch mod.lowercased() {
+        let flags = lowercasedModifiers.reduce(CGEventFlags.maskNonCoalesced) { result, mod in
+            switch mod {
             case "command": return result.union(.maskCommand)
             case "shift": return result.union(.maskShift)
             case "option": return result.union(.maskAlternate)

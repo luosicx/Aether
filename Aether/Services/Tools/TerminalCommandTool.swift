@@ -1,40 +1,33 @@
 /// 终端命令执行工具（macOS only）
 ///
-/// 通过 Process 在 macOS 上执行 shell 命令（/bin/bash -c），返回 stdout 和 stderr 合并输出。
-/// 内置危险命令防护（rm -rf /、mkfs、dd if=、shutdown 等）和 30 秒超时保护。
+/// 通过 Process 在 macOS 上执行白名单内的命令，返回 stdout 和 stderr 合并输出。
+/// 不再通过 /bin/bash -c 执行任意字符串，从而避免命令注入。
+/// 内置 30 秒超时保护。
 /// 调用方式：execute(arguments: ["command": "..."])，command 为必填参数。
 #if os(macOS)
 import Foundation
 
-/// macOS 命令行执行工具，执行 shell 命令并返回输出
+/// macOS 命令行执行工具，执行白名单命令并返回输出
 final class TerminalCommandTool: ToolProtocol {
-    /// 危险命令模式列表（作用于规范化后的命令）。
-    /// 包含常见绕过形式：多余空格、$HOME 引用、--no-preserve-root、引号包裹等。
-    private let dangerousPatterns = [
-        "rm -rf /",
-        "rm -rf /*",
-        "rm -rf --no-preserve-root /",
-        "rm -rf ~",
-        "rm -rf ~/",
-        "rm -rf ~/*",
-        "rm -rf $HOME",
-        "rm -rf $HOME/",
-        "rm -rf $HOME/*",
-        "mkfs",
-        "dd if=",
-        "shutdown",
-        "reboot",
-        "halt",
-        ":(){:|:&};:"
+    var riskLevel: ToolRiskLevel { .dangerous }
+
+    /// 允许执行的命令白名单。
+    /// key 为命令名（输入字符串中的第一个 token），value 为可能的可执行文件绝对路径列表，
+    /// 按顺序查找第一个存在且可执行的文件。
+    private let allowedCommands: [String: [String]] = [
+        "ls": ["/bin/ls"],
+        "pwd": ["/bin/pwd"],
+        "git": ["/usr/bin/git"],
+        "brew": ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"]
     ]
 
     /// 工具定义
     /// - name: `run_terminal_command`
-    /// - parameters: `command`（必填，String）— 要执行的 shell 命令
+    /// - parameters: `command`（必填，String）— 要执行的命令
     var definition: ToolDefinition {
         ToolDefinition(
             name: "run_terminal_command",
-            description: "在 macOS 上执行 shell 命令，返回 stdout 和 stderr，超时 30 秒",
+            description: "在 macOS 上执行白名单内的终端命令，返回 stdout 和 stderr，超时 30 秒",
             parameters: [
                 "type": "object",
                 "properties": [
@@ -45,7 +38,7 @@ final class TerminalCommandTool: ToolProtocol {
         )
     }
 
-    /// 执行 shell 命令
+    /// 执行白名单内的命令
     ///
     /// - Parameter arguments: 含 `command` 键的参数字典
     /// - Returns: 命令的 stdout + stderr 输出，或错误信息字符串
@@ -54,17 +47,25 @@ final class TerminalCommandTool: ToolProtocol {
         guard let command = arguments["command"] as? String, !command.isEmpty else {
             return "错误：请提供要执行的命令"
         }
-        // 危险命令防护：检测 rm -rf / / mkfs / dd if= / shutdown / reboot 等
-        // 先对命令做规范化（折叠空白、去除引号），再匹配，防止简单绕过。
-        let normalized = Self.normalizeCommand(command)
-        for pattern in dangerousPatterns where normalized.contains(pattern) {
-            return "错误：禁止执行危险命令"
+
+        let tokens = splitCommand(command)
+        guard let baseCommand = tokens.first else {
+            return "错误：请提供要执行的命令"
         }
 
-        // 用 Process 启动 /bin/bash 执行命令，stdout/stderr 分别接 Pipe
+        guard let candidatePaths = allowedCommands[baseCommand] else {
+            return "错误：不允许执行的命令: \(command)"
+        }
+
+        guard let executablePath = candidatePaths.first(where: {
+            FileManager.default.fileExists(atPath: $0) && FileManager.default.isExecutableFile(atPath: $0)
+        }) else {
+            return "错误：命令未安装: \(baseCommand)"
+        }
+
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/bash")
-        process.arguments = ["-c", command]
+        process.executableURL = URL(fileURLWithPath: executablePath)
+        process.arguments = Array(tokens.dropFirst())
         let stdoutPipe = Pipe()
         let stderrPipe = Pipe()
         process.standardOutput = stdoutPipe
@@ -77,6 +78,7 @@ final class TerminalCommandTool: ToolProtocol {
                 continuation.resume(returning: "错误：无法启动进程：\(error.localizedDescription)")
                 return
             }
+
             // 超时 30 秒：超时后终止进程
             let timeoutWorkItem = DispatchWorkItem {
                 if process.isRunning {
@@ -110,15 +112,44 @@ final class TerminalCommandTool: ToolProtocol {
         }
     }
 
-    /// 规范化命令字符串：折叠连续空白并移除引号，便于统一匹配危险模式。
-    private static func normalizeCommand(_ command: String) -> String {
-        var normalized = command.trimmingCharacters(in: .whitespacesAndNewlines)
-        while normalized.contains("  ") {
-            normalized = normalized.replacingOccurrences(of: "  ", with: " ")
+    /// 将命令字符串按空白拆分为 token，并尊重单引号和双引号。
+    private func splitCommand(_ command: String) -> [String] {
+        var tokens: [String] = []
+        var current = ""
+        var inSingleQuote = false
+        var inDoubleQuote = false
+
+        for character in command {
+            switch character {
+            case "'":
+                if inDoubleQuote {
+                    current.append(character)
+                } else {
+                    inSingleQuote.toggle()
+                }
+            case "\"":
+                if inSingleQuote {
+                    current.append(character)
+                } else {
+                    inDoubleQuote.toggle()
+                }
+            case " ", "\t", "\n", "\r":
+                if inSingleQuote || inDoubleQuote {
+                    current.append(character)
+                } else if !current.isEmpty {
+                    tokens.append(current)
+                    current = ""
+                }
+            default:
+                current.append(character)
+            }
         }
-        normalized = normalized.replacingOccurrences(of: "\"", with: "")
-        normalized = normalized.replacingOccurrences(of: "'", with: "")
-        return normalized
+
+        if !current.isEmpty {
+            tokens.append(current)
+        }
+
+        return tokens
     }
 }
 #endif

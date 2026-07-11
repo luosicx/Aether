@@ -59,23 +59,68 @@ final class ToolRegistryTests: XCTestCase {
         XCTAssertTrue(json.contains("\"name\""), "JSON 应含 name 字段")
         XCTAssertTrue(json.contains("\"parameters\""), "JSON 应含 parameters 字段")
     }
+
+    // MARK: - 工具执行确认框架集成测试
+
+    /// 危险工具在 confirmationService 拒绝时应抛 NSError（domain = "ToolRegistry"，code = 2）
+    func testExecuteDangerousToolDeniedThrowsCode2() async {
+        let originalService = registry.confirmationService
+        defer { registry.confirmationService = originalService }
+        registry.confirmationService = DenyAllConfirmationService()
+
+        // 临时将 calculate 替换为危险工具，测试结束后恢复
+        let originalCalculator = registry.getTool(named: "calculate")
+        defer {
+            if let originalCalculator = originalCalculator {
+                registry.register(tool: originalCalculator)
+            }
+        }
+        registry.register(tool: DummyTool(name: "calculate", result: "BOOM", riskLevel: .dangerous))
+
+        do {
+            _ = try await registry.execute(name: "calculate", arguments: [:])
+            XCTFail("危险工具被拒绝确认后应抛错")
+        } catch {
+            let nserror = error as NSError
+            XCTAssertEqual(nserror.domain, "ToolRegistry", "错误 domain 应为 ToolRegistry")
+            XCTAssertEqual(nserror.code, 2, "错误 code 应为 2")
+        }
+    }
+
+    /// 普通工具无需确认即可执行成功
+    func testExecuteNormalToolDoesNotRequireConfirmation() async throws {
+        let originalService = registry.confirmationService
+        defer { registry.confirmationService = originalService }
+        registry.confirmationService = DenyAllConfirmationService()
+
+        let result = try await registry.execute(name: "calculate", arguments: ["expression": "1 + 1"])
+        XCTAssertEqual(result, "2", "普通工具不应要求确认")
+    }
 }
 
-/// 测试用占位工具：name 与 result 可配置，execute 返回固定字符串
+/// 测试用占位工具：name、result 与 riskLevel 可配置，execute 返回固定字符串
 private final class DummyTool: ToolProtocol {
-    private let name: String
+    private let _definition: ToolDefinition
     private let result: String
+    private let _riskLevel: ToolRiskLevel
 
-    init(name: String, result: String) {
-        self.name = name
+    init(name: String, result: String, riskLevel: ToolRiskLevel = .normal) {
+        self._definition = ToolDefinition(name: name, description: "test dummy", parameters: [:])
         self.result = result
+        self._riskLevel = riskLevel
     }
 
-    var definition: ToolDefinition {
-        ToolDefinition(name: name, description: "test dummy", parameters: [:])
-    }
+    var definition: ToolDefinition { _definition }
+    var riskLevel: ToolRiskLevel { _riskLevel }
 
     func execute(arguments: [String: Any]) async throws -> String {
         result
+    }
+}
+
+/// 测试用确认服务：总是拒绝，用于验证敏感/危险工具会被取消执行
+private final class DenyAllConfirmationService: ToolConfirmationService {
+    func confirm(tool: ToolProtocol, arguments: [String: Any]) async -> Bool {
+        false
     }
 }

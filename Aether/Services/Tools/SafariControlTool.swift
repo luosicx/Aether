@@ -9,6 +9,8 @@ import Foundation
 
 /// macOS Safari 浏览器自动化工具，通过 AppleScript 控制 Safari
 final class SafariControlTool: ToolProtocol {
+    var riskLevel: ToolRiskLevel { .dangerous }
+
     /// 工具定义
     /// - name: `control_safari`
     /// - parameters: `action`（必填，String）— 操作类型；
@@ -29,6 +31,34 @@ final class SafariControlTool: ToolProtocol {
                 "required": ["action"]
             ]
         )
+    }
+
+    private let allowedDomains: [String] = [
+        "openai.com",
+        "deepseek.com",
+        "apple.com",
+        "google.com"
+    ]
+
+    /// 检查 URL 是否在白名单内（仅允许 https，并支持子域名通配）
+    private func isURLAllowed(_ urlString: String) -> Bool {
+        guard let url = URL(string: urlString),
+              let scheme = url.scheme?.lowercased(),
+              scheme == "https",
+              let host = url.host?.lowercased() else {
+            return false
+        }
+        return allowedDomains.contains { domain in
+            let domain = domain.lowercased()
+            return host == domain || host.hasSuffix(".\(domain)")
+        }
+    }
+
+    /// 对 AppleScript 字符串字面量进行转义，防止字符串插值注入
+    private func appleScriptLiteral(_ string: String) -> String {
+        return string
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
     }
 
     /// 执行 Safari 控制操作
@@ -82,30 +112,29 @@ final class SafariControlTool: ToolProtocol {
         guard let url = arguments["url"] as? String else {
             return "错误：请提供 url 参数"
         }
+        guard isURLAllowed(url) else {
+            return "错误：不允许的 URL: \(url)"
+        }
+        let escapedURL = appleScriptLiteral(url)
         let script = """
         tell application "Safari"
-            set URL of current tab of front window to "\(url)"
+            set URL of current tab of front window to "\(escapedURL)"
         end tell
         """
         return runAppleScript(script)
     }
 
-    /// 在当前标签页执行 JavaScript 代码
+    /// 在当前标签页执行 JavaScript 代码（已禁用）
     private func runJS(_ arguments: [String: Any]) -> String {
-        guard let jsCode = arguments["script"] as? String else {
-            return "错误：请提供 script 参数"
-        }
-        let script = """
-        tell application "Safari"
-            do JavaScript "\(jsCode)" in current tab of front window
-        end tell
-        """
-        return runAppleScript(script)
+        return "错误：run_js 操作已被禁用"
     }
 
     /// 新建标签页（或文档），url 为空时新建空白文档
     private func newTab(_ arguments: [String: Any]) -> String {
         let url = arguments["url"] as? String ?? ""
+        if !url.isEmpty && !isURLAllowed(url) {
+            return "错误：不允许的 URL: \(url)"
+        }
         let script: String
         if url.isEmpty {
             script = """
@@ -114,9 +143,10 @@ final class SafariControlTool: ToolProtocol {
             end tell
             """
         } else {
+            let escapedURL = appleScriptLiteral(url)
             script = """
             tell application "Safari"
-                make new document with properties {URL:"\(url)"}
+                make new document with properties {URL:"\(escapedURL)"}
             end tell
             """
         }
