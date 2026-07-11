@@ -293,7 +293,7 @@ jobs:
 
   # Coverage status check: blocks PR merge if non-Views coverage < 90%
   coverage-summary:
-    needs: unit-tests
+    needs: [unit-tests, ui-tests]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -314,7 +314,7 @@ jobs:
 
   # Code quality status check: SonarQube static analysis
   code-quality:
-    needs: unit-tests
+    needs: coverage-summary
     runs-on: macos-15
     if: always()
     steps:
