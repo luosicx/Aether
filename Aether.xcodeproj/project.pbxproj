@@ -205,6 +205,9 @@
 		EF8F6CED79CD3CD894CB665B /* LaunchScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06338EAB3D44F558619E23D1 /* LaunchScreen.swift */; };
 		F0F246B22366C61D222BE835 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4793E58E7B8E0482175F372A /* Foundation.framework */; };
 		F1A2B3C4D5E6F7A8B9C0D1E2 /* OnDeviceModelCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2B3C4D5E6F7A8B9C0D1E2F3 /* OnDeviceModelCatalog.swift */; };
+		F1E2D3C4B5A6001100000002 /* ChatChunkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1E2D3C4B5A6001100000001 /* ChatChunkTests.swift */; };
+		F1E2D3C4B5A6002200000002 /* ModelProviderFactoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1E2D3C4B5A6002200000001 /* ModelProviderFactoryTests.swift */; };
+		F1E2D3C4B5A6003300000002 /* LanguageManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1E2D3C4B5A6003300000001 /* LanguageManagerTests.swift */; };
 		F2714354198A19F1E7742BD7 /* ToolProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7968844D2C435C17D9287AE /* ToolProtocol.swift */; };
 		F321621C8828CBDBBF5BB142 /* SwiftData.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B2095A1ED03408007FEFDBEB /* SwiftData.framework */; };
 		F359A39E541ABB4A3FE1ECE9 /* IntentChatServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05901B8A22C088927620C3AE /* IntentChatServiceTests.swift */; };
@@ -427,6 +430,9 @@
 		EF66C150012289835F7C4885 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = "<group>"; };
 		F0073D07F6E96B6034CAE1E4 /* SemanticCacheTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SemanticCacheTests.swift; sourceTree = "<group>"; };
 		F1CD426E5EA88109389F61F3 /* EventKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = EventKit.framework; path = System/Library/Frameworks/EventKit.framework; sourceTree = "<group>"; };
+		F1E2D3C4B5A6001100000001 /* ChatChunkTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatChunkTests.swift; sourceTree = "<group>"; };
+		F1E2D3C4B5A6002200000001 /* ModelProviderFactoryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ModelProviderFactoryTests.swift; sourceTree = "<group>"; };
+		F1E2D3C4B5A6003300000001 /* LanguageManagerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LanguageManagerTests.swift; sourceTree = "<group>"; };
 		F28A1CFC98C7601B399A721C /* FeedbackBar.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FeedbackBar.swift; sourceTree = "<group>"; };
 		F38DFCE93DCA5A78D5F2FCB5 /* AetherUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AetherUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F3E4D5C6B7A89012FEDCBA98 /* OnDeviceModelDownloaderTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OnDeviceModelDownloaderTests.swift; sourceTree = "<group>"; };
@@ -894,6 +900,9 @@
 				4F39630C03DDA73E1AEA3EF8 /* PresetPromptsTests.swift */,
 				ABBA08145D383109918F8AF7 /* DesignTokensTests.swift */,
 				770A9665430D71E21A9B1CF8 /* EmptyStateViewTests.swift */,
+				F1E2D3C4B5A6001100000001 /* ChatChunkTests.swift */,
+				F1E2D3C4B5A6002200000001 /* ModelProviderFactoryTests.swift */,
+				F1E2D3C4B5A6003300000001 /* LanguageManagerTests.swift */,
 			);
 			path = AetherTests;
 			sourceTree = "<group>";
@@ -1280,6 +1289,9 @@
 				E23882EBC47F3140F103D658 /* PresetPromptsTests.swift in Sources */,
 				46C6807EDF9892647AFD98B8 /* DesignTokensTests.swift in Sources */,
 				BE8A82FCC620E57EF2F5867F /* EmptyStateViewTests.swift in Sources */,
+				F1E2D3C4B5A6001100000002 /* ChatChunkTests.swift in Sources */,
+				F1E2D3C4B5A6002200000002 /* ModelProviderFactoryTests.swift in Sources */,
+				F1E2D3C4B5A6003300000002 /* LanguageManagerTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

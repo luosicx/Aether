@@ -17,11 +17,15 @@ final class ChatViewModelTests: XCTestCase {
             configurations: config
         )
         context = ModelContext(container)
+        // 隔离 Keychain：使用内存后端，避免依赖真实系统 Keychain（各测试可自行 saveAPIKey 预置 key）
+        KeychainManager.shared.backend = InMemoryKeychainBackend()
     }
 
     override func tearDownWithError() throws {
         context = nil
         container = nil
+        // 恢复真实 Keychain 后端，避免影响其他测试类
+        KeychainManager.shared.backend = SystemKeychainBackend()
     }
 
     /// 17.1 表驱动：从尾部累加超过 tokenLimit 时截断（保留最近的、丢弃最早的）
@@ -243,20 +247,387 @@ final class ChatViewModelTests: XCTestCase {
         XCTAssertNotNil(qwenResolved, "Qwen provider 应正常解析")
         XCTAssertEqual(qwenResolved?.1, .qwen, "Qwen provider 解析结果应为 .qwen")
     }
+
+    // MARK: - 深度补充测试
+
+    /// 17.10 processMessage 桩回复模式（UITEST_DISABLE_NETWORK）：
+    /// 以 UITEST_DISABLE_NETWORK 启动参数运行时，processMessage 应短路为固定桩回复，
+    /// 追加 assistant 消息并清理流式状态。无此启动参数时跳过（需 UITEST scheme 配合）。
+    func testProcessMessageStubReplyUITESTMode() async throws {
+        try XCTSkipUnless(
+            ProcessInfo.processInfo.arguments.contains("UITEST_DISABLE_NETWORK"),
+            "需以 -UITEST_DISABLE_NETWORK 启动参数运行"
+        )
+        let vm = ChatViewModel()
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+        let userMsg = ChatMessage(role: "user", content: "你好")
+        userMsg.conversation = conv
+        conv.messages.append(userMsg)
+
+        await vm.processMessage("桩测试内容", conversation: conv, modelContext: context)
+
+        let assistantMsgs = conv.messages.filter { $0.role == "assistant" }
+        XCTAssertEqual(assistantMsgs.count, 1, "桩模式应追加 1 条 assistant 消息")
+        XCTAssertTrue(assistantMsgs.first?.content.contains("桩测试内容") == true,
+                      "桩回复应包含原始输入文本")
+        XCTAssertFalse(vm.isLoading, "桩模式完成后 isLoading 应为 false")
+        XCTAssertEqual(vm.streamingText, "", "桩模式完成后 streamingText 应被清空")
+    }
+
+    /// 17.11 sendMessage 非空输入流程：追加用户消息、清空 inputText、翻转 isLoading，
+    /// 后台 processMessage 完成后 isLoading 复位并追加 assistant 消息。
+    func testSendMessageFlowAppendsAndTogglesLoading() async throws {
+        let mock = MockLLMProvider()
+        mock.chatChunks = ["你好", "，世界"]
+        let vm = ChatViewModel(client: mock)
+        vm.selectedProvider = .onDevice  // 端侧推理绕过 apiKey 检查
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+
+        vm.inputText = "测试消息"
+        vm.sendMessage(in: conv, modelContext: context)
+
+        // 同步断言：sendMessage 立即设置的状态
+        XCTAssertTrue(vm.isLoading, "sendMessage 后 isLoading 应为 true")
+        XCTAssertEqual(vm.inputText, "", "inputText 应被清空")
+        XCTAssertEqual(conv.messages.count, 1, "应追加 1 条用户消息")
+        XCTAssertEqual(conv.messages.first?.role, "user")
+        XCTAssertEqual(conv.messages.first?.content, "测试消息")
+        XCTAssertEqual(vm.streamingText, "", "streamingText 应被重置")
+        XCTAssertTrue(vm.currentToolSteps.isEmpty, "currentToolSteps 应被清空")
+
+        // 轮询等待后台 processMessage Task 完成（streamingTask 为 private，无法直接 await）
+        for _ in 0..<100 {
+            if !vm.isLoading { break }
+            try await Task.sleep(nanoseconds: 50_000_000)  // 50ms
+        }
+        XCTAssertFalse(vm.isLoading, "processMessage 完成后 isLoading 应为 false")
+        XCTAssertEqual(vm.streamingText, "", "streamingText 应被清空")
+        let assistantMsgs = conv.messages.filter { $0.role == "assistant" }
+        XCTAssertEqual(assistantMsgs.count, 1, "应追加 1 条 assistant 消息")
+        XCTAssertEqual(assistantMsgs.first?.content, "你好，世界",
+                       "assistant 内容应为所有 chunk 拼接")
+    }
+
+    /// 17.12 RAG 开启 + DeepSeek provider（无 Qwen Key）：
+    /// ragEmbeddingProvider 降级到 .deepseek，应设置 embedding 不支持错误并清空 citations。
+    /// 预置 DeepSeek API Key 以绕过 apiKey 缺失检查（否则 RAG 错误会被覆盖）。
+    func testProcessMessageRAGEnabledDeepSeekSetsEmbeddingError() async throws {
+        try KeychainManager.shared.saveAPIKey("test-key", for: .deepseek)
+
+        let mock = MockLLMProvider()
+        let vm = ChatViewModel(client: mock)
+        vm.selectedProvider = .deepseek
+        vm.ragEnabled = true
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+        let userMsg = ChatMessage(role: "user", content: "你好")
+        userMsg.conversation = conv
+        conv.messages.append(userMsg)
+
+        await vm.processMessage("你好", conversation: conv, modelContext: context)
+
+        XCTAssertEqual(
+            vm.errorMessage,
+            NSLocalizedString("DeepSeek 不支持知识库嵌入，请在设置中配置 Qwen API Key 或切换供应商为 Qwen", comment: ""),
+            "RAG + DeepSeek 无 Qwen Key 时应设置 embedding 不支持错误"
+        )
+        XCTAssertTrue(vm.currentCitations.isEmpty, "RAG 降级时应清空 currentCitations")
+    }
+
+    /// 17.13 RAG 关闭：currentCitations 应被清空（即使预置了非空值）
+    func testProcessMessageRAGDisabledClearsCitations() async throws {
+        let mock = MockLLMProvider()
+        mock.chatChunks = ["回复"]
+        let vm = ChatViewModel(client: mock)
+        vm.selectedProvider = .onDevice
+        vm.ragEnabled = false
+        // 预置非空 citations，验证 processMessage 会清空
+        vm.currentCitations = [DocumentChunk(content: "旧引用1"), DocumentChunk(content: "旧引用2")]
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+        let userMsg = ChatMessage(role: "user", content: "你好")
+        userMsg.conversation = conv
+        conv.messages.append(userMsg)
+
+        await vm.processMessage("你好", conversation: conv, modelContext: context)
+
+        XCTAssertTrue(vm.currentCitations.isEmpty, "RAG 关闭时 currentCitations 应被清空")
+    }
+
+    /// 17.14 工具调用开启：mock 返回 toolCalls，验证 currentToolSteps 更新（status=.completed，result 正确）
+    func testProcessMessageToolsEnabledUpdatesToolSteps() async throws {
+        let mock = MockLLMProvider()
+        mock.toolCalls = [
+            AccumulatedToolCall(
+                id: "call-1", type: "function", name: "calculate",
+                arguments: "{\"expression\": \"1 + 2\"}"
+            )
+        ]
+        let vm = ChatViewModel(client: mock)
+        vm.selectedProvider = .onDevice
+        vm.toolsEnabled = true
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+        let userMsg = ChatMessage(role: "user", content: "计算 1+2")
+        userMsg.conversation = conv
+        conv.messages.append(userMsg)
+
+        await vm.processMessage("计算 1+2", conversation: conv, modelContext: context)
+
+        XCTAssertEqual(vm.currentToolSteps.count, 1, "应创建 1 个 ToolStep")
+        let step = vm.currentToolSteps[0]
+        XCTAssertEqual(step.toolName, "calculate")
+        XCTAssertEqual(step.status, .completed, "calculate 执行成功时 status 应为 .completed")
+        XCTAssertEqual(step.result, "3", "calculate 1+2 结果应为 3")
+        XCTAssertEqual(step.loopIndex, 1, "首轮 loopIndex 应为 1")
+        // 验证 tool 消息被追加到 conversation
+        let toolMsgs = conv.messages.filter { $0.role == "tool" }
+        XCTAssertEqual(toolMsgs.count, 1, "应追加 1 条 tool 消息")
+        XCTAssertEqual(toolMsgs.first?.toolName, "calculate")
+        XCTAssertEqual(toolMsgs.first?.toolCallId, "call-1")
+    }
+
+    /// 17.15 工具调用关闭：不应产生 ToolStep，走纯文本 chat 路径
+    func testProcessMessageToolsDisabledNoToolSteps() async throws {
+        let mock = MockLLMProvider()
+        mock.chatChunks = ["普通回复"]
+        let vm = ChatViewModel(client: mock)
+        vm.selectedProvider = .onDevice
+        vm.toolsEnabled = false
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+        let userMsg = ChatMessage(role: "user", content: "你好")
+        userMsg.conversation = conv
+        conv.messages.append(userMsg)
+
+        await vm.processMessage("你好", conversation: conv, modelContext: context)
+
+        XCTAssertTrue(vm.currentToolSteps.isEmpty, "工具关闭时不应产生 ToolStep")
+        let assistantMsgs = conv.messages.filter { $0.role == "assistant" }
+        XCTAssertEqual(assistantMsgs.count, 1)
+        XCTAssertEqual(assistantMsgs.first?.content, "普通回复")
+    }
+
+    /// 17.16 模型选择 auto 模式 + 短文本：SmartRouter 路由到 deepseek-chat
+    func testProcessMessageModelSelectionAutoRoutesToChat() async throws {
+        try KeychainManager.shared.saveAPIKey("test-key", for: .deepseek)
+        let mock = MockLLMProvider()
+        mock.chatChunks = ["回复"]
+        let vm = ChatViewModel(client: mock)
+        vm.selectedProvider = .deepseek
+        vm.modelSelectionMode = "auto"
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+        let userMsg = ChatMessage(role: "user", content: "你好")
+        userMsg.conversation = conv
+        conv.messages.append(userMsg)
+
+        await vm.processMessage("你好", conversation: conv, modelContext: context)
+
+        XCTAssertEqual(mock.capturedConfig?.model, "deepseek-chat",
+                       "auto 模式短文本应路由到 deepseek-chat")
+    }
+
+    /// 17.17 模型选择 auto 模式 + 长文本(>=50字)：SmartRouter 路由到 deepseek-reasoner
+    func testProcessMessageModelSelectionAutoRoutesToReasoner() async throws {
+        try KeychainManager.shared.saveAPIKey("test-key", for: .deepseek)
+        let mock = MockLLMProvider()
+        mock.chatChunks = ["回复"]
+        let vm = ChatViewModel(client: mock)
+        vm.selectedProvider = .deepseek
+        vm.modelSelectionMode = "auto"
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+        let longText = String(repeating: "这是一段需要深度推理的长文本。", count: 5)  // 75 字符 >= 50
+        let userMsg = ChatMessage(role: "user", content: longText)
+        userMsg.conversation = conv
+        conv.messages.append(userMsg)
+
+        await vm.processMessage(longText, conversation: conv, modelContext: context)
+
+        XCTAssertEqual(mock.capturedConfig?.model, "deepseek-reasoner",
+                       "auto 模式长文本(>=50字)应路由到 deepseek-reasoner")
+    }
+
+    /// 17.18 模型选择手动 chat 模式：modelSelectionMode = "deepseek-chat"
+    func testProcessMessageModelSelectionChatMode() async throws {
+        try KeychainManager.shared.saveAPIKey("test-key", for: .deepseek)
+        let mock = MockLLMProvider()
+        mock.chatChunks = ["回复"]
+        let vm = ChatViewModel(client: mock)
+        vm.selectedProvider = .deepseek
+        vm.modelSelectionMode = "deepseek-chat"
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+        let userMsg = ChatMessage(role: "user", content: "你好")
+        userMsg.conversation = conv
+        conv.messages.append(userMsg)
+
+        await vm.processMessage("你好", conversation: conv, modelContext: context)
+
+        XCTAssertEqual(mock.capturedConfig?.model, "deepseek-chat",
+                       "手动 chat 模式应映射到 deepseek-chat")
+    }
+
+    /// 17.19 模型选择手动 reasoner 模式：modelSelectionMode = "deepseek-reasoner"
+    func testProcessMessageModelSelectionReasonerMode() async throws {
+        try KeychainManager.shared.saveAPIKey("test-key", for: .deepseek)
+        let mock = MockLLMProvider()
+        mock.chatChunks = ["回复"]
+        let vm = ChatViewModel(client: mock)
+        vm.selectedProvider = .deepseek
+        vm.modelSelectionMode = "deepseek-reasoner"
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+        let userMsg = ChatMessage(role: "user", content: "你好")
+        userMsg.conversation = conv
+        conv.messages.append(userMsg)
+
+        await vm.processMessage("你好", conversation: conv, modelContext: context)
+
+        XCTAssertEqual(mock.capturedConfig?.model, "deepseek-reasoner",
+                       "手动 reasoner 模式应映射到 deepseek-reasoner")
+    }
+
+    /// 17.20 streamingText 累积和清理：多 chunk 拼接后 streamingText 清空，assistant 内容为完整拼接
+    func testProcessMessageStreamingAccumulationAndCleanup() async throws {
+        let mock = MockLLMProvider()
+        mock.chatChunks = ["Hello", " ", "World", "!"]
+        let vm = ChatViewModel(client: mock)
+        vm.selectedProvider = .onDevice
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+        let userMsg = ChatMessage(role: "user", content: "hi")
+        userMsg.conversation = conv
+        conv.messages.append(userMsg)
+
+        await vm.processMessage("hi", conversation: conv, modelContext: context)
+
+        XCTAssertEqual(vm.streamingText, "", "processMessage 完成后 streamingText 应被清空")
+        let assistantMsgs = conv.messages.filter { $0.role == "assistant" }
+        XCTAssertEqual(assistantMsgs.count, 1)
+        XCTAssertEqual(assistantMsgs.first?.content, "Hello World!",
+                       "assistant 内容应为所有 chunk 拼接结果")
+    }
+
+    /// 17.21 错误处理：apiKey 缺失时设置 errorMessage 并复位 isLoading
+    func testProcessMessageErrorMessageWhenAPIKeyMissing() async throws {
+        // InMemoryKeychainBackend 默认无 key → apiKey 为空
+        let mock = MockLLMProvider()
+        let vm = ChatViewModel(client: mock)
+        vm.selectedProvider = .deepseek
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+        let userMsg = ChatMessage(role: "user", content: "你好")
+        userMsg.conversation = conv
+        conv.messages.append(userMsg)
+
+        await vm.processMessage("你好", conversation: conv, modelContext: context)
+
+        XCTAssertEqual(vm.errorMessage, LLMError.apiKeyMissing.userMessage,
+                       "apiKey 缺失时应设置 apiKeyMissing 错误消息")
+        XCTAssertFalse(vm.isLoading, "错误后 isLoading 应为 false")
+        XCTAssertEqual(vm.streamingText, "", "错误后 streamingText 应被清空")
+    }
+
+    /// 17.22 conversation 消息追加：processMessage 完成后 assistant 消息追加到 conversation
+    func testProcessMessageAppendsAssistantMessageToConversation() async throws {
+        let mock = MockLLMProvider()
+        mock.chatChunks = ["这是回复"]
+        let vm = ChatViewModel(client: mock)
+        vm.selectedProvider = .onDevice
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+        let userMsg = ChatMessage(role: "user", content: "你好")
+        userMsg.conversation = conv
+        conv.messages.append(userMsg)
+        let initialCount = conv.messages.count
+
+        await vm.processMessage("你好", conversation: conv, modelContext: context)
+
+        XCTAssertEqual(conv.messages.count, initialCount + 1, "应追加 1 条 assistant 消息")
+        XCTAssertEqual(conv.messages.last?.role, "assistant")
+        XCTAssertEqual(conv.messages.last?.content, "这是回复")
+        // vm.messages 也应同步更新
+        XCTAssertTrue(vm.messages.contains(where: { $0.role == "assistant" && $0.content == "这是回复" }),
+                       "vm.messages 也应包含该 assistant 消息")
+    }
+
+    /// 17.23 工具执行失败：currentToolSteps 标记 .failed 并设置 errorMessage
+    func testProcessMessageToolExecutionFailureSetsFailedStatus() async throws {
+        let mock = MockLLMProvider()
+        mock.toolCalls = [
+            AccumulatedToolCall(
+                id: "call-fail", type: "function",
+                name: "nonexistent_tool", arguments: "{}"
+            )
+        ]
+        let vm = ChatViewModel(client: mock)
+        vm.selectedProvider = .onDevice
+        vm.toolsEnabled = true
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+        let userMsg = ChatMessage(role: "user", content: "调用不存在工具")
+        userMsg.conversation = conv
+        conv.messages.append(userMsg)
+
+        await vm.processMessage("调用不存在工具", conversation: conv, modelContext: context)
+
+        XCTAssertEqual(vm.currentToolSteps.count, 1, "应创建 1 个 ToolStep")
+        let step = vm.currentToolSteps[0]
+        XCTAssertEqual(step.toolName, "nonexistent_tool")
+        XCTAssertEqual(step.status, .failed, "工具未注册时 status 应为 .failed")
+        XCTAssertNotNil(step.result, "失败时应记录错误结果")
+        XCTAssertNotNil(vm.errorMessage, "工具失败时应设置 errorMessage")
+        XCTAssertTrue(vm.errorMessage?.contains("nonexistent_tool") == true,
+                     "errorMessage 应包含工具名")
+    }
 }
 
-/// 用于单元测试的 LLMProvider 桩实现：chat 返回立即结束的空 stream，embed 返回预设结果
-/// 避免在测试中发起真实网络请求
+/// 用于单元测试的 LLMProvider 桩实现：chat 返回可配置的流式 chunk，embed 返回预设结果。
+/// 避免在测试中发起真实网络请求。默认 chatChunks 为空时流立即 finish（保持向后兼容）。
 final class MockLLMProvider: LLMProvider {
     /// embed 返回的预设 embedding 二维数组（默认空）
     var embedResult: [[Float]] = []
+    /// 纯文本 chat 流式返回的 chunk 序列（默认空 → 流立即 finish）
+    var chatChunks: [String] = []
+    /// 工具 chat 流式返回的文本内容（nil → 不 yield content）
+    var toolChatResponse: String?
+    /// 工具调用列表（仅在 tools-chat 首次调用时 yield 一次，避免 ReAct 循环无限触发）
+    var toolCalls: [AccumulatedToolCall]?
+    /// 捕获最近一次 chat 调用的 config（用于验证模型选择）
+    private(set) var capturedConfig: ChatConfig?
+    /// 捕获最近一次 chat 调用的 apiKey
+    private(set) var capturedApiKey: String?
+    /// 标记 toolCalls 是否已 yield（避免 ReAct 循环重复触发）
+    private var toolCallsYielded = false
 
     func chat(messages: [APIMessage], config: ChatConfig, apiKey: String) -> AsyncStream<String> {
-        AsyncStream { $0.finish() }
+        capturedConfig = config
+        capturedApiKey = apiKey
+        return AsyncStream { cont in
+            for chunk in self.chatChunks {
+                cont.yield(chunk)
+            }
+            cont.finish()
+        }
     }
 
     func chat(messages: [APIMessage], config: ChatConfig, tools: [ToolDef], apiKey: String) -> AsyncStream<ParsedChunk> {
-        AsyncStream { $0.finish() }
+        capturedConfig = config
+        capturedApiKey = apiKey
+        return AsyncStream { cont in
+            if let resp = self.toolChatResponse {
+                cont.yield(ParsedChunk(content: resp, toolCalls: nil))
+            }
+            if let calls = self.toolCalls, !self.toolCallsYielded {
+                cont.yield(ParsedChunk(content: nil, toolCalls: calls))
+                self.toolCallsYielded = true
+            }
+            cont.finish()
+        }
     }
 
     func embed(texts: [String], apiKey: String) async throws -> [[Float]] {
