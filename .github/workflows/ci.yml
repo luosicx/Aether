@@ -138,7 +138,12 @@ jobs:
           # Match file lines only: leading whitespace + /abs/path.swift + pct + (cov/tot)
           pattern = re.compile(r"^\s+(/\S+\.swift)\s+([\d.]+)%\s+\((\d+)/(\d+)\)", re.MULTILINE)
           # Directories excluded from coverage:
-          EXCLUDE_PATTERNS = ["/Views/", "/DesignSystem/", "/App/AetherApp", "/Protocols/", "/Actors/"]
+          # - Views/: pure SwiftUI views
+          # - DesignSystem/: design token definitions
+          # - App/AetherApp: @main entry point
+          # - Protocols/, Actors/: protocol/actor definitions
+          # - AetherTests/, AetherUITests/: test files should not count toward source coverage
+          EXCLUDE_PATTERNS = ["/Views/", "/DesignSystem/", "/App/AetherApp", "/Protocols/", "/Actors/", "/AetherTests/", "/AetherUITests/"]
           for m in pattern.finditer(text):
               path = m.group(1)
               cov = int(m.group(3))
