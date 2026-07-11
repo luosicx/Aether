@@ -150,4 +150,33 @@ final class AlarmToolTests: XCTestCase {
         let result = try await tool.execute(arguments: ["time": 830])
         XCTAssertEqual(result, "错误：请提供闹钟时间", "非字符串 time 应返回参数错误")
     }
+
+    // MARK: - 补充：label 属性描述与 description 关键字
+
+    /// definition.parameters["properties"]["label"] 应含非空 description
+    /// 便于 LLM 理解 label 字段用途
+    func testDefinitionLabelPropertyHasDescription() {
+        let properties = tool.definition.parameters["properties"] as? [String: Any]
+        let labelProp = properties?["label"] as? [String: Any]
+        let desc = labelProp?["description"] as? String
+        XCTAssertFalse(desc?.isEmpty == true, "label description 不应为空")
+    }
+
+    /// definition.description 应含 "闹钟" 或 "提醒" 相关描述
+    /// 不依赖 locale 断言，仅校验关键字存在
+    func testDefinitionDescriptionContainsAlarmKeyword() {
+        let desc = tool.definition.description
+        XCTAssertTrue(desc.contains("闹钟") || desc.contains("提醒"),
+                      "description 应含 \"闹钟\" 或 \"提醒\" 关键字，实际：\(desc)")
+    }
+
+    // MARK: - execute 参数校验补充
+
+    /// arguments 缺 time 但提供 label：应返回 "错误：请提供闹钟时间"
+    /// 验证 label 存在不能替代必需的 time 参数（前置参数校验在权限请求之前，不触及 EventKit）
+    func testExecuteMissingTimeButHasLabel() async throws {
+        let result = try await tool.execute(arguments: ["label": "测试"])
+        XCTAssertEqual(result, "错误：请提供闹钟时间",
+                       "缺 time 时即使有 label 也应返回参数错误")
+    }
 }

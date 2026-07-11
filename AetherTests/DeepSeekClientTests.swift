@@ -311,4 +311,129 @@ final class DeepSeekClientTests: XCTestCase {
         XCTAssertNotNil(arguments as? String)
         XCTAssertEqual(arguments as? String, "{\"expression\":\"1+2\"}")
     }
+
+    // MARK: - chat 流 HTTP 错误分支
+
+    /// chat 流 HTTP 401 错误：应发 llmErrorOccurred 通知并正常 finish
+    func testChatStreamHTTPErrorPostsNotification() async {
+        MockURLProtocol.responseData = Data("unauthorized".utf8)
+        MockURLProtocol.statusCode = 401
+
+        let expectation = XCTNSNotificationExpectation(name: .llmErrorOccurred, object: nil)
+        expectation.handler = { note in
+            (note.userInfo?["error"] as? LLMError) != nil
+        }
+
+        let messages = [APIMessage(role: "user", content: "hi", images: nil, toolCallId: nil, toolName: nil, toolCalls: nil)]
+        let stream = client.chat(messages: messages, config: .default, apiKey: apiKey)
+        var collected: [String] = []
+        for await chunk in stream { collected.append(chunk) }
+        XCTAssertTrue(collected.isEmpty, "HTTP 错误不应 yield 任何 chunk")
+        await fulfillment(of: [expectation], timeout: 2.0)
+    }
+
+    /// chat 流 network error：应发 llmErrorOccurred 通知并正常 finish
+    func testChatStreamNetworkErrorPostsNotification() async {
+        MockURLProtocol.error = NSError(domain: "test", code: -1)
+        MockURLProtocol.statusCode = 200
+
+        let expectation = XCTNSNotificationExpectation(name: .llmErrorOccurred, object: nil)
+        expectation.handler = { note in
+            (note.userInfo?["error"] as? LLMError) != nil
+        }
+
+        let messages = [APIMessage(role: "user", content: "hi", images: nil, toolCallId: nil, toolName: nil, toolCalls: nil)]
+        let stream = client.chat(messages: messages, config: .default, apiKey: apiKey)
+        var collected: [String] = []
+        for await chunk in stream { collected.append(chunk) }
+        XCTAssertTrue(collected.isEmpty, "network error 不应 yield chunk")
+        await fulfillment(of: [expectation], timeout: 2.0)
+    }
+
+    // MARK: - chat with tools 流错误分支
+
+    /// chat with tools 流 HTTP 500 错误：应发通知并 finish
+    func testChatWithToolsHTTPErrorPostsNotification() async {
+        MockURLProtocol.responseData = Data("server error".utf8)
+        MockURLProtocol.statusCode = 500
+
+        let expectation = XCTNSNotificationExpectation(name: .llmErrorOccurred, object: nil)
+        expectation.handler = { note in
+            (note.userInfo?["error"] as? LLMError) != nil
+        }
+
+        let messages = [APIMessage(role: "user", content: "hi", images: nil, toolCallId: nil, toolName: nil, toolCalls: nil)]
+        let tools = [ToolDef(type: "function", function: ToolDef.FunctionDef(name: "calc", description: "calc", parameters: ["type": AnyCodable("object")]))]
+        let stream = client.chat(messages: messages, config: .default, tools: tools, apiKey: apiKey)
+        var collected: [ParsedChunk] = []
+        for await chunk in stream { collected.append(chunk) }
+        XCTAssertTrue(collected.isEmpty, "HTTP 错误不应 yield chunk")
+        await fulfillment(of: [expectation], timeout: 2.0)
+    }
+
+    /// chat with tools 流 network error：应发通知并 finish
+    func testChatWithToolsNetworkErrorPostsNotification() async {
+        MockURLProtocol.error = NSError(domain: "test", code: -2)
+        MockURLProtocol.statusCode = 200
+
+        let expectation = XCTNSNotificationExpectation(name: .llmErrorOccurred, object: nil)
+        expectation.handler = { note in
+            (note.userInfo?["error"] as? LLMError) != nil
+        }
+
+        let messages = [APIMessage(role: "user", content: "hi", images: nil, toolCallId: nil, toolName: nil, toolCalls: nil)]
+        let tools = [ToolDef(type: "function", function: ToolDef.FunctionDef(name: "calc", description: "calc", parameters: ["type": AnyCodable("object")]))]
+        let stream = client.chat(messages: messages, config: .default, tools: tools, apiKey: apiKey)
+        for await _ in stream {}
+        await fulfillment(of: [expectation], timeout: 2.0)
+    }
+
+    // MARK: - SSE 行跳过逻辑
+
+    /// SSE 行跳过：非 data: 前缀、[DONE]、空行、坏 JSON 均被跳过，只 yield 有效 content
+    func testSSELineSkippingLogic() async {
+        // 包含：注释行、空行、[DONE]、坏 JSON、有效 chunk
+        let sse = """
+        : comment line
+
+        data: [DONE]
+
+        data: {invalid json}
+
+        data: {"choices":[{"delta":{"content":"OK"}}]}
+
+        """
+        MockURLProtocol.responseData = sse.data(using: .utf8)
+        MockURLProtocol.statusCode = 200
+
+        let messages = [APIMessage(role: "user", content: "hi", images: nil, toolCallId: nil, toolName: nil, toolCalls: nil)]
+        let stream = client.chat(messages: messages, config: .default, apiKey: apiKey)
+        var collected: [String] = []
+        for await chunk in stream { collected.append(chunk) }
+        XCTAssertEqual(collected, ["OK"], "只应 yield 有效 content，跳过注释/[DONE]/坏 JSON")
+    }
+
+    // MARK: - embed JSON 解码失败
+
+    /// embed 返回非 JSON 数据应抛 LLMError（networkError 或 unknown）
+    func testEmbedNonJSONResponseThrows() async {
+        MockURLProtocol.responseData = Data("not a json".utf8)
+        MockURLProtocol.statusCode = 200
+
+        let expectation = XCTNSNotificationExpectation(name: .llmErrorOccurred, object: nil)
+        expectation.handler = { note in
+            (note.userInfo?["error"] as? LLMError) != nil
+        }
+
+        do {
+            _ = try await client.embed(texts: ["x"], apiKey: apiKey)
+            XCTFail("非 JSON 响应应抛错")
+        } catch let err as LLMError {
+            // 预期：networkError（JSONDecoder 错误被包装为 networkError）
+            _ = err
+        } catch {
+            XCTFail("期望 LLMError，实际：\(type(of: error))")
+        }
+        await fulfillment(of: [expectation], timeout: 2.0)
+    }
 }

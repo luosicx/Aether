@@ -202,4 +202,72 @@ final class LogUploaderTests: XCTestCase {
         let status = await uploader.lastUploadStatus
         XCTAssertEqual(status, "success", "第 3 次成功后应记为 success")
     }
+
+    // MARK: - 边缘测试补充
+
+    // 上报请求应使用 POST 方法并设置 Content-Type: application/json
+    func testUploadSetsPOSTMethodAndContentType() async {
+        await drainShared()
+        await seedEvents(1)
+        MockURLProtocol.fallbackStatusCode = 200
+
+        await uploader.uploadIfNeeded()
+
+        XCTAssertNotNil(MockURLProtocol.lastRequest)
+        XCTAssertEqual(MockURLProtocol.lastRequest?.httpMethod, "POST", "应使用 POST 方法")
+        XCTAssertEqual(
+            MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Content-Type"),
+            "application/json",
+            "Content-Type 应为 application/json"
+        )
+    }
+
+    // 上报请求体应包含记录的 event / payload / timestamp 字段
+    func testUploadRequestBodyContainsRecordFields() async {
+        await drainShared()
+        await TelemetryService.shared.track(.toolCall(toolName: "alarm", success: true, durationMs: 42))
+        MockURLProtocol.fallbackStatusCode = 200
+
+        await uploader.uploadIfNeeded()
+
+        XCTAssertNotNil(MockURLProtocol.lastBody)
+        let json = try? JSONSerialization.jsonObject(with: MockURLProtocol.lastBody ?? Data(), options: []) as? [[String: Any]]
+        XCTAssertNotNil(json)
+        XCTAssertEqual(json?.count, 1)
+        let record = json?.first
+        XCTAssertEqual(record?["event"] as? String, "toolCall")
+        let payload = record?["payload"] as? [String: String]
+        XCTAssertEqual(payload?["toolName"], "alarm")
+        XCTAssertEqual(payload?["durationMs"], "42")
+        XCTAssertNotNil(record?["timestamp"], "请求体应包含 timestamp 字段")
+        XCTAssertNotNil(record?["id"], "请求体应包含 id 字段")
+    }
+
+    // 上报失败时 lastUploadAt 不应被更新（保持 nil）
+    func testFailureDoesNotUpdateLastUploadAt() async {
+        await drainShared()
+        await seedEvents(2)
+        MockURLProtocol.fallbackStatusCode = 500
+
+        await uploader.uploadIfNeeded()
+
+        let lastUploadAt = await uploader.lastUploadAt
+        XCTAssertNil(lastUploadAt, "失败时 lastUploadAt 不应更新，保持 nil")
+        let status = await uploader.lastUploadStatus
+        XCTAssertEqual(status, "failed")
+    }
+
+    // 4xx 响应（如 404）同样触发重试逻辑
+    func test4xxResponseTriggersRetry() async {
+        await drainShared()
+        await seedEvents(1)
+        // 404 不在 2xx 范围，应触发重试：前 2 次 404 + 第 3 次 200
+        MockURLProtocol.responseQueue = [404, 404, 200]
+
+        await uploader.uploadIfNeeded()
+
+        XCTAssertEqual(MockURLProtocol.requestCount, 3, "404 应触发重试，共 3 次请求")
+        let status = await uploader.lastUploadStatus
+        XCTAssertEqual(status, "success", "第 3 次 200 后应记为 success")
+    }
 }

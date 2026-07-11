@@ -94,4 +94,53 @@ final class RateLimiterTests: XCTestCase {
         }
         await assertChatRateLimited(limiter)
     }
+
+    // MARK: - 边缘测试补充
+
+    // 默认初始化：chatPerMin=20，embedPerMin=10，应分别允许 20/10 次成功
+    func testDefaultInitValues() async throws {
+        let limiter = RateLimiter() // 使用默认值 chatPerMin=20, embedPerMin=10
+        // chat 应可成功 20 次
+        for _ in 0..<20 {
+            try await limiter.acquireChat()
+        }
+        await assertChatRateLimited(limiter)
+        // embed 应可成功 10 次
+        for _ in 0..<10 {
+            try await limiter.acquireEmbed()
+        }
+        await assertEmbedRateLimited(limiter)
+    }
+
+    // embed 耗尽后 chat 仍可用：验证两类令牌独立计数
+    func testEmbedExhaustedChatStillAvailable() async throws {
+        let limiter = RateLimiter(chatPerMin: 3, embedPerMin: 1)
+        // 耗尽唯一的 embed 令牌
+        try await limiter.acquireEmbed()
+        await assertEmbedRateLimited(limiter)
+        // chat 仍可使用 3 次
+        for _ in 0..<3 {
+            try await limiter.acquireChat()
+        }
+        await assertChatRateLimited(limiter)
+    }
+
+    // 交错申请 chat 与 embed：互不影响各自计数
+    func testInterleavedChatAndEmbed() async throws {
+        let limiter = RateLimiter(chatPerMin: 2, embedPerMin: 2)
+        try await limiter.acquireChat()
+        try await limiter.acquireEmbed()
+        try await limiter.acquireChat()
+        try await limiter.acquireEmbed()
+        // 两者均已耗尽
+        await assertChatRateLimited(limiter)
+        await assertEmbedRateLimited(limiter)
+    }
+
+    // 边界条件：chatPerMin=1，仅一次成功，第二次即限流
+    func testSingleChatTokenSucceedsOnce() async throws {
+        let limiter = RateLimiter(chatPerMin: 1, embedPerMin: 5)
+        try await limiter.acquireChat()
+        await assertChatRateLimited(limiter)
+    }
 }
