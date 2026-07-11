@@ -47,6 +47,36 @@ final class AetherUITests: XCTestCase {
         }
     }
 
+    /// 轮询 Toggle 值，替代 Thread.sleep 等待动画完成
+    private func waitForToggleValue(_ toggle: XCUIElement, equals expected: String, timeout: TimeInterval = 3) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if (toggle.value as? String) == expected { return true }
+            Thread.sleep(forTimeInterval: 0.1)
+        }
+        return (toggle.value as? String) == expected
+    }
+
+    /// 轮询 Toggle 值变化（用于翻转验证，不关心目标值）
+    private func waitForToggleChange(_ toggle: XCUIElement, from oldValue: String?, timeout: TimeInterval = 3) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if (toggle.value as? String) != oldValue { return true }
+            Thread.sleep(forTimeInterval: 0.1)
+        }
+        return (toggle.value as? String) != oldValue
+    }
+
+    /// 轮询输入框文本包含子串，替代 typeText 后的固定等待
+    private func waitForInputContains(_ field: XCUIElement, substring: String, timeout: TimeInterval = 3) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if let v = field.value as? String, v.contains(substring) { return true }
+            Thread.sleep(forTimeInterval: 0.1)
+        }
+        return (field.value as? String)?.contains(substring) ?? false
+    }
+
     // MARK: - 流 1：启动看到 emptyState + placeholder + 发送按钮初始禁用
     func testLaunchShowsEmptyState() {
         let app = makeApp()
@@ -116,8 +146,6 @@ final class AetherUITests: XCTestCase {
         saveButton.tap()
         // UIT 中 Keychain 可能因 entitlement 不可用，saveMessage 不一定出现
         // 验证保存按钮点击不 crash + 仍在设置页（用导航栏标题验证，比按钮 exists 更稳定）
-        // 固定等待：Keychain 保存为同步调用，需等待保存完成后再验证 UI 状态
-        Thread.sleep(forTimeInterval: 0.5)
         XCTAssertTrue(app.buttons["saveAPIKeyButton"].waitForExistence(timeout: 3),
                       "保存后应仍在设置页")
     }
@@ -144,10 +172,11 @@ final class AetherUITests: XCTestCase {
         }
         XCTAssertTrue(saveButton.waitForExistence(timeout: 5), "保存按钮应存在")
         saveButton.tap()
-        // 固定等待：Keychain 保存为同步调用，需等待保存完成后再触发删除流程
-        Thread.sleep(forTimeInterval: 0.5)
-
-        // 再删除（触发 alert）
+        let delBtn = app.buttons["deleteAPIKeyButton"]
+        let delDeadline = Date().addingTimeInterval(3)
+        while !delBtn.isHittable && Date() < delDeadline {
+            Thread.sleep(forTimeInterval: 0.1)
+        }
         app.buttons["deleteAPIKeyButton"].tap()
         XCTAssertTrue(app.alerts.firstMatch.waitForExistence(timeout: 5), "应弹出删除确认 alert")
         // alert 含「取消」+「删除」两个按钮
@@ -195,8 +224,8 @@ final class AetherUITests: XCTestCase {
             case 2: ragToggle.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5)).tap()
             default: ragToggle.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
             }
-            // 固定等待：Toggle 动画完成后再读取 value，避免读到过渡态旧值
-            Thread.sleep(forTimeInterval: 0.5)
+            // 轮询 Toggle 值变化，替代固定 sleep
+            _ = waitForToggleChange(ragToggle, from: ragBefore)
             ragAfter = ragToggle.value as? String
             ragTapAttempts += 1
         }
@@ -207,8 +236,11 @@ final class AetherUITests: XCTestCase {
         let toolsToggle = app.switches["toolsToggle"]
         scrollToElement(toolsToggle, in: app)
         XCTAssertTrue(toolsToggle.waitForExistence(timeout: 5), "应存在工具调用开关")
-        // 固定等待：scrollToElement 后 Form 可能仍在滚动惯性中，等待动画完成再读取 value
-        Thread.sleep(forTimeInterval: 0.5)
+        // 轮询 isHittable，等待滚动惯性结束
+        let toolsHitDeadline = Date().addingTimeInterval(2)
+        while !toolsToggle.isHittable && Date() < toolsHitDeadline {
+            Thread.sleep(forTimeInterval: 0.1)
+        }
         let toolsBefore = toolsToggle.value as? String
         var toolsAfter = toolsBefore
         var tapAttempts = 0
@@ -220,14 +252,17 @@ final class AetherUITests: XCTestCase {
             case 2: toolsToggle.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5)).tap()
             default: toolsToggle.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
             }
-            // 固定等待：Toggle 动画完成后再读取 value，避免读到过渡态旧值
-            Thread.sleep(forTimeInterval: 0.5)
+            // 轮询 Toggle 值变化，替代固定 sleep
+            _ = waitForToggleChange(toolsToggle, from: toolsBefore)
             toolsAfter = toolsToggle.value as? String
             tapAttempts += 1
             if toolsAfter == toolsBefore {
                 scrollToElement(toolsToggle, in: app)
-                // 固定等待：滚动后等待动画完成，再重试 tap
-                Thread.sleep(forTimeInterval: 0.3)
+                // 轮询 isHittable，等待滚动动画完成
+                let d = Date().addingTimeInterval(2)
+                while !toolsToggle.isHittable && Date() < d {
+                    Thread.sleep(forTimeInterval: 0.1)
+                }
             }
         }
         XCTAssertNotEqual(toolsBefore, toolsAfter, "工具调用开关值应翻转")
@@ -291,7 +326,10 @@ final class AetherUITests: XCTestCase {
             XCTAssertTrue(reasonerSeg.exists || reasonerSeg.waitForExistence(timeout: 3), "段存在时应存在「Reasoner」段")
 
             reasonerSeg.tap()
-            Thread.sleep(forTimeInterval: 0.3)
+            let segDeadline = Date().addingTimeInterval(3)
+            while (reasonerSeg.value as? String) != "1" && Date() < segDeadline {
+                Thread.sleep(forTimeInterval: 0.1)
+            }
             let reasonerValue = reasonerSeg.value as? String
             if let v = reasonerValue, !v.isEmpty {
                 XCTAssertEqual(v, "1", "Reasoner 应为选中态")
@@ -312,21 +350,24 @@ final class AetherUITests: XCTestCase {
         input.tap()
         // iOS 26.2 (CI): tap 后可能未立即聚焦，等待键盘出现再输入
         _ = app.keyboards.firstMatch.waitForExistence(timeout: 3)
-        Thread.sleep(forTimeInterval: 0.5)
+        // 额外确认键盘稳定（连续两帧存在）
+        if app.keyboards.firstMatch.exists {
+            Thread.sleep(forTimeInterval: 0.1)
+        }
         if !app.keyboards.firstMatch.exists {
             input.tap()
             _ = app.keyboards.firstMatch.waitForExistence(timeout: 3)
         }
         input.typeText("hi")
         // iOS 26.2 (CI): typeText 偶发未生效，验证文本已输入
-        Thread.sleep(forTimeInterval: 0.3)
+        _ = waitForInputContains(input, substring: "hi")
         var inputText = input.value as? String ?? ""
         if !inputText.contains("hi") {
             // 重试：再次点击输入框并输入
             input.tap()
-            Thread.sleep(forTimeInterval: 0.3)
+            _ = app.keyboards.firstMatch.waitForExistence(timeout: 2)
             input.typeText("hi")
-            Thread.sleep(forTimeInterval: 0.3)
+            _ = waitForInputContains(input, substring: "hi", timeout: 3)
             inputText = input.value as? String ?? ""
         }
         // 验证发送按钮已启用（输入非空时才启用）
@@ -335,17 +376,23 @@ final class AetherUITests: XCTestCase {
         if !sendButton.isEnabled {
             // 重试：再次点击输入框并输入
             input.tap()
-            Thread.sleep(forTimeInterval: 0.3)
+            _ = app.keyboards.firstMatch.waitForExistence(timeout: 2)
             input.typeText("hi")
-            Thread.sleep(forTimeInterval: 0.3)
+            _ = waitForInputContains(input, substring: "hi", timeout: 3)
         }
         sendButton.tap()
         // iOS 26.2 (CI): sendButton 点击可能未触发发送，验证输入已清空
-        Thread.sleep(forTimeInterval: 0.5)
-        if sendButton.isEnabled {
+        let sendDeadline = Date().addingTimeInterval(3)
+        while !(input.value as? String ?? "").isEmpty && Date() < sendDeadline {
+            Thread.sleep(forTimeInterval: 0.1)
+        }
+        if sendButton.isEnabled && !(input.value as? String ?? "").isEmpty {
             // 输入未清空说明发送未触发，重试点击
             sendButton.tap()
-            Thread.sleep(forTimeInterval: 0.5)
+            let retryDeadline = Date().addingTimeInterval(3)
+            while !(input.value as? String ?? "").isEmpty && Date() < retryDeadline {
+                Thread.sleep(forTimeInterval: 0.1)
+            }
         }
         // 等待桩回复出现，确认会话已创建
         // 桩回复文本为「（UIT 测试模式）已收到：hi」
@@ -440,8 +487,13 @@ final class AetherUITests: XCTestCase {
             // iOS 26.2 (CI): 选项元素不存在时，只验证 tonePicker 存在即可（已通过上方断言）
             // 选项菜单可能未渲染或为不同元素类型，跳过选项验证避免 CI 误报
         }
-        // 固定等待：Picker 选项选择后导航返回动画完成，再滚动查找工具开关
-        Thread.sleep(forTimeInterval: 0.3)
+        // 轮询 Picker 选项消失，替代固定 sleep
+        let pickerDismissedDeadline = Date().addingTimeInterval(3)
+        while app.descendants(matching: .any).matching(
+            NSPredicate(format: "label == %@", "正式")
+        ).firstMatch.exists && Date() < pickerDismissedDeadline {
+            Thread.sleep(forTimeInterval: 0.1)
+        }
 
         // 工具 Toggle：勾选 calculate（可能在 toneRow 下方，需要再滚动一点）
         // Day 18: SettingsView Toggle 改用 toolDef.function.description 作为标签
@@ -452,25 +504,27 @@ final class AetherUITests: XCTestCase {
         var enableAttempts = 0
         while (calcToggle.value as? String) == "0" && enableAttempts < 4 {
             calcToggle.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
-            // 固定等待：Toggle 动画完成后再读取 value，避免读到过渡态旧值
-            Thread.sleep(forTimeInterval: 0.4)
+            // 轮询 Toggle 值，替代固定 sleep
+            _ = waitForToggleValue(calcToggle, equals: "1")
             enableAttempts += 1
         }
         XCTAssertEqual(calcToggle.value as? String, "1", "calculate 工具应被开启")
 
         // 完成 → 触发 onDisappear 持久化到 SwiftData
         app.buttons["settingsDoneButton"].tap()
-        // 固定等待：sheet 关闭动画 + onDisappear 持久化落盘，避免 terminate 中断保存
-        Thread.sleep(forTimeInterval: 2.0)
+        XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(timeout: 5),
+                      "设置 sheet 应已关闭")
+        let persistDeadline = Date().addingTimeInterval(1)
+        while Date() < persistDeadline {
+            Thread.sleep(forTimeInterval: 0.2)
+        }
 
         // terminate + launch 模拟重进 App，验证 SwiftData 持久化
         // 复用同一 app 实例并覆盖 launchArguments：去掉 UITEST_RESET_DATA，避免清空刚保存的偏好
         app.terminate()
         app.launchArguments = ["UITEST_DISABLE_NETWORK", "UITEST_DISABLE_SPLASH"]
         app.launch()
-        // 固定等待：SwiftData 初始化与偏好加载完成，避免 onAppear 时机竞争
-        Thread.sleep(forTimeInterval: 1.5)
-        XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(timeout: 5), "重进后应回到主界面")
+        XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(timeout: 8), "重进后应回到主界面")
         app.buttons["settingsButton"].tap()
 
         // 验证语气保持「正式」（需要滚动到用户偏好 Section）
@@ -513,8 +567,11 @@ final class AetherUITests: XCTestCase {
         let backButton = app.navigationBars.buttons.firstMatch
         if backButton.waitForExistence(timeout: 2) {
             backButton.tap()
-            // 固定等待：导航返回动画完成，再滚动查找工具开关
-            Thread.sleep(forTimeInterval: 0.3)
+            // 轮询 settingsButton 出现，替代固定 sleep
+            let backDeadline = Date().addingTimeInterval(3)
+            while !app.buttons["settingsButton"].exists && Date() < backDeadline {
+                Thread.sleep(forTimeInterval: 0.1)
+            }
         }
 
         // 验证 calculate 工具保持开启
@@ -522,15 +579,9 @@ final class AetherUITests: XCTestCase {
         let calcToggle2 = app.switches["toolToggle_calculate"]
         scrollToElement(calcToggle2, in: app, maxAttempts: 16)
         XCTAssertTrue(calcToggle2.waitForExistence(timeout: 5), "重进后应存在 calculate 工具开关")
-        // SwiftData 持久化 + onAppear 加载存在时机差异，重试读取开关值确保稳定
-        var calcValue = calcToggle2.value as? String
-        var valueRetry = 0
-        while calcValue != "1" && valueRetry < 8 {
-            // 固定等待：SwiftData 持久化与 onAppear 加载存在时机差异，轮询读取开关值
-            Thread.sleep(forTimeInterval: 0.5)
-            calcValue = calcToggle2.value as? String
-            valueRetry += 1
-        }
+        // SwiftData 持久化 + onAppear 加载存在时机差异，轮询读取开关值确保稳定
+        _ = waitForToggleValue(calcToggle2, equals: "1", timeout: 8)
+        let calcValue = calcToggle2.value as? String
         XCTAssertEqual(calcValue, "1", "重进后 calculate 工具应保持开启")
     }
 
@@ -587,8 +638,11 @@ final class AetherUITests: XCTestCase {
         // 清除搜索后输入不匹配关键词
         let clearBtn = app.buttons["clearSearchButton"]
         if clearBtn.exists { clearBtn.tap() }
-        // 固定等待：清除搜索后列表过滤刷新，再输入新的搜索词
-        Thread.sleep(forTimeInterval: 0.3)
+        // 轮询搜索框清空，替代固定 sleep
+        let clearDeadline = Date().addingTimeInterval(3)
+        while !(searchField.value as? String ?? "").isEmpty && Date() < clearDeadline {
+            Thread.sleep(forTimeInterval: 0.1)
+        }
         searchField.tap()
         searchField.typeText("不存在的关键词XYZ")
         _ = app.cells.containing(.staticText, identifier: "新对话").firstMatch
