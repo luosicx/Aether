@@ -9,7 +9,7 @@ on:
 jobs:
   unit-tests:
     runs-on: macos-15
-    timeout-minutes: 20
+    timeout-minutes: 25
     outputs:
       coverage_pct: ${{ steps.coverage.outputs.coverage_pct }}
       coverage_pass: ${{ steps.coverage.outputs.coverage_pass }}
@@ -81,7 +81,7 @@ jobs:
             -default-test-execution-time-allowance 30 \
             -maximum-test-execution-time-allowance 60 \
             -parallel-testing-enabled YES \
-            -parallel-testing-worker-count 4 \
+            -parallel-testing-worker-count 2 \
             -enableCodeCoverage YES \
             -resultBundlePath TestResults.xcresult \
             CODE_SIGNING_ALLOWED=NO
@@ -196,7 +196,7 @@ jobs:
 
   ui-tests:
     runs-on: macos-15
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v5
 
