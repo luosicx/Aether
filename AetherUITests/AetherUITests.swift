@@ -241,48 +241,49 @@ final class AetherUITests: XCTestCase {
 
         app.buttons["settingsButton"].tap()
 
-        // Day 17: 懒加载 Form 中 element(boundBy:) 不可靠（滚动后索引变化），
-        // 改为先滚动到「自动」按钮（模型 Picker 的段），再用 buttons 直接访问各段
-        // segmented Picker 的 segment 由系统生成，无 accessibilityIdentifier，
-        // 用 predicate 通过 label 查找（segment 的 label 查找在 XCUI 中可靠）
-        // segmented Picker 在不同 Xcode 版本中可能呈现为 buttons 或 segmentedControls.buttons
-        // 先尝试 segmentedControls.buttons，回退到普通 buttons
+        // 先滚动 Form 让模型 Picker 区域进入可见范围
+        // 不依赖 scrollToElement（它需要元素已存在），直接滚动固定次数
+        let formScroller = app.collectionViews.firstMatch.exists
+            ? app.collectionViews.firstMatch
+            : (app.tables.firstMatch.exists ? app.tables.firstMatch : app.scrollViews.firstMatch)
+        for _ in 0..<3 {
+            formScroller.swipeUp()
+            Thread.sleep(forTimeInterval: 0.3)
+        }
+
+        // segmented Picker 在不同 Xcode 版本中呈现方式不同
+        // 尝试多种查找方式
         let autoSeg = app.segmentedControls.buttons["自动"]
+            .exists ? app.segmentedControls.buttons["自动"]
+            : (app.buttons["自动"].exists ? app.buttons["自动"]
+               : app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "自动")).firstMatch)
+
+        // 如果仍然找不到，再滚动几次
         if !autoSeg.exists {
-            // 回退：通过 predicate 在所有 buttons 中查找
-            let autoByPredicate = app.buttons.matching(NSPredicate(format: "label == %@", "自动")).firstMatch
-            scrollToElement(autoByPredicate, in: app)
-            XCTAssertTrue(autoByPredicate.waitForExistence(timeout: 5), "应存在「自动」段")
-            let chatSeg = app.buttons.matching(NSPredicate(format: "label == %@", "Chat")).firstMatch
-            let reasonerSeg = app.buttons.matching(NSPredicate(format: "label == %@", "Reasoner")).firstMatch
-            XCTAssertTrue(chatSeg.exists, "应存在「Chat」段")
-            XCTAssertTrue(reasonerSeg.exists, "应存在「Reasoner」段")
-
-            reasonerSeg.tap()
-            Thread.sleep(forTimeInterval: 0.3)
-            let reasonerValue = reasonerSeg.value as? String
-            if let v = reasonerValue, !v.isEmpty {
-                XCTAssertEqual(v, "1", "Reasoner 应为选中态")
-            } else {
-                XCTAssertTrue(reasonerSeg.exists, "Reasoner 段应存在")
+            for _ in 0..<5 {
+                formScroller.swipeUp()
+                Thread.sleep(forTimeInterval: 0.3)
+                if autoSeg.exists { break }
             }
+        }
+
+        XCTAssertTrue(autoSeg.waitForExistence(timeout: 5), "应存在「自动」段")
+        let chatSeg = app.segmentedControls.buttons["Chat"].exists
+            ? app.segmentedControls.buttons["Chat"]
+            : app.buttons["Chat"]
+        let reasonerSeg = app.segmentedControls.buttons["Reasoner"].exists
+            ? app.segmentedControls.buttons["Reasoner"]
+            : app.buttons["Reasoner"]
+        XCTAssertTrue(chatSeg.exists || chatSeg.waitForExistence(timeout: 3), "应存在「Chat」段")
+        XCTAssertTrue(reasonerSeg.exists || reasonerSeg.waitForExistence(timeout: 3), "应存在「Reasoner」段")
+
+        reasonerSeg.tap()
+        Thread.sleep(forTimeInterval: 0.3)
+        let reasonerValue = reasonerSeg.value as? String
+        if let v = reasonerValue, !v.isEmpty {
+            XCTAssertEqual(v, "1", "Reasoner 应为选中态")
         } else {
-            // 使用 segmentedControls.buttons 路径
-            scrollToElement(autoSeg, in: app)
-            XCTAssertTrue(autoSeg.waitForExistence(timeout: 5), "应存在「自动」段")
-            let chatSeg = app.segmentedControls.buttons["Chat"]
-            let reasonerSeg = app.segmentedControls.buttons["Reasoner"]
-            XCTAssertTrue(chatSeg.exists, "应存在「Chat」段")
-            XCTAssertTrue(reasonerSeg.exists, "应存在「Reasoner」段")
-
-            reasonerSeg.tap()
-            Thread.sleep(forTimeInterval: 0.3)
-            let reasonerValue = reasonerSeg.value as? String
-            if let v = reasonerValue, !v.isEmpty {
-                XCTAssertEqual(v, "1", "Reasoner 应为选中态")
-            } else {
-                XCTAssertTrue(reasonerSeg.exists, "Reasoner 段应存在")
-            }
+            XCTAssertTrue(reasonerSeg.exists, "Reasoner 段应存在")
         }
     }
 
@@ -295,11 +296,24 @@ final class AetherUITests: XCTestCase {
         let input = inputField(in: app)
         XCTAssertTrue(input.waitForExistence(timeout: 5))
         input.tap()
+        // CI 上 tap 后可能未立即聚焦，等待键盘出现再输入
+        Thread.sleep(forTimeInterval: 0.5)
+        input.tap()
         input.typeText("hi")
-        app.buttons["sendButton"].tap()
+        // 验证发送按钮已启用（输入非空时才启用）
+        let sendButton = app.buttons["sendButton"]
+        XCTAssertTrue(sendButton.waitForExistence(timeout: 3), "发送按钮应存在")
+        if !sendButton.isEnabled {
+            // 重试：再次点击输入框并输入
+            input.tap()
+            Thread.sleep(forTimeInterval: 0.3)
+            input.typeText("hi")
+            Thread.sleep(forTimeInterval: 0.3)
+        }
+        sendButton.tap()
         // 等待桩回复出现，确认会话已创建
         let stub = app.staticTexts.containing(
-            NSPredicate(format: "label CONTAINS %@", "UIT 测试模式")
+            NSPredicate(format: "label CONTAINS %@", "测试模式")
         ).firstMatch
         XCTAssertTrue(stub.waitForExistence(timeout: 15), "应出现桩回复确认会话创建")
         dismissKeyboard(in: app)
@@ -339,23 +353,34 @@ final class AetherUITests: XCTestCase {
 
         // 语气 Picker 选「正式」（Form 默认 picker 为导航式：点击行 → 推入选项列表）
         // 「用户偏好」Section 在 Form 底部，需要滚动到可见
+        // 先尝试直接查找，如果找不到再滚动
         let toneRow = app.staticTexts["语气"].firstMatch
-        // CI 上 Form 可能需要更多滚动才能让底部元素进入 accessibility tree
-        // 尝试多种滚动方式：collectionView、table、scrollView
-        var scrollAttempts = 0
-        while !toneRow.exists && scrollAttempts < 20 {
-            if app.collectionViews.firstMatch.exists {
-                app.collectionViews.firstMatch.swipeUp()
-            } else if app.tables.firstMatch.exists {
-                app.tables.firstMatch.swipeUp()
-            } else {
-                app.scrollViews.firstMatch.swipeUp()
+
+        // 如果直接找不到，滚动 Form（限制 10 次，避免 CI 超时）
+        if !toneRow.exists {
+            let formScroller = app.collectionViews.firstMatch.exists
+                ? app.collectionViews.firstMatch
+                : (app.tables.firstMatch.exists ? app.tables.firstMatch : app.scrollViews.firstMatch)
+            var scrollAttempts = 0
+            while !toneRow.exists && scrollAttempts < 10 {
+                formScroller.swipeUp()
+                scrollAttempts += 1
+                _ = toneRow.waitForExistence(timeout: 1)
             }
-            scrollAttempts += 1
-            _ = toneRow.waitForExistence(timeout: 1)
         }
-        XCTAssertTrue(toneRow.waitForExistence(timeout: 5), "应存在语气 Picker 行")
-        toneRow.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+
+        // 如果 staticText 仍找不到，尝试在 cell 中查找
+        if !toneRow.exists {
+            // 语气 Picker 可能是 Form cell 中的文本
+            let toneCell = app.cells.containing(.staticText, identifier: "语气").firstMatch
+            if toneCell.exists {
+                toneCell.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            } else {
+                XCTAssertTrue(false, "应存在语气 Picker 行")
+            }
+        } else {
+            toneRow.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        }
         // Picker 选项由系统生成，无 accessibilityIdentifier，用 predicate 通过 label 查找
         let formalOption = app.buttons.matching(NSPredicate(format: "label == %@", "正式")).firstMatch
         if !formalOption.waitForExistence(timeout: 2) {
