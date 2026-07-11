@@ -108,12 +108,12 @@ jobs:
           echo "=== Code Coverage Report ==="
           xcrun xccov view --report TestResults.xcresult || echo "Coverage report unavailable"
 
-      - name: Check Coverage Threshold (≥ 80%, excluding Views/DesignSystem/App/Protocols)
+      - name: Check Coverage Threshold (≥ 90%, excluding Views/DesignSystem/App/Protocols)
         id: coverage
         if: always()
         continue-on-error: true
         run: |
-          echo "=== Checking code coverage threshold (≥ 80%, excluding Views/DesignSystem/App/Protocols) ==="
+          echo "=== Checking code coverage threshold (≥ 90%, excluding Views/DesignSystem/App/Protocols) ==="
           # Get full coverage report from xccov (includes per-file and per-function lines)
           # Format:
           #   Aether.app                    59.85% (10106/16886)
@@ -166,7 +166,7 @@ jobs:
           echo "Non-Views line coverage: ${COVERAGE_PCT}% (${COVERED}/${TOTAL}, skipped ${SKIPPED} Views files)"
           echo "coverage_pct=${COVERAGE_PCT}" >> $GITHUB_OUTPUT
           # Compare using awk (bash does not support float comparison)
-          THRESHOLD=80.0
+          THRESHOLD=90.0
           COVERAGE_OK=$(awk -v cov="$COVERAGE_PCT" -v thr="$THRESHOLD" 'BEGIN { print (cov >= thr) ? 1 : 0 }')
           if [ "$COVERAGE_OK" -eq 1 ]; then
             echo "PASS: Coverage ${COVERAGE_PCT}% ≥ ${THRESHOLD}% (excluding Views/DesignSystem/App/Protocols)"
@@ -292,7 +292,7 @@ jobs:
           path: UITestResults.xcresult
           if-no-files-found: warn
 
-  # Coverage status check: blocks PR merge if coverage < 80%
+  # Coverage status check: blocks PR merge if coverage < 90%
   coverage-summary:
     needs: [unit-tests, ui-tests]
     runs-on: ubuntu-latest
@@ -307,11 +307,11 @@ jobs:
             exit 1
           fi
           if [ "${{ needs.unit-tests.outputs.coverage_pass }}" != "true" ]; then
-            echo "FAIL: Coverage ${{ needs.unit-tests.outputs.coverage_pct }}% < 80% threshold"
+            echo "FAIL: Coverage ${{ needs.unit-tests.outputs.coverage_pct }}% < 90% threshold"
             echo "Please add tests to improve coverage."
             exit 1
           fi
-          echo "PASS: Coverage ${{ needs.unit-tests.outputs.coverage_pct }}% ≥ 80%"
+          echo "PASS: Coverage ${{ needs.unit-tests.outputs.coverage_pct }}% ≥ 90%"
 
   # Code quality status check: SonarQube static analysis
   code-quality:
@@ -348,9 +348,17 @@ jobs:
           xccov-to-cobertura coverage-xcresult/TestResults.xcresult -o coverage-report/cobertura.xml || \
             echo "WARN: cobertura conversion failed, continuing without coverage"
 
+      - name: Disable SonarCloud Automatic Analysis
+        # 如果 SonarCloud 开启了 Automatic Analysis，会与 CI 分析冲突
+        # 此步骤通过 API 禁用 Automatic Analysis，确保 CI 扫描能正常运行
+        run: |
+          curl -s -X POST "${{ secrets.SONAR_HOST_URL }}/api/project_analysis/set_auto_analysis" \
+            -u "${{ secrets.SONAR_TOKEN }}:" \
+            -d "project=luosicx_Aether" \
+            -d "auto_analysis=false" \
+            || echo "WARN: Failed to disable Automatic Analysis (may already be disabled)"
+
       - name: SonarQube Scan
-        id: sonar
-        continue-on-error: true
         uses: SonarSource/sonarqube-scan-action@v4
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -358,19 +366,7 @@ jobs:
         with:
           # 配置已迁移至 sonar-project.properties
           # 注意：若 SonarCloud 开启了 Automatic Analysis，CI 扫描会报错
-          # 解决：登录 SonarCloud → Project Settings → Disable Automatic Analysis
+          # 解决：登录 SonarCloud → Project Settings → Analysis Method → 选择 GitHub Actions CI
+          # 详见 doc/plans/sonarcloud-setup-guide.md
           args: >
             -Dsonar.qualitygate.wait=true
-
-      - name: SonarQube Scan Result
-        if: always()
-        run: |
-          if [ "${{ steps.sonar.outcome }}" = "failure" ] || [ "${{ steps.sonar.outcome }}" = "skipped" ]; then
-            echo "WARN: SonarCloud scan failed or was skipped."
-            echo "This may be due to Automatic Analysis being enabled on SonarCloud."
-            echo "To fix: Login to SonarCloud → Project Settings → Disable Automatic Analysis."
-            echo "See doc/plans/sonarcloud-setup-guide.md for details."
-            # Don't fail the PR - SonarCloud is informational, not a merge blocker
-            exit 0
-          fi
-          echo "SonarCloud scan completed successfully."
