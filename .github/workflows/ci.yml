@@ -86,8 +86,9 @@ jobs:
             exit 1
           fi
           # Parse the overall line coverage percentage from the app target line
-          # xccov format: "Aether.app    51.15% (8637/16886)"
-          COVERAGE_PCT=$(echo "$COVERAGE_OUTPUT" | grep "Aether.app" | head -1 | sed -E 's/.*([0-9]+\.[0-9]+)%.*/\1/')
+          # xccov format: "Aether.app    51.43% (8685/16886)"
+          # Use grep -oE to extract the first "XX.XX%" pattern (sed greedy match bug extracts "1.43" from "51.43%")
+          COVERAGE_PCT=$(echo "$COVERAGE_OUTPUT" | grep "Aether.app" | head -1 | grep -oE '[0-9]+\.[0-9]+%' | head -1 | tr -d '%')
           if [ -z "$COVERAGE_PCT" ]; then
             echo "ERROR: Could not parse coverage percentage"
             echo "Report output:"
