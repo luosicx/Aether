@@ -48,7 +48,7 @@ final class AetherUITests: XCTestCase {
     }
 
     /// 轮询 Toggle 值，替代 Thread.sleep 等待动画完成
-    private func waitForToggleValue(_ toggle: XCUIElement, equals expected: String, timeout: TimeInterval = 1.5) -> Bool {
+    private func waitForToggleValue(_ toggle: XCUIElement, equals expected: String, timeout: TimeInterval = 0.5) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
             if (toggle.value as? String) == expected { return true }
@@ -58,7 +58,7 @@ final class AetherUITests: XCTestCase {
     }
 
     /// 轮询 Toggle 值变化（用于翻转验证，不关心目标值）
-    private func waitForToggleChange(_ toggle: XCUIElement, from oldValue: String?, timeout: TimeInterval = 1.5) -> Bool {
+    private func waitForToggleChange(_ toggle: XCUIElement, from oldValue: String?, timeout: TimeInterval = 0.5) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
             if (toggle.value as? String) != oldValue { return true }
@@ -68,7 +68,7 @@ final class AetherUITests: XCTestCase {
     }
 
     /// 轮询输入框文本包含子串，替代 typeText 后的固定等待
-    private func waitForInputContains(_ field: XCUIElement, substring: String, timeout: TimeInterval = 1.5) -> Bool {
+    private func waitForInputContains(_ field: XCUIElement, substring: String, timeout: TimeInterval = 0.5) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
             if let v = field.value as? String, v.contains(substring) { return true }
@@ -173,7 +173,7 @@ final class AetherUITests: XCTestCase {
         XCTAssertTrue(saveButton.waitForExistence(timeout: 5), "保存按钮应存在")
         saveButton.tap()
         let delBtn = app.buttons["deleteAPIKeyButton"]
-        let delDeadline = Date().addingTimeInterval(1.5)
+        let delDeadline = Date().addingTimeInterval(0.5)
         while !delBtn.isHittable && Date() < delDeadline {
             Thread.sleep(forTimeInterval: 0.1)
         }
@@ -326,7 +326,7 @@ final class AetherUITests: XCTestCase {
             XCTAssertTrue(reasonerSeg.exists || reasonerSeg.waitForExistence(timeout: 3), "段存在时应存在「Reasoner」段")
 
             reasonerSeg.tap()
-            let segDeadline = Date().addingTimeInterval(1.5)
+            let segDeadline = Date().addingTimeInterval(0.5)
             while (reasonerSeg.value as? String) != "1" && Date() < segDeadline {
                 Thread.sleep(forTimeInterval: 0.1)
             }
@@ -367,7 +367,7 @@ final class AetherUITests: XCTestCase {
             input.tap()
             _ = app.keyboards.firstMatch.waitForExistence(timeout: 2)
             input.typeText("hi")
-            _ = waitForInputContains(input, substring: "hi", timeout: 1.5)
+            _ = waitForInputContains(input, substring: "hi", timeout: 0.5)
             inputText = input.value as? String ?? ""
         }
         // 验证发送按钮已启用（输入非空时才启用）
@@ -378,18 +378,18 @@ final class AetherUITests: XCTestCase {
             input.tap()
             _ = app.keyboards.firstMatch.waitForExistence(timeout: 2)
             input.typeText("hi")
-            _ = waitForInputContains(input, substring: "hi", timeout: 1.5)
+            _ = waitForInputContains(input, substring: "hi", timeout: 0.5)
         }
         sendButton.tap()
         // iOS 26.2 (CI): sendButton 点击可能未触发发送，验证输入已清空
-        let sendDeadline = Date().addingTimeInterval(1.5)
+        let sendDeadline = Date().addingTimeInterval(0.5)
         while !(input.value as? String ?? "").isEmpty && Date() < sendDeadline {
             Thread.sleep(forTimeInterval: 0.1)
         }
         if sendButton.isEnabled && !(input.value as? String ?? "").isEmpty {
             // 输入未清空说明发送未触发，重试点击
             sendButton.tap()
-            let retryDeadline = Date().addingTimeInterval(1.5)
+            let retryDeadline = Date().addingTimeInterval(0.5)
             while !(input.value as? String ?? "").isEmpty && Date() < retryDeadline {
                 Thread.sleep(forTimeInterval: 0.1)
             }
@@ -488,7 +488,7 @@ final class AetherUITests: XCTestCase {
             // 选项菜单可能未渲染或为不同元素类型，跳过选项验证避免 CI 误报
         }
         // 轮询 Picker 选项消失，替代固定 sleep
-        let pickerDismissedDeadline = Date().addingTimeInterval(1.5)
+        let pickerDismissedDeadline = Date().addingTimeInterval(0.5)
         while app.descendants(matching: .any).matching(
             NSPredicate(format: "label == %@", "正式")
         ).firstMatch.exists && Date() < pickerDismissedDeadline {
@@ -568,7 +568,7 @@ final class AetherUITests: XCTestCase {
         if backButton.waitForExistence(timeout: 2) {
             backButton.tap()
             // 轮询 settingsButton 出现，替代固定 sleep
-            let backDeadline = Date().addingTimeInterval(1.5)
+            let backDeadline = Date().addingTimeInterval(0.5)
             while !app.buttons["settingsButton"].exists && Date() < backDeadline {
                 Thread.sleep(forTimeInterval: 0.1)
             }
@@ -639,7 +639,7 @@ final class AetherUITests: XCTestCase {
         let clearBtn = app.buttons["clearSearchButton"]
         if clearBtn.exists { clearBtn.tap() }
         // 轮询搜索框清空，替代固定 sleep
-        let clearDeadline = Date().addingTimeInterval(1.5)
+        let clearDeadline = Date().addingTimeInterval(0.5)
         while !(searchField.value as? String ?? "").isEmpty && Date() < clearDeadline {
             Thread.sleep(forTimeInterval: 0.1)
         }
