@@ -411,4 +411,238 @@ final class SettingsViewModelTests: XCTestCase {
         XCTAssertEqual(conv.systemPrompt, "新的系统提示词",
                        "updateSystemPrompt 后会话的 systemPrompt 应被回写")
     }
+
+    // MARK: - 默认初始值
+
+    /// selectedProvider 默认应为 .deepseek
+    func testSelectedProviderDefaultIsDeepSeek() {
+        XCTAssertEqual(vm.selectedProvider, .deepseek,
+                       "selectedProvider 默认应为 .deepseek")
+    }
+
+    /// selectedModel 默认应为 APIConfig.defaultModel
+    func testSelectedModelDefault() {
+        XCTAssertEqual(vm.selectedModel, APIConfig.defaultModel,
+                       "selectedModel 默认应为 APIConfig.defaultModel")
+    }
+
+    /// systemPrompt 默认应为 defaultSystemPrompt
+    func testSystemPromptDefault() {
+        XCTAssertEqual(vm.systemPrompt, SettingsViewModel.defaultSystemPrompt,
+                       "systemPrompt 默认应为 defaultSystemPrompt")
+        XCTAssertEqual(vm.systemPrompt, "你是一个有帮助的AI助手。",
+                       "defaultSystemPrompt 应为 '你是一个有帮助的AI助手。'")
+    }
+
+    /// isSaving 默认应为 false，saveMessage 默认应为 nil
+    func testIsSavingAndSaveMessageDefaults() {
+        XCTAssertFalse(vm.isSaving, "isSaving 默认应为 false")
+        XCTAssertNil(vm.saveMessage, "saveMessage 默认应为 nil")
+    }
+
+    /// defaultSystemPrompt 静态常量应为固定字符串
+    func testDefaultSystemPromptStaticConstant() {
+        XCTAssertEqual(SettingsViewModel.defaultSystemPrompt, "你是一个有帮助的AI助手。",
+                       "defaultSystemPrompt 静态常量应为 '你是一个有帮助的AI助手。'")
+    }
+
+    // MARK: - 向后兼容 API（无参版本）
+
+    /// saveAPIKey() 无参版本应等价于 saveAPIKey(for: .deepseek)
+    func testSaveAPIKeyNoArgBackwardCompat() throws {
+        vm.deepseekAPIKey = "backward-compat-key"
+        vm.saveAPIKey()
+
+        XCTAssertEqual(KeychainManager.shared.getAPIKey(for: .deepseek), "backward-compat-key",
+                       "saveAPIKey() 无参版本应写入 deepseek account")
+        XCTAssertNotNil(vm.saveMessage, "saveAPIKey 后 saveMessage 应非 nil")
+    }
+
+    /// deleteAPIKey() 无参版本应等价于 deleteAPIKey(for: .deepseek)
+    func testDeleteAPIKeyNoArgBackwardCompat() throws {
+        try KeychainManager.shared.saveAPIKey("to-be-deleted", for: .deepseek)
+        vm.deepseekAPIKey = "to-be-deleted"
+
+        vm.deleteAPIKey()
+
+        XCTAssertEqual(vm.deepseekAPIKey, "", "deleteAPIKey 后 deepseekAPIKey 应清空")
+        XCTAssertNil(KeychainManager.shared.getAPIKey(for: .deepseek),
+                     "Keychain 中 deepseek key 应已删除")
+    }
+
+    /// saveAPIKey(for: .deepseek) 显式版本应写入 deepseek account
+    func testSaveAPIKeyExplicitDeepSeek() throws {
+        vm.deepseekAPIKey = "explicit-ds-key"
+        vm.saveAPIKey(for: .deepseek)
+
+        XCTAssertEqual(KeychainManager.shared.getAPIKey(for: .deepseek), "explicit-ds-key",
+                       "saveAPIKey(for: .deepseek) 应写入 deepseek account")
+    }
+
+    // MARK: - loadAPIKeysFromKeychain 副作用
+
+    /// loadAPIKeysFromKeychain 应同时触发 BFF 配置与 OnDevice 配置的加载
+    func testLoadAPIKeysFromKeychainTriggersConfigLoads() async {
+        // 预置 BFF 配置到 UserDefaults
+        var bffConfig = BFFConfig()
+        bffConfig.enabled = true
+        bffConfig.userToken = "side-effect-token"
+        let bffData = try? JSONEncoder().encode(bffConfig)
+        UserDefaults.standard.set(bffData, forKey: BFFConfig.userDefaultsKey)
+
+        // 预置 OnDevice 配置到 UserDefaults
+        var onDeviceConfig = OnDeviceConfig.default
+        onDeviceConfig.enabled = true
+        onDeviceConfig.maxTokens = 2048
+        let onDeviceData = try? JSONEncoder().encode(onDeviceConfig)
+        UserDefaults.standard.set(onDeviceData, forKey: OnDeviceConfig.userDefaultsKey)
+
+        // 调用前 vm 配置应为默认值
+        XCTAssertFalse(vm.bffConfig.enabled, "调用前 bffConfig.enabled 应为 false")
+        XCTAssertFalse(vm.onDeviceConfig.enabled, "调用前 onDeviceConfig.enabled 应为 false")
+
+        await vm.loadAPIKeysFromKeychain()
+
+        // loadAPIKeysFromKeychain 应触发 loadBFFConfig 与 loadOnDeviceConfig
+        XCTAssertTrue(vm.bffConfig.enabled, "loadAPIKeysFromKeychain 后 bffConfig 应从 UserDefaults 加载")
+        XCTAssertEqual(vm.bffConfig.userToken, "side-effect-token",
+                       "loadAPIKeysFromKeychain 后 bffConfig.userToken 应为预置值")
+        XCTAssertTrue(vm.onDeviceConfig.enabled, "loadAPIKeysFromKeychain 后 onDeviceConfig 应从 UserDefaults 加载")
+        XCTAssertEqual(vm.onDeviceConfig.maxTokens, 2048,
+                       "loadAPIKeysFromKeychain 后 onDeviceConfig.maxTokens 应为预置值")
+    }
+
+    // MARK: - BFF 配置字段级持久化
+
+    /// saveBFFConfig 应持久化 endpointURL 字段
+    func testSaveBFFConfigPersistsEndpointURL() {
+        vm.bffConfig.endpointURL = URL(string: "https://field-level.test")!
+        vm.saveBFFConfig()
+        vm.bffConfig = .default
+
+        vm.loadBFFConfig()
+
+        XCTAssertEqual(vm.bffConfig.endpointURL.absoluteString, "https://field-level.test",
+                       "endpointURL 字段应能持久化往返")
+    }
+
+    /// saveBFFConfig 应持久化限流字段
+    func testSaveBFFConfigPersistsRateLimits() {
+        vm.bffConfig.chatRateLimitPerMin = 99
+        vm.bffConfig.embedRateLimitPerMin = 88
+        vm.saveBFFConfig()
+        vm.bffConfig = .default
+
+        vm.loadBFFConfig()
+
+        XCTAssertEqual(vm.bffConfig.chatRateLimitPerMin, 99, "chatRateLimitPerMin 应持久化往返")
+        XCTAssertEqual(vm.bffConfig.embedRateLimitPerMin, 88, "embedRateLimitPerMin 应持久化往返")
+    }
+
+    // MARK: - OnDeviceConfig 字段级持久化
+
+    /// saveOnDeviceConfig 应持久化 temperature 字段
+    func testSaveOnDeviceConfigPersistsTemperature() {
+        vm.onDeviceConfig.temperature = 0.3
+        vm.saveOnDeviceConfig()
+        vm.onDeviceConfig = .default
+
+        vm.loadOnDeviceConfig()
+
+        XCTAssertEqual(vm.onDeviceConfig.temperature, 0.3, accuracy: 0.001,
+                       "temperature 字段应能持久化往返")
+    }
+
+    /// saveOnDeviceConfig 应持久化 modelName 字段
+    func testSaveOnDeviceConfigPersistsModelName() {
+        vm.onDeviceConfig.modelName = "custom-model-name"
+        vm.saveOnDeviceConfig()
+        vm.onDeviceConfig = .default
+
+        vm.loadOnDeviceConfig()
+
+        XCTAssertEqual(vm.onDeviceConfig.modelName, "custom-model-name",
+                       "modelName 字段应能持久化往返")
+    }
+
+    /// saveOnDeviceConfig 应持久化 autoSwitchOnNetworkLoss 字段
+    func testSaveOnDeviceConfigPersistsAutoSwitch() {
+        vm.onDeviceConfig.autoSwitchOnNetworkLoss = false
+        vm.saveOnDeviceConfig()
+        vm.onDeviceConfig = .default
+
+        vm.loadOnDeviceConfig()
+
+        XCTAssertFalse(vm.onDeviceConfig.autoSwitchOnNetworkLoss,
+                       "autoSwitchOnNetworkLoss 字段应能持久化往返")
+    }
+
+    // MARK: - loadFromRemoteConfig 分支
+
+    /// loadFromRemoteConfig 在用户手动切换 provider 后不应覆盖 selectedProvider
+    /// （验证 didSet 标记 userCustomizedProvider 的逻辑）
+    func testLoadFromRemoteConfigPreservesCustomizedProvider() async {
+        // 用户手动切换 provider 到 qwen（触发 didSet 标记 userCustomizedProvider）
+        vm.selectedProvider = .qwen
+        XCTAssertEqual(vm.selectedProvider, .qwen, "手动切换后 selectedProvider 应为 qwen")
+
+        await vm.loadFromRemoteConfig()
+
+        // 即使远程配置加载，也不应覆盖用户已自定义的 provider
+        XCTAssertEqual(vm.selectedProvider, .qwen,
+                       "loadFromRemoteConfig 不应覆盖用户手动切换的 provider")
+    }
+
+    /// loadFromRemoteConfig 在 systemPrompt 为默认值时可用远程值覆盖
+    /// （网络失败时回退到 RemoteConfig.default，其 defaultSystemPrompt 与默认值相同，故应保持默认）
+    func testLoadFromRemoteConfigWithDefaultSystemPrompt() async {
+        // 确保 systemPrompt 为默认值
+        vm.systemPrompt = ChatConfig.default.systemPrompt
+
+        await vm.loadFromRemoteConfig()
+
+        // 远程回退到 default.defaultSystemPrompt（与默认值相同），systemPrompt 应保持默认
+        XCTAssertEqual(vm.systemPrompt, ChatConfig.default.systemPrompt,
+                       "远程加载后 systemPrompt 应为默认值或远程值")
+        XCTAssertFalse(vm.systemPrompt.isEmpty, "systemPrompt 不应为空")
+    }
+
+    /// loadFromRemoteConfig 在 enableFallback 为 false 时应尝试用远程 featureFlags 覆盖
+    /// （网络失败回退到 RemoteConfig.default.featureFlags.enableFallback=false，故保持 false）
+    func testLoadFromRemoteConfigUpdatesEnableFallbackWhenFalse() async {
+        XCTAssertFalse(vm.enableFallback, "调用前 enableFallback 应为 false")
+
+        await vm.loadFromRemoteConfig()
+
+        // 回退到默认 RemoteConfig，featureFlags.enableFallback 默认为 false
+        XCTAssertFalse(vm.enableFallback,
+                       "远程回退后 enableFallback 应为 false（默认）")
+    }
+
+    /// loadFromRemoteConfig 在 enableFallback 已手动开启时不应被远程配置关闭
+    func testLoadFromRemoteConfigPreservesEnabledFallback() async {
+        vm.enableFallback = true
+
+        await vm.loadFromRemoteConfig()
+
+        // enableFallback 为 true 时不应被远程覆盖
+        XCTAssertTrue(vm.enableFallback,
+                      "已开启的 enableFallback 不应被远程配置覆盖")
+    }
+
+    // MARK: - bffConfig 字段修改
+
+    /// 修改 bffConfig 的 enabled 字段后应反映在 vm 状态中
+    func testBFFConfigEnabledMutation() {
+        XCTAssertFalse(vm.bffConfig.enabled)
+        vm.bffConfig.enabled = true
+        XCTAssertTrue(vm.bffConfig.enabled, "修改后 bffConfig.enabled 应为 true")
+    }
+
+    /// 修改 bffConfig 的 userToken 字段后应反映在 vm 状态中
+    func testBFFConfigUserTokenMutation() {
+        XCTAssertEqual(vm.bffConfig.userToken, "")
+        vm.bffConfig.userToken = "mutated-token"
+        XCTAssertEqual(vm.bffConfig.userToken, "mutated-token")
+    }
 }

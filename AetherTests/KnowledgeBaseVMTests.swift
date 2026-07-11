@@ -113,4 +113,184 @@ final class KnowledgeBaseVMTests: XCTestCase {
         )
         XCTAssertFalse(vm.isImporting, "应未进入导入状态")
     }
+
+    // MARK: - load 边界情况
+
+    /// load 在空 context 上应返回空文档列表
+    func testLoadOnEmptyContextReturnsEmptyDocuments() {
+        vm.load(modelContext: context)
+        XCTAssertEqual(vm.documents.count, 0, "空 context 时 documents 应为空")
+        XCTAssertTrue(vm.documents.isEmpty, "空 context 时 documents 应为空数组")
+    }
+
+    /// load 单个 source 单个 chunk 时应聚合为 1 个文档
+    func testLoadSingleSourceSingleChunk() {
+        insertChunks(source: "only.pdf", count: 1, baseTime: 5000)
+
+        vm.load(modelContext: context)
+
+        XCTAssertEqual(vm.documents.count, 1, "单个 source 应聚合为 1 个文档")
+        XCTAssertEqual(vm.documents.first?.source, "only.pdf")
+        XCTAssertEqual(vm.documents.first?.chunkCount, 1, "chunkCount 应为 1")
+    }
+
+    /// load 多次调用应幂等（不累积重复行）
+    func testLoadIsIdempotent() {
+        insertChunks(source: "A.pdf", count: 2, baseTime: 1000)
+
+        vm.load(modelContext: context)
+        let countAfterFirstLoad = vm.documents.count
+
+        vm.load(modelContext: context)
+
+        XCTAssertEqual(vm.documents.count, countAfterFirstLoad, "多次 load 不应累积重复行")
+        XCTAssertEqual(vm.documents.count, 1, "应始终为 1 个文档")
+    }
+
+    /// load 后插入新 chunk 再 load，应反映新增的 chunk
+    func testLoadReflectsNewChunksAfterReload() {
+        insertChunks(source: "A.pdf", count: 1, baseTime: 1000)
+        vm.load(modelContext: context)
+        XCTAssertEqual(vm.documents.first?.chunkCount, 1, "初次 load chunkCount 应为 1")
+
+        // 再插入同 source 的 chunk
+        insertChunks(source: "A.pdf", count: 2, baseTime: 2000)
+        vm.load(modelContext: context)
+
+        XCTAssertEqual(vm.documents.count, 1, "仍为 1 个文档")
+        XCTAssertEqual(vm.documents.first?.chunkCount, 3, "重新 load 后 chunkCount 应为 3")
+    }
+
+    // MARK: - deleteDocument 边界情况
+
+    /// deleteDocument 删除不存在的 source 应为 no-op（不修改 documents、不抛错）
+    func testDeleteNonExistentSourceIsNoOp() {
+        insertChunks(source: "A.pdf", count: 2, baseTime: 1000)
+        vm.load(modelContext: context)
+        XCTAssertEqual(vm.documents.count, 1)
+
+        // 删除不存在的 source
+        vm.deleteDocument(source: "nonexistent.pdf", modelContext: context)
+
+        XCTAssertEqual(vm.documents.count, 1, "删除不存在的 source 后 documents 应不变")
+        XCTAssertEqual(vm.documents.first?.source, "A.pdf", "剩余文档应为 A.pdf")
+    }
+
+    /// deleteDocument 在空 documents 上调用应为 no-op
+    func testDeleteOnEmptyDocumentsIsNoOp() {
+        vm.load(modelContext: context)
+        XCTAssertEqual(vm.documents.count, 0)
+
+        vm.deleteDocument(source: "anything.pdf", modelContext: context)
+
+        XCTAssertEqual(vm.documents.count, 0, "空 documents 上删除应保持为空")
+    }
+
+    /// deleteDocument 删除全部 source 后 documents 应为空
+    func testDeleteAllSourcesResultsInEmptyDocuments() {
+        insertChunks(source: "A.pdf", count: 1, baseTime: 1000)
+        insertChunks(source: "B.pdf", count: 1, baseTime: 2000)
+        vm.load(modelContext: context)
+        XCTAssertEqual(vm.documents.count, 2)
+
+        vm.deleteDocument(source: "A.pdf", modelContext: context)
+        vm.deleteDocument(source: "B.pdf", modelContext: context)
+
+        XCTAssertEqual(vm.documents.count, 0, "删除所有 source 后 documents 应为空")
+    }
+
+    /// deleteDocument 后再 load 应从 context 重建（已删除的 source 不再出现）
+    func testDeleteDocumentPersistsAcrossReload() {
+        insertChunks(source: "A.pdf", count: 2, baseTime: 1000)
+        insertChunks(source: "B.pdf", count: 1, baseTime: 2000)
+        vm.load(modelContext: context)
+
+        vm.deleteDocument(source: "A.pdf", modelContext: context)
+
+        // 重新 load，A.pdf 不应再出现
+        vm.load(modelContext: context)
+        XCTAssertEqual(vm.documents.count, 1, "重新 load 后 A.pdf 不应出现")
+        XCTAssertEqual(vm.documents.first?.source, "B.pdf", "仅剩 B.pdf")
+    }
+
+    // MARK: - importDocument 不可读文件
+
+    /// importDocument 文件内容为空时应设置错误消息
+    func testImportDocumentEmptyContentSetsErrorMessage() async {
+        let vm = KnowledgeBaseVM(provider: .deepseek)
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("empty_\(UUID().uuidString).txt")
+        try? "".write(to: tempURL, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: tempURL) }
+
+        await vm.importDocument(url: tempURL, modelContext: context)
+
+        XCTAssertNotNil(vm.errorMessage, "空文件应设置错误消息")
+        XCTAssertTrue(vm.errorMessage?.contains("无法读取文档内容") ?? false,
+                      "错误消息应包含'无法读取文档内容'，实际：\(vm.errorMessage ?? "nil")")
+        XCTAssertFalse(vm.isImporting, "应未进入导入状态")
+    }
+
+    /// importDocument 不存在的文件应设置错误消息
+    func testImportDocumentNonExistentFileSetsErrorMessage() async {
+        let vm = KnowledgeBaseVM(provider: .deepseek)
+        let nonExistentURL = URL(fileURLWithPath: "/tmp/non_existent_file_\(UUID().uuidString).txt")
+
+        await vm.importDocument(url: nonExistentURL, modelContext: context)
+
+        XCTAssertNotNil(vm.errorMessage, "不存在的文件应设置错误消息")
+        XCTAssertTrue(vm.errorMessage?.contains("无法读取文档内容") ?? false,
+                      "错误消息应包含'无法读取文档内容'，实际：\(vm.errorMessage ?? "nil")")
+        XCTAssertFalse(vm.isImporting, "应未进入导入状态")
+    }
+
+    // MARK: - provider 属性
+
+    /// KnowledgeBaseVM(provider: .deepseek) 的 provider 应为 .deepseek
+    func testProviderPropertyDeepSeek() {
+        let vm = KnowledgeBaseVM(provider: .deepseek)
+        XCTAssertEqual(vm.provider, .deepseek, "provider 应为 .deepseek")
+    }
+
+    /// KnowledgeBaseVM(provider: .qwen) 的 provider 应为 .qwen
+    func testProviderPropertyQwen() {
+        let vm = KnowledgeBaseVM(provider: .qwen)
+        XCTAssertEqual(vm.provider, .qwen, "provider 应为 .qwen")
+    }
+
+    /// KnowledgeBaseVM 默认 provider 应为 .deepseek
+    func testProviderPropertyDefault() {
+        XCTAssertEqual(vm.provider, .deepseek, "默认 provider 应为 .deepseek")
+    }
+
+    // MARK: - 初始状态
+
+    /// 新建的 KnowledgeBaseVM 初始状态应为空
+    func testInitialState() {
+        XCTAssertEqual(vm.documents.count, 0, "初始 documents 应为空")
+        XCTAssertFalse(vm.isImporting, "初始 isImporting 应为 false")
+        XCTAssertNil(vm.errorMessage, "初始 errorMessage 应为 nil")
+    }
+
+    // MARK: - DocumentRow 标识
+
+    /// DocumentRow 的 id 应等于 source
+    func testDocumentRowIdEqualsSource() {
+        insertChunks(source: "test.pdf", count: 1, baseTime: 1000)
+        vm.load(modelContext: context)
+
+        let row = vm.documents.first
+        XCTAssertEqual(row?.id, "test.pdf", "DocumentRow.id 应等于 source")
+        XCTAssertEqual(row?.source, "test.pdf")
+    }
+
+    /// 多个 source 的 DocumentRow id 应互不相同
+    func testDocumentRowIdsAreUnique() {
+        insertChunks(source: "A.pdf", count: 1, baseTime: 1000)
+        insertChunks(source: "B.pdf", count: 1, baseTime: 2000)
+        vm.load(modelContext: context)
+
+        let ids = Set(vm.documents.map(\.id))
+        XCTAssertEqual(ids.count, 2, "不同 source 的 DocumentRow id 应互不相同")
+    }
 }
