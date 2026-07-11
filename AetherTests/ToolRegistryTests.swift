@@ -59,6 +59,35 @@ final class ToolRegistryTests: XCTestCase {
         XCTAssertTrue(json.contains("\"name\""), "JSON 应含 name 字段")
         XCTAssertTrue(json.contains("\"parameters\""), "JSON 应含 parameters 字段")
     }
+
+    /// ToolDef.parameters 中的嵌套 JSON Schema（properties / required 等）必须被正确序列化，
+    /// 不能因 AnyCodable.encode 丢失字典/数组而变成 null。
+    func testToolDefParametersNestedSerialization() throws {
+        // 使用 calculate 工具，其 parameters 包含嵌套的 properties 与 required 数组
+        guard let calculateDef = registry.allToolDefs.first(where: { $0.function.name == "calculate" }) else {
+            return XCTFail("calculate 工具应存在")
+        }
+        let data = try JSONEncoder().encode(calculateDef)
+        let json = String(data: data, encoding: .utf8) ?? ""
+
+        // 嵌套结构必须存在且不为 null
+        XCTAssertTrue(json.contains("\"properties\""), "parameters 应包含 properties")
+        XCTAssertTrue(json.contains("\"required\""), "parameters 应包含 required")
+        XCTAssertTrue(json.contains("\"expression\""), "properties 中应包含 expression 字段")
+        XCTAssertFalse(json.contains("\"properties\":null"), "properties 不能为 null")
+        XCTAssertFalse(json.contains("\"required\":null"), "required 不能为 null")
+
+        // 反序列化后验证结构完整
+        let decoded = try JSONDecoder().decode(ToolDef.self, from: data)
+        XCTAssertEqual(decoded.function.name, "calculate")
+        let params = decoded.function.parameters
+        XCTAssertEqual(params["type"]?.value as? String, "object")
+        let properties = params["properties"]?.value as? [String: AnyCodable]
+        XCTAssertNotNil(properties, "反序列化后 properties 应存在")
+        XCTAssertNotNil(properties?["expression"], "expression 字段应存在")
+        let required = params["required"]?.value as? [AnyCodable]
+        XCTAssertEqual(required?.compactMap { $0.value as? String }, ["expression"])
+    }
 }
 
 /// 测试用占位工具：name 与 result 可配置，execute 返回固定字符串

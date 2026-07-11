@@ -145,7 +145,13 @@ struct AnyCodable: Codable {
     let value: Any
 
     init(_ value: Any) {
-        self.value = value
+        if let dict = value as? [String: Any] {
+            self.value = dict.mapValues { AnyCodable($0) }
+        } else if let array = value as? [Any] {
+            self.value = array.map { AnyCodable($0) }
+        } else {
+            self.value = value
+        }
     }
 
     init(from decoder: Decoder) throws {
@@ -159,27 +165,55 @@ struct AnyCodable: Codable {
         } else if let string = try? container.decode(String.self) {
             value = string
         } else if let array = try? container.decode([AnyCodable].self) {
-            value = array.map(\.value)
+            value = array
         } else if let dict = try? container.decode([String: AnyCodable].self) {
-            value = dict.mapValues(\.value)
+            value = dict
         } else {
             value = ()
         }
     }
 
     func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
         if let int = value as? Int {
+            var container = encoder.singleValueContainer()
             try container.encode(int)
         } else if let double = value as? Double {
+            var container = encoder.singleValueContainer()
             try container.encode(double)
         } else if let bool = value as? Bool {
+            var container = encoder.singleValueContainer()
             try container.encode(bool)
         } else if let string = value as? String {
+            var container = encoder.singleValueContainer()
             try container.encode(string)
+        } else if let array = value as? [AnyCodable] {
+            var container = encoder.unkeyedContainer()
+            try container.encode(contentsOf: array)
+        } else if let dict = value as? [String: AnyCodable] {
+            var container = encoder.container(keyedBy: AnyCodingKey.self)
+            for (key, value) in dict {
+                try container.encode(value, forKey: AnyCodingKey(stringValue: key))
+            }
         } else {
+            var container = encoder.singleValueContainer()
             try container.encodeNil()
         }
+    }
+}
+
+/// 动态编码字典时使用的通用 CodingKey
+private struct AnyCodingKey: CodingKey {
+    var stringValue: String
+    var intValue: Int?
+
+    init(stringValue: String) {
+        self.stringValue = stringValue
+        self.intValue = nil
+    }
+
+    init?(intValue: Int) {
+        self.stringValue = String(intValue)
+        self.intValue = intValue
     }
 }
 
