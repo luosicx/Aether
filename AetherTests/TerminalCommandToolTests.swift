@@ -26,6 +26,22 @@ final class TerminalCommandToolTests: XCTestCase {
         XCTAssertEqual(result, "错误：禁止执行危险命令")
     }
 
+    func testExecuteDangerousCommandBypasses() async throws {
+        let bypasses = [
+            "rm  -rf  /",           // 多余空格
+            "rm -rf --no-preserve-root /",
+            "rm -rf \"$HOME\"",     // 引号包裹
+            "rm -rf '$HOME'",
+            "rm -rf $HOME/",
+            "rm -rf ~/*",
+            "dd  if=/dev/zero",
+        ]
+        for command in bypasses {
+            let result = try await tool.execute(arguments: ["command": command])
+            XCTAssertEqual(result, "错误：禁止执行危险命令", "命令应被拦截: \(command)")
+        }
+    }
+
     func testExecuteStderrCommand() async throws {
         let result = try await tool.execute(arguments: ["command": "ls /nonexistent"])
         XCTAssertTrue(result.contains("No such file"), "实际：\(result)")
