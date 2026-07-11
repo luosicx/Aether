@@ -56,7 +56,7 @@ final class AetherUITests: XCTestCase {
                       "emptyState 应显示「以太」标题")
         XCTAssertTrue(inputField(in: app).exists, "应显示输入框 placeholder「输入消息…」")
 
-        let sendButton = app.buttons["发送"]
+        let sendButton = app.buttons["sendButton"]
         XCTAssertTrue(sendButton.waitForExistence(timeout: 3), "应存在发送按钮")
         XCTAssertFalse(sendButton.isEnabled, "空输入时发送按钮应禁用")
     }
@@ -66,11 +66,11 @@ final class AetherUITests: XCTestCase {
         let app = makeApp()
         app.launch()
 
-        XCTAssertTrue(app.buttons["会话列表"].waitForExistence(timeout: 5), "应存在「会话列表」按钮")
-        app.buttons["会话列表"].tap()
+        XCTAssertTrue(app.buttons["conversationListButton"].waitForExistence(timeout: 5), "应存在「会话列表」按钮")
+        app.buttons["conversationListButton"].tap()
         // 确认 sheet 出现（用导航栏标题或新建按钮兜底）
         XCTAssertTrue(app.navigationBars["对话"].waitForExistence(timeout: 5)
-                      || app.buttons["新建对话"].waitForExistence(timeout: 5),
+                      || app.buttons["newConversationButton"].waitForExistence(timeout: 5),
                       "应打开会话列表 sheet")
 
         // UITEST_RESET_DATA 已在启动时清空数据，会话列表应为空
@@ -83,8 +83,8 @@ final class AetherUITests: XCTestCase {
         let app = makeApp()
         app.launch()
 
-        app.buttons["会话列表"].tap()
-        app.buttons["新建对话"].firstMatch.tap()
+        app.buttons["conversationListButton"].tap()
+        app.buttons["newConversationButton"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["新对话"].waitForExistence(timeout: 3),
                       "创建后应出现「新对话」行")
     }
@@ -94,8 +94,8 @@ final class AetherUITests: XCTestCase {
         let app = makeApp()
         app.launch()
 
-        app.buttons["设置"].tap()
-        let secureField = app.secureTextFields["DeepSeek API Key"]
+        app.buttons["settingsButton"].tap()
+        let secureField = app.secureTextFields["deepseekAPIKeySecureField"]
         // Day 17: 新增「健康」Section 后 API Key 输入框被推到 Form 更下方，
         // 需先滚动让 SwiftUI Form 懒渲染该元素到 accessibility tree
         scrollToElement(secureField, in: app)
@@ -106,7 +106,7 @@ final class AetherUITests: XCTestCase {
         // 改为在 secureField 上 swipeUp 滚动 Form 让保存按钮进入可见区域，
         // tap 保存按钮会自动收起键盘
         secureField.swipeUp()
-        let saveButton = app.buttons["保存 API Key"]
+        let saveButton = app.buttons["saveAPIKeyButton"]
         // 滚动后等待保存按钮出现在无障碍树中
         if !saveButton.waitForExistence(timeout: 0.5) {
             secureField.swipeUp()
@@ -127,8 +127,8 @@ final class AetherUITests: XCTestCase {
         let app = makeApp()
         app.launch()
 
-        app.buttons["设置"].tap()
-        let secureField = app.secureTextFields["DeepSeek API Key"]
+        app.buttons["settingsButton"].tap()
+        let secureField = app.secureTextFields["deepseekAPIKeySecureField"]
         // Day 17: 新增「健康」Section 后需先滚动到可见区域
         scrollToElement(secureField, in: app)
         XCTAssertTrue(secureField.waitForExistence(timeout: 5))
@@ -136,7 +136,7 @@ final class AetherUITests: XCTestCase {
         secureField.typeText("sk-test")
         // Day 17: dismissKeyboard 不可靠，改为 swipeUp 滚动 Form 让保存按钮可见
         secureField.swipeUp()
-        let saveButton = app.buttons["保存 API Key"]
+        let saveButton = app.buttons["saveAPIKeyButton"]
         // 滚动后等待保存按钮出现在无障碍树中
         if !saveButton.waitForExistence(timeout: 0.5) {
             secureField.swipeUp()
@@ -148,7 +148,7 @@ final class AetherUITests: XCTestCase {
         Thread.sleep(forTimeInterval: 0.5)
 
         // 再删除（触发 alert）
-        app.buttons["删除 API Key"].tap()
+        app.buttons["deleteAPIKeyButton"].tap()
         XCTAssertTrue(app.alerts.firstMatch.waitForExistence(timeout: 5), "应弹出删除确认 alert")
         // alert 含「取消」+「删除」两个按钮
         let deleteBtn = app.alerts.firstMatch.buttons["删除"]
@@ -177,9 +177,9 @@ final class AetherUITests: XCTestCase {
         let app = makeApp()
         app.launch()
 
-        app.buttons["设置"].tap()
+        app.buttons["settingsButton"].tap()
 
-        let ragToggle = app.switches["启用 RAG 知识库"]
+        let ragToggle = app.switches["ragToggle"]
         // Day 17: 先滚动让元素进入 accessibility tree（必须在 waitForExistence 之前）
         scrollToElement(ragToggle, in: app)
         XCTAssertTrue(ragToggle.waitForExistence(timeout: 5), "应存在 RAG 开关")
@@ -204,7 +204,7 @@ final class AetherUITests: XCTestCase {
 
         // Day 13: RAG tap 后 Form 可能自动滚动导致 Tools Toggle 位置漂移，
         // 先滚动 Form 让 Tools Toggle 完全可见，再读取 frame 后用 coordinate.tap() 命中把手
-        let toolsToggle = app.switches["启用工具调用"]
+        let toolsToggle = app.switches["toolsToggle"]
         scrollToElement(toolsToggle, in: app)
         XCTAssertTrue(toolsToggle.waitForExistence(timeout: 5), "应存在工具调用开关")
         // 固定等待：scrollToElement 后 Form 可能仍在滚动惯性中，等待动画完成再读取 value
@@ -239,15 +239,17 @@ final class AetherUITests: XCTestCase {
         let app = makeApp()
         app.launch()
 
-        app.buttons["设置"].tap()
+        app.buttons["settingsButton"].tap()
 
         // Day 17: 懒加载 Form 中 element(boundBy:) 不可靠（滚动后索引变化），
         // 改为先滚动到「自动」按钮（模型 Picker 的段），再用 buttons 直接访问各段
-        let autoSeg = app.buttons["自动"]
+        // segmented Picker 的 segment 由系统生成，无 accessibilityIdentifier，
+        // 用 predicate 通过 label 查找（segment 的 label 查找在 XCUI 中可靠）
+        let autoSeg = app.buttons.matching(NSPredicate(format: "label == %@", "自动")).firstMatch
         scrollToElement(autoSeg, in: app)
         XCTAssertTrue(autoSeg.waitForExistence(timeout: 5), "应存在「自动」段")
-        let chatSeg = app.buttons["Chat"]
-        let reasonerSeg = app.buttons["Reasoner"]
+        let chatSeg = app.buttons.matching(NSPredicate(format: "label == %@", "Chat")).firstMatch
+        let reasonerSeg = app.buttons.matching(NSPredicate(format: "label == %@", "Reasoner")).firstMatch
         XCTAssertTrue(chatSeg.exists, "应存在「Chat」段")
         XCTAssertTrue(reasonerSeg.exists, "应存在「Reasoner」段")
 
@@ -277,7 +279,7 @@ final class AetherUITests: XCTestCase {
         XCTAssertTrue(input.waitForExistence(timeout: 5))
         input.tap()
         input.typeText("hi")
-        app.buttons["发送"].tap()
+        app.buttons["sendButton"].tap()
         // 等待桩回复出现，确认会话已创建
         let stub = app.staticTexts.containing(
             NSPredicate(format: "label CONTAINS %@", "UIT 测试模式")
@@ -286,11 +288,11 @@ final class AetherUITests: XCTestCase {
         dismissKeyboard(in: app)
 
         // 打开设置
-        app.buttons["设置"].tap()
+        app.buttons["settingsButton"].tap()
         // Day 13: 新增「供应商」「自动降级」Section 后 TextEditor 被推到 Form 较下方，
         // SwiftUI Form 懒渲染：必须先滚动到 TextEditor 才会进入 accessibility tree。
         // 顺序：先 scrollToElement 让 TextEditor 渲染，再用 waitForExistence 确认。
-        let editor = app.textViews["系统提示词"]
+        let editor = app.textViews["systemPromptTextEditor"]
         scrollToElement(editor, in: app)
         XCTAssertTrue(editor.waitForExistence(timeout: 5), "应存在系统提示词 TextEditor")
         editor.tap()
@@ -298,12 +300,12 @@ final class AetherUITests: XCTestCase {
         dismissKeyboard(in: app)
 
         // 完成 → 持久化到会话
-        app.buttons["完成"].tap()
+        app.buttons["settingsDoneButton"].tap()
         // 重进设置验证
-        XCTAssertTrue(app.buttons["设置"].waitForExistence(timeout: 5))
-        app.buttons["设置"].tap()
+        XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(timeout: 5))
+        app.buttons["settingsButton"].tap()
 
-        let editor2 = app.textViews["系统提示词"]
+        let editor2 = app.textViews["systemPromptTextEditor"]
         scrollToElement(editor2, in: app)
         XCTAssertTrue(editor2.waitForExistence(timeout: 5))
         let value = editor2.value as? String ?? ""
@@ -316,7 +318,7 @@ final class AetherUITests: XCTestCase {
         let app = makeApp()
         app.launch()
 
-        app.buttons["设置"].tap()
+        app.buttons["settingsButton"].tap()
 
         // 语气 Picker 选「正式」（Form 默认 picker 为导航式：点击行 → 推入选项列表）
         // 「用户偏好」Section 在 Form 底部，需要滚动到可见
@@ -331,7 +333,8 @@ final class AetherUITests: XCTestCase {
         }
         XCTAssertTrue(toneRow.waitForExistence(timeout: 5), "应存在语气 Picker 行")
         toneRow.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-        let formalOption = app.buttons["正式"].firstMatch
+        // Picker 选项由系统生成，无 accessibilityIdentifier，用 predicate 通过 label 查找
+        let formalOption = app.buttons.matching(NSPredicate(format: "label == %@", "正式")).firstMatch
         if !formalOption.waitForExistence(timeout: 2) {
             // Picker 推入的选项列表可能是 staticText 而非 button
             let formalText = app.staticTexts["正式"].firstMatch
@@ -345,7 +348,7 @@ final class AetherUITests: XCTestCase {
 
         // 工具 Toggle：勾选 calculate（可能在 toneRow 下方，需要再滚动一点）
         // Day 18: SettingsView Toggle 改用 toolDef.function.description 作为标签
-        let calcToggle = app.switches["对数学表达式求值，支持加减乘除、括号、浮点数"]
+        let calcToggle = app.switches["toolToggle_calculate"]
         scrollToElement(calcToggle, in: app, maxAttempts: 12)
         XCTAssertTrue(calcToggle.waitForExistence(timeout: 5), "应存在 calculate 工具开关")
         // coordinate.tap() 偶发落空（同 testToggleRAGAndTools），重试确保开关翻转为开启
@@ -359,7 +362,7 @@ final class AetherUITests: XCTestCase {
         XCTAssertEqual(calcToggle.value as? String, "1", "calculate 工具应被开启")
 
         // 完成 → 触发 onDisappear 持久化到 SwiftData
-        app.buttons["完成"].tap()
+        app.buttons["settingsDoneButton"].tap()
         // 固定等待：sheet 关闭动画 + onDisappear 持久化落盘，避免 terminate 中断保存
         Thread.sleep(forTimeInterval: 2.0)
 
@@ -370,8 +373,8 @@ final class AetherUITests: XCTestCase {
         app.launch()
         // 固定等待：SwiftData 初始化与偏好加载完成，避免 onAppear 时机竞争
         Thread.sleep(forTimeInterval: 1.5)
-        XCTAssertTrue(app.buttons["设置"].waitForExistence(timeout: 5), "重进后应回到主界面")
-        app.buttons["设置"].tap()
+        XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(timeout: 5), "重进后应回到主界面")
+        app.buttons["settingsButton"].tap()
 
         // 验证语气保持「正式」（需要滚动到用户偏好 Section）
         let toneRow2 = app.staticTexts["语气"].firstMatch
@@ -400,7 +403,7 @@ final class AetherUITests: XCTestCase {
 
         // 验证 calculate 工具保持开启
         // Day 18: SettingsView Toggle 改用 toolDef.function.description 作为标签
-        let calcToggle2 = app.switches["对数学表达式求值，支持加减乘除、括号、浮点数"]
+        let calcToggle2 = app.switches["toolToggle_calculate"]
         scrollToElement(calcToggle2, in: app, maxAttempts: 16)
         XCTAssertTrue(calcToggle2.waitForExistence(timeout: 5), "重进后应存在 calculate 工具开关")
         // SwiftData 持久化 + onAppear 加载存在时机差异，重试读取开关值确保稳定
@@ -423,8 +426,8 @@ final class AetherUITests: XCTestCase {
         let app = makeApp()
         app.launch()
 
-        app.buttons["会话列表"].tap()
-        app.buttons["新建对话"].firstMatch.tap()
+        app.buttons["conversationListButton"].tap()
+        app.buttons["newConversationButton"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["新对话"].waitForExistence(timeout: 3))
 
         let row = app.cells.firstMatch
@@ -450,12 +453,12 @@ final class AetherUITests: XCTestCase {
         let app = makeApp()
         app.launch()
 
-        app.buttons["会话列表"].tap()
-        app.buttons["新建对话"].firstMatch.tap()
+        app.buttons["conversationListButton"].tap()
+        app.buttons["newConversationButton"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["新对话"].waitForExistence(timeout: 3))
 
         // 搜索匹配关键词
-        let searchField = app.textFields["搜索会话标题…"].firstMatch
+        let searchField = app.textFields["conversationSearchField"].firstMatch
         XCTAssertTrue(searchField.waitForExistence(timeout: 3), "应存在搜索框")
         searchField.tap()
         searchField.typeText("新对话")
@@ -466,7 +469,7 @@ final class AetherUITests: XCTestCase {
                       "匹配关键词时应显示行")
 
         // 清除搜索后输入不匹配关键词
-        let clearBtn = app.buttons["清除搜索"]
+        let clearBtn = app.buttons["clearSearchButton"]
         if clearBtn.exists { clearBtn.tap() }
         // 固定等待：清除搜索后列表过滤刷新，再输入新的搜索词
         Thread.sleep(forTimeInterval: 0.3)
@@ -478,7 +481,7 @@ final class AetherUITests: XCTestCase {
                        "不匹配时行应隐藏")
 
         // 清除搜索恢复
-        let clearBtn2 = app.buttons["清除搜索"]
+        let clearBtn2 = app.buttons["clearSearchButton"]
         if clearBtn2.exists { clearBtn2.tap() }
         XCTAssertTrue(app.cells.containing(.staticText, identifier: "新对话").firstMatch
                       .waitForExistence(timeout: 3),
@@ -498,10 +501,10 @@ final class AetherUITests: XCTestCase {
         XCTAssertTrue(input.waitForExistence(timeout: 5))
         input.tap()
         input.typeText("hello")
-        app.buttons["发送"].tap()
+        app.buttons["sendButton"].tap()
 
-        // 等待错误条出现（ErrorBanner 的「关闭」按钮 accessibilityLabel 为「关闭」）
-        let closeButton = app.buttons["关闭"]
+        // 等待错误条出现（ErrorBanner 的关闭按钮 accessibilityIdentifier 为 "closeErrorBannerButton"）
+        let closeButton = app.buttons["closeErrorBannerButton"]
         XCTAssertTrue(closeButton.waitForExistence(timeout: 10), "应出现错误条关闭按钮")
 
         // 点击关闭，验证错误条消失
