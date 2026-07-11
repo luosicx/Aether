@@ -233,4 +233,140 @@ final class KeychainManagerTests: XCTestCase {
         XCTAssertTrue(error.errorDescription?.contains("网络中断") == true,
                       "networkError 描述应含底层消息")
     }
+
+    // MARK: - Keychain 迁移逻辑测试
+
+    /// 辅助：用 InMemoryKeychainBackend 预填充旧 service 数据
+    private func prefillLegacyData(backend: InMemoryKeychainBackend, account: String, data: Data) {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "com.aibuilder.apikey",
+            kSecAttrAccount as String: account,
+            kSecValueData as String: data
+        ]
+        _ = backend.secItemAdd(query as CFDictionary)
+    }
+
+    /// migrateLegacyKeychainIfNeeded：旧 service 有数据时迁移到新 service
+    func testMigrateLegacyKeychainWithData() {
+        let backend = InMemoryKeychainBackend()
+        let legacyData = "old-api-key-123".data(using: .utf8)!
+        prefillLegacyData(backend: backend, account: ModelProvider.deepseek.keychainAccount, data: legacyData)
+
+        KeychainManager.shared.backend = backend
+        // 确保新 service 无旧数据
+        KeychainManager.shared.deleteAPIKey(for: .deepseek)
+
+        // 手动触发迁移
+        KeychainManager.shared.migrateLegacyKeychainIfNeeded()
+
+        // 验证迁移后新 service 有数据
+        let migrated = KeychainManager.shared.getAPIKey(for: .deepseek)
+        XCTAssertEqual(migrated, "old-api-key-123", "迁移后应能从新 service 读取旧数据")
+    }
+
+    /// migrateLegacyKeychainIfNeeded：旧 service 无数据时正常跳过
+    func testMigrateLegacyNoDataSkipsGracefully() {
+        let backend = InMemoryKeychainBackend()
+        KeychainManager.shared.backend = backend
+        KeychainManager.shared.deleteAPIKey(for: .deepseek)
+
+        KeychainManager.shared.migrateLegacyKeychainIfNeeded()
+
+        XCTAssertNil(KeychainManager.shared.getAPIKey(for: .deepseek), "无迁移数据时新 service 应为空")
+        XCTAssertNil(KeychainManager.shared.getAPIKey(for: .qwen), "qwen 也应为空")
+    }
+
+    // MARK: - InMemoryKeychainBackend 边界测试
+
+    /// InMemoryKeychainBackend 的 secItemCopyMatching 对不存在的 key 返回 errSecItemNotFound
+    func testInMemoryBackendReturnsNotFoundForMissingKey() {
+        let backend = InMemoryKeychainBackend()
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "test-service",
+            kSecAttrAccount as String: "test-account",
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var result: CFTypeRef?
+        let status = backend.secItemCopyMatching(query as CFDictionary, &result)
+        XCTAssertEqual(status, errSecItemNotFound, "不存在的 key 应返回 errSecItemNotFound")
+    }
+
+    /// InMemoryKeychainBackend 的 secItemDelete 对不存在的 key 也返回 success
+    func testInMemoryBackendDeleteIsIdempotent() {
+        let backend = InMemoryKeychainBackend()
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "test-service",
+            kSecAttrAccount as String: "test-account"
+        ]
+        // 删除不存在的 key
+        let status = backend.secItemDelete(query as CFDictionary)
+        XCTAssertEqual(status, errSecSuccess, "删除不存在的 key 应返回 success")
+    }
+
+    /// InMemoryKeychainBackend 的 secItemAdd 正确写入并返回 success
+    func testInMemoryBackendAddSucceeds() {
+        let backend = InMemoryKeychainBackend()
+        let data = "test-value".data(using: .utf8)!
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "test-service",
+            kSecAttrAccount as String: "test-account",
+            kSecValueData as String: data
+        ]
+        let status = backend.secItemAdd(query as CFDictionary)
+        XCTAssertEqual(status, errSecSuccess, "写入应返回 success")
+
+        // 验证可读取
+        let readQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "test-service",
+            kSecAttrAccount as String: "test-account",
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var result: CFTypeRef?
+        let readStatus = backend.secItemCopyMatching(readQuery as CFDictionary, &result)
+        XCTAssertEqual(readStatus, errSecSuccess, "读取应返回 success")
+        XCTAssertEqual(result as? Data, data, "读取的数据应与写入一致")
+    }
+
+    /// InMemoryKeychainBackend 先删后加（幂等保存）
+    func testInMemoryBackendDeleteThenAddIsIdempotent() {
+        let backend = InMemoryKeychainBackend()
+        let data1 = "value1".data(using: .utf8)!
+        let data2 = "value2".data(using: .utf8)!
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "test-service",
+            kSecAttrAccount as String: "test-account",
+            kSecValueData as String: data1
+        ]
+
+        // 第一次写入
+        _ = backend.secItemAdd(query as CFDictionary)
+
+        // 修改 data 后先删后加
+        var deleteQuery = query
+        deleteQuery.removeValue(forKey: kSecValueData as String)
+        _ = backend.secItemDelete(deleteQuery as CFDictionary)
+        var addQuery = query
+        addQuery[kSecValueData as String] = data2
+        _ = backend.secItemAdd(addQuery as CFDictionary)
+
+        // 验证最终值为 data2
+        let readQuery: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "test-service",
+            kSecAttrAccount as String: "test-account",
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var result: CFTypeRef?
+        _ = backend.secItemCopyMatching(readQuery as CFDictionary, &result)
+        XCTAssertEqual(result as? Data, data2, "先删后加后应为 data2")
+    }
 }

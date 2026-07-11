@@ -129,4 +129,118 @@ final class FallbackLLMProviderTests: XCTestCase {
         XCTAssertEqual(provider.lastUsedProvider, .deepseek, "embed 路径不降级，lastUsedProvider 应保持 primary")
         XCTAssertEqual(provider.didFallback, false, "embed 不应触发降级")
     }
+
+    // MARK: - chatWithTools 路径测试
+
+    /// chatWithTools：主 provider 成功，不降级
+    func testChatWithToolsPrimarySuccessNoFallback() async {
+        let primary = StubLLMProvider()
+        primary.chatContents = ["Hello", " World"]
+        let fallback = StubLLMProvider()
+        fallback.chatContents = ["Fallback"]
+
+        let provider = FallbackLLMProvider(
+            primary: primary, fallback: fallback,
+            primaryProvider: .deepseek, fallbackProvider: .qwen
+        )
+
+        var chunks: [ParsedChunk] = []
+        for await chunk in provider.chat(messages: [], config: .default, tools: [], apiKey: "key") {
+            chunks.append(chunk)
+        }
+
+        XCTAssertEqual(chunks.count, 2, "应产出 2 个 chunk")
+        XCTAssertEqual(chunks[0].content, "Hello")
+        XCTAssertEqual(chunks[1].content, " World")
+        XCTAssertEqual(provider.lastUsedProvider, .deepseek, "lastUsedProvider 应为 primary")
+        XCTAssertEqual(provider.didFallback, false, "不应触发降级")
+    }
+
+    /// chatWithTools：主 provider 失败，降级到 fallback
+    func testChatWithToolsPrimaryFailsTriggersFallback() async {
+        let primary = StubLLMProvider()
+        primary.shouldFail = true
+        let fallback = StubLLMProvider()
+        fallback.chatContents = ["Fallback content"]
+
+        let provider = FallbackLLMProvider(
+            primary: primary, fallback: fallback,
+            primaryProvider: .deepseek, fallbackProvider: .qwen
+        )
+
+        var chunks: [ParsedChunk] = []
+        for await chunk in provider.chat(messages: [], config: .default, tools: [], apiKey: "key") {
+            chunks.append(chunk)
+        }
+
+        XCTAssertEqual(chunks.count, 1, "应产出 1 个 chunk（来自 fallback）")
+        XCTAssertEqual(chunks[0].content, "Fallback content")
+        XCTAssertEqual(provider.lastUsedProvider, .qwen, "lastUsedProvider 应为 fallback")
+        XCTAssertEqual(provider.didFallback, true, "应触发降级")
+    }
+
+    /// chatWithTools：主和备用都失败
+    func testChatWithToolsBothFailYieldsNothing() async {
+        let primary = StubLLMProvider()
+        primary.shouldFail = true
+        let fallback = StubLLMProvider()
+        fallback.shouldFail = true
+
+        let provider = FallbackLLMProvider(
+            primary: primary, fallback: fallback,
+            primaryProvider: .deepseek, fallbackProvider: .qwen
+        )
+
+        var chunks: [ParsedChunk] = []
+        for await chunk in provider.chat(messages: [], config: .default, tools: [], apiKey: "key") {
+            chunks.append(chunk)
+        }
+
+        XCTAssertEqual(chunks.count, 0, "两者都失败时不应产出 chunk")
+        XCTAssertEqual(provider.lastUsedProvider, .qwen, "fallback 路径已被触发")
+        XCTAssertEqual(provider.didFallback, true, "应标记触发降级")
+    }
+
+    /// embed 成功路径：主 provider 成功返回结果
+    func testEmbedSuccessReturnsResult() async throws {
+        let primary = StubLLMProvider()
+        primary.embedResult = [[0.1, 0.2, 0.3]]
+        let fallback = StubLLMProvider()
+        fallback.embedResult = [[0.9]]
+
+        let provider = FallbackLLMProvider(
+            primary: primary, fallback: fallback,
+            primaryProvider: .deepseek, fallbackProvider: .qwen
+        )
+
+        let result = try await provider.embed(texts: ["test"], apiKey: "key")
+        XCTAssertEqual(result.count, 1, "应返回 1 个向量")
+        XCTAssertEqual(result[0], [0.1, 0.2, 0.3], "应返回 primary 的结果")
+        XCTAssertEqual(provider.lastUsedProvider, .deepseek, "embed 成功后 lastUsedProvider 应为 primary")
+        XCTAssertEqual(provider.didFallback, false, "embed 成功不应触发降级")
+    }
+
+    /// 降级后再调用 embed：lastUsedProvider 应重置为 primary
+    func testEmbedAfterFallbackResetsLastUsedProvider() async throws {
+        let primary = StubLLMProvider()
+        primary.shouldFail = true
+        let fallback = StubLLMProvider()
+        fallback.chatContents = ["fallback"]
+        fallback.embedResult = [[0.5]]
+
+        let provider = FallbackLLMProvider(
+            primary: primary, fallback: fallback,
+            primaryProvider: .deepseek, fallbackProvider: .qwen
+        )
+
+        // 先触发 chat 降级
+        for await _ in provider.chat(messages: [], config: .default, apiKey: "key") {}
+        XCTAssertEqual(provider.didFallback, true, "chat 应触发降级")
+        XCTAssertEqual(provider.lastUsedProvider, .qwen)
+
+        // 然后调用 embed，lastUsedProvider 应重置
+        _ = try await provider.embed(texts: ["x"], apiKey: "key")
+        XCTAssertEqual(provider.lastUsedProvider, .deepseek, "embed 应重置 lastUsedProvider 为 primary")
+        XCTAssertEqual(provider.didFallback, false, "embed 应重置 didFallback 为 false")
+    }
 }

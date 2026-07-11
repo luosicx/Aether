@@ -88,7 +88,7 @@ final class KeychainManager {
 
     /// 迁移旧 Keychain service 到新 service（com.aibuilder.apikey → com.aether.apikey）。
     /// 遍历所有 provider account，若旧 service 下存在数据则迁移到新 service 并删除旧条目。
-    private func migrateLegacyKeychainIfNeeded() {
+    internal func migrateLegacyKeychainIfNeeded() {
         for provider in ModelProvider.allCases {
             let account = provider.keychainAccount
             // 查询旧 service 下的数据
