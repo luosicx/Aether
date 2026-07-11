@@ -202,6 +202,10 @@
 		EAB87D44BEC44A2F3F6954F8 /* CardStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1222C063DBBE4FB784B1240 /* CardStyle.swift */; };
 		EDB2E1399F6C832427EC3DC3 /* NetworkMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 16C4FE76CE229070845476F7 /* NetworkMonitor.swift */; };
 		EE000000000000000000E002 /* ChatInputBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000E001 /* ChatInputBar.swift */; };
+		E1F2A3B4C5D6004100000002 /* CodeSyntaxHighlighterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F2A3B4C5D6004100000001 /* CodeSyntaxHighlighterTests.swift */; };
+		E1F2A3B4C5D6004200000002 /* MarkdownTableParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F2A3B4C5D6004200000001 /* MarkdownTableParserTests.swift */; };
+		E1F2A3B4C5D6004300000002 /* RemoteConfigTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F2A3B4C5D6004300000001 /* RemoteConfigTests.swift */; };
+		E1F2A3B4C5D6004400000002 /* MLXInferenceEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F2A3B4C5D6004400000001 /* MLXInferenceEngineTests.swift */; };
 		EF8F6CED79CD3CD894CB665B /* LaunchScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06338EAB3D44F558619E23D1 /* LaunchScreen.swift */; };
 		F0F246B22366C61D222BE835 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4793E58E7B8E0482175F372A /* Foundation.framework */; };
 		F1A2B3C4D5E6F7A8B9C0D1E2 /* OnDeviceModelCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2B3C4D5E6F7A8B9C0D1E2F3 /* OnDeviceModelCatalog.swift */; };
@@ -427,6 +431,10 @@
 		E8EFEF1D661C35FC318E27BA /* ColorTokens.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ColorTokens.swift; sourceTree = "<group>"; };
 		EBC97AC964782C385A85278D /* NotificationServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NotificationServiceTests.swift; sourceTree = "<group>"; };
 		EE000000000000000000E001 /* ChatInputBar.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatInputBar.swift; sourceTree = "<group>"; };
+		E1F2A3B4C5D6004100000001 /* CodeSyntaxHighlighterTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CodeSyntaxHighlighterTests.swift; sourceTree = "<group>"; };
+		E1F2A3B4C5D6004200000001 /* MarkdownTableParserTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MarkdownTableParserTests.swift; sourceTree = "<group>"; };
+		E1F2A3B4C5D6004300000001 /* RemoteConfigTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RemoteConfigTests.swift; sourceTree = "<group>"; };
+		E1F2A3B4C5D6004400000001 /* MLXInferenceEngineTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MLXInferenceEngineTests.swift; sourceTree = "<group>"; };
 		EF66C150012289835F7C4885 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = "<group>"; };
 		F0073D07F6E96B6034CAE1E4 /* SemanticCacheTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SemanticCacheTests.swift; sourceTree = "<group>"; };
 		F1CD426E5EA88109389F61F3 /* EventKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = EventKit.framework; path = System/Library/Frameworks/EventKit.framework; sourceTree = "<group>"; };
@@ -903,6 +911,10 @@
 				F1E2D3C4B5A6001100000001 /* ChatChunkTests.swift */,
 				F1E2D3C4B5A6002200000001 /* ModelProviderFactoryTests.swift */,
 				F1E2D3C4B5A6003300000001 /* LanguageManagerTests.swift */,
+				E1F2A3B4C5D6004100000001 /* CodeSyntaxHighlighterTests.swift */,
+				E1F2A3B4C5D6004200000001 /* MarkdownTableParserTests.swift */,
+				E1F2A3B4C5D6004300000001 /* RemoteConfigTests.swift */,
+				E1F2A3B4C5D6004400000001 /* MLXInferenceEngineTests.swift */,
 			);
 			path = AetherTests;
 			sourceTree = "<group>";
@@ -1292,6 +1304,10 @@
 				F1E2D3C4B5A6001100000002 /* ChatChunkTests.swift in Sources */,
 				F1E2D3C4B5A6002200000002 /* ModelProviderFactoryTests.swift in Sources */,
 				F1E2D3C4B5A6003300000002 /* LanguageManagerTests.swift in Sources */,
+				E1F2A3B4C5D6004100000002 /* CodeSyntaxHighlighterTests.swift in Sources */,
+				E1F2A3B4C5D6004200000002 /* MarkdownTableParserTests.swift in Sources */,
+				E1F2A3B4C5D6004300000002 /* RemoteConfigTests.swift in Sources */,
+				E1F2A3B4C5D6004400000002 /* MLXInferenceEngineTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

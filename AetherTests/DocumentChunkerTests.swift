@@ -86,6 +86,103 @@ final class DocumentChunkerTests: XCTestCase {
         XCTAssertFalse(chunks[0].content.hasSuffix(" "), "不应有尾部空白")
     }
 
+    // MARK: - 边界情况补充
+
+    /// 纯空白文本（空格、换行、tab）应返回空数组
+    /// NLTokenizer 在纯空白上不产生 token，currentChunk 保持空，最终不落盘
+    func testWhitespaceOnlyTextReturnsEmpty() {
+        let chunks = chunker.chunkDocument("   \n\t  \n  ", source: "whitespace.txt")
+        XCTAssertTrue(chunks.isEmpty, "纯空白文本应返回空数组")
+    }
+
+    /// 单字符文本应返回 1 个 chunk
+    func testSingleCharacterText() {
+        let chunks = chunker.chunkDocument("A", source: "single.txt")
+        XCTAssertEqual(chunks.count, 1, "单字符应返回 1 个 chunk")
+        XCTAssertEqual(chunks[0].content, "A")
+    }
+
+    /// 含 emoji 的文本不应崩溃，且 chunk 内容应保留 emoji
+    func testEmojiInTextDoesNotCrash() {
+        let text = "Hello 世界 🌍。这是一段含 emoji 的文本。"
+        let chunks = chunker.chunkDocument(text, source: "emoji.txt")
+        XCTAssertFalse(chunks.isEmpty, "含 emoji 文本应至少返回 1 个 chunk")
+        XCTAssertTrue(chunks[0].content.contains("🌍"), "chunk 内容应保留 emoji")
+    }
+
+    /// 含换行符和 tab 的文本不应崩溃
+    func testNewlinesAndTabsInText() {
+        let text = "第一行。\n\t第二行。\n第三行。"
+        let chunks = chunker.chunkDocument(text, source: "newlines.txt")
+        XCTAssertFalse(chunks.isEmpty, "含换行符文本应至少返回 1 个 chunk")
+    }
+
+    /// 纯中文长文本应正确分块（NLTokenizer 对中文句号「。」分句可靠）
+    func testLongChineseTextChunks() {
+        let sentence = "这是用于测试中文长文本分块的句子，包含足够多的字符以触发切分机制。"
+        let text = (0..<100).map { _ in sentence }.joined(separator: "")
+        let chunks = chunker.chunkDocument(text, source: "chinese.txt")
+        XCTAssertGreaterThanOrEqual(chunks.count, 2, "长中文文本应切分出至少 2 块")
+        // 所有 chunk 的 source 应一致
+        for chunk in chunks {
+            XCTAssertEqual(chunk.source, "chinese.txt")
+        }
+    }
+
+    /// 超长文本（远超 maxChars 2048）应产生多个 chunk
+    func testVeryLongTextProducesMultipleChunks() {
+        let sentence = "这是一段测试用的中文句子，用于验证超长文本的分块行为。"
+        let text = (0..<500).map { _ in sentence }.joined(separator: "")
+        let chunks = chunker.chunkDocument(text, source: "very-long.txt")
+        XCTAssertGreaterThanOrEqual(chunks.count, 3, "超长文本应切分出至少 3 块，实际：\(chunks.count)")
+        // chunkIndex 应从 0 连续递增
+        for (i, chunk) in chunks.enumerated() {
+            XCTAssertEqual(chunk.chunkIndex, i, "chunkIndex 应连续递增")
+        }
+    }
+
+    /// 混合中英文文本不应崩溃
+    func testMixedChineseEnglishText() {
+        let text = "Hello 世界。This is a test。这是测试。End of text。"
+        let chunks = chunker.chunkDocument(text, source: "mixed.txt")
+        XCTAssertFalse(chunks.isEmpty, "混合文本应至少返回 1 个 chunk")
+    }
+
+    /// 含特殊标点（！？；）的文本不应崩溃
+    func testSpecialPunctuationInText() {
+        let text = "你好！真的吗？好吧；继续。"
+        let chunks = chunker.chunkDocument(text, source: "punct.txt")
+        XCTAssertFalse(chunks.isEmpty, "含特殊标点文本应至少返回 1 个 chunk")
+    }
+
+    /// 含数字和符号的文本不应崩溃
+    func testNumbersAndSymbolsInText() {
+        let text = "价格是 100 元（约 $14.5）。折扣 50%！"
+        let chunks = chunker.chunkDocument(text, source: "numbers.txt")
+        XCTAssertFalse(chunks.isEmpty, "含数字符号文本应至少返回 1 个 chunk")
+    }
+
+    /// 多个 chunk 的 source 应全部一致
+    func testAllChunksHaveSameSource() {
+        let sentence = "测试句子用于验证 source 透传。"
+        let text = (0..<200).map { _ in sentence }.joined(separator: "")
+        let chunks = chunker.chunkDocument(text, source: "consistent-source.pdf")
+        XCTAssertGreaterThanOrEqual(chunks.count, 1)
+        for chunk in chunks {
+            XCTAssertEqual(chunk.source, "consistent-source.pdf", "所有 chunk source 应一致")
+        }
+    }
+
+    /// chunk 内容不应为空字符串（trimming 后）
+    func testChunkContentNotEmptyAfterTrimming() {
+        let text = "  有效内容。  另一段内容。  "
+        let chunks = chunker.chunkDocument(text, source: "trim-content.txt")
+        XCTAssertFalse(chunks.isEmpty)
+        for chunk in chunks {
+            XCTAssertFalse(chunk.content.isEmpty, "trimming 后 chunk 内容不应为空")
+        }
+    }
+
     // MARK: - Helpers
 
     /// 返回 a 末尾与 b 开头的最长公共子串长度（上限 overlapChars）

@@ -584,6 +584,441 @@ final class ChatViewModelTests: XCTestCase {
         XCTAssertTrue(vm.errorMessage?.contains("nonexistent_tool") == true,
                      "errorMessage 应包含工具名")
     }
+
+    // MARK: - 深度补充测试 Phase 2：BFF / Fallback / OnDevice / 状态清理 / 错误分支
+
+    /// BFF 模式启用时跳过 apiKey 缺失检查（BFF 分支优先于 apiKey 守卫）
+    func testBFFModeSkipsAPIKeyMissingCheck() async throws {
+        let mock = MockLLMProvider()
+        mock.chatChunks = ["BFF 回复"]
+        let vm = ChatViewModel(client: mock)
+        vm.selectedProvider = .deepseek
+        vm.bffConfig.enabled = true
+        // 不保存 apiKey（InMemoryKeychainBackend 默认空）
+
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+        let userMsg = ChatMessage(role: "user", content: "你好")
+        userMsg.conversation = conv
+        conv.messages.append(userMsg)
+
+        await vm.processMessage("你好", conversation: conv, modelContext: context)
+
+        XCTAssertNil(vm.errorMessage, "BFF 模式启用时应跳过 apiKey 缺失检查，不设 errorMessage")
+        XCTAssertFalse(vm.isLoading, "完成后 isLoading 应为 false")
+        let assistantMsgs = conv.messages.filter { $0.role == "assistant" }
+        XCTAssertEqual(assistantMsgs.count, 1, "应追加 1 条 assistant 消息")
+        XCTAssertEqual(assistantMsgs.first?.content, "BFF 回复")
+    }
+
+    /// BFF 模式令牌桶耗尽后抛 rateLimited，errorMessage 设为限流提示
+    func testBFFModeRateLimitExhaustionSetsErrorMessage() async throws {
+        let mock = MockLLMProvider()
+        let vm = ChatViewModel(client: mock)
+        vm.selectedProvider = .onDevice  // 跳过 apiKey 检查，仅依赖 BFF 限流器
+        vm.bffConfig.enabled = true
+        // chatRateLimitPerMin 默认 20，消耗 20 次后第 21 次应触发限流
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+        let userMsg = ChatMessage(role: "user", content: "你好")
+        userMsg.conversation = conv
+        conv.messages.append(userMsg)
+
+        for i in 0..<20 {
+            vm.errorMessage = nil
+            await vm.processMessage("你好", conversation: conv, modelContext: context)
+            XCTAssertNil(vm.errorMessage, "第 \(i + 1) 次调用不应触发限流")
+        }
+        // 第 21 次应触发限流
+        await vm.processMessage("你好", conversation: conv, modelContext: context)
+        XCTAssertEqual(
+            vm.errorMessage,
+            String(format: NSLocalizedString("请求过于频繁，请 %d 秒后重试", comment: ""), 60),
+            "令牌耗尽后应设置限流 errorMessage"
+        )
+        XCTAssertFalse(vm.isLoading, "限流后 isLoading 应为 false")
+    }
+
+    /// FallbackLLMProvider 主 provider 无产出时降级到备用 provider
+    func testFallbackProviderTriggersFallbackWhenPrimaryEmpty() async throws {
+        let primaryMock = MockLLMProvider()
+        primaryMock.chatChunks = []  // 主 provider 无产出 → 触发降级
+        let fallbackMock = MockLLMProvider()
+        fallbackMock.chatChunks = ["降级", "回复"]
+        let fallbackClient = FallbackLLMProvider(
+            primary: primaryMock, fallback: fallbackMock,
+            primaryProvider: .deepseek, fallbackProvider: .qwen
+        )
+        let vm = ChatViewModel(client: fallbackClient)
+        vm.selectedProvider = .onDevice  // 跳过 apiKey 检查
+
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+        let userMsg = ChatMessage(role: "user", content: "你好")
+        userMsg.conversation = conv
+        conv.messages.append(userMsg)
+
+        await vm.processMessage("你好", conversation: conv, modelContext: context)
+
+        XCTAssertEqual(vm.lastUsedProvider, .qwen, "主 provider 无产出时 lastUsedProvider 应为备用 .qwen")
+        XCTAssertTrue(vm.didFallbackLastRequest, "应标记 didFallbackLastRequest = true")
+        let assistantMsgs = conv.messages.filter { $0.role == "assistant" }
+        XCTAssertEqual(assistantMsgs.count, 1)
+        XCTAssertEqual(assistantMsgs.first?.content, "降级回复", "应使用备用 provider 的内容")
+    }
+
+    /// FallbackLLMProvider 主 provider 有产出时不降级
+    func testFallbackProviderNoFallbackWhenPrimaryYields() async throws {
+        let primaryMock = MockLLMProvider()
+        primaryMock.chatChunks = ["主回复"]
+        let fallbackMock = MockLLMProvider()
+        fallbackMock.chatChunks = ["不应使用"]
+        let fallbackClient = FallbackLLMProvider(
+            primary: primaryMock, fallback: fallbackMock,
+            primaryProvider: .deepseek, fallbackProvider: .qwen
+        )
+        let vm = ChatViewModel(client: fallbackClient)
+        vm.selectedProvider = .onDevice
+
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+        let userMsg = ChatMessage(role: "user", content: "你好")
+        userMsg.conversation = conv
+        conv.messages.append(userMsg)
+
+        await vm.processMessage("你好", conversation: conv, modelContext: context)
+
+        XCTAssertEqual(vm.lastUsedProvider, .deepseek, "主 provider 有产出时 lastUsedProvider 应为主 .deepseek")
+        XCTAssertFalse(vm.didFallbackLastRequest, "不应触发降级")
+        let assistantMsgs = conv.messages.filter { $0.role == "assistant" }
+        XCTAssertEqual(assistantMsgs.first?.content, "主回复", "应使用主 provider 的内容")
+    }
+
+    /// 非 Fallback 路径：普通 MockLLMProvider 时 lastUsedProvider 初值为 effectiveProvider
+    func testLastUsedProviderInitializedToSelectedProvider() async throws {
+        let mock = MockLLMProvider()
+        mock.chatChunks = ["回复"]
+        let vm = ChatViewModel(client: mock)
+        vm.selectedProvider = .onDevice  // toolsEnabled=false → effectiveProvider=selectedProvider
+
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+        let userMsg = ChatMessage(role: "user", content: "你好")
+        userMsg.conversation = conv
+        conv.messages.append(userMsg)
+
+        await vm.processMessage("你好", conversation: conv, modelContext: context)
+
+        XCTAssertEqual(vm.lastUsedProvider, .onDevice, "非降级时 lastUsedProvider 应为 selectedProvider")
+        XCTAssertFalse(vm.didFallbackLastRequest)
+    }
+
+    /// switchToOnDevice 保存原 provider 并切换到端侧；switchToOriginalProvider 恢复
+    func testSwitchToOnDeviceAndOriginalProviderRoundTrip() {
+        let vm = ChatViewModel()
+        vm.selectedProvider = .deepseek
+
+        vm.switchToOnDevice()
+        XCTAssertEqual(vm.selectedProvider, .onDevice, "switchToOnDevice 后 selectedProvider 应为 .onDevice")
+
+        vm.switchToOriginalProvider()
+        XCTAssertEqual(vm.selectedProvider, .deepseek, "switchToOriginalProvider 后应恢复为 .deepseek")
+    }
+
+    /// switchToOnDevice 守卫：已处于 onDevice 时不重复保存原 provider
+    func testSwitchToOnDeviceGuardWhenAlreadyOnDevice() {
+        let vm = ChatViewModel()
+        vm.selectedProvider = .onDevice  // 已是 onDevice
+
+        vm.switchToOnDevice()  // 守卫应直接 return，不保存原 provider
+        XCTAssertEqual(vm.selectedProvider, .onDevice)
+
+        // 此时无 originalSelectedProvider，switchToOriginalProvider 应无操作
+        vm.switchToOriginalProvider()
+        XCTAssertEqual(vm.selectedProvider, .onDevice, "无保存的原 provider 时应保持 .onDevice")
+    }
+
+    /// switchToOriginalProvider 守卫：非 onDevice 状态时不恢复
+    func testSwitchToOriginalProviderGuardWhenNotOnDevice() {
+        let vm = ChatViewModel()
+        vm.selectedProvider = .qwen
+
+        vm.switchToOriginalProvider()  // 非 onDevice，守卫应直接 return
+        XCTAssertEqual(vm.selectedProvider, .qwen, "非 onDevice 时 switchToOriginalProvider 应无操作")
+    }
+
+    /// onDevice provider 跳过 apiKey 检查（无 apiKey 也能正常请求）
+    func testOnDeviceProviderSkipsAPIKeyCheck() async throws {
+        let mock = MockLLMProvider()
+        mock.chatChunks = ["端侧回复"]
+        let vm = ChatViewModel(client: mock)
+        vm.selectedProvider = .onDevice
+        // 不保存 apiKey
+
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+        let userMsg = ChatMessage(role: "user", content: "你好")
+        userMsg.conversation = conv
+        conv.messages.append(userMsg)
+
+        await vm.processMessage("你好", conversation: conv, modelContext: context)
+
+        XCTAssertNil(vm.errorMessage, "onDevice 应跳过 apiKey 检查，不设 errorMessage")
+        XCTAssertEqual(vm.lastUsedProvider, .onDevice)
+        let assistantMsgs = conv.messages.filter { $0.role == "assistant" }
+        XCTAssertEqual(assistantMsgs.first?.content, "端侧回复")
+    }
+
+    /// switchTo 加载目标会话的多条历史消息（替代 loadHistory 概念）
+    func testSwitchToLoadsMultipleHistoricalMessages() throws {
+        let vm = ChatViewModel()
+        let conv = Conversation(title: "历史", systemPrompt: "你是助手")
+        context.insert(conv)
+        for content in ["历史消息1", "历史消息2", "历史消息3"] {
+            let msg = ChatMessage(role: "user", content: content)
+            msg.conversation = conv
+            conv.messages.append(msg)
+        }
+        try context.save()
+
+        vm.switchTo(conversation: conv)
+
+        XCTAssertEqual(vm.messages.count, 3, "应加载全部 3 条历史消息")
+        XCTAssertEqual(vm.messages.map(\.content), ["历史消息1", "历史消息2", "历史消息3"])
+    }
+
+    /// switchTo 切换到空会话时清空 messages（替代 clearConversation 概念）
+    func testSwitchToEmptyConversationClearsMessages() throws {
+        let vm = ChatViewModel()
+        vm.messages = [ChatMessage(role: "user", content: "旧消息")]
+        let conv = Conversation(title: "空会话", systemPrompt: "")
+        context.insert(conv)
+
+        vm.switchTo(conversation: conv)
+
+        XCTAssertTrue(vm.messages.isEmpty, "切换到空会话时 messages 应被清空")
+    }
+
+    /// resendMessage 设置 inputText 后触发发送流程（替代 regenerateLastMessage 概念）
+    func testResendMessageSetsInputAndSends() async throws {
+        let mock = MockLLMProvider()
+        mock.chatChunks = ["回复"]
+        let vm = ChatViewModel(client: mock)
+        vm.selectedProvider = .onDevice
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+
+        vm.resendMessage(content: "重发内容", in: conv, modelContext: context)
+
+        XCTAssertEqual(vm.inputText, "", "resendMessage 后 inputText 应被清空（sendMessage 清空）")
+        XCTAssertEqual(conv.messages.count, 1, "应追加 1 条用户消息")
+        XCTAssertEqual(conv.messages.first?.role, "user")
+        XCTAssertEqual(conv.messages.first?.content, "重发内容")
+        XCTAssertTrue(vm.isLoading, "resendMessage 后 isLoading 应为 true")
+
+        // 等待后台 processMessage 完成
+        for _ in 0..<100 {
+            if !vm.isLoading { break }
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+        XCTAssertFalse(vm.isLoading)
+    }
+
+    /// processMessage 将 conversation.systemPrompt 传入 ChatConfig（替代 updateSystemPrompt 概念）
+    func testProcessMessagePassesSystemPromptToConfig() async throws {
+        let mock = MockLLMProvider()
+        mock.chatChunks = ["回复"]
+        let vm = ChatViewModel(client: mock)
+        vm.selectedProvider = .onDevice
+        let conv = Conversation(title: "测试", systemPrompt: "你是翻译官")
+        context.insert(conv)
+        let userMsg = ChatMessage(role: "user", content: "你好")
+        userMsg.conversation = conv
+        conv.messages.append(userMsg)
+
+        await vm.processMessage("你好", conversation: conv, modelContext: context)
+
+        XCTAssertEqual(mock.capturedConfig?.systemPrompt, "你是翻译官",
+                       "ChatConfig.systemPrompt 应来自 conversation.systemPrompt")
+    }
+
+    /// sendMessage 无 pendingImage 时用户消息不应附带图片
+    func testSendMessageWithoutPendingImageKeepsAttachedImageNil() throws {
+        let mock = MockLLMProvider()
+        let vm = ChatViewModel(client: mock)
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+        vm.pendingImage = nil
+        vm.inputText = "纯文本"
+
+        vm.sendMessage(in: conv, modelContext: context)
+
+        XCTAssertNil(conv.messages.first?.attachedImage, "无 pendingImage 时 attachedImage 应为 nil")
+        XCTAssertNil(vm.pendingImage, "pendingImage 应保持 nil")
+    }
+
+    /// sendMessage 空输入守卫提前返回时不清空 pendingImage（多模态图片守卫）
+    func testSendMessageEmptyInputDoesNotClearPendingImage() throws {
+        let mock = MockLLMProvider()
+        let vm = ChatViewModel(client: mock)
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+        let imageData = Data([0xFF])
+        vm.pendingImage = imageData
+        vm.inputText = "   "  // 空白输入
+
+        vm.sendMessage(in: conv, modelContext: context)
+
+        XCTAssertEqual(vm.pendingImage, imageData, "空输入守卫提前返回时 pendingImage 不应被清空")
+        XCTAssertEqual(conv.messages.count, 0, "不应创建任何消息")
+    }
+
+    /// isRecording 默认值为 false
+    func testIsRecordingDefaultsFalse() {
+        let vm = ChatViewModel()
+        XCTAssertFalse(vm.isRecording, "isRecording 默认应为 false")
+    }
+
+    /// speakingMessageId 默认值为 nil
+    func testSpeakingMessageIdDefaultsNil() {
+        let vm = ChatViewModel()
+        XCTAssertNil(vm.speakingMessageId, "speakingMessageId 默认应为 nil")
+    }
+
+    /// toggleSpeak 连续切换多个消息 id，speakingMessageId 应跟随最后一条；再次点击同一条停止
+    func testToggleSpeakAcrossMultipleMessages() {
+        let vm = ChatViewModel()
+        let id1 = UUID(), id2 = UUID(), id3 = UUID()
+
+        vm.toggleSpeak(messageId: id1, content: "a")
+        XCTAssertEqual(vm.speakingMessageId, id1)
+        vm.toggleSpeak(messageId: id2, content: "b")
+        XCTAssertEqual(vm.speakingMessageId, id2)
+        vm.toggleSpeak(messageId: id3, content: "c")
+        XCTAssertEqual(vm.speakingMessageId, id3, "连续切换后应跟随最后一条 id")
+        // 再次点击同一条应停止
+        vm.toggleSpeak(messageId: id3, content: "c")
+        XCTAssertNil(vm.speakingMessageId, "同 id 再次点击应停止朗读")
+    }
+
+    /// sendMessage 清空预置的 currentToolSteps（状态清理）
+    func testSendMessageClearsCurrentToolSteps() throws {
+        let mock = MockLLMProvider()
+        let vm = ChatViewModel(client: mock)
+        vm.selectedProvider = .onDevice
+        vm.currentToolSteps = [ChatViewModel.ToolStep(
+            toolName: "calculate", status: .running, result: nil,
+            thought: nil, arguments: "{}", loopIndex: 1
+        )]
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+        vm.inputText = "你好"
+
+        vm.sendMessage(in: conv, modelContext: context)
+
+        XCTAssertTrue(vm.currentToolSteps.isEmpty, "sendMessage 应清空 currentToolSteps")
+    }
+
+    /// errorMessage 被新错误覆盖（apiKey 缺失覆盖旧错误信息）
+    func testErrorMessageOverwrittenByAPIKeyMissingError() async throws {
+        let mock = MockLLMProvider()
+        let vm = ChatViewModel(client: mock)
+        vm.selectedProvider = .deepseek
+        vm.errorMessage = "旧错误信息"
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+        let userMsg = ChatMessage(role: "user", content: "你好")
+        userMsg.conversation = conv
+        conv.messages.append(userMsg)
+
+        await vm.processMessage("你好", conversation: conv, modelContext: context)
+
+        XCTAssertEqual(vm.errorMessage, LLMError.apiKeyMissing.userMessage,
+                       "apiKey 缺失错误应覆盖旧 errorMessage")
+    }
+
+    /// Qwen provider apiKey 缺失时设置 errorMessage（错误分支覆盖不同 provider）
+    func testQwenProviderAPIKeyMissingSetsError() async throws {
+        let mock = MockLLMProvider()
+        let vm = ChatViewModel(client: mock)
+        vm.selectedProvider = .qwen
+        // 不保存 apiKey
+
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+        let userMsg = ChatMessage(role: "user", content: "你好")
+        userMsg.conversation = conv
+        conv.messages.append(userMsg)
+
+        await vm.processMessage("你好", conversation: conv, modelContext: context)
+
+        XCTAssertEqual(vm.errorMessage, LLMError.apiKeyMissing.userMessage,
+                       "Qwen 无 apiKey 时应设置 apiKeyMissing 错误")
+        XCTAssertFalse(vm.isLoading)
+        XCTAssertEqual(vm.streamingText, "")
+    }
+
+    /// 语义缓存写入后命中：首次请求写入缓存，第二次同 query 同 embedding 命中缓存（即使 mock chunks 已变）
+    func testCacheWriteThenHitReturnsCachedResponse() async throws {
+        let embedding: [Float] = [0.9, 0.1, 0.0]
+        let mock = MockLLMProvider()
+        mock.embedResult = [embedding]
+        mock.chatChunks = ["原始回复"]
+        let vm = ChatViewModel(client: mock)
+        vm.selectedProvider = .onDevice
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+        let userMsg = ChatMessage(role: "user", content: "你好")
+        userMsg.conversation = conv
+        conv.messages.append(userMsg)
+
+        // 首次调用：走 LLM，写入缓存
+        await vm.processMessage("你好", conversation: conv, modelContext: context)
+        let firstAssistant = conv.messages.filter { $0.role == "assistant" }.last
+        XCTAssertEqual(firstAssistant?.content, "原始回复", "首次应返回 LLM 响应")
+
+        // 修改 mock chunks，验证第二次命中缓存而非新 chunks
+        mock.chatChunks = ["新回复"]
+        await vm.processMessage("你好", conversation: conv, modelContext: context)
+        let secondAssistant = conv.messages.filter { $0.role == "assistant" }.last
+        XCTAssertEqual(secondAssistant?.content, "原始回复",
+                       "第二次应命中缓存返回原始回复，而非新的 mock chunks")
+    }
+
+    /// processMessage 完成后填充 lastDebugInfo（provider / fallbackUsed / apiResponse）
+    func testLastDebugInfoPopulatedAfterProcessMessage() async throws {
+        let mock = MockLLMProvider()
+        mock.chatChunks = ["调试回复"]
+        let vm = ChatViewModel(client: mock)
+        vm.selectedProvider = .onDevice
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+        let userMsg = ChatMessage(role: "user", content: "你好")
+        userMsg.conversation = conv
+        conv.messages.append(userMsg)
+
+        await vm.processMessage("你好", conversation: conv, modelContext: context)
+
+        XCTAssertNotNil(vm.lastDebugInfo, "processMessage 后应填充 lastDebugInfo")
+        XCTAssertEqual(vm.lastDebugInfo?.apiResponse, "调试回复")
+        XCTAssertEqual(vm.lastDebugInfo?.provider, vm.lastUsedProvider?.displayName)
+        XCTAssertFalse(vm.lastDebugInfo?.fallbackUsed ?? true, "非降级时 fallbackUsed 应为 false")
+    }
+
+    /// streamingText 在 sendMessage 时被重置为空字符串（即便预置了残留值）
+    func testSendMessageResetsStreamingText() throws {
+        let mock = MockLLMProvider()
+        let vm = ChatViewModel(client: mock)
+        vm.selectedProvider = .onDevice
+        vm.streamingText = "残留流式文本"
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+        vm.inputText = "你好"
+
+        vm.sendMessage(in: conv, modelContext: context)
+
+        XCTAssertEqual(vm.streamingText, "", "sendMessage 应重置 streamingText 为空字符串")
+    }
 }
 
 /// 用于单元测试的 LLMProvider 桩实现：chat 返回可配置的流式 chunk，embed 返回预设结果。

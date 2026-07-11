@@ -315,6 +315,127 @@ final class OnDeviceModelDownloaderTests: XCTestCase {
         XCTAssertNil(DownloadSource(rawValue: "unknown"), "未知 rawValue 应返回 nil")
     }
 
+    // MARK: - 12. makeDownloadSessionConfig 每次返回新实例
+
+    /// 每次调用 makeDownloadSessionConfig 应返回独立的 URLSessionConfiguration 实例，
+    /// 避免共享状态污染（如某次修改 timeout 影响其他下载）。
+    func testDownloadSessionConfigReturnsDistinctInstances() async {
+        let config1 = await OnDeviceModelDownloader.shared.makeDownloadSessionConfig()
+        let config2 = await OnDeviceModelDownloader.shared.makeDownloadSessionConfig()
+        XCTAssertFalse(config1 === config2, "两次调用应返回不同实例")
+    }
+
+    // MARK: - 13. SHA256 空文件
+
+    /// verifySHA256 对空文件应正常计算（SHA256 of empty data）
+    func testVerifySHA256EmptyFile() async throws {
+        let tempDir = FileManager.default.temporaryDirectory
+        let testFile = tempDir.appendingPathComponent("empty-\(UUID().uuidString).bin")
+        defer { try? FileManager.default.removeItem(at: testFile) }
+
+        try Data().write(to: testFile)
+
+        // SHA256 of empty data = e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+        let emptySHA256 = SHA256.hash(data: Data()).map { String(format: "%02x", $0) }.joined()
+        let result = await downloader.verifySHA256(filePath: testFile, expected: emptySHA256)
+        XCTAssertTrue(result, "空文件 SHA256 应匹配已知值")
+    }
+
+    // MARK: - 14. SHA256 大小写敏感
+
+    /// 实现使用小写 hex（String(format: "%02x")），大写 hex 应不匹配
+    func testVerifySHA256CaseSensitive() async throws {
+        let tempDir = FileManager.default.temporaryDirectory
+        let testFile = tempDir.appendingPathComponent("case-\(UUID().uuidString).bin")
+        defer { try? FileManager.default.removeItem(at: testFile) }
+
+        let content = "case sensitivity test".data(using: .utf8)!
+        try content.write(to: testFile)
+
+        let expectedLower = SHA256.hash(data: content).map { String(format: "%02x", $0) }.joined()
+        let expectedUpper = expectedLower.uppercased()
+
+        let matchLower = await downloader.verifySHA256(filePath: testFile, expected: expectedLower)
+        XCTAssertTrue(matchLower, "小写 hex 应匹配")
+        let matchUpper = await downloader.verifySHA256(filePath: testFile, expected: expectedUpper)
+        XCTAssertFalse(matchUpper, "大写 hex 不应匹配（实现用 %02x 小写）")
+    }
+
+    // MARK: - 15. SHA256 二进制内容
+
+    /// verifySHA256 对任意二进制内容应正确校验
+    func testVerifySHA256BinaryContent() async throws {
+        let tempDir = FileManager.default.temporaryDirectory
+        let testFile = tempDir.appendingPathComponent("binary-\(UUID().uuidString).bin")
+        defer { try? FileManager.default.removeItem(at: testFile) }
+
+        // 构造含 0x00 和 0xFF 的二进制数据
+        var bytes: [UInt8] = []
+        for i in 0..<256 { bytes.append(UInt8(i)) }
+        let content = Data(bytes)
+        try content.write(to: testFile)
+
+        let expected = SHA256.hash(data: content).map { String(format: "%02x", $0) }.joined()
+        let result = await downloader.verifySHA256(filePath: testFile, expected: expected)
+        XCTAssertTrue(result, "二进制内容 SHA256 应匹配")
+    }
+
+    // MARK: - 16. deleteModel 对目录
+
+    /// deleteModel 对目录路径应正常删除（FileManager.removeItem 支持目录）
+    func testDeleteModelOnDirectory() async throws {
+        let tempDir = FileManager.default.temporaryDirectory
+        let testDir = tempDir.appendingPathComponent("model-dir-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: testDir, withIntermediateDirectories: false)
+        defer { try? FileManager.default.removeItem(at: testDir) }
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: testDir.path))
+        try await downloader.deleteModel(at: testDir)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: testDir.path), "目录应被删除")
+    }
+
+    // MARK: - 17. cancelDownload 连续多次调用
+
+    /// 连续多次 cancelDownload 不应崩溃，isDownloading 保持 false
+    func testCancelDownloadMultipleTimesNoCrash() async {
+        await downloader.cancelDownload()
+        await downloader.cancelDownload()
+        await downloader.cancelDownload()
+
+        let isDownloading = await downloader.isDownloading
+        XCTAssertFalse(isDownloading, "多次 cancel 后 isDownloading 应保持 false")
+    }
+
+    // MARK: - 18. resumeDownload 连续多次调用
+
+    /// 无 resumeData 时连续多次 resumeDownload 不应崩溃，isDownloading 保持 false
+    func testResumeDownloadMultipleTimesNoCrash() async {
+        await downloader.resumeDownload()
+        await downloader.resumeDownload()
+
+        let isDownloading = await downloader.isDownloading
+        XCTAssertFalse(isDownloading, "无 resumeData 时多次 resumeDownload 不应修改状态")
+    }
+
+    // MARK: - 19. OnDeviceError.loadFailed 与 modelNotFound 携带路径
+
+    /// deleteModel 对无权限路径应抛出 OnDeviceError（loadFailed 或 modelNotFound）
+    func testDeleteModelNonExistentNestedPath() async {
+        let nestedURL = URL(fileURLWithPath: "/tmp/non-existent-\(UUID().uuidString)/model.bin")
+        do {
+            try await downloader.deleteModel(at: nestedURL)
+            XCTFail("删除不存在的文件应抛出 modelNotFound")
+        } catch let error as OnDeviceError {
+            if case .modelNotFound = error {
+                // 期望：文件不存在时抛 modelNotFound
+            } else {
+                XCTFail("期望 modelNotFound，实际：\(error)")
+            }
+        } catch {
+            XCTFail("期望 OnDeviceError，实际：\(type(of: error))")
+        }
+    }
+
     // MARK: - 辅助
 
     /// 复用下载器单例，简化测试代码

@@ -220,4 +220,244 @@ final class BFFProxyClientTests: XCTestCase {
         }
         XCTAssertTrue(msg.contains(NSLocalizedString("BFF 服务异常", comment: "")), "userMessage 应含 'BFF 服务异常'，实际：\(msg)")
     }
+
+    // MARK: - 8. 429 无 Retry-After Header → 默认 60 秒
+
+    func testChat429WithoutRetryAfterDefaultsTo60() async {
+        MockURLProtocol.responseData = Data("{}".utf8)
+        MockURLProtocol.statusCode = 429
+        // 不设置 Retry-After Header
+        MockURLProtocol.responseHeaders = ["Content-Type": "text/event-stream"]
+
+        let expectation = XCTNSNotificationExpectation(name: .llmErrorOccurred, object: nil)
+        nonisolated(unsafe) var capturedError: LLMError?
+        expectation.handler = { note in
+            if let err = note.userInfo?["error"] as? LLMError {
+                capturedError = err
+                return true
+            }
+            return false
+        }
+
+        _ = await consume(stream: client.chat(messages: makeMessages(), config: .default, apiKey: ""))
+
+        await fulfillment(of: [expectation], timeout: 2.0)
+        guard case .rateLimited(let retryAfter) = capturedError else {
+            XCTFail("期望 .rateLimited，实际：\(String(describing: capturedError))")
+            return
+        }
+        XCTAssertEqual(retryAfter, 60, "无 Retry-After 时应默认 60 秒")
+    }
+
+    // MARK: - 9. 429 非法 Retry-After → 默认 60 秒
+
+    func testChat429WithInvalidRetryAfterDefaultsTo60() async {
+        MockURLProtocol.responseData = Data("{}".utf8)
+        MockURLProtocol.statusCode = 429
+        MockURLProtocol.responseHeaders = [
+            "Content-Type": "text/event-stream",
+            "Retry-After": "not-a-number"
+        ]
+
+        let expectation = XCTNSNotificationExpectation(name: .llmErrorOccurred, object: nil)
+        nonisolated(unsafe) var capturedError: LLMError?
+        expectation.handler = { note in
+            if let err = note.userInfo?["error"] as? LLMError {
+                capturedError = err
+                return true
+            }
+            return false
+        }
+
+        _ = await consume(stream: client.chat(messages: makeMessages(), config: .default, apiKey: ""))
+
+        await fulfillment(of: [expectation], timeout: 2.0)
+        guard case .rateLimited(let retryAfter) = capturedError else {
+            XCTFail("期望 .rateLimited，实际：\(String(describing: capturedError))")
+            return
+        }
+        XCTAssertEqual(retryAfter, 60, "非法 Retry-After 应默认 60 秒")
+    }
+
+    // MARK: - 10. 403 → apiError
+
+    func testChat403ReturnsApiError() async {
+        MockURLProtocol.responseData = Data("{}".utf8)
+        MockURLProtocol.statusCode = 403
+
+        let expectation = XCTNSNotificationExpectation(name: .llmErrorOccurred, object: nil)
+        nonisolated(unsafe) var capturedError: LLMError?
+        expectation.handler = { note in
+            if let err = note.userInfo?["error"] as? LLMError {
+                capturedError = err
+                return true
+            }
+            return false
+        }
+
+        _ = await consume(stream: client.chat(messages: makeMessages(), config: .default, apiKey: ""))
+
+        await fulfillment(of: [expectation], timeout: 2.0)
+        guard case .apiError(let code, _) = capturedError else {
+            XCTFail("期望 .apiError，实际：\(String(describing: capturedError))")
+            return
+        }
+        XCTAssertEqual(code, 403, "403 应映射到 apiError(403)")
+    }
+
+    // MARK: - 11. 网络错误 → LLMError.networkError 通知
+
+    func testChatNetworkErrorPostsNotification() async {
+        MockURLProtocol.error = URLError(.notConnectedToInternet)
+        MockURLProtocol.statusCode = 200
+
+        let expectation = XCTNSNotificationExpectation(name: .llmErrorOccurred, object: nil)
+        nonisolated(unsafe) var capturedError: LLMError?
+        expectation.handler = { note in
+            if let err = note.userInfo?["error"] as? LLMError {
+                capturedError = err
+                return true
+            }
+            return false
+        }
+
+        _ = await consume(stream: client.chat(messages: makeMessages(), config: .default, apiKey: ""))
+
+        await fulfillment(of: [expectation], timeout: 2.0)
+        guard case .networkError = capturedError else {
+            XCTFail("期望 .networkError，实际：\(String(describing: capturedError))")
+            return
+        }
+    }
+
+    // MARK: - 12. SSE 跳过非 data 前缀行
+
+    func testChatSkipsNonDataLines() async {
+        let sse = """
+        : comment line
+
+        event: ping
+
+        data: {"choices":[{"delta":{"content":"OK"}}]}
+
+        data: [DONE]
+
+        """
+        MockURLProtocol.responseData = sse.data(using: .utf8)
+        MockURLProtocol.statusCode = 200
+
+        let collected = await consume(stream: client.chat(messages: makeMessages(), config: .default, apiKey: ""))
+        XCTAssertEqual(collected, "OK", "应仅解析 data: 前缀行的内容")
+    }
+
+    // MARK: - 13. SSE 损坏 JSON 不崩溃
+
+    func testChatHandlesMalformedJSON() async {
+        let sse = """
+        data: {invalid json}
+
+        data: {"choices":[{"delta":{"content":"valid"}}]}
+
+        data: [DONE]
+
+        """
+        MockURLProtocol.responseData = sse.data(using: .utf8)
+        MockURLProtocol.statusCode = 200
+
+        let collected = await consume(stream: client.chat(messages: makeMessages(), config: .default, apiKey: ""))
+        XCTAssertEqual(collected, "valid", "损坏 JSON 行应被跳过，仅解析有效内容")
+    }
+
+    // MARK: - 14. embed 空入参短路
+
+    func testEmbedEmptyInputShortCircuits() async throws {
+        MockURLProtocol.responseData = Data("{}".utf8)
+        MockURLProtocol.statusCode = 200
+        MockURLProtocol.lastRequest = nil
+
+        let result = try await client.embed(texts: [], apiKey: "")
+        XCTAssertEqual(result, [], "空入参应返回空数组")
+        XCTAssertNil(MockURLProtocol.lastRequest, "空入参不应发出 HTTP 请求")
+    }
+
+    // MARK: - 15. embed HTTP 错误抛 LLMError
+
+    func testEmbedHTTPErrorThrows() async {
+        MockURLProtocol.responseData = Data("{}".utf8)
+        MockURLProtocol.statusCode = 401
+
+        let expectation = XCTNSNotificationExpectation(name: .llmErrorOccurred, object: nil)
+        nonisolated(unsafe) var capturedError: LLMError?
+        expectation.handler = { note in
+            if let err = note.userInfo?["error"] as? LLMError {
+                capturedError = err
+                return true
+            }
+            return false
+        }
+
+        do {
+            _ = try await client.embed(texts: ["x"], apiKey: "")
+            XCTFail("应抛出错误")
+        } catch let err as LLMError {
+            guard case .llmErrorOccurred = err else {
+                XCTFail("期望 llmErrorOccurred（401），实际：\(err)")
+                return
+            }
+        } catch {
+            XCTFail("期望 LLMError，实际：\(type(of: error))")
+        }
+
+        await fulfillment(of: [expectation], timeout: 2.0)
+    }
+
+    // MARK: - 16. embed 请求携带 X-BFF-Token 和 X-Provider
+
+    func testEmbedSendsHeaders() async throws {
+        let json = """
+        {"data":[{"embedding":[0.1,0.2],"index":0}]}
+        """
+        MockURLProtocol.responseData = json.data(using: .utf8)
+        MockURLProtocol.statusCode = 200
+        MockURLProtocol.lastRequest = nil
+
+        _ = try await client.embed(texts: ["test"], apiKey: "")
+
+        XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "X-BFF-Token"), bffToken,
+                       "embed 应携带 X-BFF-Token")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "X-Provider"), "deepseek",
+                       "embed 应携带 X-Provider")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Content-Type"), "application/json",
+                       "embed Content-Type 应为 application/json")
+    }
+
+    // MARK: - 17. embed 返回按 index 排序的向量
+
+    func testEmbedReturnsSortedVectors() async throws {
+        let json = """
+        {"data":[{"embedding":[0.3,0.4],"index":1},{"embedding":[0.1,0.2],"index":0}]}
+        """
+        MockURLProtocol.responseData = json.data(using: .utf8)
+        MockURLProtocol.statusCode = 200
+
+        let result = try await client.embed(texts: ["a", "b"], apiKey: "")
+        XCTAssertEqual(result.count, 2)
+        XCTAssertEqual(result[0], [0.1, 0.2], "index 0 应排在前")
+        XCTAssertEqual(result[1], [0.3, 0.4], "index 1 应排在后")
+    }
+
+    // MARK: - 18. embed 请求路径包含 v1/embeddings
+
+    func testEmbedSendsToCorrectEndpoint() async throws {
+        let json = """
+        {"data":[{"embedding":[0.1],"index":0}]}
+        """
+        MockURLProtocol.responseData = json.data(using: .utf8)
+        MockURLProtocol.statusCode = 200
+
+        _ = try await client.embed(texts: ["x"], apiKey: "")
+
+        let path = MockURLProtocol.lastRequest?.url?.path ?? ""
+        XCTAssertTrue(path.contains("/v1/embeddings"), "embed 路径应包含 /v1/embeddings，实际：\(path)")
+    }
 }
