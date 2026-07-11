@@ -251,29 +251,42 @@ final class AetherUITests: XCTestCase {
             Thread.sleep(forTimeInterval: 0.3)
         }
 
-        // segmented Picker 在不同 Xcode 版本中呈现方式不同
-        // 尝试多种查找方式
-        let autoSeg = app.segmentedControls.buttons["自动"]
-            .exists ? app.segmentedControls.buttons["自动"]
-            : (app.buttons["自动"].exists ? app.buttons["自动"]
-               : app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "自动")).firstMatch)
+        // iOS 26.2 (CI): segmented Picker 段不渲染为 segmentedControls.buttons
+        // 通过 modelPicker accessibilityIdentifier 定位 Picker，再在其后代中查找段
+        let modelPicker = app.pickers["modelPicker"]
+        _ = modelPicker.waitForExistence(timeout: 3)
 
+        /// 多路径查找段：Picker 后代 button → Picker 后代 otherElement → segmentedControls → 顶层 button → 全局后代
+        func findSegment(_ label: String) -> XCUIElement {
+            if modelPicker.exists {
+                let btnInPicker = modelPicker.descendants(matching: .any).buttons[label]
+                if btnInPicker.exists { return btnInPicker }
+                let otherInPicker = modelPicker.descendants(matching: .any).otherElements[label]
+                if otherInPicker.exists { return otherInPicker }
+            }
+            let segBtn = app.segmentedControls.buttons[label]
+            if segBtn.exists { return segBtn }
+            let topBtn = app.buttons[label]
+            if topBtn.exists { return topBtn }
+            return app.descendants(matching: .any).matching(
+                NSPredicate(format: "label == %@", label)
+            ).firstMatch
+        }
+
+        let autoSeg = findSegment("自动")
         // 如果仍然找不到，再滚动几次
         if !autoSeg.exists {
             for _ in 0..<5 {
                 formScroller.swipeUp()
                 Thread.sleep(forTimeInterval: 0.3)
+                _ = modelPicker.waitForExistence(timeout: 1)
                 if autoSeg.exists { break }
             }
         }
 
         XCTAssertTrue(autoSeg.waitForExistence(timeout: 5), "应存在「自动」段")
-        let chatSeg = app.segmentedControls.buttons["Chat"].exists
-            ? app.segmentedControls.buttons["Chat"]
-            : app.buttons["Chat"]
-        let reasonerSeg = app.segmentedControls.buttons["Reasoner"].exists
-            ? app.segmentedControls.buttons["Reasoner"]
-            : app.buttons["Reasoner"]
+        let chatSeg = findSegment("Chat")
+        let reasonerSeg = findSegment("Reasoner")
         XCTAssertTrue(chatSeg.exists || chatSeg.waitForExistence(timeout: 3), "应存在「Chat」段")
         XCTAssertTrue(reasonerSeg.exists || reasonerSeg.waitForExistence(timeout: 3), "应存在「Reasoner」段")
 
@@ -296,10 +309,25 @@ final class AetherUITests: XCTestCase {
         let input = inputField(in: app)
         XCTAssertTrue(input.waitForExistence(timeout: 5))
         input.tap()
-        // CI 上 tap 后可能未立即聚焦，等待键盘出现再输入
+        // iOS 26.2 (CI): tap 后可能未立即聚焦，等待键盘出现再输入
+        _ = app.keyboards.firstMatch.waitForExistence(timeout: 3)
         Thread.sleep(forTimeInterval: 0.5)
-        input.tap()
+        if !app.keyboards.firstMatch.exists {
+            input.tap()
+            _ = app.keyboards.firstMatch.waitForExistence(timeout: 3)
+        }
         input.typeText("hi")
+        // iOS 26.2 (CI): typeText 偶发未生效，验证文本已输入
+        Thread.sleep(forTimeInterval: 0.3)
+        var inputText = input.value as? String ?? ""
+        if !inputText.contains("hi") {
+            // 重试：再次点击输入框并输入
+            input.tap()
+            Thread.sleep(forTimeInterval: 0.3)
+            input.typeText("hi")
+            Thread.sleep(forTimeInterval: 0.3)
+            inputText = input.value as? String ?? ""
+        }
         // 验证发送按钮已启用（输入非空时才启用）
         let sendButton = app.buttons["sendButton"]
         XCTAssertTrue(sendButton.waitForExistence(timeout: 3), "发送按钮应存在")
@@ -311,11 +339,24 @@ final class AetherUITests: XCTestCase {
             Thread.sleep(forTimeInterval: 0.3)
         }
         sendButton.tap()
+        // iOS 26.2 (CI): sendButton 点击可能未触发发送，验证输入已清空
+        Thread.sleep(forTimeInterval: 0.5)
+        if sendButton.isEnabled {
+            // 输入未清空说明发送未触发，重试点击
+            sendButton.tap()
+            Thread.sleep(forTimeInterval: 0.5)
+        }
         // 等待桩回复出现，确认会话已创建
+        // 桩回复文本为「（UIT 测试模式）已收到：hi」
+        // iOS 26.2 (CI): 桩回复出现时机更慢，超时从 15s 提升到 25s，并增加「已收到」兜底匹配
         let stub = app.staticTexts.containing(
             NSPredicate(format: "label CONTAINS %@", "测试模式")
         ).firstMatch
-        XCTAssertTrue(stub.waitForExistence(timeout: 15), "应出现桩回复确认会话创建")
+        let stubFallback = app.staticTexts.containing(
+            NSPredicate(format: "label CONTAINS %@", "已收到")
+        ).firstMatch
+        let stubMatched = stub.waitForExistence(timeout: 25) || stubFallback.waitForExistence(timeout: 5)
+        XCTAssertTrue(stubMatched, "应出现桩回复确认会话创建")
         dismissKeyboard(in: app)
 
         // 打开设置
@@ -353,34 +394,37 @@ final class AetherUITests: XCTestCase {
 
         // 语气 Picker 选「正式」（Form 默认 picker 为导航式：点击行 → 推入选项列表）
         // 「用户偏好」Section 在 Form 底部，需要滚动到可见
-        // 先尝试直接查找，如果找不到再滚动
-        let toneRow = app.staticTexts["语气"].firstMatch
+        // iOS 26.2 (CI): Picker label「语气」不渲染为 StaticText
+        // 用 descendants(matching: .any) 跨元素类型搜索 tonePicker identifier（picker/otherElement/cell 均可命中）
+        let toneById = app.descendants(matching: .any).matching(identifier: "tonePicker").firstMatch
+        let toneByText = app.staticTexts["语气"].firstMatch
 
         // 如果直接找不到，滚动 Form（限制 10 次，避免 CI 超时）
-        if !toneRow.exists {
+        // 滚动条件：任一候选元素存在即停止（toneById 适配 iOS 26.2，toneByText 适配旧版）
+        if !toneById.exists && !toneByText.exists {
             let formScroller = app.collectionViews.firstMatch.exists
                 ? app.collectionViews.firstMatch
                 : (app.tables.firstMatch.exists ? app.tables.firstMatch : app.scrollViews.firstMatch)
             var scrollAttempts = 0
-            while !toneRow.exists && scrollAttempts < 10 {
+            while !toneById.exists && !toneByText.exists && scrollAttempts < 10 {
                 formScroller.swipeUp()
                 scrollAttempts += 1
-                _ = toneRow.waitForExistence(timeout: 1)
+                _ = toneById.waitForExistence(timeout: 1)
             }
         }
 
-        // 如果 staticText 仍找不到，尝试在 cell 中查找
-        if !toneRow.exists {
-            // 语气 Picker 可能是 Form cell 中的文本
-            let toneCell = app.cells.containing(.staticText, identifier: "语气").firstMatch
-            if toneCell.exists {
-                toneCell.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-            } else {
-                XCTAssertTrue(false, "应存在语气 Picker 行")
-            }
+        // 定位 Picker 行：identifier 优先（iOS 26.2），staticText 兜底（旧版），cell 兜底
+        let toneRow: XCUIElement
+        if toneById.exists {
+            toneRow = toneById
+        } else if toneByText.exists {
+            toneRow = toneByText
         } else {
-            toneRow.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            toneRow = app.cells.containing(.staticText, identifier: "语气").firstMatch
         }
+
+        XCTAssertTrue(toneRow.waitForExistence(timeout: 5), "应存在语气 Picker 行")
+        toneRow.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         // Picker 选项由系统生成，无 accessibilityIdentifier，用 predicate 通过 label 查找
         let formalOption = app.buttons.matching(NSPredicate(format: "label == %@", "正式")).firstMatch
         if !formalOption.waitForExistence(timeout: 2) {
@@ -425,16 +469,27 @@ final class AetherUITests: XCTestCase {
         app.buttons["settingsButton"].tap()
 
         // 验证语气保持「正式」（需要滚动到用户偏好 Section）
-        let toneRow2 = app.staticTexts["语气"].firstMatch
+        // iOS 26.2 (CI): 用 descendants(matching: .any) 跨元素类型搜索 tonePicker identifier（同首次进入）
+        let toneById2 = app.descendants(matching: .any).matching(identifier: "tonePicker").firstMatch
+        let toneByText2 = app.staticTexts["语气"].firstMatch
         // Form 容器优先 tables（SwiftUI Form 在 XCUI 中通常为 table），collectionViews 兜底
         var scrollAttempts2 = 0
-        while !toneRow2.exists && scrollAttempts2 < 16 {
+        while !toneById2.exists && !toneByText2.exists && scrollAttempts2 < 16 {
             let scroller = app.tables.firstMatch.exists
                 ? app.tables.firstMatch
                 : (app.collectionViews.firstMatch.exists ? app.collectionViews.firstMatch : app.scrollViews.firstMatch)
             scroller.swipeUp()
             scrollAttempts2 += 1
-            _ = toneRow2.waitForExistence(timeout: 1)
+            _ = toneById2.waitForExistence(timeout: 1)
+        }
+        // 定位 Picker 行：identifier 优先（iOS 26.2），staticText 兜底（旧版），cell 兜底
+        let toneRow2: XCUIElement
+        if toneById2.exists {
+            toneRow2 = toneById2
+        } else if toneByText2.exists {
+            toneRow2 = toneByText2
+        } else {
+            toneRow2 = app.cells.containing(.staticText, identifier: "语气").firstMatch
         }
         XCTAssertTrue(toneRow2.waitForExistence(timeout: 5), "重进后应存在语气 Picker 行")
         toneRow2.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
