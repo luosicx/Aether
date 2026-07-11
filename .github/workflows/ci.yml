@@ -352,11 +352,6 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
         with:
+          # 大部分配置已迁移至 sonar-project.properties，此处仅保留 CI 动态参数
           args: >
-            -Dsonar.projectKey=luosicx_Aether
-            -Dsonar.organization=luosicx
-            -Dsonar.sources=Aether
-            -Dsonar.tests=AetherTests,AetherUITests
-            -Dsonar.swift.coverageReportPaths=coverage-report/cobertura.xml
-            -Dsonar.exclusions=**/Views/**,**/DesignSystem/**
-            -Dsonar.coverage.exclusions=**/Views/**,**/DesignSystem/**
+            -Dsonar.qualitygate.wait=true

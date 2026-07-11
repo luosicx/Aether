@@ -159,4 +159,90 @@ final class TelemetryServiceTests: XCTestCase {
         XCTAssertEqual(records[1].payload["provider"], "beta")
         XCTAssertEqual(records[2].payload["provider"], "gamma")
     }
+
+    // MARK: - lastUploadAt / lastUploadStatus 默认值与边界验证
+
+    /// 新实例的 lastUploadAt 应为 nil（尚未上报过）
+    func testLastUploadAtDefaultIsNil() async {
+        let service = TelemetryService()
+        let value = await service.lastUploadAt
+        XCTAssertNil(value, "新实例 lastUploadAt 应为 nil")
+    }
+
+    /// 新实例的 lastUploadStatus 应为 "idle"
+    func testLastUploadStatusDefaultIsIdle() async {
+        let service = TelemetryService()
+        let status = await service.lastUploadStatus
+        XCTAssertEqual(status, "idle", "新实例 lastUploadStatus 应为 'idle'")
+    }
+
+    /// bufferCount 初始应为 0
+    func testBufferCountInitiallyZero() async {
+        let service = TelemetryService()
+        let count = await service.bufferCount
+        XCTAssertEqual(count, 0)
+    }
+
+    /// shouldUpload：空缓冲 + 从未上报 → 不应触发
+    func testShouldUploadEmptyBufferNeverUploaded() async {
+        let service = TelemetryService()
+        let should = await service.shouldUpload(now: Date(), threshold: 100, interval: 300)
+        XCTAssertFalse(should, "空缓冲且从未上报不应触发")
+    }
+
+    /// shouldUpload：buffer 恰好低于阈值 1 条 + 从未上报 → 仍触发（首次上报分支）
+    func testShouldUploadBelowThresholdButNeverUploaded() async {
+        let service = TelemetryService()
+        await service.track(.messageSent(provider: "p", model: "m", inputTokens: 1))
+        let should = await service.shouldUpload(now: Date(), threshold: 100, interval: 300)
+        XCTAssertTrue(should, "从未上报且有数据时应触发首次上报")
+    }
+
+    /// shouldUpload：threshold=1，1 条即触发
+    func testShouldUploadThresholdOne() async {
+        let service = TelemetryService()
+        await service.track(.errorOccurred(errorType: "x", userMessage: "y"))
+        let should = await service.shouldUpload(now: Date(), threshold: 1, interval: 300)
+        XCTAssertTrue(should, "buffer=1 达 threshold=1 应触发")
+    }
+
+    /// drain 后再 track：bufferCount 应正确反映新写入数量
+    func testTrackAfterDrainPreservesNewRecords() async {
+        let service = TelemetryService()
+        await service.track(.messageSent(provider: "a", model: "m", inputTokens: 0))
+        _ = await service.drain()
+        let countAfterDrain = await service.bufferCount
+        XCTAssertEqual(countAfterDrain, 0)
+        await service.track(.messageSent(provider: "b", model: "m", inputTokens: 1))
+        let countAfterTrack = await service.bufferCount
+        XCTAssertEqual(countAfterTrack, 1)
+        let records = await service.drain()
+        XCTAssertEqual(records.count, 1)
+        XCTAssertEqual(records[0].payload["provider"], "b")
+    }
+
+    /// TelemetryRecord Equatable 一致性
+    func testTelemetryRecordEquatable() {
+        let id = UUID()
+        let now = Date()
+        let r1 = TelemetryRecord(id: id, event: "test", payload: ["k": "v"], timestamp: now)
+        let r2 = TelemetryRecord(id: id, event: "test", payload: ["k": "v"], timestamp: now)
+        XCTAssertEqual(r1, r2)
+    }
+
+    /// TelemetryRecord Codable 往返
+    func testTelemetryRecordCodableRoundTrip() throws {
+        let record = TelemetryRecord(
+            id: UUID(), event: "llmResponse",
+            payload: ["latencyMs": "200", "success": "true"],
+            timestamp: Date()
+        )
+        let data = try JSONEncoder().encode(record)
+        let decoded = try JSONDecoder().decode(TelemetryRecord.self, from: data)
+        XCTAssertEqual(decoded.id, record.id)
+        XCTAssertEqual(decoded.event, record.event)
+        XCTAssertEqual(decoded.payload, record.payload)
+        // timestamp 精度可能有微小差异，用 timeIntervalSince 比较
+        XCTAssertLessThan(abs(decoded.timestamp.timeIntervalSince(record.timestamp)), 0.001)
+    }
 }

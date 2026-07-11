@@ -143,4 +143,79 @@ final class RateLimiterTests: XCTestCase {
         try await limiter.acquireChat()
         await assertChatRateLimited(limiter)
     }
+
+    // MARK: - 补充边界测试
+
+    /// 令牌耗尽后立即再申请应被限流（距上次补充不足 60 秒）
+    func testImmediateReacquireAfterExhaustionIsBlocked() async throws {
+        let limiter = RateLimiter(chatPerMin: 3, embedPerMin: 3)
+        // 耗尽所有 chat 令牌
+        for _ in 0..<3 {
+            try await limiter.acquireChat()
+        }
+        // 立即再申请应被限流
+        await assertChatRateLimited(limiter)
+        // 同理耗尽 embed
+        for _ in 0..<3 {
+            try await limiter.acquireEmbed()
+        }
+        await assertEmbedRateLimited(limiter)
+    }
+
+    /// 默认限额 chatPerMin=20 的精确验证：前 20 次成功，第 21 次限流
+    func testDefaultChatLimitExactBoundary() async throws {
+        let limiter = RateLimiter()
+        for i in 0..<20 {
+            do {
+                try await limiter.acquireChat()
+            } catch {
+                XCTFail("第 \(i+1) 次 acquireChat 不应失败: \(error)")
+            }
+        }
+        await assertChatRateLimited(limiter)
+    }
+
+    /// 默认限额 embedPerMin=10 的精确验证：前 10 次成功，第 11 次限流
+    func testDefaultEmbedLimitExactBoundary() async throws {
+        let limiter = RateLimiter()
+        for i in 0..<10 {
+            do {
+                try await limiter.acquireEmbed()
+            } catch {
+                XCTFail("第 \(i+1) 次 acquireEmbed 不应失败: \(error)")
+            }
+        }
+        await assertEmbedRateLimited(limiter)
+    }
+
+    /// chatPerMin=0 时任何 chat 申请应立即限流
+    func testZeroChatLimitImmediatelyBlocks() async {
+        let limiter = RateLimiter(chatPerMin: 0, embedPerMin: 5)
+        await assertChatRateLimited(limiter)
+    }
+
+    /// embedPerMin=0 时任何 embed 申请应立即限流
+    func testZeroEmbedLimitImmediatelyBlocks() async {
+        let limiter = RateLimiter(chatPerMin: 5, embedPerMin: 0)
+        await assertEmbedRateLimited(limiter)
+    }
+
+    /// chat 和 embed 同时耗尽后两者均应被限流
+    func testBothExhaustedSimultaneously() async throws {
+        let limiter = RateLimiter(chatPerMin: 1, embedPerMin: 1)
+        try await limiter.acquireChat()
+        try await limiter.acquireEmbed()
+        await assertChatRateLimited(limiter)
+        await assertEmbedRateLimited(limiter)
+    }
+
+    /// 多次连续限流错误类型一致性：始终抛 LLMError.rateLimited(retryAfter: 60)
+    func testRepeatedRateLimitErrorsAreConsistent() async throws {
+        let limiter = RateLimiter(chatPerMin: 1, embedPerMin: 10)
+        try await limiter.acquireChat()
+        // 连续 3 次应抛相同类型的错误
+        for _ in 0..<3 {
+            await assertChatRateLimited(limiter)
+        }
+    }
 }
