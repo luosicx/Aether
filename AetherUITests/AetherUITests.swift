@@ -235,7 +235,7 @@ final class AetherUITests: XCTestCase {
 
     // MARK: - 流 7：模型 segmented 切换
     // Day 12: Picker 段改为「自动 / Chat / Reasoner」三段
-    func testSwitchModel() {
+    func testSwitchModel() throws {
         let app = makeApp()
         app.launch()
 
