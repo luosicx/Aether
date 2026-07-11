@@ -22,7 +22,7 @@ jobs:
           xcode-version: 'latest'
 
       - name: Cache Build Products
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: build
           key: build-ut-${{ runner.os }}-${{ hashFiles('Aether.xcodeproj/project.pbxproj', '**/*.swift') }}
@@ -184,7 +184,7 @@ jobs:
 
       - name: Upload coverage results artifact
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: coverage-results
           path: TestResults.xcresult
@@ -193,7 +193,7 @@ jobs:
 
       - name: Upload test results artifact
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: ut-test-results
           path: TestResults.xcresult
@@ -211,7 +211,7 @@ jobs:
           xcode-version: 'latest'
 
       - name: Cache Build Products
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: build
           key: build-uit-${{ runner.os }}-${{ hashFiles('Aether.xcodeproj/project.pbxproj', '**/*.swift') }}
@@ -291,7 +291,7 @@ jobs:
 
       - name: Upload UIT results artifact
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: uit-test-results
           path: UITestResults.xcresult
@@ -334,13 +334,13 @@ jobs:
           xcode-version: 'latest'
 
       - name: Cache SonarQube packages
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.sonar/cache
           key: ${{ runner.os }}-sonar
 
       - name: Download coverage results
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: coverage-results
           path: coverage-xcresult
