@@ -8,6 +8,7 @@
 .wolf/
 .trae/
 .claude/
+.qoder/
 
 # Xcode 用户数据
 xcuserdata/
@@ -20,6 +21,7 @@ xcuserdata/
 # 临时输出目录
 tmp/
 output/
+build/
 
 # Swift Package Manager 缓存
 .build/
