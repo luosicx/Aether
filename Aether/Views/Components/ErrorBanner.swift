@@ -38,6 +38,7 @@ struct ErrorBanner: View {
                     .foregroundStyle(.secondary)
             }
             .accessibilityLabel("关闭")
+            .accessibilityIdentifier("closeErrorBannerButton")
         }
         .padding(.horizontal, Spacing.lg)
         .padding(.vertical, 12)

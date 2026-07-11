@@ -86,4 +86,77 @@ final class TelemetryServiceTests: XCTestCase {
         let shouldEmpty = await empty.shouldUpload(now: Date(), threshold: 100, interval: 300)
         XCTAssertFalse(shouldEmpty, "空缓冲且从未上报不应触发")
     }
+
+    // MARK: - 边缘测试补充
+
+    // 所有事件类型的 payload 编码：覆盖 TelemetryEvent 全部 case 的 name 与 payload
+    func testAllEventTypesPayloadEncoding() async {
+        let service = TelemetryService()
+        await service.track(.messageSent(provider: "deepseek", model: "chat", inputTokens: 10))
+        await service.track(.llmResponse(latencyMs: 200, success: true, outputTokens: 30))
+        await service.track(.toolCall(toolName: "alarm", success: false, durationMs: 5))
+        await service.track(.fallbackTriggered(from: "deepseek", to: "qwen", reason: "timeout"))
+        await service.track(.errorOccurred(errorType: "apiError", userMessage: "失败"))
+
+        let records = await service.drain()
+        XCTAssertEqual(records.count, 5)
+        // 逐一验证事件名
+        XCTAssertEqual(records[0].event, "messageSent")
+        XCTAssertEqual(records[1].event, "llmResponse")
+        XCTAssertEqual(records[2].event, "toolCall")
+        XCTAssertEqual(records[3].event, "fallbackTriggered")
+        XCTAssertEqual(records[4].event, "errorOccurred")
+        // 验证关键 payload 字段
+        XCTAssertEqual(records[1].payload["success"], "true")
+        XCTAssertEqual(records[1].payload["latencyMs"], "200")
+        XCTAssertEqual(records[2].payload["toolName"], "alarm")
+        XCTAssertEqual(records[3].payload["from"], "deepseek")
+        XCTAssertEqual(records[3].payload["to"], "qwen")
+        XCTAssertEqual(records[4].payload["errorType"], "apiError")
+    }
+
+    // 自定义阈值：threshold=5 时，5 条事件即触发上报（边界等于）
+    func testShouldUploadWithCustomThreshold() async {
+        let service = TelemetryService()
+        for _ in 0..<5 {
+            await service.track(.llmResponse(latencyMs: 100, success: true, outputTokens: 1))
+        }
+        // buffer.count(5) >= threshold(5) → true
+        let should = await service.shouldUpload(now: Date(), threshold: 5, interval: 300)
+        XCTAssertTrue(should, "buffer 达自定义阈值 5 应触发上报")
+        // 4 条低于阈值 5，但从未上报且有数据 → 仍应触发
+        let service2 = TelemetryService()
+        for _ in 0..<4 {
+            await service2.track(.llmResponse(latencyMs: 100, success: true, outputTokens: 1))
+        }
+        let should2 = await service2.shouldUpload(now: Date(), threshold: 5, interval: 300)
+        XCTAssertTrue(should2, "从未上报且有数据即使低于阈值也应触发首次上报")
+    }
+
+    // track 写入记录的 timestamp 应接近当前时间
+    func testTrackPreservesRecentTimestamp() async {
+        let service = TelemetryService()
+        let before = Date()
+        await service.track(.toolCall(toolName: "test", success: true, durationMs: 1))
+        let after = Date()
+
+        let records = await service.drain()
+        XCTAssertEqual(records.count, 1)
+        XCTAssertGreaterThanOrEqual(records[0].timestamp, before, "timestamp 不应早于 track 前")
+        XCTAssertLessThanOrEqual(records[0].timestamp, after, "timestamp 不应晚于 track 后")
+    }
+
+    // drain 返回的记录顺序应与写入顺序一致
+    func testDrainReturnsRecordsInOrder() async {
+        let service = TelemetryService()
+        let providers = ["alpha", "beta", "gamma"]
+        for p in providers {
+            await service.track(.messageSent(provider: p, model: "m", inputTokens: 0))
+        }
+        let records = await service.drain()
+        XCTAssertEqual(records.count, 3)
+        XCTAssertEqual(records[0].payload["provider"], "alpha")
+        XCTAssertEqual(records[1].payload["provider"], "beta")
+        XCTAssertEqual(records[2].payload["provider"], "gamma")
+    }
 }
