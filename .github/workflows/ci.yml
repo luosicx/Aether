@@ -273,3 +273,21 @@ jobs:
           name: uit-test-results
           path: UITestResults.xcresult
           if-no-files-found: warn
+
+  # Summary job required by branch protection rule (expects "test" status check)
+  test:
+    needs: [unit-tests, ui-tests]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check job results
+        run: |
+          if [ "${{ needs.unit-tests.result }}" != "success" ]; then
+            echo "unit-tests job failed with result: ${{ needs.unit-tests.result }}"
+            exit 1
+          fi
+          if [ "${{ needs.ui-tests.result }}" != "success" ]; then
+            echo "ui-tests job failed with result: ${{ needs.ui-tests.result }}"
+            exit 1
+          fi
+          echo "All test jobs passed"
