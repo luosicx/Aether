@@ -477,6 +477,7 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           # 配置已迁移至 sonar-project.properties
           # 注意：若 SonarCloud 开启了 Automatic Analysis，CI 扫描会报错
@@ -484,3 +485,5 @@ jobs:
           # 详见 doc/plans/sonarcloud-setup-guide.md
           args: >
             -Dsonar.qualitygate.wait=true
+            -Dsonar.scm.provider=github
+            ${{ github.event_name == 'pull_request' && format('-Dsonar.pullrequest.key={0} -Dsonar.pullrequest.branch={1} -Dsonar.pullrequest.base={2}', github.event.pull_request.number, github.head_ref, github.base_ref) || '' }}
