@@ -156,4 +156,138 @@ final class ShortcutsToolTests: XCTestCase {
         let result = try await createTool.execute(arguments: ["name": "", "action": "open_url"])
         XCTAssertEqual(result, "错误：请提供快捷指令名称")
     }
+
+    // MARK: - definition 描述验证
+
+    /// run_shortcut 的 description 不应为空
+    func testRunDefinitionDescriptionNonEmpty() {
+        XCTAssertFalse(runTool.definition.description.isEmpty,
+                       "run_shortcut description 不应为空")
+    }
+
+    /// list_shortcuts 的 description 不应为空
+    func testListDefinitionDescriptionNonEmpty() {
+        XCTAssertFalse(listTool.definition.description.isEmpty,
+                       "list_shortcuts description 不应为空")
+    }
+
+    /// create_shortcut 的 description 不应为空
+    func testCreateDefinitionDescriptionNonEmpty() {
+        XCTAssertFalse(createTool.definition.description.isEmpty,
+                       "create_shortcut description 不应为空")
+    }
+
+    /// create_shortcut description 应提及动作类型
+    func testCreateDefinitionDescriptionMentionsActions() {
+        let desc = createTool.definition.description
+        XCTAssertTrue(desc.contains("open_url") || desc.contains("run_script"),
+                      "description 应提及动作类型，实际：\(desc)")
+    }
+
+    /// run_shortcut description 应提及快捷指令
+    func testRunDefinitionDescriptionMentionsShortcut() {
+        let desc = runTool.definition.description
+        XCTAssertTrue(desc.contains("快捷指令"),
+                      "description 应提及 '快捷指令'，实际：\(desc)")
+    }
+
+    // MARK: - definition 结构补充验证
+
+    /// list_shortcut 的 properties 应为空字典
+    func testListDefinitionPropertiesEmpty() {
+        let properties = listTool.definition.parameters["properties"] as? [String: Any]
+        XCTAssertNotNil(properties, "properties 应存在")
+        XCTAssertEqual(properties?.count, 0, "list_shortcut 的 properties 应为空字典")
+    }
+
+    /// run_shortcut 的 required 应仅包含 name
+    func testRunDefinitionRequiredOnlyName() {
+        let required = runTool.definition.parameters["required"] as? [String]
+        XCTAssertEqual(required, ["name"], "required 应仅含 name")
+    }
+
+    /// create_shortcut 的 name 属性应有 description
+    func testCreateDefinitionNamePropertyHasDescription() {
+        let properties = createTool.definition.parameters["properties"] as? [String: [String: Any]]
+        let nameProp = properties?["name"]
+        XCTAssertNotNil(nameProp?["description"] as? String,
+                        "name 属性应有 description")
+        XCTAssertFalse((nameProp?["description"] as? String)?.isEmpty ?? true,
+                       "name description 不应为空")
+    }
+
+    /// create_shortcut 的 action 属性应有 description 且提及动作类型
+    func testCreateDefinitionActionPropertyDescription() {
+        let properties = createTool.definition.parameters["properties"] as? [String: [String: Any]]
+        let actionProp = properties?["action"]
+        let desc = actionProp?["description"] as? String ?? ""
+        XCTAssertFalse(desc.isEmpty, "action description 不应为空")
+        XCTAssertTrue(desc.contains("open_url") || desc.contains("run_script"),
+                      "action description 应提及动作类型")
+    }
+
+    // MARK: - execute 参数类型校验
+
+    /// name 为非 String 类型（Int）应返回错误
+    func testRunExecuteNameNotString() async throws {
+        let result = try await runTool.execute(arguments: ["name": 123])
+        XCTAssertEqual(result, "错误：请提供快捷指令名称")
+    }
+
+    /// name 为非 String 类型（Int）应返回错误
+    func testCreateExecuteNameNotString() async throws {
+        let result = try await createTool.execute(arguments: ["name": 123, "action": "open_url"])
+        XCTAssertEqual(result, "错误：请提供快捷指令名称")
+    }
+
+    // MARK: - CreateShortcutTool 各 action 成功路径
+
+    /// open_url 动作成功路径：应返回创建成功消息
+    func testCreateOpenUrlSuccess() async throws {
+        try XCTSkipIf(ProcessInfo.processInfo.environment["CI"] != nil,
+                      "跳过：CI 环境下 UIApplication.shared.open 可能不可用")
+        let result = try await createTool.execute(arguments: [
+            "name": "TestOpenURL",
+            "action": "open_url",
+            "url": "https://example.com"
+        ])
+        XCTAssertTrue(result.contains("已创建快捷指令"), "open_url 成功应返回创建消息，实际：\(result)")
+        XCTAssertTrue(result.contains("TestOpenURL"))
+    }
+
+    /// run_script 动作成功路径：应返回创建成功消息
+    func testCreateRunScriptSuccess() async throws {
+        try XCTSkipIf(ProcessInfo.processInfo.environment["CI"] != nil,
+                      "跳过：CI 环境下 UIApplication.shared.open 可能不可用")
+        let result = try await createTool.execute(arguments: [
+            "name": "TestRunScript",
+            "action": "run_script",
+            "script": "echo hello"
+        ])
+        XCTAssertTrue(result.contains("已创建快捷指令"), "run_script 成功应返回创建消息，实际：\(result)")
+    }
+
+    /// show_text 动作成功路径：应返回创建成功消息
+    func testCreateShowTextSuccess() async throws {
+        try XCTSkipIf(ProcessInfo.processInfo.environment["CI"] != nil,
+                      "跳过：CI 环境下 UIApplication.shared.open 可能不可用")
+        let result = try await createTool.execute(arguments: [
+            "name": "TestShowText",
+            "action": "show_text",
+            "text": "Hello World"
+        ])
+        XCTAssertTrue(result.contains("已创建快捷指令"), "show_text 成功应返回创建消息，实际：\(result)")
+    }
+
+    /// copy_to_clipboard 动作成功路径：应返回创建成功消息
+    func testCreateCopyToClipboardSuccess() async throws {
+        try XCTSkipIf(ProcessInfo.processInfo.environment["CI"] != nil,
+                      "跳过：CI 环境下 UIApplication.shared.open 可能不可用")
+        let result = try await createTool.execute(arguments: [
+            "name": "TestCopy",
+            "action": "copy_to_clipboard",
+            "text": "clipboard content"
+        ])
+        XCTAssertTrue(result.contains("已创建快捷指令"), "copy_to_clipboard 成功应返回创建消息，实际：\(result)")
+    }
 }

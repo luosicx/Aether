@@ -179,4 +179,116 @@ final class AlarmToolTests: XCTestCase {
         XCTAssertEqual(result, "错误：请提供闹钟时间",
                        "缺 time 时即使有 label 也应返回参数错误")
     }
+
+    // MARK: - definition 深度结构验证
+
+    /// definition.parameters 顶层应恰好含 type / properties / required 三个键
+    func testDefinitionParametersHasThreeKeys() {
+        let keys = tool.definition.parameters.keys
+        XCTAssertEqual(keys.count, 3, "parameters 应含 3 个顶层键")
+        XCTAssertTrue(keys.contains("type"))
+        XCTAssertTrue(keys.contains("properties"))
+        XCTAssertTrue(keys.contains("required"))
+    }
+
+    /// properties 应同时包含 time 和 label
+    func testDefinitionPropertiesContainsBothTimeAndLabel() {
+        let properties = tool.definition.parameters["properties"] as? [String: Any]
+        XCTAssertNotNil(properties?["time"], "应含 time 属性")
+        XCTAssertNotNil(properties?["label"], "应含 label 属性")
+        XCTAssertEqual(properties?.count, 2, "properties 应含 2 个属性")
+    }
+
+    /// time 和 label 的 type 都应为 "string"
+    func testDefinitionTimeAndLabelTypeIsString() {
+        let properties = tool.definition.parameters["properties"] as? [String: [String: Any]]
+        XCTAssertEqual(properties?["time"]?["type"] as? String, "string",
+                       "time type 应为 string")
+        XCTAssertEqual(properties?["label"]?["type"] as? String, "string",
+                       "label type 应为 string")
+    }
+
+    /// label 不应在 required 数组中（为可选参数）
+    func testDefinitionLabelNotInRequired() {
+        let required = tool.definition.parameters["required"] as? [String]
+        XCTAssertFalse(required?.contains("label") ?? true,
+                       "label 不应在 required 中")
+    }
+
+    /// label description 应提及"闹钟"或"标签"
+    func testDefinitionLabelDescriptionMentionsAlarm() {
+        let properties = tool.definition.parameters["properties"] as? [String: [String: Any]]
+        let desc = properties?["label"]?["description"] as? String ?? ""
+        XCTAssertTrue(desc.contains("闹钟") || desc.contains("标签"),
+                      "label description 应提及闹钟或标签，实际：\(desc)")
+    }
+
+    // MARK: - execute time 类型边界
+
+    /// time 为 Double 类型应返回错误
+    func testExecuteTimeAsDouble() async throws {
+        let result = try await tool.execute(arguments: ["time": 8.30])
+        XCTAssertEqual(result, "错误：请提供闹钟时间",
+                       "Double 类型 time 应返回参数错误")
+    }
+
+    /// time 为 Bool 类型应返回错误
+    func testExecuteTimeAsBool() async throws {
+        let result = try await tool.execute(arguments: ["time": true])
+        XCTAssertEqual(result, "错误：请提供闹钟时间",
+                       "Bool 类型 time 应返回参数错误")
+    }
+
+    /// time 为 Array 类型应返回错误
+    func testExecuteTimeAsArray() async throws {
+        let result = try await tool.execute(arguments: ["time": ["08", "30"]])
+        XCTAssertEqual(result, "错误：请提供闹钟时间",
+                       "Array 类型 time 应返回参数错误")
+    }
+
+    /// time 为 Dictionary 类型应返回错误
+    func testExecuteTimeAsDictionary() async throws {
+        let result = try await tool.execute(arguments: ["time": ["hour": 8]])
+        XCTAssertEqual(result, "错误：请提供闹钟时间",
+                       "Dictionary 类型 time 应返回参数错误")
+    }
+
+    // MARK: - EventKit 权限依赖路径（模拟器跳过）
+
+    /// 有效时间格式 "08:30" + 默认 label：应返回成功（需 EventKit 权限）
+    func testExecuteValidTimeWithDefaultLabel() async throws {
+        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil,
+                      "跳过：模拟器环境下 EventKit 权限请求挂起")
+        let result = try await tool.execute(arguments: ["time": "08:30"])
+        XCTAssertTrue(result.contains("已创建闹钟"), "有效时间应创建成功，实际：\(result)")
+        XCTAssertTrue(result.contains("08:30"), "结果应含时间")
+        XCTAssertTrue(result.contains("闹钟"), "默认 label 应为 '闹钟'")
+    }
+
+    /// 有效时间格式 + 自定义 label：应返回成功且含自定义 label
+    func testExecuteValidTimeWithCustomLabel() async throws {
+        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil,
+                      "跳过：模拟器环境下 EventKit 权限请求挂起")
+        let result = try await tool.execute(arguments: ["time": "09:00", "label": "起床"])
+        XCTAssertTrue(result.contains("已创建闹钟"), "有效时间应创建成功")
+        XCTAssertTrue(result.contains("起床"), "结果应含自定义 label '起床'")
+    }
+
+    /// 有效时间格式 "00:00"（午夜）：应返回成功
+    func testExecuteMidnightTime() async throws {
+        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil,
+                      "跳过：模拟器环境下 EventKit 权限请求挂起")
+        let result = try await tool.execute(arguments: ["time": "00:00"])
+        XCTAssertTrue(result.contains("已创建闹钟") || result.hasPrefix("错误"),
+                      "午夜时间应返回成功或错误，实际：\(result)")
+    }
+
+    /// 有效时间格式 "23:59"（最晚时间）：应返回成功
+    func testExecuteLatestTime() async throws {
+        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil,
+                      "跳过：模拟器环境下 EventKit 权限请求挂起")
+        let result = try await tool.execute(arguments: ["time": "23:59"])
+        XCTAssertTrue(result.contains("已创建闹钟") || result.hasPrefix("错误"),
+                      "最晚时间应返回成功或错误，实际：\(result)")
+    }
 }

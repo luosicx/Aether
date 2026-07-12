@@ -104,4 +104,171 @@ final class LocationToolTests: XCTestCase {
         XCTAssertFalse(result.isEmpty, "macOS 上 execute 应返回非空字符串（成功或错误提示）")
     }
     #endif
+
+    // MARK: - definition 结构完整性
+
+    /// definition 的 parameters 应包含 type、properties、required 三个键
+    func testDefinitionParametersContainsAllKeys() {
+        let def = tool.definition
+        XCTAssertNotNil(def.parameters["type"], "parameters 应包含 type 键")
+        XCTAssertNotNil(def.parameters["properties"], "parameters 应包含 properties 键")
+        XCTAssertNotNil(def.parameters["required"], "parameters 应包含 required 键")
+    }
+
+    /// definition 的 required 应为空数组
+    func testDefinitionRequiredIsEmptyArray() {
+        let def = tool.definition
+        let required = def.parameters["required"] as? [String]
+        XCTAssertEqual(required?.count, 0, "required 应为空数组")
+    }
+
+    /// definition 的 properties 应为空字典
+    func testDefinitionPropertiesIsEmptyDict() {
+        let def = tool.definition
+        let properties = def.parameters["properties"] as? [String: Any]
+        XCTAssertEqual(properties?.count, 0, "properties 应为空字典")
+    }
+
+    /// definition 的 name 应为有效的工具标识符（无空格、全小写）
+    func testDefinitionNameIsValidIdentifier() {
+        let name = tool.definition.name
+        XCTAssertFalse(name.isEmpty, "工具名不应为空")
+        XCTAssertFalse(name.contains(" "), "工具名不应包含空格")
+        XCTAssertEqual(name, name.lowercased(), "工具名应为小写")
+    }
+
+    /// definition 多次访问应返回全新但等价的实例（非共享引用）
+    func testDefinitionIsStableAcrossManyCalls() {
+        let names = (0..<10).map { _ in tool.definition.name }
+        let uniqueNames = Set(names)
+        XCTAssertEqual(uniqueNames.count, 1, "10 次访问应返回一致的 name")
+    }
+
+    // MARK: - execute 参数边界
+
+    /// execute 传入 nil 值的参数应不影响执行（应忽略所有参数）
+    func testExecuteWithNilValueArguments() async throws {
+        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
+                      "跳过：模拟器/CI 环境下 CLLocationManager 定位耗时过长")
+        let result = try await tool.execute(arguments: ["key": NSNull()])
+        XCTAssertFalse(result.isEmpty, "传入 NSNull 值应不影响 execute 返回非空字符串")
+    }
+
+    /// execute 传入嵌套字典参数应不影响执行
+    func testExecuteWithNestedDictArguments() async throws {
+        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
+                      "跳过：模拟器/CI 环境下 CLLocationManager 定位耗时过长")
+        let result = try await tool.execute(arguments: ["nested": ["a": 1, "b": "str"]])
+        XCTAssertFalse(result.isEmpty, "传入嵌套字典应不影响 execute 返回非空字符串")
+    }
+
+    /// execute 传入数组参数应不影响执行
+    func testExecuteWithArrayArguments() async throws {
+        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
+                      "跳过：模拟器/CI 环境下 CLLocationManager 定位耗时过长")
+        let result = try await tool.execute(arguments: ["list": [1, 2, 3]])
+        XCTAssertFalse(result.isEmpty, "传入数组参数应不影响 execute 返回非空字符串")
+    }
+
+    // MARK: - execute 不跳过测试（验证超时/权限错误格式）
+
+    /// execute 在 CI/模拟器环境下应返回包含位置或错误信息的字符串（不跳过）
+    func testExecuteInCIReturnsExpectedFormat() async throws {
+        // 不跳过：execute 应在 10 秒超时后返回错误字符串
+        let result = try await tool.execute(arguments: [:])
+        XCTAssertFalse(result.isEmpty, "execute 应始终返回非空字符串")
+        // 成功："当前位置：..." 或失败："定位权限未授权..." / "定位超时..." / "定位失败..."
+        let hasExpectedPrefix = result.contains("当前位置") ||
+                                 result.contains("定位") ||
+                                 result.contains("经纬度")
+        XCTAssertTrue(hasExpectedPrefix,
+                      "结果应包含位置或定位相关关键词，实际：\(result)")
+    }
+
+    /// execute 应始终返回 String 类型（不抛异常）
+    func testExecuteAlwaysReturnsStringWithoutThrowing() async throws {
+        let result = try await tool.execute(arguments: [:])
+        XCTAssertFalse(result.isEmpty, "execute 应返回非空字符串")
+    }
+
+    // MARK: - 实例独立性
+
+    /// 多个 LocationTool 实例应各自独立，definition 一致但无共享状态
+    func testMultipleInstancesAreIndependent() {
+        let tool1 = LocationTool()
+        let tool2 = LocationTool()
+        let tool3 = LocationTool()
+
+        XCTAssertEqual(tool1.definition.name, tool2.definition.name)
+        XCTAssertEqual(tool2.definition.name, tool3.definition.name)
+        XCTAssertEqual(tool1.definition.description, tool2.definition.description)
+        XCTAssertEqual(tool1.definition.parameters["type"] as? String,
+                       tool3.definition.parameters["type"] as? String)
+    }
+
+    /// LocationTool 创建大量实例不应崩溃
+    func testCreatingManyInstancesDoesNotCrash() {
+        var tools: [LocationTool] = []
+        for _ in 0..<50 {
+            tools.append(LocationTool())
+        }
+        XCTAssertEqual(tools.count, 50, "应能创建 50 个实例")
+        // 所有实例的 definition 应一致
+        let firstName = tools.first?.definition.name
+        XCTAssertTrue(tools.allSatisfy { $0.definition.name == firstName },
+                      "所有实例的 name 应一致")
+    }
+
+    // MARK: - ToolProtocol 协议验证
+
+    /// LocationTool 通过 ToolProtocol 协议访问时应能获取 definition
+    func testToolProtocolDefinitionAccess() {
+        let tools: [ToolProtocol] = [LocationTool(), LocationTool()]
+        for tool in tools {
+            XCTAssertEqual(tool.definition.name, "get_location")
+            XCTAssertFalse(tool.definition.description.isEmpty)
+        }
+    }
+
+    /// definition 的 description 应包含「地理」或「定位」关键词
+    func testDefinitionDescriptionContainsKeywords() {
+        let desc = tool.definition.description
+        let hasKeyword = desc.contains("地理") || desc.contains("定位") || desc.contains("位置")
+        XCTAssertTrue(hasKeyword, "描述应包含地理/定位/位置关键词，实际：\(desc)")
+    }
+
+    /// definition 的 name 长度应在合理范围内
+    func testDefinitionNameLengthReasonable() {
+        let name = tool.definition.name
+        XCTAssertGreaterThan(name.count, 3, "工具名长度应大于 3")
+        XCTAssertLessThan(name.count, 50, "工具名长度应小于 50")
+    }
+
+    // MARK: - execute 并发调用
+
+    /// 并发调用 execute 不应崩溃（多个 LocationTool 实例同时定位）
+    func testConcurrentExecuteDoesNotCrash() async throws {
+        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
+                      "跳过：模拟器/CI 环境下并发定位不稳定")
+        let tool1 = LocationTool()
+        let tool2 = LocationTool()
+
+        async let r1 = try tool1.execute(arguments: [:])
+        async let r2 = try tool2.execute(arguments: [:])
+        let results = try await [r1, r2]
+
+        for result in results {
+            XCTAssertFalse(result.isEmpty, "并发 execute 应返回非空字符串")
+        }
+    }
+
+    /// execute 多次串行调用应稳定返回非空字符串
+    func testExecuteSerialCallsStableNonEmpty() async throws {
+        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
+                      "跳过：模拟器/CI 环境下 CLLocationManager 定位耗时过长")
+        for _ in 0..<3 {
+            let result = try await tool.execute(arguments: [:])
+            XCTAssertFalse(result.isEmpty, "串行 execute 应每次返回非空字符串")
+        }
+    }
 }

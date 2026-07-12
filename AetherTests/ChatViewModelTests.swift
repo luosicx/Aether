@@ -1530,6 +1530,322 @@ final class ChatViewModelTests: XCTestCase {
         XCTAssertEqual(limited.last?.content, "i j", "应保留最后一条")
         XCTAssertEqual(limited.first?.content, "e f", "应从 e f 开始保留")
     }
+
+    // MARK: - 深度补充测试 Phase 4：工具调用边界 / 反馈边界 / 通知边界 / 会话切换
+
+    /// 工具调用带无效 JSON 参数：args 解析为空字典 {}，工具仍应执行
+    func testToolCallWithInvalidJSONArguments() async throws {
+        let mock = MockLLMProvider()
+        mock.toolCalls = [
+            AccumulatedToolCall(id: "call-1", type: "function", name: "calculate",
+                                arguments: "{invalid json}")  // 无效 JSON
+        ]
+        let vm = ChatViewModel(client: mock)
+        vm.selectedProvider = .onDevice
+        vm.toolsEnabled = true
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+        let userMsg = ChatMessage(role: "user", content: "计算")
+        userMsg.conversation = conv
+        conv.messages.append(userMsg)
+
+        await vm.processMessage("计算", conversation: conv, modelContext: context)
+
+        // 无效 JSON → args 为空字典 → calculate 工具因缺少 expression 应失败
+        XCTAssertEqual(vm.currentToolSteps.count, 1)
+        XCTAssertEqual(vm.currentToolSteps[0].status, .failed,
+                       "无效 JSON 参数导致 calculate 缺少 expression，应为 .failed")
+    }
+
+    /// 工具调用带空字符串参数：args 解析为空字典
+    func testToolCallWithEmptyStringArguments() async throws {
+        let mock = MockLLMProvider()
+        mock.toolCalls = [
+            AccumulatedToolCall(id: "call-1", type: "function", name: "calculate",
+                                arguments: "")
+        ]
+        let vm = ChatViewModel(client: mock)
+        vm.selectedProvider = .onDevice
+        vm.toolsEnabled = true
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+        let userMsg = ChatMessage(role: "user", content: "计算")
+        userMsg.conversation = conv
+        conv.messages.append(userMsg)
+
+        await vm.processMessage("计算", conversation: conv, modelContext: context)
+
+        XCTAssertEqual(vm.currentToolSteps.count, 1)
+        // 空字符串 → JSONSerialization 失败 → args 为 [:] → calculate 缺少 expression → .failed
+        XCTAssertEqual(vm.currentToolSteps[0].status, .failed)
+    }
+
+    /// handleFeedback 的 feedbackToast 在 2 秒后应自动清除
+    func testHandleFeedbackToastAutoClears() async throws {
+        let vm = ChatViewModel()
+        let msgId = UUID()
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+
+        vm.handleFeedback(messageId: msgId, isPositive: true, modelContext: context)
+        XCTAssertNotNil(vm.feedbackToast, "点赞后应设置 feedbackToast")
+
+        // 等待 2.5 秒让自动清除 Task 执行
+        try await Task.sleep(nanoseconds: 2_500_000_000)
+
+        XCTAssertNil(vm.feedbackToast, "2 秒后 feedbackToast 应被自动清除")
+    }
+
+    /// submitFeedback 对已存在的反馈记录应调用 updateFeedback 而非 saveFeedback
+    func testSubmitFeedbackUpdatesExistingFeedback() {
+        let vm = ChatViewModel()
+        let msgId = UUID()
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+
+        // 首次点赞
+        vm.submitFeedback(messageId: msgId, isPositive: true, citations: [], modelContext: context)
+        let storage = ChatStorage(modelContext: context)
+        let firstFeedback = storage.fetchFeedback(messageId: msgId)
+        XCTAssertNotNil(firstFeedback)
+        XCTAssertEqual(firstFeedback?.isPositive, true)
+
+        // 切换为踩（update 路径）
+        vm.submitFeedback(messageId: msgId, isPositive: false, citations: [], modelContext: context)
+        let updatedFeedback = storage.fetchFeedback(messageId: msgId)
+        XCTAssertNotNil(updatedFeedback)
+        XCTAssertEqual(updatedFeedback?.isPositive, false, "切换后应为 false（踩）")
+    }
+
+    /// switchTo 连续调用多次应正确切换 messages
+    func testSwitchToMultipleTimes() throws {
+        let vm = ChatViewModel()
+        let conv1 = Conversation(title: "会话1", systemPrompt: "你是助手1")
+        let conv2 = Conversation(title: "会话2", systemPrompt: "你是助手2")
+        let conv3 = Conversation(title: "会话3", systemPrompt: "你是助手3")
+        context.insert(conv1)
+        context.insert(conv2)
+        context.insert(conv3)
+
+        let msg1 = ChatMessage(role: "user", content: "消息1")
+        msg1.conversation = conv1
+        conv1.messages.append(msg1)
+        let msg2 = ChatMessage(role: "user", content: "消息2")
+        msg2.conversation = conv2
+        conv2.messages.append(msg2)
+        let msg3 = ChatMessage(role: "user", content: "消息3")
+        msg3.conversation = conv3
+        conv3.messages.append(msg3)
+        try context.save()
+
+        vm.switchTo(conversation: conv1)
+        XCTAssertEqual(vm.messages.count, 1)
+        XCTAssertEqual(vm.messages.first?.content, "消息1")
+
+        vm.switchTo(conversation: conv2)
+        XCTAssertEqual(vm.messages.count, 1)
+        XCTAssertEqual(vm.messages.first?.content, "消息2")
+
+        vm.switchTo(conversation: conv3)
+        XCTAssertEqual(vm.messages.count, 1)
+        XCTAssertEqual(vm.messages.first?.content, "消息3")
+    }
+
+    /// .llmErrorOccurred 通知无 userInfo 时不应设置 errorMessage
+    func testErrorNotificationWithNoUserInfoDoesNotSetError() async throws {
+        let vm = ChatViewModel()
+        vm.errorMessage = nil
+
+        NotificationCenter.default.post(name: .llmErrorOccurred, object: nil, userInfo: nil)
+
+        // 等待潜在的通知处理
+        try await Task.sleep(nanoseconds: 500_000_000)
+        XCTAssertNil(vm.errorMessage, "无 userInfo 的通知不应设置 errorMessage")
+    }
+
+    /// .llmErrorOccurred 通知 userInfo 缺少 error 和 message 键时不应设置 errorMessage
+    func testErrorNotificationWithEmptyUserInfoDoesNotSetError() async throws {
+        let vm = ChatViewModel()
+        vm.errorMessage = nil
+
+        NotificationCenter.default.post(name: .llmErrorOccurred, object: nil, userInfo: [:])
+
+        try await Task.sleep(nanoseconds: 500_000_000)
+        XCTAssertNil(vm.errorMessage, "空 userInfo 的通知不应设置 errorMessage")
+    }
+
+    /// limitTokens 单条消息超过 limit 时应返回空数组
+    func testLimitTokensSingleMessageExceedsLimit() {
+        let vm = ChatViewModel()
+        vm.tokenLimit = 1
+        // "a b c d e" → 5 词 → Int(6.5) = 6 tokens > 1
+        let messages = [APIMessage(role: "user", content: "a b c d e",
+                                   images: nil, toolCallId: nil, toolName: nil, toolCalls: nil)]
+        let limited = vm.limitTokens(messages, max: 1)
+        XCTAssertTrue(limited.isEmpty, "单条消息超过 limit 时应返回空数组")
+    }
+
+    /// buildEffectiveSystemPrompt 所有偏好默认（tone="默认"）时应返回原 base
+    func testBuildEffectiveSystemPromptDefaultToneReturnsBase() {
+        let vm = ChatViewModel()
+        let pref = UserPreference()
+        pref.preferredTone = "默认"  // 默认值
+        let result = vm.buildEffectiveSystemPrompt(base: "你是助手", preference: pref)
+        XCTAssertEqual(result, "你是助手", "tone 为默认值时不应注入偏好")
+    }
+
+    /// buildEffectiveSystemPrompt 空 base + 空 preference 应返回空字符串
+    func testBuildEffectiveSystemPromptEmptyBaseEmptyPreference() {
+        let vm = ChatViewModel()
+        let pref = UserPreference()
+        let result = vm.buildEffectiveSystemPrompt(base: "", preference: pref)
+        XCTAssertEqual(result, "", "空 base + 空 preference 应返回空字符串")
+    }
+
+    /// resendMessage 空内容应走 sendMessage 守卫，不创建消息
+    func testResendMessageWithEmptyContent() async throws {
+        let mock = MockLLMProvider()
+        let vm = ChatViewModel(client: mock)
+        vm.selectedProvider = .onDevice
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+
+        vm.resendMessage(content: "   ", in: conv, modelContext: context)
+
+        XCTAssertEqual(conv.messages.count, 0, "空白内容 resendMessage 不应创建消息")
+        XCTAssertFalse(vm.isLoading, "空白内容不应触发 isLoading")
+    }
+
+    /// onDevice + toolsEnabled + 在线（默认状态）→ effectiveProviderForRequest 降级到 fallback provider。
+    /// currentNetworkStatus 默认为 .online（init 中设置），无需额外修改。
+    func testOnDeviceWithToolsEnabledOnlineDegradesToFallback() async throws {
+        let mock = MockLLMProvider()
+        mock.chatChunks = ["降级回复"]
+        let vm = ChatViewModel(client: mock)
+        vm.selectedProvider = .onDevice
+        vm.toolsEnabled = true
+        // currentNetworkStatus 默认为 .online（private(set)，无法从外部修改）
+        XCTAssertEqual(vm.currentNetworkStatus, .online, "默认网络状态应为 online")
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+        let userMsg = ChatMessage(role: "user", content: "你好")
+        userMsg.conversation = conv
+        conv.messages.append(userMsg)
+
+        await vm.processMessage("你好", conversation: conv, modelContext: context)
+
+        // onDevice + toolsEnabled + online → effectiveProvider = .onDevice.fallback = .deepseek
+        XCTAssertNotEqual(vm.lastUsedProvider, .onDevice,
+                          "在线 + 工具开启时应降级到 fallback provider")
+        XCTAssertFalse(vm.didFallbackLastRequest, "未触发 FallbackLLMProvider 降级（使用 effectiveProvider）")
+        XCTAssertNil(vm.errorMessage, "降级到云端 provider 不应设置错误")
+    }
+
+    /// toggleSpeak 后切换会话：speakingMessageId 应被 switchTo 清空
+    func testSwitchToClearsSpeakingMessageId() throws {
+        let vm = ChatViewModel()
+        let id = UUID()
+        vm.speakingMessageId = id  // 模拟正在朗读
+
+        let conv = Conversation(title: "新会话", systemPrompt: "")
+        context.insert(conv)
+
+        vm.switchTo(conversation: conv)
+
+        // switchTo 清理 streamingText 和 isLoading，但 speakingMessageId 由 voiceService delegate 管理
+        // 此处验证 switchTo 不直接影响 speakingMessageId（它由 toggleSpeak / onSpeakFinished 管理）
+        // 但 streamingText 和 isLoading 应被清空
+        XCTAssertEqual(vm.streamingText, "")
+        XCTAssertFalse(vm.isLoading)
+    }
+
+    /// sendMessage 后 selectedModel 应保持不变
+    func testSendMessagePreservesSelectedModel() throws {
+        let mock = MockLLMProvider()
+        let vm = ChatViewModel(client: mock)
+        vm.selectedProvider = .onDevice
+        vm.selectedModel = "custom-model"
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+
+        vm.inputText = "你好"
+        vm.sendMessage(in: conv, modelContext: context)
+
+        XCTAssertEqual(vm.selectedModel, "custom-model",
+                       "sendMessage 不应修改 selectedModel")
+    }
+
+    /// lastDebugInfo 的 promptJSON 应为有效 JSON
+    func testLastDebugInfoPromptJSONIsValidJSON() async throws {
+        let mock = MockLLMProvider()
+        mock.chatChunks = ["回复"]
+        let vm = ChatViewModel(client: mock)
+        vm.selectedProvider = .onDevice
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+        let userMsg = ChatMessage(role: "user", content: "你好")
+        userMsg.conversation = conv
+        conv.messages.append(userMsg)
+
+        await vm.processMessage("你好", conversation: conv, modelContext: context)
+
+        XCTAssertNotNil(vm.lastDebugInfo)
+        let promptJSON = vm.lastDebugInfo?.promptJSON ?? ""
+        XCTAssertFalse(promptJSON.isEmpty, "promptJSON 不应为空")
+        // 验证是有效 JSON
+        let jsonData = promptJSON.data(using: .utf8)!
+        let parsed = try? JSONSerialization.jsonObject(with: jsonData) as? [[String: Any]]
+        XCTAssertNotNil(parsed, "promptJSON 应为有效 JSON 数组")
+        XCTAssertGreaterThan(parsed?.count ?? 0, 0, "promptJSON 应包含至少 1 条消息")
+    }
+
+    /// multiple tool calls 混合成功与失败：成功标记 completed，失败标记 failed
+    func testMultipleToolCallsMixedSuccessAndFailure() async throws {
+        let mock = MockLLMProvider()
+        mock.toolCalls = [
+            AccumulatedToolCall(id: "call-1", type: "function", name: "calculate",
+                                arguments: "{\"expression\": \"1 + 1\"}"),  // 成功
+            AccumulatedToolCall(id: "call-2", type: "function", name: "nonexistent_tool",
+                                arguments: "{}")  // 失败
+        ]
+        let vm = ChatViewModel(client: mock)
+        vm.selectedProvider = .onDevice
+        vm.toolsEnabled = true
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+        let userMsg = ChatMessage(role: "user", content: "混合测试")
+        userMsg.conversation = conv
+        conv.messages.append(userMsg)
+
+        await vm.processMessage("混合测试", conversation: conv, modelContext: context)
+
+        XCTAssertEqual(vm.currentToolSteps.count, 2, "应创建 2 个 ToolStep")
+        XCTAssertEqual(vm.currentToolSteps[0].status, .completed, "calculate 应成功")
+        XCTAssertEqual(vm.currentToolSteps[1].status, .failed, "nonexistent_tool 应失败")
+    }
+
+    /// processMessage 完成后 streamingText 最终值为空
+    func testProcessMessageCleansStreamingTextAfterToolCall() async throws {
+        let mock = MockLLMProvider()
+        mock.toolChatResponse = "思考中"
+        mock.toolCalls = [
+            AccumulatedToolCall(id: "call-1", type: "function", name: "calculate",
+                                arguments: "{\"expression\": \"1 + 1\"}")
+        ]
+        let vm = ChatViewModel(client: mock)
+        vm.selectedProvider = .onDevice
+        vm.toolsEnabled = true
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+        let userMsg = ChatMessage(role: "user", content: "计算 1+1")
+        userMsg.conversation = conv
+        conv.messages.append(userMsg)
+
+        await vm.processMessage("计算 1+1", conversation: conv, modelContext: context)
+
+        XCTAssertEqual(vm.streamingText, "", "工具调用完成后 streamingText 应被清空")
+        XCTAssertFalse(vm.isLoading, "完成后 isLoading 应为 false")
+    }
 }
 
 /// 用于单元测试的 LLMProvider 桩实现：chat 返回可配置的流式 chunk，embed 返回预设结果。

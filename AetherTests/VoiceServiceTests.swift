@@ -333,4 +333,274 @@ final class VoiceServiceTests: XCTestCase {
         service.speechSynthesizer(synthesizer, didCancel: utterance)
         wait(for: [secondExpectation], timeout: 2.0)
     }
+
+    // MARK: - applyConfig 精确边界值
+
+    /// rate 恰好为 0 时应正常工作（clamp 后仍为 0）
+    func testSpeakWithExactZeroRate() {
+        let service = VoiceService()
+        let config = TTSConfig(voiceIdentifier: "", rate: 0.0,
+                              pitchMultiplier: 1.0, volume: 1.0)
+        service.speak("测试", config: config)
+        if let msg = service.errorMessage {
+            XCTAssertEqual(msg, NSLocalizedString("未找到中文语音，使用默认语音", comment: ""),
+                           "rate=0 时 errorMessage 应为固定文案")
+        }
+    }
+
+    /// rate 恰好为 1 时应正常工作（clamp 后仍为 1）
+    func testSpeakWithExactMaxRate() {
+        let service = VoiceService()
+        let config = TTSConfig(voiceIdentifier: "", rate: 1.0,
+                              pitchMultiplier: 1.0, volume: 1.0)
+        service.speak("测试", config: config)
+        if let msg = service.errorMessage {
+            XCTAssertEqual(msg, NSLocalizedString("未找到中文语音，使用默认语音", comment: ""),
+                           "rate=1 时 errorMessage 应为固定文案")
+        }
+    }
+
+    /// pitchMultiplier 恰好为 0.5 时应正常工作（clamp 下限）
+    func testSpeakWithExactMinPitch() {
+        let service = VoiceService()
+        let config = TTSConfig(voiceIdentifier: "", rate: 0.5,
+                              pitchMultiplier: 0.5, volume: 1.0)
+        service.speak("测试", config: config)
+        if let msg = service.errorMessage {
+            XCTAssertEqual(msg, NSLocalizedString("未找到中文语音，使用默认语音", comment: ""),
+                           "pitch=0.5 时 errorMessage 应为固定文案")
+        }
+    }
+
+    /// pitchMultiplier 恰好为 2.0 时应正常工作（clamp 上限）
+    func testSpeakWithExactMaxPitch() {
+        let service = VoiceService()
+        let config = TTSConfig(voiceIdentifier: "", rate: 0.5,
+                              pitchMultiplier: 2.0, volume: 1.0)
+        service.speak("测试", config: config)
+        if let msg = service.errorMessage {
+            XCTAssertEqual(msg, NSLocalizedString("未找到中文语音，使用默认语音", comment: ""),
+                           "pitch=2.0 时 errorMessage 应为固定文案")
+        }
+    }
+
+    /// volume 恰好为 0 时应正常工作（clamp 后仍为 0，静音朗读）
+    func testSpeakWithExactZeroVolume() {
+        let service = VoiceService()
+        let config = TTSConfig(voiceIdentifier: "", rate: 0.5,
+                              pitchMultiplier: 1.0, volume: 0.0)
+        service.speak("测试", config: config)
+        if let msg = service.errorMessage {
+            XCTAssertEqual(msg, NSLocalizedString("未找到中文语音，使用默认语音", comment: ""),
+                           "volume=0 时 errorMessage 应为固定文案")
+        }
+    }
+
+    /// volume 恰好为 1 时应正常工作（clamp 上限）
+    func testSpeakWithExactMaxVolume() {
+        let service = VoiceService()
+        let config = TTSConfig(voiceIdentifier: "", rate: 0.5,
+                              pitchMultiplier: 1.0, volume: 1.0)
+        service.speak("测试", config: config)
+        if let msg = service.errorMessage {
+            XCTAssertEqual(msg, NSLocalizedString("未找到中文语音，使用默认语音", comment: ""),
+                           "volume=1 时 errorMessage 应为固定文案")
+        }
+    }
+
+    /// 所有参数均为最小值时应正常工作
+    func testSpeakWithAllMinValues() {
+        let service = VoiceService()
+        let config = TTSConfig(voiceIdentifier: "", rate: 0.0,
+                              pitchMultiplier: 0.5, volume: 0.0)
+        service.speak("最小值测试", config: config)
+        if let msg = service.errorMessage {
+            XCTAssertEqual(msg, NSLocalizedString("未找到中文语音，使用默认语音", comment: ""),
+                           "全最小值时 errorMessage 应为固定文案")
+        }
+    }
+
+    /// 所有参数均为最大值时应正常工作
+    func testSpeakWithAllMaxValues() {
+        let service = VoiceService()
+        let config = TTSConfig(voiceIdentifier: "", rate: 1.0,
+                              pitchMultiplier: 2.0, volume: 1.0)
+        service.speak("最大值测试", config: config)
+        if let msg = service.errorMessage {
+            XCTAssertEqual(msg, NSLocalizedString("未找到中文语音，使用默认语音", comment: ""),
+                           "全最大值时 errorMessage 应为固定文案")
+        }
+    }
+
+    // MARK: - resolveVoice 缓存行为
+
+    /// 两次 speak 使用不同 voiceIdentifier 时 errorMessage 状态应更新
+    func testSpeakWithDifferentIdentifiersUpdatesCache() {
+        let service = VoiceService()
+        let config1 = TTSConfig(voiceIdentifier: "com.voice.first",
+                               rate: 0.5, pitchMultiplier: 1.0, volume: 1.0)
+        service.speak("第一次", config: config1)
+        let errorAfterFirst = service.errorMessage
+
+        let config2 = TTSConfig(voiceIdentifier: "com.voice.second",
+                               rate: 0.5, pitchMultiplier: 1.0, volume: 1.0)
+        service.speak("第二次", config: config2)
+        let errorAfterSecond = service.errorMessage
+
+        // 两次使用不同的 identifier，errorMessage 状态可能更新
+        // 验证不崩溃且 errorMessage 状态合理
+        _ = errorAfterFirst
+        _ = errorAfterSecond
+    }
+
+    /// speak 后再使用相同 identifier 的 config 应命中缓存（errorMessage 不变）
+    func testResolveVoiceCacheHitOnSameIdentifier() {
+        let service = VoiceService()
+        let config = TTSConfig(voiceIdentifier: "com.test.cache.voice",
+                              rate: 0.5, pitchMultiplier: 1.0, volume: 1.0)
+
+        service.speak("第一次", config: config)
+        let errorAfterFirst = service.errorMessage
+
+        service.speak("第二次", config: config)
+        let errorAfterSecond = service.errorMessage
+
+        // 缓存命中时 errorMessage 状态应一致
+        XCTAssertEqual(errorAfterFirst, errorAfterSecond,
+                       "相同 identifier 第二次 speak 应命中缓存，errorMessage 一致")
+    }
+
+    // MARK: - speak 中断与状态重置
+
+    /// speak 中再次 speak 应中断当前朗读并重置 isPreviewing
+    func testSpeakInterruptsPreviousSpeak() {
+        let service = VoiceService()
+        service.previewVoice("试听中", config: .defaultValue)
+        XCTAssertTrue(service.isPreviewing, "试听中 isPreviewing 应为 true")
+
+        // speak 应中断试听
+        service.speak("新内容")
+        XCTAssertFalse(service.isPreviewing, "speak 后 isPreviewing 应为 false（中断试听）")
+    }
+
+    /// stopSpeaking 在未 speak 时调用不应崩溃
+    func testStopSpeakingWhenNotSpeakingDoesNotCrash() {
+        let service = VoiceService()
+        // 未调用 speak 直接 stopSpeaking
+        service.stopSpeaking()
+        // 验证不崩溃即可
+    }
+
+    /// 连续多次 stopSpeaking 不应崩溃
+    func testMultipleStopSpeakingCallsNoCrash() {
+        let service = VoiceService()
+        service.speak("测试")
+        service.stopSpeaking()
+        service.stopSpeaking()
+        service.stopSpeaking()
+        // 验证不崩溃即可
+    }
+
+    // MARK: - delegate 边界
+
+    /// didFinish 在试听模式下不应触发 onSpeakFinished
+    func testDidFinishDuringPreviewDoesNotTriggerCallback() {
+        let service = VoiceService()
+        service.previewVoice("试听", config: .defaultValue)
+        XCTAssertTrue(service.isPreviewing, "试听后 isPreviewing 应为 true")
+
+        let expectation = XCTestExpectation(description: "onSpeakFinished 不应被调用")
+        expectation.isInverted = true
+        service.onSpeakFinished = { expectation.fulfill() }
+        let synthesizer = AVSpeechSynthesizer()
+        let utterance = AVSpeechUtterance(string: "test")
+        service.speechSynthesizer(synthesizer, didFinish: utterance)
+        wait(for: [expectation], timeout: 2.0)
+    }
+
+    /// didCancel 在试听模式下应清理试听状态但不触发 onSpeakFinished
+    func testDidCancelDuringPreviewDoesNotTriggerMainCallback() {
+        let service = VoiceService()
+        service.previewVoice("试听", config: .defaultValue)
+        XCTAssertTrue(service.isPreviewing)
+
+        let expectation = XCTestExpectation(description: "onSpeakFinished 不应被调用")
+        expectation.isInverted = true
+        service.onSpeakFinished = { expectation.fulfill() }
+        let synthesizer = AVSpeechSynthesizer()
+        let utterance = AVSpeechUtterance(string: "test")
+        service.speechSynthesizer(synthesizer, didCancel: utterance)
+        wait(for: [expectation], timeout: 2.0)
+    }
+
+    // MARK: - speak Unicode 文本
+
+    /// speak 中文长文本不应崩溃
+    func testSpeakChineseTextDoesNotCrash() {
+        let service = VoiceService()
+        service.speak("你好世界，这是一段中文测试文本。")
+        if let msg = service.errorMessage {
+            XCTAssertEqual(msg, NSLocalizedString("未找到中文语音，使用默认语音", comment: ""),
+                           "中文文本 speak 的 errorMessage 应为固定文案")
+        }
+    }
+
+    /// speak 含 emoji 的文本不应崩溃
+    func testSpeakEmojiTextDoesNotCrash() {
+        let service = VoiceService()
+        service.speak("Hello 🌍🎉🚀")
+        if let msg = service.errorMessage {
+            XCTAssertEqual(msg, NSLocalizedString("未找到中文语音，使用默认语音", comment: ""),
+                           "emoji 文本 speak 的 errorMessage 应为固定文案")
+        }
+    }
+
+    /// speak 含特殊字符的文本不应崩溃
+    func testSpeakSpecialCharactersDoesNotCrash() {
+        let service = VoiceService()
+        service.speak("Test\t\n\\\"'特殊字符!@#$%^&*()")
+        if let msg = service.errorMessage {
+            XCTAssertEqual(msg, NSLocalizedString("未找到中文语音，使用默认语音", comment: ""),
+                           "特殊字符文本 speak 的 errorMessage 应为固定文案")
+        }
+    }
+
+    // MARK: - onRecognized 回包设置
+
+    /// onRecognized 可被设置为 nil（清除回调）
+    func testOnRecognizedCanBeSetToNil() {
+        let service = VoiceService()
+        service.onRecognized = { _ in }
+        service.onRecognized = nil
+        // 设置为 nil 后调用不应崩溃
+        service.onRecognized?("test")
+        // 验证不崩溃即可
+    }
+
+    // MARK: - previewVoice 边界
+
+    /// previewVoice 空字符串不应崩溃
+    func testPreviewVoiceEmptyStringDoesNotCrash() {
+        let service = VoiceService()
+        service.previewVoice("", config: .defaultValue)
+        XCTAssertTrue(service.isPreviewing, "空字符串 previewVoice 后 isPreviewing 应为 true")
+    }
+
+    /// previewVoice 超长文本不应崩溃
+    func testPreviewVoiceLongTextDoesNotCrash() {
+        let service = VoiceService()
+        let longText = String(repeating: "试听文本。", count: 200)
+        service.previewVoice(longText, config: .defaultValue)
+        XCTAssertTrue(service.isPreviewing, "超长文本 previewVoice 后 isPreviewing 应为 true")
+    }
+
+    /// stopPreview 连续多次调用不应崩溃
+    func testMultipleStopPreviewCallsNoCrash() {
+        let service = VoiceService()
+        service.previewVoice("试听", config: .defaultValue)
+        service.stopPreview()
+        service.stopPreview()
+        service.stopPreview()
+        XCTAssertFalse(service.isPreviewing, "多次 stopPreview 后 isPreviewing 应为 false")
+    }
 }

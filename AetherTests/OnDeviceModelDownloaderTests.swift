@@ -439,6 +439,299 @@ final class OnDeviceModelDownloaderTests: XCTestCase {
         }
     }
 
+    // MARK: - 20. SHA256 Unicode / 多字节内容
+
+    /// verifySHA256 对含中文、emoji 的 Unicode 内容应正确校验
+    func testVerifySHA256UnicodeContent() async throws {
+        let tempDir = FileManager.default.temporaryDirectory
+        let testFile = tempDir.appendingPathComponent("unicode-\(UUID().uuidString).bin")
+        defer { try? FileManager.default.removeItem(at: testFile) }
+
+        let content = "你好世界🌍🎉 Hello World".data(using: .utf8)!
+        try content.write(to: testFile)
+
+        let expected = SHA256.hash(data: content).map { String(format: "%02x", $0) }.joined()
+        let result = await downloader.verifySHA256(filePath: testFile, expected: expected)
+        XCTAssertTrue(result, "Unicode 内容 SHA256 应匹配")
+    }
+
+    /// verifySHA256 对恰好 4MB（chunkSize 整数倍）的文件应正确校验
+    func testVerifySHA256ExactChunkSize() async throws {
+        let tempDir = FileManager.default.temporaryDirectory
+        let testFile = tempDir.appendingPathComponent("exact-chunk-\(UUID().uuidString).bin")
+        defer { try? FileManager.default.removeItem(at: testFile) }
+
+        let chunkSize = 4 * 1024 * 1024
+        let content = Data(count: chunkSize)  // 恰好 4MB
+        try content.write(to: testFile)
+
+        let expected = SHA256.hash(data: content).map { String(format: "%02x", $0) }.joined()
+        let result = await downloader.verifySHA256(filePath: testFile, expected: expected)
+        XCTAssertTrue(result, "恰好 4MB 文件 SHA256 应匹配（单次 chunk 读取）")
+    }
+
+    /// verifySHA256 对 8MB+ 文件（多 chunk）应正确校验
+    func testVerifySHA256MultiChunk() async throws {
+        let tempDir = FileManager.default.temporaryDirectory
+        let testFile = tempDir.appendingPathComponent("multi-chunk-\(UUID().uuidString).bin")
+        defer { try? FileManager.default.removeItem(at: testFile) }
+
+        let chunkSize = 4 * 1024 * 1024
+        let content = Data(count: chunkSize * 2 + 512)  // 8MB + 512B
+        try content.write(to: testFile)
+
+        let expected = SHA256.hash(data: content).map { String(format: "%02x", $0) }.joined()
+        let result = await downloader.verifySHA256(filePath: testFile, expected: expected)
+        XCTAssertTrue(result, "8MB+ 文件 SHA256 应匹配（多 chunk 读取）")
+    }
+
+    /// verifySHA256 对重复字节模式应正确校验
+    func testVerifySHA256RepeatedPattern() async throws {
+        let tempDir = FileManager.default.temporaryDirectory
+        let testFile = tempDir.appendingPathComponent("pattern-\(UUID().uuidString).bin")
+        defer { try? FileManager.default.removeItem(at: testFile) }
+
+        let pattern: [UInt8] = [0xAB, 0xCD, 0xEF, 0x01, 0x23, 0x45, 0x67, 0x89]
+        var content = Data()
+        for _ in 0..<1000 {
+            content.append(contentsOf: pattern)
+        }  // 8KB
+        try content.write(to: testFile)
+
+        let expected = SHA256.hash(data: content).map { String(format: "%02x", $0) }.joined()
+        let result = await downloader.verifySHA256(filePath: testFile, expected: expected)
+        XCTAssertTrue(result, "重复字节模式 SHA256 应匹配")
+    }
+
+    // MARK: - 21. deleteModel 边界路径
+
+    /// deleteModel 对含空格与 Unicode 的文件名应正常删除
+    func testDeleteModelWithSpecialCharacters() async throws {
+        let tempDir = FileManager.default.temporaryDirectory
+        let testFile = tempDir.appendingPathComponent("模型 文件-\(UUID().uuidString).bin")
+        try "data".data(using: .utf8)!.write(to: testFile)
+
+        try await downloader.deleteModel(at: testFile)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: testFile.path),
+                       "含空格/Unicode 的文件应被删除")
+    }
+
+    /// deleteModel 对符号链接应正常删除（仅删链接不删目标）
+    func testDeleteModelOnSymlink() async throws {
+        try XCTSkipIf(ProcessInfo.processInfo.operatingSystemVersion.majorVersion < 13,
+                      "某些旧版 macOS 上符号链接行为不一致")
+        let tempDir = FileManager.default.temporaryDirectory
+        let target = tempDir.appendingPathComponent("target-\(UUID().uuidString).bin")
+        let link = tempDir.appendingPathComponent("link-\(UUID().uuidString).bin")
+        try "target data".data(using: .utf8)!.write(to: target)
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: target)
+        defer { try? FileManager.default.removeItem(at: target) }
+
+        try await downloader.deleteModel(at: link)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: link.path), "符号链接应被删除")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: target.path), "目标文件不应被删除")
+    }
+
+    // MARK: - 22. OnDeviceConfig 自定义值
+
+    /// OnDeviceConfig 自定义 downloadSource 为 international 时应返回对应 URL
+    func testOnDeviceConfigCustomDownloadSource() {
+        var config = OnDeviceConfig.default
+        config.downloadSource = .international
+        XCTAssertEqual(config.downloadSource, .international)
+        XCTAssertEqual(config.modelName, "Llama-3.2-1B-Instruct-Q4_K_M",
+                       "默认 modelName 应为 Q4_K_M 量化版本")
+        XCTAssertEqual(config.maxTokens, 512, "默认 maxTokens 应为 512")
+        XCTAssertEqual(config.temperature, 0.7, "默认 temperature 应为 0.7")
+        XCTAssertTrue(config.autoSwitchOnNetworkLoss, "默认应启用断网自动切换")
+        XCTAssertFalse(config.enabled, "默认应未启用端侧推理")
+    }
+
+    /// OnDeviceConfig 默认 modelPath 应为 nil
+    func testOnDeviceConfigDefaultModelPathIsNil() {
+        let config = OnDeviceConfig.default
+        XCTAssertNil(config.modelPath, "默认 modelPath 应为 nil")
+    }
+
+    /// OnDeviceConfig 应支持 Codable 编解码
+    func testOnDeviceConfigCodableRoundTrip() throws {
+        var config = OnDeviceConfig.default
+        config.enabled = true
+        config.modelPath = URL(fileURLWithPath: "/tmp/test-model.bin")
+        config.maxTokens = 1024
+
+        let data = try JSONEncoder().encode(config)
+        let decoded = try JSONDecoder().decode(OnDeviceConfig.self, from: data)
+
+        XCTAssertEqual(decoded, config, "Codable 往返应保持值一致")
+        XCTAssertTrue(decoded.enabled)
+        XCTAssertEqual(decoded.maxTokens, 1024)
+    }
+
+    // MARK: - 23. OnDeviceModelCatalog 完整性
+
+    /// OnDeviceModelCatalog 所有模型应有有效的 HuggingFace 和 ModelScope URL
+    func testModelCatalogAllModelsHaveValidURLs() {
+        for model in OnDeviceModelCatalog.models {
+            XCTAssertTrue(model.huggingFaceURL.absoluteString.hasPrefix("https://"),
+                          "模型 \(model.id) 的 HuggingFace URL 应为 https")
+            XCTAssertTrue(model.modelScopeURL.absoluteString.hasPrefix("https://"),
+                          "模型 \(model.id) 的 ModelScope URL 应为 https")
+        }
+    }
+
+    /// OnDeviceModelCatalog 所有模型应有非空 description
+    func testModelCatalogAllModelsHaveNonEmptyDescription() {
+        for model in OnDeviceModelCatalog.models {
+            XCTAssertFalse(model.description.isEmpty,
+                           "模型 \(model.id) 的 description 不应为空")
+        }
+    }
+
+    /// OnDeviceModelCatalog 所有模型的 estimatedSizeMB 应大于 0
+    func testModelCatalogAllModelsHavePositiveSize() {
+        for model in OnDeviceModelCatalog.models {
+            XCTAssertGreaterThan(model.estimatedSizeMB, 0,
+                                 "模型 \(model.id) 的 estimatedSizeMB 应大于 0")
+        }
+    }
+
+    /// OnDeviceModelCatalog find(id:) 对部分匹配应返回 nil（精确匹配）
+    func testModelCatalogFindIsExactMatch() {
+        XCTAssertNil(OnDeviceModelCatalog.find(id: "Llama"), "部分匹配应返回 nil")
+        XCTAssertNil(OnDeviceModelCatalog.find(id: ""), "空字符串应返回 nil")
+        XCTAssertNil(OnDeviceModelCatalog.find(id: "Llama-3.2-1B-Instruct-4bit "),
+                     "带尾空格应返回 nil（精确匹配）")
+    }
+
+    // MARK: - 24. DownloadSource 完整覆盖
+
+    /// DownloadSource displayName 应包含对应的平台名
+    func testDownloadSourceDisplayNameContainsPlatform() {
+        XCTAssertTrue(DownloadSource.domestic.displayName.contains("ModelScope") || DownloadSource.domestic.displayName.contains("国内"),
+                      "domestic displayName 应含平台标识")
+        XCTAssertTrue(DownloadSource.international.displayName.contains("HuggingFace") || DownloadSource.international.displayName.contains("国外"),
+                      "international displayName 应含平台标识")
+    }
+
+    /// DownloadSource domestic 与 international 应互不相同
+    func testDownloadSourceDomesticNotEqualInternational() {
+        XCTAssertNotEqual(DownloadSource.domestic, DownloadSource.international,
+                          "domestic 与 international 应不同")
+    }
+
+    // MARK: - 25. makeDownloadSessionConfig 额外属性
+
+    /// makeDownloadSessionConfig 应返回 default 配置类型
+    func testDownloadSessionConfigIsDefaultType() async {
+        let config = await downloader.makeDownloadSessionConfig()
+        XCTAssertEqual(config.urlCache, URLSessionConfiguration.default.urlCache,
+                       "urlCache 应与 default 一致")
+    }
+
+    // MARK: - 26. 并发安全性
+
+    /// 并发调用 verifySHA256 不应崩溃（actor 隔离保证）
+    func testConcurrentVerifySHA256NoCrash() async throws {
+        let tempDir = FileManager.default.temporaryDirectory
+        let testFile = tempDir.appendingPathComponent("concurrent-\(UUID().uuidString).bin")
+        defer { try? FileManager.default.removeItem(at: testFile) }
+
+        let content = "concurrent test".data(using: .utf8)!
+        try content.write(to: testFile)
+        let expected = SHA256.hash(data: content).map { String(format: "%02x", $0) }.joined()
+
+        // 并发发起多个 verifySHA256 调用
+        async let r1 = downloader.verifySHA256(filePath: testFile, expected: expected)
+        async let r2 = downloader.verifySHA256(filePath: testFile, expected: expected)
+        async let r3 = downloader.verifySHA256(filePath: testFile, expected: "wrong")
+
+        let results = await [r1, r2, r3]
+        XCTAssertTrue(results[0], "第一次并发校验应成功")
+        XCTAssertTrue(results[1], "第二次并发校验应成功")
+        XCTAssertFalse(results[2], "第三次并发校验应失败（期望值不匹配）")
+    }
+
+    /// 并发调用 deleteModel 同一文件不应崩溃（actor 串行化）
+    func testConcurrentDeleteModelNoCrash() async throws {
+        let tempDir = FileManager.default.temporaryDirectory
+        let testFile1 = tempDir.appendingPathComponent("concurrent-del-1-\(UUID().uuidString).bin")
+        let testFile2 = tempDir.appendingPathComponent("concurrent-del-2-\(UUID().uuidString).bin")
+        try "data1".data(using: .utf8)!.write(to: testFile1)
+        try "data2".data(using: .utf8)!.write(to: testFile2)
+
+        // 并发删除不同文件
+        async let r1: Void = try downloader.deleteModel(at: testFile1)
+        async let r2: Void = try downloader.deleteModel(at: testFile2)
+        _ = try await (r1, r2)
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: testFile1.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: testFile2.path))
+    }
+
+    // MARK: - 27. OnDeviceError 完整覆盖
+
+    /// OnDeviceError.loadFailed 应携带底层错误信息
+    func testLoadFailedErrorCarriesMessage() {
+        let msg = "特定加载错误"
+        let error = OnDeviceError.loadFailed(msg)
+        XCTAssertTrue(error.errorDescription?.contains(msg) == true,
+                      "loadFailed 描述应包含底层错误信息")
+    }
+
+    /// OnDeviceError.sha256Mismatch 应截取前 8 字符展示
+    func testSHA256MismatchTruncatesHash() {
+        let longExpected = String(repeating: "a", count: 64)
+        let longActual = String(repeating: "b", count: 64)
+        let error = OnDeviceError.sha256Mismatch(expected: longExpected, actual: longActual)
+        let desc = error.errorDescription ?? ""
+        XCTAssertTrue(desc.contains("aaaaaaaa"), "描述应包含 expected 的前 8 字符")
+        XCTAssertTrue(desc.contains("bbbbbbbb"), "描述应包含 actual 的前 8 字符")
+    }
+
+    /// OnDeviceError.modelNotFound 应使用 lastPathComponent
+    func testModelNotFoundUsesLastPathComponent() {
+        let url = URL(fileURLWithPath: "/tmp/deep/path/model.gguf")
+        let error = OnDeviceError.modelNotFound(url)
+        XCTAssertTrue(error.errorDescription?.contains("model.gguf") == true,
+                      "modelNotFound 描述应包含文件名")
+        XCTAssertFalse(error.errorDescription?.contains("/tmp/deep/path/") == true,
+                       "modelNotFound 描述不应包含完整路径（仅 lastPathComponent）")
+    }
+
+    // MARK: - 28. startDownload 守卫
+
+    /// startDownload 对 file:// URL 应最终设置 lastError（不崩溃，下载失败后走错误分支）
+    func testStartDownloadWithFileURLSetsError() async {
+        let fileURL = URL(fileURLWithPath: "/tmp/nonexistent-\(UUID().uuidString).bin")
+        let destURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("dest-\(UUID().uuidString).bin")
+        defer { try? FileManager.default.removeItem(at: destURL) }
+
+        await downloader.startDownload(url: fileURL, to: destURL, expectedSHA256: "")
+
+        let hasError = await downloader.lastError != nil
+        let isDownloading = await downloader.isDownloading
+        XCTAssertTrue(hasError, "file:// URL 下载应失败并设置 lastError")
+        XCTAssertFalse(isDownloading, "失败后 isDownloading 应为 false")
+    }
+
+    // MARK: - 29. cancelDownload 后状态
+
+    /// cancelDownload 后 progress 应保持不变（未实际下载）
+    func testCancelDownloadKeepsProgressAtZero() async {
+        await downloader.cancelDownload()
+        let progress = await downloader.progress
+        XCTAssertEqual(progress, 0.0, "未实际下载时 cancel 后 progress 应为 0.0")
+    }
+
+    /// cancelDownload 后 lastError 应保持 nil（cancel 不产生错误）
+    func testCancelDownloadDoesNotSetError() async {
+        await downloader.cancelDownload()
+        let lastError = await downloader.lastError
+        XCTAssertNil(lastError, "cancelDownload 不应设置 lastError")
+    }
+
     // MARK: - 辅助
 
     /// 复用下载器单例，简化测试代码

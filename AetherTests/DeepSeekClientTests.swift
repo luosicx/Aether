@@ -436,4 +436,212 @@ final class DeepSeekClientTests: XCTestCase {
         }
         await fulfillment(of: [expectation], timeout: 2.0)
     }
+
+    // MARK: - chat with tools 成功解析 tool_calls
+
+    /// sendRequestWithTools 成功路径：SSE 包含 tool_calls 增量，应累积并 yield ParsedChunk
+    func testChatWithToolsStreamParsesToolCalls() async {
+        // 构造 SSE：首个 chunk 含 tool_call id/name，第二个 chunk 累积 arguments
+        let sse = """
+        data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_123","type":"function","function":{"name":"calculate","arguments":"{\\"x\\":"}}]}}]}
+
+        data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"1,\\"y\\":2}"}}]}}]}
+
+        data: [DONE]
+
+        """
+        MockURLProtocol.responseData = sse.data(using: .utf8)
+        MockURLProtocol.statusCode = 200
+
+        let messages = [APIMessage(role: "user", content: "hi", images: nil, toolCallId: nil, toolName: nil, toolCalls: nil)]
+        let tools = [ToolDef(type: "function", function: ToolDef.FunctionDef(name: "calc", description: "calc", parameters: ["type": AnyCodable("object")]))]
+        let stream = client.chat(messages: messages, config: .default, tools: tools, apiKey: apiKey)
+
+        var chunks: [ParsedChunk] = []
+        for await chunk in stream {
+            chunks.append(chunk)
+        }
+        XCTAssertGreaterThanOrEqual(chunks.count, 1, "应至少 yield 一个 ParsedChunk")
+
+        // 最后一个 chunk 的 toolCalls 应包含累积后的完整工具调用
+        guard let lastChunk = chunks.last,
+              let toolCalls = lastChunk.toolCalls,
+              let firstToolCall = toolCalls.first else {
+            XCTFail("最后的 chunk 应包含累积的 toolCalls")
+            return
+        }
+        XCTAssertEqual(firstToolCall.id, "call_123")
+        XCTAssertEqual(firstToolCall.name, "calculate")
+        XCTAssertEqual(firstToolCall.type, "function")
+        XCTAssertTrue(firstToolCall.arguments.contains("1"), "arguments 应包含累积的 '1'，实际：\(firstToolCall.arguments)")
+    }
+
+    /// sendRequestWithTools 成功路径：SSE 含纯文本 content（无 tool_calls）
+    func testChatWithToolsStreamReturnsContentOnly() async {
+        let sse = """
+        data: {"choices":[{"delta":{"content":"Hello"}}]}
+
+        data: [DONE]
+
+        """
+        MockURLProtocol.responseData = sse.data(using: .utf8)
+        MockURLProtocol.statusCode = 200
+
+        let messages = [APIMessage(role: "user", content: "hi", images: nil, toolCallId: nil, toolName: nil, toolCalls: nil)]
+        let tools = [ToolDef(type: "function", function: ToolDef.FunctionDef(name: "noop", description: "noop", parameters: ["type": AnyCodable("object")]))]
+        let stream = client.chat(messages: messages, config: .default, tools: tools, apiKey: apiKey)
+
+        var chunks: [ParsedChunk] = []
+        for await chunk in stream {
+            chunks.append(chunk)
+        }
+        XCTAssertEqual(chunks.count, 1, "应 yield 一个 chunk")
+        XCTAssertEqual(chunks[0].content, "Hello")
+        XCTAssertNil(chunks[0].toolCalls, "无 tool_calls 时 toolCalls 应为 nil")
+    }
+
+    /// sendRequestWithTools：SSE 仅含 [DONE]，不应 yield 任何 chunk
+    func testChatWithToolsStreamDoneOnly() async {
+        MockURLProtocol.responseData = Data("data: [DONE]\n\n".utf8)
+        MockURLProtocol.statusCode = 200
+
+        let messages = [APIMessage(role: "user", content: "hi", images: nil, toolCallId: nil, toolName: nil, toolCalls: nil)]
+        let tools = [ToolDef(type: "function", function: ToolDef.FunctionDef(name: "noop", description: "noop", parameters: ["type": AnyCodable("object")]))]
+        let stream = client.chat(messages: messages, config: .default, tools: tools, apiKey: apiKey)
+
+        var chunks: [ParsedChunk] = []
+        for await chunk in stream {
+            chunks.append(chunk)
+        }
+        XCTAssertTrue(chunks.isEmpty, "[DONE] only 不应 yield chunk")
+    }
+
+    /// sendRequestWithTools：SSE 行跳过逻辑（非 data 行、坏 JSON、[DONE]）
+    func testChatWithToolsStreamLineSkipping() async {
+        let sse = """
+        : comment
+
+        data: [DONE]
+
+        data: {invalid}
+
+        data: {"choices":[{"delta":{"content":"OK"}}]}
+
+        """
+        MockURLProtocol.responseData = sse.data(using: .utf8)
+        MockURLProtocol.statusCode = 200
+
+        let messages = [APIMessage(role: "user", content: "hi", images: nil, toolCallId: nil, toolName: nil, toolCalls: nil)]
+        let tools = [ToolDef(type: "function", function: ToolDef.FunctionDef(name: "noop", description: "noop", parameters: ["type": AnyCodable("object")]))]
+        let stream = client.chat(messages: messages, config: .default, tools: tools, apiKey: apiKey)
+
+        var chunks: [ParsedChunk] = []
+        for await chunk in stream {
+            chunks.append(chunk)
+        }
+        // 应只 yield 1 个有效 content chunk
+        XCTAssertEqual(chunks.count, 1, "只应 yield 有效 content chunk")
+        XCTAssertEqual(chunks[0].content, "OK")
+    }
+
+    // MARK: - embed 边界
+
+    /// embed 响应缺少 usage 字段时应正常解码（usage 为可选字段）
+    func testEmbedResponseWithoutUsageField() async throws {
+        let json = """
+        {"data":[{"embedding":[0.1,0.2],"index":0}]}
+        """
+        MockURLProtocol.responseData = json.data(using: .utf8)
+        MockURLProtocol.statusCode = 200
+
+        let result = try await client.embed(texts: ["x"], apiKey: apiKey)
+        XCTAssertEqual(result.count, 1)
+        XCTAssertEqual(result[0], [0.1, 0.2])
+    }
+
+    /// embed 响应 data 为空数组
+    func testEmbedResponseEmptyDataArray() async throws {
+        let json = """
+        {"data":[],"usage":null}
+        """
+        MockURLProtocol.responseData = json.data(using: .utf8)
+        MockURLProtocol.statusCode = 200
+
+        let result = try await client.embed(texts: ["x"], apiKey: apiKey)
+        XCTAssertEqual(result, [], "data 为空数组应返回空向量数组")
+    }
+
+    /// embed HTTP 429 限流应抛 LLMError
+    func testEmbedRateLimitedThrows() async throws {
+        MockURLProtocol.responseData = Data("rate limited".utf8)
+        MockURLProtocol.statusCode = 429
+
+        let expectation = XCTNSNotificationExpectation(name: .llmErrorOccurred, object: nil)
+        expectation.handler = { note in
+            (note.userInfo?["error"] as? LLMError) != nil
+        }
+
+        do {
+            _ = try await client.embed(texts: ["x"], apiKey: apiKey)
+            XCTFail("429 应抛错")
+        } catch let err as LLMError {
+            if case .apiError(let code, _) = err {
+                XCTAssertEqual(code, 429)
+            } else {
+                XCTFail("期望 apiError(429)，实际：\(err)")
+            }
+        } catch {
+            XCTFail("期望 LLMError，实际：\(type(of: error))")
+        }
+        await fulfillment(of: [expectation], timeout: 2.0)
+    }
+
+    /// chat 流 SSE 含多个 content chunk，应全部 yield
+    func testChatStreamMultipleContentChunks() async {
+        let sse = """
+        data: {"choices":[{"delta":{"content":"A"}}]}
+
+        data: {"choices":[{"delta":{"content":"B"}}]}
+
+        data: {"choices":[{"delta":{"content":"C"}}]}
+
+        data: [DONE]
+
+        """
+        MockURLProtocol.responseData = sse.data(using: .utf8)
+        MockURLProtocol.statusCode = 200
+
+        let messages = [APIMessage(role: "user", content: "hi", images: nil, toolCallId: nil, toolName: nil, toolCalls: nil)]
+        let stream = client.chat(messages: messages, config: .default, apiKey: apiKey)
+
+        var collected: [String] = []
+        for await chunk in stream {
+            collected.append(chunk)
+        }
+        XCTAssertEqual(collected, ["A", "B", "C"], "应按顺序 yield 所有 content chunk")
+    }
+
+    /// chat 流 SSE 含空 content 的 chunk（content 为空字符串），空字符串也会被 yield
+    func testChatStreamEmptyContentIsYielded() async {
+        let sse = """
+        data: {"choices":[{"delta":{"content":""}}]}
+
+        data: {"choices":[{"delta":{"content":"OK"}}]}
+
+        data: [DONE]
+
+        """
+        MockURLProtocol.responseData = sse.data(using: .utf8)
+        MockURLProtocol.statusCode = 200
+
+        let messages = [APIMessage(role: "user", content: "hi", images: nil, toolCallId: nil, toolName: nil, toolCalls: nil)]
+        let stream = client.chat(messages: messages, config: .default, apiKey: apiKey)
+
+        var collected: [String] = []
+        for await chunk in stream {
+            collected.append(chunk)
+        }
+        // 空 content 字符串也会被 yield（content 非 nil 即通过 guard let）
+        XCTAssertEqual(collected, ["", "OK"], "空 content 字符串应被 yield")
+    }
 }

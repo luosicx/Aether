@@ -343,27 +343,136 @@ jobs:
           key: ${{ runner.os }}-sonar
 
       - name: Download coverage results
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: coverage-results
           path: coverage-xcresult
 
       - name: Convert xcresult to cobertura
         run: |
-          # Install xccov-to-cobertura via Homebrew (idempotent)
-          brew install xccov-to-cobertura 2>/dev/null || true
           mkdir -p coverage-report
-          # 尝试转换覆盖率数据，如果失败则生成空 XML 避免 SonarCloud 报错
-          if ! xccov-to-cobertura coverage-xcresult/TestResults.xcresult -o coverage-report/cobertura.xml 2>/dev/null; then
-            echo "WARN: cobertura conversion failed, generating empty report"
-            cat > coverage-report/cobertura.xml << 'XMLEOF'
-          <?xml version="1.0" ?>
-          <!DOCTYPE coverage SYSTEM "http://cobertura.sourceforge.net/xml/coverage-04.dtd">
-          <coverage line-rate="0" branch-rate="0" lines-covered="0" lines-valid="0" branches-covered="0" branches-valid="0" complexity="0" version="0.1" timestamp="0">
-            <sources/><packages/><classes/>
-          </coverage>
-          XMLEOF
+          XCRESULT_PATH="coverage-xcresult/TestResults.xcresult"
+          OUTPUT_XML="coverage-report/cobertura.xml"
+          # 1. 优先通过 pip3 安装 xccov-to-cobertura（brew formula 在 macos-15 上不存在）
+          USE_FALLBACK=1
+          if pip3 install xccov-to-cobertura 2>/dev/null; then
+            if xccov-to-cobertura "$XCRESULT_PATH" -o "$OUTPUT_XML" 2>/dev/null; then
+              echo "cobertura.xml generated via xccov-to-cobertura (pip3)"
+              USE_FALLBACK=0
+            else
+              echo "WARN: xccov-to-cobertura conversion failed, falling back to Python parser"
+            fi
+          else
+            echo "WARN: pip3 install xccov-to-cobertura failed, falling back to Python parser"
           fi
+          # 2. pip3 路径失败时，用 Python 直接解析 xcrun xccov view --json 并生成 cobertura XML
+          if [ "$USE_FALLBACK" = "1" ]; then
+            python3 - "$XCRESULT_PATH" "$OUTPUT_XML" << 'PYEOF'
+          import json, subprocess, os, sys
+          import xml.etree.ElementTree as ET
+          xcresult_path, output_xml = sys.argv[1], sys.argv[2]
+          proc = subprocess.run(
+              ['xcrun', 'xccov', 'view', '--json', xcresult_path],
+              capture_output=True, text=True
+          )
+          if proc.returncode != 0:
+              print(f"ERROR: xccov view failed: {proc.stderr}", file=sys.stderr)
+              sys.exit(1)
+          data = json.loads(proc.stdout)
+          # 收集所有文件覆盖率: { pkg_path: [(filename, full_path, file_cov, file_tot, [(ln, hits), ...])] }
+          packages = {}
+          total_covered = 0
+          total_valid = 0
+          for target in data.get('targets', []):
+              for f in target.get('files', []):
+                  path = f.get('path', '')
+                  if not path:
+                      continue
+                  filename = os.path.basename(path)
+                  pkg_dir = os.path.dirname(path)
+                  lines = f.get('lines', [])
+                  file_cov = 0
+                  file_tot = 0
+                  line_entries = []
+                  for line in lines:
+                      ln = line.get('line', line.get('lineNumber', 0))
+                      if not ln or int(ln) <= 0:
+                          continue
+                      count = line.get('executionCount', 0)
+                      hits = int(count) if count else 0
+                      file_tot += 1
+                      if hits > 0:
+                          file_cov += 1
+                      line_entries.append((int(ln), hits))
+                  total_covered += file_cov
+                  total_valid += file_tot
+                  packages.setdefault(pkg_dir, []).append(
+                      (filename, path, file_cov, file_tot, line_entries)
+                  )
+          if total_valid == 0:
+              print("ERROR: no coverage lines found in xcresult", file=sys.stderr)
+              sys.exit(1)
+          line_rate = total_covered / total_valid
+          # 构建 cobertura XML
+          root = ET.Element('coverage')
+          root.set('line-rate', f'{line_rate:.4f}')
+          root.set('branch-rate', '0')
+          root.set('lines-covered', str(total_covered))
+          root.set('lines-valid', str(total_valid))
+          root.set('branches-covered', '0')
+          root.set('branches-valid', '0')
+          root.set('complexity', '0')
+          root.set('version', '0.1')
+          root.set('timestamp', '0')
+          ET.SubElement(root, 'sources')
+          packages_el = ET.SubElement(root, 'packages')
+          classes_el = ET.SubElement(root, 'classes')
+          for pkg_path, pkg_files in packages.items():
+              pkg_cov = sum(x[2] for x in pkg_files)
+              pkg_tot = sum(x[3] for x in pkg_files)
+              pkg_rate = pkg_cov / pkg_tot if pkg_tot > 0 else 0.0
+              pkg_el = ET.SubElement(packages_el, 'package')
+              pkg_el.set('name', pkg_path)
+              pkg_el.set('line-rate', f'{pkg_rate:.4f}')
+              pkg_classes_el = ET.SubElement(pkg_el, 'classes')
+              for filename, path, f_cov, f_tot, line_entries in pkg_files:
+                  f_rate = f_cov / f_tot if f_tot > 0 else 0.0
+                  cls_el = ET.SubElement(pkg_classes_el, 'class')
+                  cls_el.set('name', filename)
+                  cls_el.set('filename', path)
+                  cls_el.set('line-rate', f'{f_rate:.4f}')
+                  lines_el = ET.SubElement(cls_el, 'lines')
+                  for ln, hits in sorted(line_entries, key=lambda x: x[0]):
+                      line_el = ET.SubElement(lines_el, 'line')
+                      line_el.set('number', str(ln))
+                      line_el.set('hits', str(hits))
+                  top_cls_el = ET.SubElement(classes_el, 'class')
+                  top_cls_el.set('name', filename)
+                  top_cls_el.set('filename', path)
+                  top_cls_el.set('line-rate', f'{f_rate:.4f}')
+                  top_lines_el = ET.SubElement(top_cls_el, 'lines')
+                  for ln, hits in sorted(line_entries, key=lambda x: x[0]):
+                      line_el = ET.SubElement(top_lines_el, 'line')
+                      line_el.set('number', str(ln))
+                      line_el.set('hits', str(hits))
+          tree = ET.ElementTree(root)
+          ET.indent(tree, space='  ', level=0)
+          tree.write(output_xml, encoding='utf-8', xml_declaration=True)
+          print(f"cobertura.xml written via Python fallback: line-rate={line_rate:.4f} ({total_covered}/{total_valid} lines)")
+          PYEOF
+          fi
+          # 3. 校验 cobertura.xml 包含真实覆盖率数据 (line-rate > 0)
+          if [ ! -f "$OUTPUT_XML" ]; then
+            echo "ERROR: cobertura.xml was not generated"
+            exit 1
+          fi
+          LINE_RATE=$(python3 -c "import xml.etree.ElementTree as ET; t=ET.parse('$OUTPUT_XML'); print(t.getroot().get('line-rate', '0'))")
+          echo "cobertura.xml line-rate: $LINE_RATE"
+          if [ "$LINE_RATE" = "0" ] || [ -z "$LINE_RATE" ]; then
+            echo "ERROR: cobertura.xml has line-rate=0, coverage data missing"
+            exit 1
+          fi
+          echo "cobertura.xml generated successfully with real coverage data"
 
       - name: Disable SonarCloud Automatic Analysis
         # 如果 SonarCloud 开启了 Automatic Analysis，会与 CI 分析冲突
