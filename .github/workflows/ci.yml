@@ -207,6 +207,18 @@ jobs:
           # 获取项目根目录，用于将绝对路径转换为相对路径
           # SonarCloud 期望相对路径（如 Aether/Services/MyService.swift）
           project_root = os.getcwd()
+          # SonarCloud 中已排除的源文件路径（与 sonar-project.properties 的 exclusions 保持一致）。
+          # coverage.xml 中如果包含 SonarCloud 不会索引的文件，Generic Coverage 解析会失败。
+          EXCLUDE_PATTERNS = [
+              "/Views/",
+              "/DesignSystem/",
+              "/App/AetherApp",
+              "/Protocols/",
+              "/Actors/",
+              "/AetherUITests/",
+              "/AetherWatch/",
+              "/AetherTests/",
+          ]
           files = []
           total_covered = 0
           total_valid = 0
@@ -222,6 +234,11 @@ jobs:
                   rel_path = os.path.relpath(abs_path, project_root)
               except ValueError:
                   rel_path = abs_path
+              # 只保留 SonarCloud sources 范围内的文件（Aether/ 下），并过滤已排除目录
+              if not rel_path.startswith("Aether/"):
+                  continue
+              if any(p in rel_path for p in EXCLUDE_PATTERNS):
+                  continue
               files.append((rel_path, cov, tot))
               total_covered += cov
               total_valid += tot
