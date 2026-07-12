@@ -28,7 +28,7 @@ struct TypingIndicator: View {
         .accessibilityLabel("AI 正在输入")
         .onAppear {
             if !reduceMotion {
-                withAnimation(.easeInOut(duration: 1.0).repeatForever(autoreverses: false)) {
+                withAnimation(AnimationTokens.blink) {
                     phase = 1
                 }
             }

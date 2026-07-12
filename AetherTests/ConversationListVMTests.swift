@@ -407,4 +407,54 @@ final class ConversationListVMTests: XCTestCase {
                        "置顶会话之间应按 createdAt 降序排列")
         XCTAssertTrue(vm.conversations.allSatisfy { $0.isPinned }, "所有会话应均置顶")
     }
+
+    // MARK: - Day 23: reorder 拖拽排序
+
+    /// reorder 应将指定会话从源位置移动到目标位置
+    func testReorderMovesConversation() {
+        _ = vm.createConversation(title: "A")!
+        _ = vm.createConversation(title: "B")!
+        _ = vm.createConversation(title: "C")!
+        vm.load(modelContext: context, cleanupEmpty: false)
+        // 初始顺序：C, B, A（按 createdAt 降序）
+        XCTAssertEqual(vm.conversations.map(\.title), ["C", "B", "A"])
+
+        // 将 C（index 0）移到末尾（toOffset 3 = 末尾）
+        vm.reorder(from: IndexSet(integer: 0), to: 3)
+
+        XCTAssertEqual(vm.conversations.map(\.title), ["B", "A", "C"],
+                       "reorder 后 C 应移到末尾")
+    }
+
+    /// reorder 后重新 load 应保持新顺序（order 持久化）
+    func testReorderPersistsAfterReload() {
+        _ = vm.createConversation(title: "A")!
+        _ = vm.createConversation(title: "B")!
+        _ = vm.createConversation(title: "C")!
+        vm.load(modelContext: context, cleanupEmpty: false)
+        XCTAssertEqual(vm.conversations.map(\.title), ["C", "B", "A"])
+
+        // 将 C 移到末尾
+        vm.reorder(from: IndexSet(integer: 0), to: 3)
+
+        // 重新 load 验证 order 持久化
+        vm.load(modelContext: context, cleanupEmpty: false)
+        XCTAssertEqual(vm.conversations.map(\.title), ["B", "A", "C"],
+                       "reorder 后重新 load 应保持新顺序")
+    }
+
+    /// reorder 中间移动：将 A（index 2）移到 index 0（头部）
+    func testReorderMoveToHead() {
+        _ = vm.createConversation(title: "A")!
+        _ = vm.createConversation(title: "B")!
+        _ = vm.createConversation(title: "C")!
+        vm.load(modelContext: context, cleanupEmpty: false)
+        XCTAssertEqual(vm.conversations.map(\.title), ["C", "B", "A"])
+
+        // 将 A（index 2）移到头部（toOffset 0）
+        vm.reorder(from: IndexSet(integer: 2), to: 0)
+
+        XCTAssertEqual(vm.conversations.map(\.title), ["A", "C", "B"],
+                       "reorder 后 A 应移到头部")
+    }
 }

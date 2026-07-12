@@ -43,3 +43,12 @@ enum AnimationTokens {
     /// 闪烁光标 0.5s
     static let blink: Animation = .easeInOut(duration: 0.5).repeatForever(autoreverses: true)
 }
+
+/// 按钮按压反馈样式：按下时缩小到 0.92，使用 AnimationTokens.buttonPress 动画
+struct PressableButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.92 : 1.0)
+            .animation(AnimationTokens.buttonPress, value: configuration.isPressed)
+    }
+}

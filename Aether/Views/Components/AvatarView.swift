@@ -9,14 +9,25 @@ struct AvatarView: View {
 
     let role: Role
     var size: CGFloat = 32
+    /// Task 26: 自定义头像二进制数据，非空时优先显示图片
+    var avatarData: Data? = nil
 
     var body: some View {
         ZStack {
             Circle()
                 .fill(backgroundColor)
-            Image(systemName: iconName)
-                .font(.system(size: size * 0.5))
-                .foregroundStyle(iconColor)
+            if let data = avatarData, let img = platformImage(from: data) {
+                // Task 26: 显示自定义头像
+                img
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: size, height: size)
+                    .clipShape(Circle())
+            } else {
+                Image(systemName: iconName)
+                    .font(.system(size: size * 0.5))
+                    .foregroundStyle(iconColor)
+            }
         }
         .frame(width: size, height: size)
         .shadow(color: glowColor, radius: 6)
@@ -51,6 +62,17 @@ struct AvatarView: View {
         case .assistant: return "sparkles"
         }
     }
+}
+
+/// 跨平台从 Data 创建 SwiftUI Image(iOS: UIImage / macOS: NSImage)
+private func platformImage(from data: Data) -> Image? {
+    #if os(iOS)
+    guard let img = UIImage(data: data) else { return nil }
+    return Image(uiImage: img)
+    #else
+    guard let img = NSImage(data: data) else { return nil }
+    return Image(nsImage: img)
+    #endif
 }
 
 #Preview {

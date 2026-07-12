@@ -39,12 +39,9 @@ extension Color {
 
     // MARK: - 背景
     /// 主背景（List / Form 默认背景）
+    /// Task 25: 改为从 ThemeManager 读取当前主题的背景色，实现主题切换
     static var backgroundPrimary: Color {
-        #if canImport(UIKit)
-        return Color(.systemBackground)
-        #else
-        return Color(NSColor.windowBackgroundColor)
-        #endif
+        ThemeManager.shared.currentTheme.backgroundGradient.first ?? Color.black
     }
     /// 次背景（卡片 / 分组背景）
     static var backgroundSecondary: Color {
@@ -65,34 +62,31 @@ extension Color {
 
     // MARK: - 气泡
     /// 用户气泡背景
-    static let bubbleUser = aetherPurple
+    /// Task 25: 从 ThemeManager 读取当前主题的用户气泡色
+    static var bubbleUser: Color {
+        ThemeManager.shared.currentTheme.bubbleUserColor
+    }
     /// 助手气泡背景（液态玻璃基底，配合视图中 .ultraThinMaterial 使用）
-    static let bubbleAI = liquidGlass
+    /// Task 25: 从 ThemeManager 读取当前主题的 AI 气泡色
+    static var bubbleAI: Color {
+        ThemeManager.shared.currentTheme.bubbleAIColor
+    }
 
     // MARK: - 文字
     /// 主要文字
+    /// Task 25: 从 ThemeManager 读取当前主题的主要文字色
     static var textPrimary: Color {
-        #if canImport(UIKit)
-        return Color(.label)
-        #else
-        return Color(NSColor.labelColor)
-        #endif
+        ThemeManager.shared.currentTheme.textPrimaryColor
     }
     /// 次要文字
+    /// Task 25: 从 ThemeManager 读取当前主题的次要文字色
     static var textSecondary: Color {
-        #if canImport(UIKit)
-        return Color(.secondaryLabel)
-        #else
-        return Color(NSColor.secondaryLabelColor)
-        #endif
+        ThemeManager.shared.currentTheme.textSecondaryColor
     }
     /// 三级文字（时间戳、占位）
+    /// Task 25: 从主题次要色派生，保证主题切换时层次一致
     static var textTertiary: Color {
-        #if canImport(UIKit)
-        return Color(.tertiaryLabel)
-        #else
-        return Color(NSColor.tertiaryLabelColor)
-        #endif
+        ThemeManager.shared.currentTheme.textSecondaryColor.opacity(0.6)
     }
 
     // MARK: - 分隔线

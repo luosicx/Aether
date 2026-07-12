@@ -58,6 +58,15 @@ final class ConversationListVM {
         }
     }
 
+    /// Day 23: 拖拽排序。移动 conversations 数组元素并更新 order 字段持久化。
+    /// - Parameters:
+    ///   - source: 被移动的元素索引集合
+    ///   - destination: 目标偏移量（与 Array.move(fromOffsets:toOffset:) 语义一致）
+    func reorder(from source: IndexSet, to destination: Int) {
+        conversations.move(fromOffsets: source, toOffset: destination)
+        storage?.reorder(conversations)
+    }
+
     /// 若会话标题仍为"新对话"且有用户消息，用首条用户消息前 20 字作为新标题
     /// （不足 20 字不加「…」）
     func autoTitleIfNeeded(for conversation: Conversation) {
