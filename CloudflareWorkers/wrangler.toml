@@ -8,6 +8,12 @@ compatibility_date = "2026-07-01"
 binding = "bff_tokens"
 id = "your-kv-namespace-id"
 
+# 全局速率限制计数器 KV namespace：键为 rate_limit:<token>:<minuteBucket>，值为请求计数
+# 部署后用 `wrangler kv:namespace create rate_limits` 创建并替换下方 id
+[[kv_namespaces]]
+binding = "rate_limits"
+id = "your-rate-limits-kv-namespace-id"
+
 # 上游 endpoint（非敏感，明文配置）
 # Secrets（DEEPSEEK_API_KEY / QWEN_API_KEY）通过 `wrangler secret put` 配置，不在此明文存储
 [vars]

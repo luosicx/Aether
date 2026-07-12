@@ -15,9 +15,14 @@ final class ToolRegistry {
     static let shared = ToolRegistry()
     /// 工具字典，key 为工具名
     private var tools: [String: ToolProtocol] = [:]
+    /// 工具权限存储，用于判断工具是否被用户启用。
+    let permissionStore: ToolPermissionStore
+    /// 可注入的确认服务，供 Tool 在执行前请求用户确认。
+    var confirmationService: ToolConfirmationService?
 
     /// 私有初始化，注册全部工具（跨平台 + macOS 独有条件注册）
-    private init() {
+    private init(permissionStore: ToolPermissionStore = .shared) {
+        self.permissionStore = permissionStore
         // 原有 4 个工具
         register(tool: AlarmTool())
         register(tool: ReminderTool())
@@ -61,10 +66,13 @@ final class ToolRegistry {
         tools[name]
     }
 
-    /// 执行工具。未注册抛 NSError。返回工具执行结果字符串。
+    /// 执行工具。未注册或禁用时抛 NSError。返回工具执行结果字符串。
     func execute(name: String, arguments: [String: Any]) async throws -> String {
         guard let tool = tools[name] else {
             throw NSError(domain: "ToolRegistry", code: 1, userInfo: [NSLocalizedDescriptionKey: "工具 \(name) 未注册"])
+        }
+        guard permissionStore.isEnabled(name) else {
+            throw NSError(domain: "ToolRegistry", code: 2, userInfo: [NSLocalizedDescriptionKey: "工具 \(name) 已被禁用，请在「设置 → 工具权限」中启用"])
         }
         return try await tool.execute(arguments: arguments)
     }

@@ -152,18 +152,17 @@ final class CreateShortcutTool: ToolProtocol {
     /// 工具定义
     /// - name: `create_shortcut`
     /// - parameters: `name`（必填）— 快捷指令名称；`action`（必填）— 动作类型；
-    ///   `url`/`script`/`text` 按动作类型按需传入
+    ///   `url`/`text` 按动作类型按需传入
     var definition: ToolDefinition {
         ToolDefinition(
             name: "create_shortcut",
-            description: "创建快捷指令，支持 open_url/run_script/show_text/copy_to_clipboard 四种基础动作",
+            description: "创建快捷指令，支持 open_url/show_text/copy_to_clipboard 三种基础动作",
             parameters: [
                 "type": "object",
                 "properties": [
                     "name": ["type": "string", "description": "快捷指令名称"],
-                    "action": ["type": "string", "description": "动作类型：open_url/run_script/show_text/copy_to_clipboard"],
+                    "action": ["type": "string", "description": "动作类型：open_url/show_text/copy_to_clipboard"],
                     "url": ["type": "string", "description": "URL（open_url 时需要）"],
-                    "script": ["type": "string", "description": "Shell 脚本（run_script 时需要）"],
                     "text": ["type": "string", "description": "文本内容（show_text/copy_to_clipboard 时需要）"]
                 ],
                 "required": ["name", "action"]
@@ -183,10 +182,14 @@ final class CreateShortcutTool: ToolProtocol {
         guard let actionType = arguments["action"] as? String else {
             return "错误：请提供 action 参数"
         }
+        // 安全策略：禁止创建包含任意 Shell 脚本的快捷指令
+        if actionType == "run_script" {
+            return "错误：run_script 动作已被禁用，不允许创建执行 Shell 脚本的快捷指令"
+        }
         // 构建 WFWorkflow plist
         let workflowAction = buildWorkflowAction(action: actionType, arguments: arguments)
         guard let action = workflowAction else {
-            return "错误：不支持的动作类型，支持 open_url/run_script/show_text/copy_to_clipboard"
+            return "错误：不支持的动作类型，支持 open_url/show_text/copy_to_clipboard"
         }
         // 构建 .shortcut 文件（WFWorkflow plist 格式）
         let workflow: [String: Any] = [
@@ -230,15 +233,6 @@ final class CreateShortcutTool: ToolProtocol {
                 "WFWorkflowActionParameters": [
                     "URL": url,
                     "WFWorkflowActionText": "Opening URL: \(url)"
-                ]
-            ]
-        case "run_script":
-            guard let script = arguments["script"] as? String else { return nil }
-            return [
-                "WFWorkflowActionIdentifier": "is.workflow.actions.runshellscript",
-                "WFWorkflowActionParameters": [
-                    "Script": script,
-                    "Input": "Input"
                 ]
             ]
         case "show_text":
