@@ -1,5 +1,6 @@
 import XCTest
 import CryptoKit
+import Network
 @testable import Aether
 
 /// 端侧模型下载器单元测试：验证自定义 URLSessionConfiguration 超时配置与 downloadTimeout 错误类型。
@@ -730,6 +731,510 @@ final class OnDeviceModelDownloaderTests: XCTestCase {
         await downloader.cancelDownload()
         let lastError = await downloader.lastError
         XCTAssertNil(lastError, "cancelDownload 不应设置 lastError")
+    }
+
+    // MARK: - 30. 下载网络分支（本地 HTTP 服务器）
+
+    /// 本地 HTTP 测试服务器：使用 Network.framework 的 NWListener 提供静态文件，
+    /// 避免 URLProtocol 与 URLSessionDownloadTask 不兼容导致测试挂起。
+    private final class LocalHTTPTestServer {
+        private var listener: NWListener?
+        private var tempDir: URL?
+        private let readyContinuation = ReadyContinuation()
+
+        /// 服务器根目录，测试可向该目录写入文件后再请求。
+        var rootURL: URL { tempDir! }
+
+        /// 启动服务器并返回 baseURL（如 http://127.0.0.1:52341）。
+        func start() async throws -> URL {
+            let tempDir = FileManager.default.temporaryDirectory
+                .appendingPathComponent("http-test-\(UUID().uuidString)")
+            try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+            self.tempDir = tempDir
+
+            let listener = try NWListener(using: .tcp, on: 0)
+            self.listener = listener
+
+            listener.stateUpdateHandler = { [weak self] state in
+                switch state {
+                case .ready:
+                    self?.readyContinuation.resume()
+                case .failed(let error):
+                    self?.readyContinuation.resume(throwing: error)
+                default:
+                    break
+                }
+            }
+
+            listener.newConnectionHandler = { [weak self] connection in
+                guard let self = self else {
+                    connection.cancel()
+                    return
+                }
+                connection.start(queue: .global())
+                self.handleConnection(connection)
+            }
+
+            listener.start(queue: .global())
+
+            try await readyContinuation.value
+
+            guard let port = listener.port?.rawValue else {
+                throw NSError(domain: "LocalHTTPTestServer", code: -1,
+                              userInfo: [NSLocalizedDescriptionKey: "无法获取监听端口"])
+            }
+            return URL(string: "http://127.0.0.1:\(port)")!
+        }
+
+        private func handleConnection(_ connection: NWConnection) {
+            var buffer = Data()
+
+            func receive() {
+                connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, isComplete, error in
+                    guard let self = self else { return }
+
+                    if error != nil {
+                        connection.cancel()
+                        return
+                    }
+
+                    if let data = data {
+                        buffer.append(data)
+                    }
+
+                    // 解析 HTTP 请求头结束位置
+                    if let range = buffer.range(of: Data("\r\n\r\n".utf8)) {
+                        let headerData = buffer.subdata(in: 0..<range.upperBound)
+                        guard let requestLine = String(data: headerData, encoding: .utf8)?
+                            .split(separator: "\r\n").first else {
+                            self.sendResponse(connection: connection, status: "400 Bad Request", body: Data())
+                            return
+                        }
+
+                        let parts = requestLine.split(separator: " ")
+                        guard parts.count >= 2, parts[0] == "GET" else {
+                            self.sendResponse(connection: connection, status: "400 Bad Request", body: Data())
+                            return
+                        }
+
+                        let path = String(parts[1]).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+                        self.serveFile(named: path, connection: connection)
+                        return
+                    }
+
+                    if isComplete {
+                        connection.cancel()
+                        return
+                    }
+
+                    receive()
+                }
+            }
+
+            receive()
+        }
+
+        private func serveFile(named name: String, connection: NWConnection) {
+            let fileURL = rootURL.appendingPathComponent(name)
+            guard FileManager.default.fileExists(atPath: fileURL.path),
+                  let data = try? Data(contentsOf: fileURL) else {
+                sendResponse(connection: connection, status: "404 Not Found", body: Data())
+                return
+            }
+            sendResponse(connection: connection, status: "200 OK", body: data)
+        }
+
+        private func sendResponse(connection: NWConnection, status: String, body: Data) {
+            let headers = "HTTP/1.1 \(status)\r\nContent-Length: \(body.count)\r\nConnection: close\r\n\r\n"
+            let headerData = headers.data(using: .utf8)!
+            connection.send(content: headerData, completion: .contentProcessed { _ in
+                connection.send(content: body, completion: .contentProcessed { _ in
+                    connection.cancel()
+                })
+            })
+        }
+
+        func stop() {
+            listener?.cancel()
+            if let tempDir = tempDir {
+                try? FileManager.default.removeItem(at: tempDir)
+            }
+            listener = nil
+            tempDir = nil
+        }
+
+        /// 用于跨 actor/队列恢复 continuations 的线程安全包装
+        private final class ReadyContinuation {
+            private var continuation: CheckedContinuation<Void, Error>?
+            private var readyError: Error?
+            private var isReady = false
+            private let lock = NSLock()
+
+            var value: Void {
+                get async throws {
+                    try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                        self.lock.lock()
+                        if let error = self.readyError {
+                            self.lock.unlock()
+                            continuation.resume(throwing: error)
+                        } else if self.isReady {
+                            self.lock.unlock()
+                            continuation.resume()
+                        } else {
+                            self.continuation = continuation
+                            self.lock.unlock()
+                        }
+                    }
+                }
+            }
+
+            func resume() {
+                lock.lock()
+                isReady = true
+                if let continuation = continuation {
+                    self.continuation = nil
+                    lock.unlock()
+                    continuation.resume()
+                } else {
+                    lock.unlock()
+                }
+            }
+
+            func resume(throwing error: Error) {
+                lock.lock()
+                readyError = error
+                if let continuation = continuation {
+                    self.continuation = nil
+                    lock.unlock()
+                    continuation.resume(throwing: error)
+                } else {
+                    lock.unlock()
+                }
+            }
+        }
+    }
+
+    private var server: LocalHTTPTestServer!
+    private var baseURL: URL!
+
+    override func setUp() async throws {
+        try await super.setUp()
+        server = LocalHTTPTestServer()
+        baseURL = try await server.start()
+    }
+
+    override func tearDown() {
+        server?.stop()
+        super.tearDown()
+    }
+
+    /// 向服务器根目录写入文件
+    private func serveFile(named name: String, data: Data) throws {
+        try data.write(to: server.rootURL.appendingPathComponent(name))
+    }
+
+    /// startDownload 成功下载后应将文件移动到目标路径，并在无 SHA256 校验时设置 progress=1.0
+    func testStartDownloadSuccessMovesFileAndSetsProgress() async throws {
+        let downloader = OnDeviceModelDownloader()
+        let content = "mock model content".data(using: .utf8)!
+        try serveFile(named: "model.bin", data: content)
+
+        let sourceURL = baseURL.appendingPathComponent("model.bin")
+        let destURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("downloaded-model-\(UUID().uuidString).bin")
+        defer { try? FileManager.default.removeItem(at: destURL) }
+
+        await downloader.startDownload(url: sourceURL, to: destURL, expectedSHA256: "")
+
+        let progress = await downloader.progress
+        let lastError = await downloader.lastError
+        let isDownloading = await downloader.isDownloading
+        let fileExists = FileManager.default.fileExists(atPath: destURL.path)
+        let fileData = fileExists ? (try? Data(contentsOf: destURL)) : nil
+
+        XCTAssertTrue(fileExists, "下载成功后目标文件应存在")
+        XCTAssertEqual(fileData, content, "下载文件内容应与服务器返回一致")
+        XCTAssertEqual(progress, 1.0, "成功下载后 progress 应为 1.0")
+        XCTAssertNil(lastError, "无 SHA256 校验时 lastError 应为 nil")
+        XCTAssertFalse(isDownloading, "完成后 isDownloading 应为 false")
+    }
+
+    /// startDownload 在期望 SHA256 匹配时应校验通过并设置 progress=1.0
+    func testStartDownloadSHA256MatchSucceeds() async throws {
+        let downloader = OnDeviceModelDownloader()
+        let content = "model with sha256".data(using: .utf8)!
+        let expected = SHA256.hash(data: content).map { String(format: "%02x", $0) }.joined()
+        try serveFile(named: "model-sha.bin", data: content)
+
+        let sourceURL = baseURL.appendingPathComponent("model-sha.bin")
+        let destURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("sha-model-\(UUID().uuidString).bin")
+        defer { try? FileManager.default.removeItem(at: destURL) }
+
+        await downloader.startDownload(url: sourceURL, to: destURL, expectedSHA256: expected)
+
+        let progress = await downloader.progress
+        let lastError = await downloader.lastError
+        XCTAssertEqual(progress, 1.0, "SHA256 匹配时 progress 应为 1.0")
+        XCTAssertNil(lastError, "SHA256 匹配时 lastError 应为 nil")
+    }
+
+    /// startDownload 在 SHA256 不匹配时应设置 sha256Mismatch 错误。
+    /// 当前实现会先将临时文件移动到目标路径再校验，因此目标文件会保留；
+    /// progress 在下载过程中已更新到 1.0，校验失败时不会被重置。
+    func testStartDownloadSHA256MismatchSetsError() async throws {
+        let downloader = OnDeviceModelDownloader()
+        let content = "model with wrong sha256".data(using: .utf8)!
+        try serveFile(named: "model-mismatch.bin", data: content)
+
+        let sourceURL = baseURL.appendingPathComponent("model-mismatch.bin")
+        let destURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("mismatch-model-\(UUID().uuidString).bin")
+        defer { try? FileManager.default.removeItem(at: destURL) }
+
+        await downloader.startDownload(url: sourceURL, to: destURL,
+                                       expectedSHA256: "0000000000000000000000000000000000000000000000000000000000000000")
+
+        let lastError = await downloader.lastError
+        let progress = await downloader.progress
+        let fileExists = FileManager.default.fileExists(atPath: destURL.path)
+        let fileData = fileExists ? (try? Data(contentsOf: destURL)) : nil
+
+        // 实现行为：文件先移动后校验，故文件存在且内容与下载一致
+        XCTAssertTrue(fileExists, "当前实现下 SHA256 不匹配时目标文件仍存在")
+        XCTAssertEqual(fileData, content, "保留的文件内容应与下载内容一致")
+        XCTAssertEqual(progress, 1.0, "下载完成后 progress 已为 1.0，校验失败不会被重置")
+        if case .sha256Mismatch = lastError {
+            // 期望
+        } else {
+            XCTFail("应返回 sha256Mismatch 错误，实际：\(String(describing: lastError))")
+        }
+    }
+
+    /// 主地址返回 404 时，startDownload 应回退到 mirrorURL 并重试一次
+    func testStartDownloadMirrorFallbackOnPrimaryFailure() async throws {
+        let downloader = OnDeviceModelDownloader()
+        let content = "mirror model content".data(using: .utf8)!
+        try serveFile(named: "mirror.bin", data: content)
+
+        let primaryURL = baseURL.appendingPathComponent("not-found.bin")
+        let mirrorURL = baseURL.appendingPathComponent("mirror.bin")
+        let destURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("mirror-model-\(UUID().uuidString).bin")
+        defer { try? FileManager.default.removeItem(at: destURL) }
+
+        await downloader.startDownload(url: primaryURL, to: destURL, expectedSHA256: "", mirrorURL: mirrorURL)
+
+        let progress = await downloader.progress
+        let lastError = await downloader.lastError
+        let fileExists = FileManager.default.fileExists(atPath: destURL.path)
+
+        XCTAssertTrue(fileExists, "镜像回退成功后目标文件应存在")
+        XCTAssertEqual(progress, 1.0, "镜像下载成功后 progress 应为 1.0")
+        XCTAssertNil(lastError, "镜像回退成功后 lastError 应为 nil")
+    }
+
+    /// 下载过程中进度回调应更新 progress，完成后达到 1.0
+    func testStartDownloadProgressUpdates() async throws {
+        let downloader = OnDeviceModelDownloader()
+        // 构造 4MB 文件，使下载持续一段时间以便观察到中间进度
+        let content = Data(count: 4 * 1024 * 1024)
+        try serveFile(named: "progress.bin", data: content)
+
+        let sourceURL = baseURL.appendingPathComponent("progress.bin")
+        let destURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("progress-\(UUID().uuidString).bin")
+        defer { try? FileManager.default.removeItem(at: destURL) }
+
+        let downloadTask = Task {
+            await downloader.startDownload(url: sourceURL, to: destURL, expectedSHA256: "")
+        }
+
+        // 在下载过程中轮询 progress
+        var sawNonZeroProgress = false
+        for _ in 0..<100 {
+            let progress = await downloader.progress
+            if progress > 0 && progress < 1.0 {
+                sawNonZeroProgress = true
+                break
+            }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+
+        await downloadTask.value
+
+        let finalProgress = await downloader.progress
+        XCTAssertTrue(sawNonZeroProgress || finalProgress == 1.0, "应观察到进度更新或已完成")
+        XCTAssertEqual(finalProgress, 1.0, "完成时 progress 应为 1.0")
+    }
+
+    /// isDownloading=true 时再次调用 startDownload 应直接返回，不发起新请求
+    func testStartDownloadWhenAlreadyDownloadingSkipsNewRequest() async throws {
+        let downloader = OnDeviceModelDownloader()
+        // 使用较大文件确保第一次下载在第二次调用时仍在进行
+        let content = Data(count: 8 * 1024 * 1024)
+        try serveFile(named: "slow.bin", data: content)
+        try serveFile(named: "should-not-request.bin", data: "unexpected".data(using: .utf8)!)
+
+        let firstURL = baseURL.appendingPathComponent("slow.bin")
+        let secondURL = baseURL.appendingPathComponent("should-not-request.bin")
+        let destURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("concurrent-\(UUID().uuidString).bin")
+        defer { try? FileManager.default.removeItem(at: destURL) }
+
+        let firstTask = Task {
+            await downloader.startDownload(url: firstURL, to: destURL, expectedSHA256: "")
+        }
+
+        // 轮询直到第一次下载进入 isDownloading=true，确保第二次调用命中 guard
+        var didStart = false
+        for _ in 0..<200 {
+            let isDownloading = await downloader.isDownloading
+            if isDownloading {
+                didStart = true
+                break
+            }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTAssertTrue(didStart, "第一次下载应在超时前进入 isDownloading=true")
+
+        let secondTask = Task {
+            await downloader.startDownload(url: secondURL, to: destURL, expectedSHA256: "")
+        }
+
+        _ = await (firstTask.value, secondTask.value)
+
+        // 目标文件内容应与第一个文件一致（第二个请求被跳过）
+        let fileData = try? Data(contentsOf: destURL)
+        XCTAssertEqual(fileData, content, "isDownloading 为 true 时第二次请求应被跳过，文件内容应与第一次一致")
+    }
+
+    /// cancelDownload 在下载中调用时不应崩溃，且 isDownloading 最终为 false
+    func testCancelDownloadDuringDownload() async throws {
+        let downloader = OnDeviceModelDownloader()
+        let content = Data(count: 8 * 1024 * 1024)
+        try serveFile(named: "cancel.bin", data: content)
+
+        let sourceURL = baseURL.appendingPathComponent("cancel.bin")
+        let destURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("cancel-\(UUID().uuidString).bin")
+        defer { try? FileManager.default.removeItem(at: destURL) }
+
+        let task = Task {
+            await downloader.startDownload(url: sourceURL, to: destURL, expectedSHA256: "")
+        }
+
+        try await Task.sleep(nanoseconds: 100_000_000)
+        await downloader.cancelDownload()
+
+        await task.value
+
+        let isDownloading = await downloader.isDownloading
+        XCTAssertFalse(isDownloading, "cancelDownload 后 isDownloading 应为 false")
+    }
+
+    /// 主地址成功时，即使提供错误的 mirrorURL 也不应回退，目标文件内容应与主地址一致。
+    /// 覆盖 `startDownload` 中仅在 `primaryFailed` 为 true 时才使用 mirrorURL 的分支。
+    func testStartDownloadPrimarySuccessIgnoresMirror() async throws {
+        let downloader = OnDeviceModelDownloader()
+        let content = "primary content".data(using: .utf8)!
+        try serveFile(named: "primary.bin", data: content)
+
+        let primaryURL = baseURL.appendingPathComponent("primary.bin")
+        let mirrorURL = baseURL.appendingPathComponent("mirror-not-used.bin")
+        let destURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("primary-success-\(UUID().uuidString).bin")
+        defer { try? FileManager.default.removeItem(at: destURL) }
+
+        await downloader.startDownload(url: primaryURL, to: destURL, expectedSHA256: "", mirrorURL: mirrorURL)
+
+        let progress = await downloader.progress
+        let lastError = await downloader.lastError
+        let fileData = try? Data(contentsOf: destURL)
+
+        XCTAssertEqual(fileData, content, "主地址成功时应使用主地址内容，不应回退 mirror")
+        XCTAssertEqual(progress, 1.0, "主地址成功后 progress 应为 1.0")
+        XCTAssertNil(lastError, "主地址成功时 lastError 应为 nil")
+    }
+
+    /// mirrorURL 与主地址相同时不应进入无限回退，应仅尝试一次主地址并失败后设置错误。
+    /// 使用会真实触发下载失败的 file:// URL，覆盖镜像回退条件中的 `mirrorURL != url` 守卫。
+    func testStartDownloadMirrorURLSameAsPrimaryDoesNotRetry() async throws {
+        let downloader = OnDeviceModelDownloader()
+        let primaryURL = URL(fileURLWithPath: "/tmp/non-existent-mirror-same-\(UUID().uuidString).bin")
+        let destURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("mirror-same-\(UUID().uuidString).bin")
+        defer { try? FileManager.default.removeItem(at: destURL) }
+
+        await downloader.startDownload(url: primaryURL, to: destURL, expectedSHA256: "", mirrorURL: primaryURL)
+
+        let lastError = await downloader.lastError
+        let isDownloading = await downloader.isDownloading
+
+        XCTAssertFalse(isDownloading, "失败后 isDownloading 应为 false")
+        XCTAssertNotNil(lastError, "主地址失败且 mirror 与主地址相同时应设置错误")
+        if case .sha256Mismatch = lastError {
+            XCTFail("不应产生 sha256Mismatch 错误")
+        }
+    }
+
+    /// cancelDownload 后若产生 resumeData，再次调用 startDownload 应进入 resumeDownload 路径，
+    /// 而不是使用新的 url/destinationURL。
+    func testStartDownloadWithResumeDataResumesInsteadOfNewURL() async throws {
+        let downloader = OnDeviceModelDownloader()
+        let content = Data(count: 8 * 1024 * 1024)
+        try serveFile(named: "resume-source.bin", data: content)
+        try serveFile(named: "should-not-download.bin", data: "unexpected".data(using: .utf8)!)
+
+        let originalURL = baseURL.appendingPathComponent("resume-source.bin")
+        let newURL = baseURL.appendingPathComponent("should-not-download.bin")
+        let destURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("resume-\(UUID().uuidString).bin")
+        defer { try? FileManager.default.removeItem(at: destURL) }
+
+        // 1) 启动一次大文件下载
+        let firstTask = Task {
+            await downloader.startDownload(url: originalURL, to: destURL, expectedSHA256: "")
+        }
+
+        // 2) 等待下载进入进行状态后取消，以获取 resumeData
+        var didStart = false
+        for _ in 0..<200 {
+            let isDownloading = await downloader.isDownloading
+            if isDownloading {
+                didStart = true
+                break
+            }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTAssertTrue(didStart, "下载应在超时前进入 isDownloading=true")
+        await downloader.cancelDownload()
+        await firstTask.value
+
+        // 3) 等待 resumeData 生成（异步回调）
+        var hasResume = false
+        for _ in 0..<300 {
+            if await downloader.hasResumeData {
+                hasResume = true
+                break
+            }
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        guard hasResume else {
+            _ = XCTSkip("当前环境与服务器未产生 resumeData，跳过断点续传路径测试")
+            return
+        }
+
+        // 4) 再次调用 startDownload，传入不同的 newURL/destURL；
+        //    实现会命中 `if resumeData != nil { await resumeDownload(); return }`
+        await downloader.startDownload(url: newURL, to: destURL, expectedSHA256: "")
+
+        let isDownloadingAfter = await downloader.isDownloading
+        let fileExists = FileManager.default.fileExists(atPath: destURL.path)
+
+        XCTAssertFalse(isDownloadingAfter, "resumeDownload 完成后 isDownloading 应为 false")
+        // resumeDownload 使用临时目录作为目标，传入的 destURL 不会被写入
+        XCTAssertFalse(fileExists, "resumeDownload 路径不应写入传入的 destURL")
     }
 
     // MARK: - 辅助

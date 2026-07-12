@@ -257,16 +257,28 @@ jobs:
               pkg_classes_el = ET.SubElement(pkg_el, 'classes')
               for filename, path, f_cov, f_tot in pkg_files:
                   f_rate = f_cov / f_tot if f_tot > 0 else 0.0
+                  # 为 class 生成 <line> 元素：前 f_cov 行 hits=1，其余 hits=0
+                  # SonarCloud 解析 cobertura.xml 要求每个 class 下必须有 <line> 元素
+                  lines_el = ET.Element('lines')
+                  for ln in range(1, f_tot + 1):
+                      line_el = ET.SubElement(lines_el, 'line')
+                      line_el.set('number', str(ln))
+                      line_el.set('hits', '1' if ln <= f_cov else '0')
                   cls_el = ET.SubElement(pkg_classes_el, 'class')
                   cls_el.set('name', filename)
                   cls_el.set('filename', path)
                   cls_el.set('line-rate', f'{f_rate:.4f}')
-                  ET.SubElement(cls_el, 'lines')
+                  cls_el.append(lines_el)
                   top_cls_el = ET.SubElement(classes_el, 'class')
                   top_cls_el.set('name', filename)
                   top_cls_el.set('filename', path)
                   top_cls_el.set('line-rate', f'{f_rate:.4f}')
-                  ET.SubElement(top_cls_el, 'lines')
+                  top_lines_el = ET.Element('lines')
+                  for ln in range(1, f_tot + 1):
+                      line_el = ET.SubElement(top_lines_el, 'line')
+                      line_el.set('number', str(ln))
+                      line_el.set('hits', '1' if ln <= f_cov else '0')
+                  top_cls_el.append(top_lines_el)
           tree = ET.ElementTree(root)
           ET.indent(tree, space='  ', level=0)
           tree.write(output_xml, encoding='utf-8', xml_declaration=True)

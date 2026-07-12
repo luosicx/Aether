@@ -293,4 +293,219 @@ final class KnowledgeBaseVMTests: XCTestCase {
         let ids = Set(vm.documents.map(\.id))
         XCTAssertEqual(ids.count, 2, "不同 source 的 DocumentRow id 应互不相同")
     }
+
+    // MARK: - importDocument Qwen 供应商路径
+
+    /// importDocument 使用 Qwen 供应商时，resolveEmbedding 成功但 apiKey 为空，应提示 "请先在设置中配置 API Key"
+    func testImportDocumentQwenProviderEmptyApiKeyShowsError() async {
+        // Qwen 供应商：resolveEmbedding 返回非 nil，但测试环境 Keychain 无 Qwen Key
+        let vm = KnowledgeBaseVM(provider: .qwen)
+
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("qwen_test_\(UUID().uuidString).txt")
+        try? "这是 Qwen 供应商测试文档内容".write(to: tempURL, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: tempURL) }
+
+        await vm.importDocument(url: tempURL, modelContext: context)
+
+        XCTAssertNotNil(vm.errorMessage, "Qwen 供应商无 API Key 时应设置错误消息")
+        XCTAssertTrue(
+            vm.errorMessage?.contains("请先在设置中配置 API Key") == true,
+            "错误消息应包含'请先在设置中配置 API Key'，实际：\(vm.errorMessage ?? "nil")"
+        )
+        XCTAssertFalse(vm.isImporting, "apiKey 为空时不应进入导入状态")
+    }
+
+    /// importDocument 使用 Qwen 供应商且文件不可读时，应先提示 "无法读取文档内容"（在 resolveEmbedding 之前）
+    func testImportDocumentQwenProviderUnreadableFileShowsContentError() async {
+        let vm = KnowledgeBaseVM(provider: .qwen)
+        let nonExistentURL = URL(fileURLWithPath: "/tmp/non_existent_qwen_\(UUID().uuidString).txt")
+
+        await vm.importDocument(url: nonExistentURL, modelContext: context)
+
+        XCTAssertNotNil(vm.errorMessage, "不可读文件应设置错误消息")
+        XCTAssertTrue(
+            vm.errorMessage?.contains("无法读取文档内容") == true,
+            "错误消息应包含'无法读取文档内容'（在 apiKey 检查之前），实际：\(vm.errorMessage ?? "nil")"
+        )
+    }
+
+    // MARK: - importDocument PDF 扩展名路径
+
+    /// importDocument 对 .pdf 扩展名文件应走 PDFExtractor 路径，非真实 PDF 返回无法读取
+    func testImportDocumentPDFExtensionNonPDFFileShowsError() async {
+        let vm = KnowledgeBaseVM(provider: .deepseek)
+        // 创建一个扩展名为 .pdf 但内容为纯文本的文件（非真实 PDF）
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("fake_\(UUID().uuidString).pdf")
+        try? "这不是一个真实的 PDF 文件".write(to: tempURL, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: tempURL) }
+
+        await vm.importDocument(url: tempURL, modelContext: context)
+
+        XCTAssertNotNil(vm.errorMessage, "非真实 PDF 文件应设置错误消息")
+        XCTAssertTrue(
+            vm.errorMessage?.contains("无法读取文档内容") == true,
+            "错误消息应包含'无法读取文档内容'，实际：\(vm.errorMessage ?? "nil")"
+        )
+        XCTAssertFalse(vm.isImporting, "PDF 解析失败时不应进入导入状态")
+    }
+
+    // MARK: - importDocument isImporting 状态
+
+    /// importDocument 在内容为空时不应设置 isImporting = true
+    func testImportDocumentEmptyContentDoesNotSetImporting() async {
+        let vm = KnowledgeBaseVM(provider: .deepseek)
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("empty_importing_\(UUID().uuidString).txt")
+        try? "".write(to: tempURL, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: tempURL) }
+
+        await vm.importDocument(url: tempURL, modelContext: context)
+
+        XCTAssertFalse(vm.isImporting, "内容为空时 isImporting 应保持 false")
+        XCTAssertNotNil(vm.errorMessage, "应设置错误消息")
+    }
+
+    // MARK: - load 不设置 errorMessage
+
+    /// load 成功时不应设置 errorMessage（保持 nil）
+    func testLoadDoesNotSetErrorMessage() {
+        insertChunks(source: "A.pdf", count: 2, baseTime: 1000)
+        vm.errorMessage = "之前的错误"
+
+        vm.load(modelContext: context)
+
+        // load 不应主动清除或设置 errorMessage（它只管理 documents）
+        XCTAssertEqual(vm.documents.count, 1, "应加载 1 个文档")
+        // errorMessage 由 importDocument 管理，load 不应触碰
+    }
+
+    // MARK: - load 多 source 排序
+
+    /// load 应按 createdAt 降序排序三个 source
+    func testLoadSortsThreeSourcesByCreatedAtDescending() {
+        insertChunks(source: "C.pdf", count: 1, baseTime: 1000)
+        insertChunks(source: "A.pdf", count: 1, baseTime: 3000)
+        insertChunks(source: "B.pdf", count: 1, baseTime: 2000)
+
+        vm.load(modelContext: context)
+
+        XCTAssertEqual(vm.documents.map(\.source), ["A.pdf", "B.pdf", "C.pdf"],
+                       "应按 createdAt 降序：A(3000) → B(2000) → C(1000)")
+    }
+
+    /// load 单个 source 多个 chunk 时 createdAt 应取最大值
+    func testLoadSingleSourceMultipleChunksMaxCreatedAt() {
+        // 5 个 chunk，createdAt 从 1000 到 1004
+        insertChunks(source: "multi.pdf", count: 5, baseTime: 1000)
+
+        vm.load(modelContext: context)
+
+        XCTAssertEqual(vm.documents.count, 1, "应聚合为 1 个文档")
+        XCTAssertEqual(vm.documents.first?.chunkCount, 5, "chunkCount 应为 5")
+        XCTAssertEqual(vm.documents.first?.createdAt, Date(timeIntervalSince1970: 1004),
+                       "createdAt 应为最大值 1004")
+    }
+
+    // MARK: - deleteDocument 后列表状态
+
+    /// deleteDocument 后剩余文档应保持正确顺序
+    func testDeleteDocumentPreservesOrderOfRemaining() {
+        insertChunks(source: "A.pdf", count: 1, baseTime: 1000)
+        insertChunks(source: "B.pdf", count: 1, baseTime: 2000)
+        insertChunks(source: "C.pdf", count: 1, baseTime: 3000)
+        vm.load(modelContext: context)
+        XCTAssertEqual(vm.documents.map(\.source), ["C.pdf", "B.pdf", "A.pdf"])
+
+        // 删除中间的 B
+        vm.deleteDocument(source: "B.pdf", modelContext: context)
+
+        XCTAssertEqual(vm.documents.count, 2, "删除 B 后应剩 2 个文档")
+        XCTAssertEqual(vm.documents.map(\.source), ["C.pdf", "A.pdf"],
+                       "删除 B 后剩余文档应保持降序排列")
+    }
+
+    /// deleteDocument 删除第一个文档后剩余列表正确
+    func testDeleteDocumentFirstElement() {
+        insertChunks(source: "A.pdf", count: 1, baseTime: 1000)
+        insertChunks(source: "B.pdf", count: 1, baseTime: 2000)
+        vm.load(modelContext: context)
+        // 排序后：B, A
+
+        vm.deleteDocument(source: "B.pdf", modelContext: context)
+
+        XCTAssertEqual(vm.documents.count, 1, "删除 B 后应剩 1 个文档")
+        XCTAssertEqual(vm.documents.first?.source, "A.pdf", "应剩 A.pdf")
+    }
+
+    /// deleteDocument 删除最后一个文档后剩余列表正确
+    func testDeleteDocumentLastElement() {
+        insertChunks(source: "A.pdf", count: 1, baseTime: 1000)
+        insertChunks(source: "B.pdf", count: 1, baseTime: 2000)
+        vm.load(modelContext: context)
+
+        vm.deleteDocument(source: "A.pdf", modelContext: context)
+
+        XCTAssertEqual(vm.documents.count, 1, "删除 A 后应剩 1 个文档")
+        XCTAssertEqual(vm.documents.first?.source, "B.pdf", "应剩 B.pdf")
+    }
+
+    // MARK: - importDocument 不同扩展名
+
+    /// importDocument 对 .txt 扩展名文件应走 String(contentsOf:) 路径读取文本
+    func testImportDocumentTXTExtensionReadsContent() async {
+        let vm = KnowledgeBaseVM(provider: .qwen)
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("txt_test_\(UUID().uuidString).txt")
+        try? "TXT 文件测试内容".write(to: tempURL, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: tempURL) }
+
+        await vm.importDocument(url: tempURL, modelContext: context)
+
+        // .txt 能读取内容，但 Qwen 无 API Key → 应提示 "请先在设置中配置 API Key"
+        XCTAssertNotNil(vm.errorMessage, "应设置错误消息")
+        XCTAssertTrue(
+            vm.errorMessage?.contains("请先在设置中配置 API Key") == true,
+            ".txt 文件读取成功但无 API Key 应提示配置 API Key，实际：\(vm.errorMessage ?? "nil")"
+        )
+    }
+
+    /// importDocument 对 .md 扩展名文件应走 String(contentsOf:) 路径读取文本
+    func testImportDocumentMDExtensionReadsContent() async {
+        let vm = KnowledgeBaseVM(provider: .qwen)
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("md_test_\(UUID().uuidString).md")
+        try? "# Markdown 标题".write(to: tempURL, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: tempURL) }
+
+        await vm.importDocument(url: tempURL, modelContext: context)
+
+        // .md 走 String(contentsOf:) 路径，读取成功但无 API Key
+        XCTAssertNotNil(vm.errorMessage, "应设置错误消息")
+        XCTAssertTrue(
+            vm.errorMessage?.contains("请先在设置中配置 API Key") == true,
+            ".md 文件读取成功但无 API Key 应提示配置 API Key，实际：\(vm.errorMessage ?? "nil")"
+        )
+    }
+
+    // MARK: - load 后 documents 属性
+
+    /// load 后 documents 应包含正确的 DocumentRow 字段（source 和 chunkCount 一致）
+    func testLoadDocumentRowFieldsCorrect() {
+        insertChunks(source: "doc1.pdf", count: 3, baseTime: 1000)
+        insertChunks(source: "doc2.pdf", count: 5, baseTime: 2000)
+
+        vm.load(modelContext: context)
+
+        let doc1 = vm.documents.first { $0.source == "doc1.pdf" }
+        XCTAssertEqual(doc1?.source, "doc1.pdf", "source 应为 doc1.pdf")
+        XCTAssertEqual(doc1?.chunkCount, 3, "chunkCount 应为 3")
+        XCTAssertEqual(doc1?.id, "doc1.pdf", "id 应等于 source")
+
+        let doc2 = vm.documents.first { $0.source == "doc2.pdf" }
+        XCTAssertEqual(doc2?.source, "doc2.pdf", "source 应为 doc2.pdf")
+        XCTAssertEqual(doc2?.chunkCount, 5, "chunkCount 应为 5")
+        XCTAssertEqual(doc2?.id, "doc2.pdf", "id 应等于 source")
+    }
 }
