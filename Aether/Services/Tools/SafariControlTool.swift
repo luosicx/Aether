@@ -31,12 +31,19 @@ final class SafariControlTool: ToolProtocol {
         )
     }
 
+    /// run_js 允许执行的目标域白名单。空集合表示默认不允许任何域。
+    private let allowedDomains: Set<String> = []
+
     /// 执行 Safari 控制操作
     ///
     /// - Parameter arguments: 含 `action` 及其所需参数的字典
     /// - Returns: 操作结果字符串，或错误信息
     /// - Throws: 不抛异常，错误以字符串形式返回
+    @MainActor
     func execute(arguments: [String: Any]) async throws -> String {
+        guard ToolRegistry.shared.isEnabled(name: "control_safari") else {
+            return "错误：Safari 控制工具未启用"
+        }
         guard let action = arguments["action"] as? String else {
             return "错误：请提供 action 参数"
         }
@@ -95,12 +102,24 @@ final class SafariControlTool: ToolProtocol {
         guard let jsCode = arguments["script"] as? String else {
             return "错误：请提供 script 参数"
         }
+        guard let host = currentPageHost(), allowedDomains.contains(host) else {
+            return "错误：当前页面所在域不在 run_js 白名单中"
+        }
         let script = """
         tell application "Safari"
             do JavaScript "\(jsCode)" in current tab of front window
         end tell
         """
         return runAppleScript(script)
+    }
+
+    /// 获取当前标签页 URL 的主机名
+    private func currentPageHost() -> String? {
+        let urlString = getURL()
+        let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !trimmed.hasPrefix("错误") else { return nil }
+        guard let url = URL(string: trimmed), let host = url.host else { return nil }
+        return host
     }
 
     /// 新建标签页（或文档），url 为空时新建空白文档

@@ -32,7 +32,11 @@ final class ScreenshotTool: ToolProtocol {
     /// - Parameter arguments: 可含 `display_id` 键的参数字典
     /// - Returns: 成功返回 PNG 文件路径，失败返回错误信息字符串
     /// - Throws: 不抛异常，错误以字符串形式返回
+    @MainActor
     func execute(arguments: [String: Any]) async throws -> String {
+        guard ToolRegistry.shared.isEnabled(name: "take_screenshot") else {
+            throw NSError(domain: "ScreenshotTool", code: 1, userInfo: [NSLocalizedDescriptionKey: "take_screenshot 工具未启用"])
+        }
         // 确定目标显示器 ID，未指定时使用主显示器
         let displayID: CGDirectDisplayID
         if let id = arguments["display_id"] as? Int {

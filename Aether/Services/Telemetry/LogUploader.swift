@@ -2,9 +2,19 @@ import Foundation
 
 /// Day 14: 日志批量上报服务。从 TelemetryService 取出缓冲事件，批量 POST 到国内云存储（阿里云 OSS / 腾讯云 COS）。
 /// 失败时指数退避重试最多 3 次；事件上报失败即丢弃，避免无限累积。actor 隔离保证并发安全。
+///
+/// 安全说明：
+/// - 生产环境必须使用带认证的端点，禁止直接向可公开写入的 OSS URL 上传。
+/// - 推荐方案：后端提供 STS 临时凭证接口（返回 AccessKeyId / AccessKeySecret / SecurityToken），
+///   客户端用 STS 签名后直传 OSS；或后端提供预签名 URL 接口，客户端直接 POST 到预签名 URL。
+/// - 当前实现通过 `authorizationHeader` 注入凭证；未提供凭证时立即拒绝上传。
 actor LogUploader {
-    /// 上报 endpoint，默认指向阿里云 OSS 占位 URL，可通过 init 注入用于测试
+    /// 上报 endpoint，默认从 `APIConfig.telemetryUploadEndpoint` 读取，可通过 init 注入用于测试
     private let endpointURL: URL
+
+    /// 上传凭证，通常为 STS 临时签名后的 Authorization header 或预签名 URL 附带参数。
+    /// `nil` 或空字符串表示无凭证，将拒绝上传。
+    private let authorizationHeader: String?
 
     /// 单批上报条数上限（预留，当前 Phase 直接全量上报 drain 出的全部记录）
     private let batchSize = 100
@@ -18,14 +28,17 @@ actor LogUploader {
     /// 最近一次上报状态：idle / success / failed
     private(set) var lastUploadStatus: String = "idle"
 
-    /// 单例，供 App 启动与后台任务调度调用
+    /// 单例，供 App 启动与后台任务调度调用。
+    /// 注意：shared 实例默认不带凭证，实际生产环境需要通过业务层注入 STS 或预签名 URL 后再上传。
     static let shared = LogUploader()
 
-    /// 允许测试注入 endpoint
-    init(endpointURL: URL? = nil) {
-        self.endpointURL = endpointURL ?? URL(
-            string: "https://aether-logs.oss-cn-hangzhou.aliyuncs.com/logs"
-        )!
+    /// 允许测试注入 endpoint 与凭证。
+    /// - Parameters:
+    ///   - endpointURL: 上传端点，nil 则使用 `APIConfig.telemetryUploadEndpoint`
+    ///   - authorizationHeader: 上传凭证，nil 或空字符串则拒绝上传
+    init(endpointURL: URL? = nil, authorizationHeader: String? = nil) {
+        self.endpointURL = endpointURL ?? URL(string: APIConfig.telemetryUploadEndpoint)!
+        self.authorizationHeader = authorizationHeader
     }
 
     /// 触发上报：drain 出 TelemetryService 缓冲 → 编码为 JSON 数组 → POST 到 endpoint。
@@ -57,12 +70,18 @@ actor LogUploader {
     ///   - records: 待上报记录数组
     ///   - retry: 当前重试次数（从 0 开始）
     private func uploadBatch(_ records: [TelemetryRecord], retry: Int) async throws {
+        // 安全校验：无凭证拒绝上传，避免将敏感日志发送到公开端点
+        guard let authorizationHeader = authorizationHeader, !authorizationHeader.isEmpty else {
+            throw LogUploaderError.missingCredentials
+        }
+
         // 编码为 JSON 数组
         let jsonData = try JSONEncoder().encode(records)
         // 构造 POST 请求
         var request = URLRequest(url: endpointURL)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(authorizationHeader, forHTTPHeaderField: "Authorization")
         request.httpBody = jsonData
         do {
             let (_, response) = try await URLSession.shared.data(for: request)
@@ -86,4 +105,10 @@ actor LogUploader {
             throw error
         }
     }
+}
+
+/// LogUploader 专用错误类型。
+enum LogUploaderError: Error {
+    /// 缺少上传凭证。需要后端提供 STS 临时凭证或预签名 URL。
+    case missingCredentials
 }

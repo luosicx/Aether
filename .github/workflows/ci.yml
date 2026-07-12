@@ -299,6 +299,72 @@ jobs:
           fi
           echo "xcodebuild exited non-zero but all UIT tests passed (simulator instability)"
 
+  security-tests:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Select Xcode (latest)
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: 'latest'
+
+      - name: Setup iOS Simulator
+        run: bash scripts/ci-setup-simulator.sh
+
+      - name: Build for Testing
+        run: |
+          xcodebuild build-for-testing \
+            -project Aether.xcodeproj \
+            -scheme Aether \
+            -destination 'platform=iOS Simulator,name=iPhone 17,arch=arm64' \
+            -configuration Debug \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Run Security Tests
+        id: test
+        continue-on-error: true
+        run: |
+          xcodebuild test-without-building \
+            -project Aether.xcodeproj \
+            -scheme Aether \
+            -destination 'platform=iOS Simulator,name=iPhone 17,arch=arm64' \
+            -configuration Debug \
+            -derivedDataPath build \
+            -only-testing:AetherTests/ToolRegistryTests \
+            -only-testing:AetherTests/ToolAuthorizationTests \
+            -only-testing:AetherTests/TerminalCommandToolTests \
+            -only-testing:AetherTests/KeychainManagerTests \
+            -only-testing:AetherTests/TelemetrySanitizerTests \
+            -only-testing:AetherTests/PromptInjectionDetectorTests \
+            -only-testing:AetherTests/ChatViewModelToolSecurityTests \
+            -only-testing:AetherTests/LogUploaderTests \
+            -only-testing:AetherTests/TelemetryServiceTests \
+            -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 30 \
+            -maximum-test-execution-time-allowance 60 \
+            -resultBundlePath SecurityTestResults.xcresult \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Verify Security Test Results
+        if: steps.test.outcome != 'success'
+        run: |
+          echo "xcodebuild test exited non-zero, verifying security test results..."
+          if [ ! -d "SecurityTestResults.xcresult" ]; then
+            echo "ERROR: No test results generated (SecurityTestResults.xcresult missing)"
+            exit 1
+          fi
+          FAILED_TESTS=$(xcrun xcresulttool get test-results summary --path SecurityTestResults.xcresult 2>/dev/null | grep -c '"failed"' | tr -d '\n')
+          FAILED_TESTS=${FAILED_TESTS:-0}
+          if [ "$FAILED_TESTS" -gt 0 ]; then
+            echo "ERROR: $FAILED_TESTS security test(s) failed"
+            xcrun xcresulttool get test-results summary --path SecurityTestResults.xcresult
+            exit 1
+          fi
+          echo "xcodebuild exited non-zero but all security tests passed (simulator instability)"
+
   # Coverage status check: blocks PR merge if coverage < 90%
   coverage-summary:
     needs: [unit-tests, ui-tests]

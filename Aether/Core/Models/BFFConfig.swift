@@ -17,6 +17,43 @@ struct BFFConfig: Codable, Sendable, Equatable {
     /// 默认配置（未启用 BFF 时的兜底值）
     static let `default` = BFFConfig()
 
-    /// UserDefaults 缓存键
+    /// UserDefaults 缓存键（现仅用于存储非敏感字段）
     static let userDefaultsKey = "bff_config_cache"
+    /// Keychain account for user token
+    static let userTokenKeychainAccount = "com.aether.bff.userToken"
+}
+
+// MARK: - 非敏感字段拆分与持久化辅助
+
+extension BFFConfig {
+    /// 非敏感字段子集，单独持久化到 UserDefaults；不含 userToken。
+    struct NonSensitive: Codable, Sendable, Equatable {
+        /// 是否启用 BFF 代理
+        var enabled: Bool = false
+        /// BFF 网关 endpoint
+        var endpointURL: URL = URL(string: "https://aether-bff.example.com") ?? URL(fileURLWithPath: "")
+        /// chat 接口客户端限流（每分钟令牌数）
+        var chatRateLimitPerMin: Int = 20
+        /// embed 接口客户端限流（每分钟令牌数）
+        var embedRateLimitPerMin: Int = 10
+    }
+
+    /// 提取非敏感字段子集
+    var nonSensitive: NonSensitive {
+        NonSensitive(
+            enabled: enabled,
+            endpointURL: endpointURL,
+            chatRateLimitPerMin: chatRateLimitPerMin,
+            embedRateLimitPerMin: embedRateLimitPerMin
+        )
+    }
+
+    /// 用非敏感字段 + token 组装完整配置
+    init(nonSensitive: NonSensitive, userToken: String) {
+        self.enabled = nonSensitive.enabled
+        self.endpointURL = nonSensitive.endpointURL
+        self.userToken = userToken
+        self.chatRateLimitPerMin = nonSensitive.chatRateLimitPerMin
+        self.embedRateLimitPerMin = nonSensitive.embedRateLimitPerMin
+    }
 }

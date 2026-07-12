@@ -7,6 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A1B2C3D4E5F6071809AB1004 /* PromptInjectionDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB1001 /* PromptInjectionDetector.swift */; };
+		A1B2C3D4E5F6071809AB1005 /* ToolAuditLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB1002 /* ToolAuditLogger.swift */; };
+		A1B2C3D4E5F6071809AB1006 /* PromptInjectionDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB1003 /* PromptInjectionDetectorTests.swift */; };
+		A1B2C3D4E5F6071809AB2001 /* ToolAuthorizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB2002 /* ToolAuthorizationTests.swift */; };
+		A1B2C3D4E5F6071809AB2003 /* ChatViewModelToolSecurityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB2004 /* ChatViewModelToolSecurityTests.swift */; };
 		01816DD644C823C301E3482E /* SmartRouterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C42CB93D5F359C823B79BD26 /* SmartRouterTests.swift */; };
 		02B8CC1E8A5ACE3D6F9222FD /* ChatActor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56D4D47C336265C381D1679A /* ChatActor.swift */; };
 		0358BFC334004D7E9D9624F8 /* BFFProxyClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9973368500D82552A2CF8091 /* BFFProxyClient.swift */; };
@@ -26,6 +31,8 @@
 		10DBF671452BBE2E6BAA6EB5 /* HealthInsight.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B15E68F979F01D85C4B9EB9 /* HealthInsight.swift */; };
 		11ABB3B9EB593606F2AC5992 /* TelemetryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C314D550CA2AEF2C572C442 /* TelemetryService.swift */; };
 		11F93F53B58375E35B0DB358 /* LogUploaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E42EAA429A0EACAC0015EDBF /* LogUploaderTests.swift */; };
+		AABBCCDDEEFF001122334455 /* TelemetrySanitizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDDEEFF001122334456 /* TelemetrySanitizer.swift */; };
+		AABBCCDDEEFF001122334457 /* TelemetrySanitizerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDDEEFF001122334458 /* TelemetrySanitizerTests.swift */; };
 		1644397835E538228B83FAB4 /* OCRToolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BAB8A9AD5C176100631153B /* OCRToolTests.swift */; };
 		178C561E8C63DC11E143F464 /* AskAetherIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = E125C397238AD29EDB9760A1 /* AskAetherIntent.swift */; };
 		1A0E0D4C378B776A5BE8E395 /* DeepSeekClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B02D1769FB52AB29C1462A49 /* DeepSeekClientTests.swift */; };
@@ -310,6 +317,8 @@
 		3B1E31D59E0D831DD494350E /* HealthKitServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HealthKitServiceTests.swift; sourceTree = "<group>"; };
 		3C314D550CA2AEF2C572C442 /* TelemetryService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TelemetryService.swift; sourceTree = "<group>"; };
 		3FB30906E36C3C9F4417D9E3 /* ChatStorage.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatStorage.swift; sourceTree = "<group>"; };
+		AABBCCDDEEFF001122334456 /* TelemetrySanitizer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TelemetrySanitizer.swift; sourceTree = "<group>"; };
+		AABBCCDDEEFF001122334458 /* TelemetrySanitizerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TelemetrySanitizerTests.swift; sourceTree = "<group>"; };
 		3FC5616BC7791E8765C816F2 /* PDFExtractorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PDFExtractorTests.swift; sourceTree = "<group>"; };
 		40EDEDC0BF4762AC0541AD9E /* SmartRouter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SmartRouter.swift; sourceTree = "<group>"; };
 		422C8087A6640516EF1CFD25 /* FileOperationTool.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FileOperationTool.swift; sourceTree = "<group>"; };
@@ -476,6 +485,8 @@
 		F9B1F8BC8AAF83AD80DCFA72 /* ToolRegistry.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ToolRegistry.swift; sourceTree = "<group>"; };
 		FA6FB322AC0A5F31625473D1 /* KeychainManagerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeychainManagerTests.swift; sourceTree = "<group>"; };
 		FAF92749FCE229D0E7C27266 /* RAGService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RAGService.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6071809AB2002 /* ToolAuthorizationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ToolAuthorizationTests.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6071809AB2004 /* ChatViewModelToolSecurityTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatViewModelToolSecurityTests.swift; sourceTree = "<group>"; };
 		FC8BFC59FBB15DF83CA1F50C /* HealthInsightGeneratorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HealthInsightGeneratorTests.swift; sourceTree = "<group>"; };
 		FE90D28BEADDDCC3803A3180 /* HeadingView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HeadingView.swift; sourceTree = "<group>"; };
 		FEE8478D4A45010E8D3FBCCC /* ClipboardToolTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ClipboardToolTests.swift; sourceTree = "<group>"; };
@@ -486,6 +497,9 @@
 		FE1A2B3C4D5E6F7000000006 /* MessageBubbleTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MessageBubbleTests.swift; sourceTree = "<group>"; };
 		FE1A2B3C4D5E6F7000000008 /* CodeBlockViewTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CodeBlockViewTests.swift; sourceTree = "<group>"; };
 		FE1A2B3C4D5E6F700000000A /* HeadingViewTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HeadingViewTests.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6071809AB1001 /* PromptInjectionDetector.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PromptInjectionDetector.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6071809AB1002 /* ToolAuditLogger.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ToolAuditLogger.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6071809AB1003 /* PromptInjectionDetectorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PromptInjectionDetectorTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -616,6 +630,7 @@
 				51A1FC489F69C66A7E4819BE /* Storage */,
 				91F00C053FF3AAE70BFA00BC /* Auth */,
 				6AD387D344D4441F1AC675BD /* Tools */,
+				A1B2C3D4E5F6071809AB1000 /* Security */,
 				E4D364DA9B3F67F77468A279 /* Voice */,
 				A57BA6C5ADB8522E36768339 /* Cache */,
 				12D5F941B28ACB61B4B43284 /* Routing */,
@@ -814,8 +829,17 @@
 				A25DCD40D09E1716B5899628 /* SystemControlTool.swift */,
 				12A0EB0900AC70CC80392CA8 /* InputAutomationTool.swift */,
 				1BE3F6B0E3D6E76923AD2D3C /* ShortcutsTool.swift */,
+				A1B2C3D4E5F6071809AB1002 /* ToolAuditLogger.swift */,
 			);
 			path = Tools;
+			sourceTree = "<group>";
+		};
+		A1B2C3D4E5F6071809AB1000 /* Security */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3D4E5F6071809AB1001 /* PromptInjectionDetector.swift */,
+			);
+			path = Security;
 			sourceTree = "<group>";
 		};
 		6F2454FB5EEC8FACCAB4256E /* Constants */ = {
@@ -877,6 +901,8 @@
 				B5E066EE6DDE0A7A5E76115F /* AlarmToolTests.swift */,
 				D9C45C4B1AE1A1D0B62559D3 /* ReminderToolTests.swift */,
 				C41ED6555734365803CF2CE4 /* ToolRegistryTests.swift */,
+				A1B2C3D4E5F6071809AB2002 /* ToolAuthorizationTests.swift */,
+				A1B2C3D4E5F6071809AB2004 /* ChatViewModelToolSecurityTests.swift */,
 				EBC97AC964782C385A85278D /* NotificationServiceTests.swift */,
 				878C578467218EC7BC842C1D /* VoiceServiceTests.swift */,
 				50A0526B29D955F2EDE4AE27 /* ChatStorageTests.swift */,
@@ -897,6 +923,7 @@
 				4FAF2B17E25952B326EA81B8 /* RemoteConfigServiceTests.swift */,
 				34F68ADC3B02EB2833170347 /* TelemetryServiceTests.swift */,
 				E42EAA429A0EACAC0015EDBF /* LogUploaderTests.swift */,
+				AABBCCDDEEFF001122334458 /* TelemetrySanitizerTests.swift */,
 				29F6D11EC132F8F84C1D3650 /* BFFProxyClientTests.swift */,
 				31CD6FD5F21DEE9B2C4112DB /* RateLimiterTests.swift */,
 				B3757B5EE3E4BD791C122F24 /* OfflineLLMProviderTests.swift */,
@@ -957,6 +984,7 @@
 				FE1A2B3C4D5E6F7000000006 /* MessageBubbleTests.swift */,
 				FE1A2B3C4D5E6F7000000008 /* CodeBlockViewTests.swift */,
 				FE1A2B3C4D5E6F700000000A /* HeadingViewTests.swift */,
+				A1B2C3D4E5F6071809AB1003 /* PromptInjectionDetectorTests.swift */,
 			);
 			path = AetherTests;
 			sourceTree = "<group>";
@@ -1091,6 +1119,7 @@
 			children = (
 				3C314D550CA2AEF2C572C442 /* TelemetryService.swift */,
 				48F89B9B4F9E3D1155C031BA /* LogUploader.swift */,
+				AABBCCDDEEFF001122334456 /* TelemetrySanitizer.swift */,
 			);
 			path = Telemetry;
 			sourceTree = "<group>";
@@ -1270,6 +1299,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1B2C3D4E5F6071809AB1006 /* PromptInjectionDetectorTests.swift in Sources */,
 				1C9D09486B61155EFC1FAE51 /* CalculatorToolTests.swift in Sources */,
 				F94B28644AA129C267942AE1 /* DateTimeToolTests.swift in Sources */,
 				E379ADF0B60E5C02A4996C42 /* SSEParserTests.swift in Sources */,
@@ -1284,6 +1314,8 @@
 				BF730D097DB0DD6715703BC7 /* AlarmToolTests.swift in Sources */,
 				2E0A1DB5E6747FCB38B0BDD6 /* ReminderToolTests.swift in Sources */,
 				E09F2F60710E5F8A1E9F5CB5 /* ToolRegistryTests.swift in Sources */,
+				A1B2C3D4E5F6071809AB2001 /* ToolAuthorizationTests.swift in Sources */,
+				A1B2C3D4E5F6071809AB2003 /* ChatViewModelToolSecurityTests.swift in Sources */,
 				752BE95DA53BA27016059599 /* NotificationServiceTests.swift in Sources */,
 				1C4E4E55C94FA33B562F19FA /* VoiceServiceTests.swift in Sources */,
 				84B130A2073A3D550F160B8F /* ChatStorageTests.swift in Sources */,
@@ -1304,6 +1336,7 @@
 				5A4C1F4FBAF4BE0C041AE047 /* RemoteConfigServiceTests.swift in Sources */,
 				26EAA08C58EFD35D4B382721 /* TelemetryServiceTests.swift in Sources */,
 				11F93F53B58375E35B0DB358 /* LogUploaderTests.swift in Sources */,
+				AABBCCDDEEFF001122334457 /* TelemetrySanitizerTests.swift in Sources */,
 				4EEF75AC31F89970F08313D0 /* BFFProxyClientTests.swift in Sources */,
 				1FD179F4C112A3D4970DB81D /* RateLimiterTests.swift in Sources */,
 				710459D3B6B42EA87D4F7D43 /* OfflineLLMProviderTests.swift in Sources */,
@@ -1371,6 +1404,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1B2C3D4E5F6071809AB1004 /* PromptInjectionDetector.swift in Sources */,
+				A1B2C3D4E5F6071809AB1005 /* ToolAuditLogger.swift in Sources */,
 				217769921333520FCEEFB981 /* AetherApp.swift in Sources */,
 				B0B65CF075744E81D2D66286 /* APIConfig.swift in Sources */,
 				94012D11AE56BDE24C31B149 /* String+TokenCount.swift in Sources */,
@@ -1425,6 +1460,7 @@
 				AE15A807EAB5B522F9FCE8C8 /* RemoteConfigService.swift in Sources */,
 				11ABB3B9EB593606F2AC5992 /* TelemetryService.swift in Sources */,
 				CE2376E7168690BDF903590D /* LogUploader.swift in Sources */,
+				AABBCCDDEEFF001122334455 /* TelemetrySanitizer.swift in Sources */,
 				D92D9D9C82889AD2EE289EFE /* BFFConfig.swift in Sources */,
 				0358BFC334004D7E9D9624F8 /* BFFProxyClient.swift in Sources */,
 				D3FA7E13C6F5754E5469E654 /* RateLimiter.swift in Sources */,

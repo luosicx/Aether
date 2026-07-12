@@ -34,6 +34,10 @@ final class SettingsViewModel {
     var isSaving = false
     /// 保存结果消息（成功/失败提示）
     var saveMessage: String?
+    /// 已启用的危险/敏感工具名集合（与 ToolRegistry 同步，供设置页 Toggle 绑定）
+    var enabledTools: Set<String> = []
+    /// 本运行周期内已授权过的敏感工具名集合，避免重复弹 Alert
+    var authorizedToolsOnce: Set<String> = []
 
     // Day 14: 远程配置加载状态标记
     /// 用户是否手动切换过 provider（true 时 loadFromRemoteConfig 不覆盖 selectedProvider）
@@ -83,23 +87,50 @@ final class SettingsViewModel {
         loadOnDeviceConfig()
     }
 
-    /// Day 15: 从 UserDefaults 读取缓存的 BFF 配置（JSON 解码）。无缓存或解码失败时用默认值。
+    /// Day 15 / Task 5: 从 UserDefaults 读取非敏感 BFF 字段，从 Keychain 读取 userToken，
+    /// 组装为完整 BFFConfig。无缓存或解码失败时用默认值。
     func loadBFFConfig() {
-        guard let data = UserDefaults.standard.data(forKey: BFFConfig.userDefaultsKey) else {
-            bffConfig = .default
-            return
+        Self.migrateLegacyBFFConfigIfNeeded()
+
+        var nonSensitive = BFFConfig.NonSensitive()
+        if let data = UserDefaults.standard.data(forKey: BFFConfig.userDefaultsKey) {
+            nonSensitive = (try? JSONDecoder().decode(BFFConfig.NonSensitive.self, from: data)) ?? nonSensitive
         }
-        bffConfig = (try? JSONDecoder().decode(BFFConfig.self, from: data)) ?? .default
+
+        let token = KeychainManager.shared.read(key: BFFConfig.userTokenKeychainAccount) ?? ""
+        bffConfig = BFFConfig(nonSensitive: nonSensitive, userToken: token)
     }
 
-    /// Day 15: 把当前 BFF 配置写入 UserDefaults（JSON 编码）
+    /// Day 15 / Task 5: 非敏感字段写入 UserDefaults，userToken 写入 Keychain。
     func saveBFFConfig() {
-        if let data = try? JSONEncoder().encode(bffConfig) {
+        if let data = try? JSONEncoder().encode(bffConfig.nonSensitive) {
             UserDefaults.standard.set(data, forKey: BFFConfig.userDefaultsKey)
         }
+        try? KeychainManager.shared.save(
+            key: BFFConfig.userTokenKeychainAccount,
+            value: bffConfig.userToken
+        )
     }
 
-    /// Day 16: 从 UserDefaults 读取缓存的端侧推理配置（JSON 解码）。无缓存或解码失败时用默认值。
+    /// Task 5: 若 UserDefaults 中仍遗留旧版完整 BFFConfig（含 userToken），
+    /// 将 token 迁移到 Keychain，随后将 UserDefaults 重写为非敏感字段子集。
+    nonisolated static func migrateLegacyBFFConfigIfNeeded() {
+        guard let data = UserDefaults.standard.data(forKey: BFFConfig.userDefaultsKey) else { return }
+        // 尝试按旧版完整 BFFConfig 解码；失败说明已迁移或数据损坏，无需处理
+        guard let legacy = try? JSONDecoder().decode(BFFConfig.self, from: data) else { return }
+
+        if !legacy.userToken.isEmpty {
+            try? KeychainManager.shared.save(
+                key: BFFConfig.userTokenKeychainAccount,
+                value: legacy.userToken
+            )
+        }
+        if let newData = try? JSONEncoder().encode(legacy.nonSensitive) {
+            UserDefaults.standard.set(newData, forKey: BFFConfig.userDefaultsKey)
+        }
+    }
+
+    /// Day 16 / Task 5: 从 UserDefaults 读取端侧推理配置。当前无敏感字段，直接 JSON 解码。
     func loadOnDeviceConfig() {
         guard let data = UserDefaults.standard.data(forKey: OnDeviceConfig.userDefaultsKey) else {
             onDeviceConfig = .default
@@ -108,7 +139,8 @@ final class SettingsViewModel {
         onDeviceConfig = (try? JSONDecoder().decode(OnDeviceConfig.self, from: data)) ?? .default
     }
 
-    /// Day 16: 把当前端侧推理配置写入 UserDefaults（JSON 编码）
+    /// Day 16 / Task 5: 把端侧推理配置写入 UserDefaults。当前无敏感字段，直接 JSON 编码。
+    /// 若未来新增签名密钥/API key，请加入 OnDeviceConfig.sensitiveKeychainAccounts 并在此方法中先写入 Keychain。
     func saveOnDeviceConfig() {
         if let data = try? JSONEncoder().encode(onDeviceConfig) {
             UserDefaults.standard.set(data, forKey: OnDeviceConfig.userDefaultsKey)
@@ -189,5 +221,20 @@ final class SettingsViewModel {
         guard let conv = conversation else { return }
         conv.systemPrompt = systemPrompt
         try? modelContext?.save()
+    }
+
+    // MARK: - 工具启用状态
+
+    /// 从 ToolRegistry 同步当前启用状态到 ViewModel
+    func loadSettings() {
+        enabledTools = ToolRegistry.shared.enabledTools
+    }
+
+    /// 切换指定工具的启用状态，并同步到 ToolRegistry 持久化。
+    /// 敏感工具首次启用时应由调用方先展示风险提示 Alert。
+    func toggleTool(name: String) {
+        let newValue = !ToolRegistry.shared.isEnabled(name: name)
+        ToolRegistry.shared.setEnabled(name: name, value: newValue)
+        enabledTools = ToolRegistry.shared.enabledTools
     }
 }

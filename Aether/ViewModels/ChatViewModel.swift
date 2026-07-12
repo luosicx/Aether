@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import Observation
 #if os(iOS)
 import ActivityKit
 #endif
@@ -85,6 +86,13 @@ final class ChatViewModel {
     var feedbackToast: String?
     /// TTS 朗读配置（音色/语速/音调/音量），由设置页同步更新，默认从 UserDefaults 加载
     var ttsConfig: TTSConfig = .load()
+    // Task 7: 提示注入检测弹窗显示状态
+    var showInjectionWarning: Bool = false
+    // Task 7: 提示注入检测弹窗提示文案
+    var injectionWarningMessage: String = ""
+    // Task 7: 提示注入弹窗用户选择回调（true=继续发送）
+    @ObservationIgnored
+    var pendingInjectionDecision: (@MainActor (Bool) -> Void)?
 
     // 测试性调整：把 client / cache 暴露为 internal 并支持注入，便于单元测试预置缓存命中或注入 Mock LLMProvider
     // 生产侧行为不变：默认参数 DeepSeekClient() / SemanticCache() 兜底
@@ -354,9 +362,33 @@ final class ChatViewModel {
 
     /// 发送当前 inputText。空 input 守卫不触发；附加 pendingImage；立即持久化用户消息防丢失；
     /// 启动 streamingTask 调用 processMessage 处理后续流式输出。
+    /// Task 7: 发送前检测提示注入，命中时弹出确认弹窗，用户取消则不加入上下文。
     func sendMessage(in conversation: Conversation, modelContext: ModelContext) {
-        guard !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        let userMessage = ChatMessage(role: "user", content: inputText)
+        let trimmed = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        if PromptInjectionDetector.isSuspicious(inputText) {
+            injectionWarningMessage = PromptInjectionDetector.reason(for: inputText)
+                ?? NSLocalizedString("检测到当前输入可能包含提示注入指令，继续发送可能导致工具被异常调用。是否继续？", comment: "")
+            pendingInjectionDecision = { [weak self] shouldContinue in
+                guard let self = self else { return }
+                self.showInjectionWarning = false
+                self.pendingInjectionDecision = nil
+                if shouldContinue {
+                    self.sendMessageConfirmed(content: inputText, in: conversation, modelContext: modelContext, injectionChecked: true)
+                }
+            }
+            showInjectionWarning = true
+            return
+        }
+
+        sendMessageConfirmed(content: inputText, in: conversation, modelContext: modelContext, injectionChecked: false)
+    }
+
+    /// Task 7: sendMessage 确认后的实际发送逻辑。
+    private func sendMessageConfirmed(content: String, in conversation: Conversation, modelContext: ModelContext, injectionChecked: Bool) {
+        let userMessage = ChatMessage(role: "user", content: content)
+        userMessage.injectionChecked = injectionChecked
         // 补充 A：附加待发送图片
         if let imageData = pendingImage {
             userMessage.attachedImage = imageData
@@ -365,7 +397,7 @@ final class ChatViewModel {
         userMessage.conversation = conversation
         conversation.messages.append(userMessage)
         messages.append(userMessage)
-        let userInput = inputText
+        let userInput = content
         inputText = ""
         isLoading = true
         streamingText = ""
@@ -578,7 +610,7 @@ final class ChatViewModel {
             loopCount += 1
             let stream: AsyncStream<ParsedChunk>
             if toolsEnabled {
-                let tools = ToolRegistry.shared.allToolDefs
+                let tools = ToolRegistry.shared.availableToolDefs
                 stream = llmClient.chat(messages: apiMessages, config: chatConfig, tools: tools, apiKey: apiKey)
             } else {
                 let raw = llmClient.chat(messages: apiMessages, config: chatConfig, apiKey: apiKey)
@@ -653,15 +685,37 @@ final class ChatViewModel {
                     let stepIdx = currentToolSteps.count - 1
                     // Day 14: 记录工具执行开始时间，用于计算 duration
                     let toolStartTime = Date()
+                    let argsData = tc.arguments.data(using: .utf8) ?? Data()
+                    let parsedArgs = (try? JSONSerialization.jsonObject(with: argsData) as? [String: Any]) ?? [:]
+                    let argsSummary = parsedArgs.keys.sorted().joined(separator: ", ")
+                    var toolAuthorized = false
                     do {
-                        let argsData = tc.arguments.data(using: .utf8) ?? Data()
-                        let args = try JSONSerialization.jsonObject(with: argsData) as? [String: Any] ?? [:]
+                        // Task 4: 调用前检查启用状态与运行时授权
+                        guard ToolRegistry.shared.isEnabled(name: tc.name) else {
+                            throw NSError(domain: "ToolRegistry", code: 3, userInfo: [NSLocalizedDescriptionKey: "工具 \(tc.name) 未启用"])
+                        }
+                        if ToolRegistry.shared.requiresAuthorization(name: tc.name) {
+                            let authResult: ToolAuthorizationResult
+                            if ToolRegistry.shared.defaultDisabledTools.contains(tc.name) {
+                                let details = "工具：\(tc.name)\n参数：\(tc.arguments)"
+                                authResult = await ToolAuthorization.shared.presentConfirmation(toolName: tc.name, details: details)
+                            } else {
+                                let purpose = ToolRegistry.shared.getTool(named: tc.name)?.definition.description ?? ""
+                                authResult = await ToolAuthorization.shared.presentSensitiveAccessConfirmation(toolName: tc.name, purpose: purpose)
+                            }
+                            guard case .authorized = authResult else {
+                                throw NSError(domain: "ToolAuthorization", code: 2, userInfo: [NSLocalizedDescriptionKey: "用户拒绝了 \(tc.name) 工具调用"])
+                            }
+                            toolAuthorized = true
+                        } else {
+                            toolAuthorized = true
+                        }
                         // Day 8: 单工具超时保护，超时抛错不中断循环
                         // 说明：withThrowingTaskGroup + 超时 Task 抛错，第一个完成的 Task 胜出；
                         //       超时后标记 failed 继续下一轮，保证 ReAct 不因单工具卡死而中断。
                         let result = try await withThrowingTaskGroup(of: String.self) { group in
                             group.addTask {
-                                try await ToolRegistry.shared.execute(name: tc.name, arguments: args)
+                                try await ToolRegistry.shared.execute(name: tc.name, arguments: parsedArgs)
                             }
                             group.addTask {
                                 try await Task.sleep(nanoseconds: UInt64(self.toolTimeout * 1_000_000_000))
@@ -677,6 +731,8 @@ final class ChatViewModel {
                         let toolDurationMs = Int(Date().timeIntervalSince(toolStartTime) * 1000)
                         let toolName = tc.name
                         Task.detached { await TelemetryService.shared.track(.toolCall(toolName: toolName, success: true, durationMs: toolDurationMs)) }
+                        // Task 7: 记录工具调用审计日志（仅记录参数键，不记录完整内容）
+                        ToolAuditLogger.shared.log(toolName: tc.name, argumentsSummary: argsSummary, authorized: toolAuthorized, timestamp: toolStartTime)
                         // 补充 D：工具执行成功后发本地通知
                         NotificationService.shared.sendNotification(
                             title: NSLocalizedString("工具调用成功", comment: ""),
@@ -689,6 +745,8 @@ final class ChatViewModel {
                         messages.append(toolMsg)
                         try? modelContext.save()
                     } catch {
+                        // Task 7: 工具调用失败/未授权也记录审计日志
+                        ToolAuditLogger.shared.log(toolName: tc.name, argumentsSummary: argsSummary, authorized: toolAuthorized, timestamp: toolStartTime)
                         // Day 14: 工具执行失败埋点 + 错误埋点
                         let toolDurationMs = Int(Date().timeIntervalSince(toolStartTime) * 1000)
                         let toolName = tc.name

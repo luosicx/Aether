@@ -31,3 +31,13 @@ struct OnDeviceConfig: Codable, Sendable, Equatable {
     /// UserDefaults 缓存键
     static let userDefaultsKey = "ondevice_config_cache"
 }
+
+// MARK: - 敏感字段 Keychain 迁移基础设施
+
+extension OnDeviceConfig {
+    /// 敏感字段及其 Keychain account 映射（当前无敏感字段，留空）。
+    /// 若未来新增签名密钥或 API key，请在此添加映射（如 ["apiKey": "com.aether.ondevice.apiKey"]），
+    /// 并在 SettingsViewModel.saveOnDeviceConfig()/loadOnDeviceConfig() 中实现对应读写，
+    /// 同时将该字段从 UserDefaults JSON 中排除。
+    static let sensitiveKeychainAccounts: [String: String] = [:]
+}
