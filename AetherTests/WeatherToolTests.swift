@@ -470,4 +470,403 @@ final class WeatherToolTests: XCTestCase {
         _ = try await tool.execute(arguments: ["city": 123])
         XCTAssertFalse(geocodingCalled, "非 String city 应走定位流程而非 geocoding")
     }
+
+    // MARK: - Forecast 缺少字段
+
+    /// Forecast 返回缺少 temperature_2m 字段应返回天气查询失败
+    func testForecastMissingTemperatureReturnsFailure() async throws {
+        URLProtocol.registerClass(MockURLProtocol.self)
+        defer { URLProtocol.unregisterClass(MockURLProtocol.self) }
+
+        MockURLProtocol.requestHandler = { url in
+            let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            if url.absoluteString.contains("geocoding-api") {
+                let json = """
+                {"results":[{"name":"上海","latitude":31.2304,"longitude":121.4737}]}
+                """
+                return (json.data(using: .utf8)!, response)
+            } else {
+                // 缺少 temperature_2m
+                let json = """
+                {"current":{"relative_humidity_2m":60,"weather_code":0,"wind_speed_10m":10}}
+                """
+                return (json.data(using: .utf8)!, response)
+            }
+        }
+
+        let result = try await tool.execute(arguments: ["city": "上海"])
+        XCTAssertTrue(result.contains("天气查询失败"), "缺少 temperature 应返回天气查询失败，实际：\(result)")
+    }
+
+    /// Forecast 返回缺少 relative_humidity_2m 字段应返回天气查询失败
+    func testForecastMissingHumidityReturnsFailure() async throws {
+        URLProtocol.registerClass(MockURLProtocol.self)
+        defer { URLProtocol.unregisterClass(MockURLProtocol.self) }
+
+        MockURLProtocol.requestHandler = { url in
+            let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            if url.absoluteString.contains("geocoding-api") {
+                let json = """
+                {"results":[{"name":"上海","latitude":31.2304,"longitude":121.4737}]}
+                """
+                return (json.data(using: .utf8)!, response)
+            } else {
+                // 缺少 relative_humidity_2m
+                let json = """
+                {"current":{"temperature_2m":25,"weather_code":0,"wind_speed_10m":10}}
+                """
+                return (json.data(using: .utf8)!, response)
+            }
+        }
+
+        let result = try await tool.execute(arguments: ["city": "上海"])
+        XCTAssertTrue(result.contains("天气查询失败"), "缺少 humidity 应返回天气查询失败，实际：\(result)")
+    }
+
+    /// Forecast 返回缺少 wind_speed_10m 字段应返回天气查询失败
+    func testForecastMissingWindSpeedReturnsFailure() async throws {
+        URLProtocol.registerClass(MockURLProtocol.self)
+        defer { URLProtocol.unregisterClass(MockURLProtocol.self) }
+
+        MockURLProtocol.requestHandler = { url in
+            let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            if url.absoluteString.contains("geocoding-api") {
+                let json = """
+                {"results":[{"name":"上海","latitude":31.2304,"longitude":121.4737}]}
+                """
+                return (json.data(using: .utf8)!, response)
+            } else {
+                // 缺少 wind_speed_10m
+                let json = """
+                {"current":{"temperature_2m":25,"relative_humidity_2m":60,"weather_code":0}}
+                """
+                return (json.data(using: .utf8)!, response)
+            }
+        }
+
+        let result = try await tool.execute(arguments: ["city": "上海"])
+        XCTAssertTrue(result.contains("天气查询失败"), "缺少 wind_speed 应返回天气查询失败，实际：\(result)")
+    }
+
+    // MARK: - Geocoding 缺少字段
+
+    /// Geocoding 返回 results 缺少 name 字段应返回未找到城市
+    func testGeocodingMissingNameReturnsNotFound() async throws {
+        URLProtocol.registerClass(MockURLProtocol.self)
+        defer { URLProtocol.unregisterClass(MockURLProtocol.self) }
+
+        MockURLProtocol.requestHandler = { url in
+            let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            // 缺少 name
+            let json = """
+            {"results":[{"latitude":31.23,"longitude":121.47}]}
+            """
+            return (json.data(using: .utf8)!, response)
+        }
+
+        let result = try await tool.execute(arguments: ["city": "测试"])
+        XCTAssertTrue(result.contains("未找到城市"), "缺少 name 应返回未找到城市，实际：\(result)")
+    }
+
+    /// Geocoding 返回 results 缺少 longitude 字段应返回未找到城市
+    func testGeocodingMissingLongitudeReturnsNotFound() async throws {
+        URLProtocol.registerClass(MockURLProtocol.self)
+        defer { URLProtocol.unregisterClass(MockURLProtocol.self) }
+
+        MockURLProtocol.requestHandler = { url in
+            let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            // 缺少 longitude
+            let json = """
+            {"results":[{"name":"上海","latitude":31.2304}]}
+            """
+            return (json.data(using: .utf8)!, response)
+        }
+
+        let result = try await tool.execute(arguments: ["city": "上海"])
+        XCTAssertTrue(result.contains("未找到城市"), "缺少 longitude 应返回未找到城市，实际：\(result)")
+    }
+
+    // MARK: - 天气码 85/86（阵雪）
+
+    /// 天气码 85 应映射为「阵雪」
+    func testWeatherCode85MapsToSnowShowers() async throws {
+        try await assertWeatherCode(85, mapsTo: "阵雪")
+    }
+
+    /// 天气码 86 应映射为「阵雪」
+    func testWeatherCode86MapsToSnowShowers() async throws {
+        try await assertWeatherCode(86, mapsTo: "阵雪")
+    }
+
+    // MARK: - 天气码边界值
+
+    /// 天气码 1 应映射为「多云」（1...3 范围边界）
+    func testWeatherCode1MapsToCloudy() async throws {
+        try await assertWeatherCode(1, mapsTo: "多云")
+    }
+
+    /// 天气码 3 应映射为「多云」（1...3 范围边界）
+    func testWeatherCode3MapsToCloudy() async throws {
+        try await assertWeatherCode(3, mapsTo: "多云")
+    }
+
+    /// 天气码 48 应映射为「雾」（45...48 范围边界）
+    func testWeatherCode48MapsToFog() async throws {
+        try await assertWeatherCode(48, mapsTo: "雾")
+    }
+
+    /// 天气码 57 应映射为「毛毛雨」（51...57 范围边界）
+    func testWeatherCode57MapsToDrizzle() async throws {
+        try await assertWeatherCode(57, mapsTo: "毛毛雨")
+    }
+
+    /// 天气码 67 应映射为「雨」（61...67 范围边界）
+    func testWeatherCode67MapsToRain() async throws {
+        try await assertWeatherCode(67, mapsTo: "雨")
+    }
+
+    /// 天气码 77 应映射为「雪」（71...77 范围边界）
+    func testWeatherCode77MapsToSnow() async throws {
+        try await assertWeatherCode(77, mapsTo: "雪")
+    }
+
+    /// 天气码 82 应映射为「阵雨」（80...82 范围边界）
+    func testWeatherCode82MapsToShowers() async throws {
+        try await assertWeatherCode(82, mapsTo: "阵雨")
+    }
+
+    /// 天气码 99 应映射为「雷暴」（95...99 范围边界）
+    func testWeatherCode99MapsToThunderstorm() async throws {
+        try await assertWeatherCode(99, mapsTo: "雷暴")
+    }
+
+    // MARK: - definition 结构验证
+
+    /// definition 的 description 不应为空
+    func testDefinitionDescriptionIsNotEmpty() {
+        let def = tool.definition
+        XCTAssertFalse(def.description.isEmpty, "definition.description 不应为空")
+        XCTAssertTrue(def.description.contains("天气"), "description 应含「天气」关键词")
+    }
+
+    /// definition 的 city 字段 description 不应为空
+    func testDefinitionCityDescriptionIsNotEmpty() {
+        let def = tool.definition
+        let properties = def.parameters["properties"] as? [String: Any]
+        let cityProp = properties?["city"] as? [String: Any]
+        let cityDesc = cityProp?["description"] as? String
+        XCTAssertFalse(cityDesc?.isEmpty ?? true, "city 字段 description 不应为空")
+    }
+
+    // MARK: - URL 构造验证
+
+    /// execute 合法城市名时 geocoding URL 应包含编码后的城市名
+    func testGeocodingURLEncodesCityName() async throws {
+        URLProtocol.registerClass(MockURLProtocol.self)
+        defer { URLProtocol.unregisterClass(MockURLProtocol.self) }
+
+        var capturedURL: URL?
+        MockURLProtocol.requestHandler = { url in
+            let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            if url.absoluteString.contains("geocoding-api") {
+                capturedURL = url
+                let json = """
+                {"results":[{"name":"上海","latitude":31.2304,"longitude":121.4737}]}
+                """
+                return (json.data(using: .utf8)!, response)
+            } else {
+                let json = """
+                {"current":{"temperature_2m":25,"relative_humidity_2m":60,"weather_code":0,"wind_speed_10m":10}}
+                """
+                return (json.data(using: .utf8)!, response)
+            }
+        }
+
+        _ = try await tool.execute(arguments: ["city": "上海"])
+
+        XCTAssertNotNil(capturedURL, "应捕获 geocoding URL")
+        XCTAssertTrue(capturedURL?.absoluteString.contains("name=%E4%B8%8A%E6%B5%B7") ?? false,
+                       "geocoding URL 应包含 URL 编码后的城市名，实际：\(capturedURL?.absoluteString ?? "nil")")
+        XCTAssertTrue(capturedURL?.absoluteString.contains("count=1") ?? false,
+                       "geocoding URL 应含 count=1 参数")
+        XCTAssertTrue(capturedURL?.absoluteString.contains("language=zh") ?? false,
+                       "geocoding URL 应含 language=zh 参数")
+    }
+
+    /// execute 合法城市名时 forecast URL 应包含经纬度参数
+    func testForecastURLContainsCoordinates() async throws {
+        URLProtocol.registerClass(MockURLProtocol.self)
+        defer { URLProtocol.unregisterClass(MockURLProtocol.self) }
+
+        var forecastURL: URL?
+        MockURLProtocol.requestHandler = { url in
+            let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            if url.absoluteString.contains("geocoding-api") {
+                let json = """
+                {"results":[{"name":"上海","latitude":31.2304,"longitude":121.4737}]}
+                """
+                return (json.data(using: .utf8)!, response)
+            } else {
+                forecastURL = url
+                let json = """
+                {"current":{"temperature_2m":25,"relative_humidity_2m":60,"weather_code":0,"wind_speed_10m":10}}
+                """
+                return (json.data(using: .utf8)!, response)
+            }
+        }
+
+        _ = try await tool.execute(arguments: ["city": "上海"])
+
+        XCTAssertNotNil(forecastURL, "应捕获 forecast URL")
+        let urlString = forecastURL?.absoluteString ?? ""
+        XCTAssertTrue(urlString.contains("latitude=31.2304"), "forecast URL 应含 latitude 参数，实际：\(urlString)")
+        XCTAssertTrue(urlString.contains("longitude=121.4737"), "forecast URL 应含 longitude 参数，实际：\(urlString)")
+        XCTAssertTrue(urlString.contains("current=temperature_2m"), "forecast URL 应含 current 参数")
+    }
+
+    // MARK: - 负经纬度城市
+
+    /// execute 西半球城市（负经纬度）应正确构造 forecast URL 并返回天气
+    func testExecuteWithNegativeCoordinates() async throws {
+        URLProtocol.registerClass(MockURLProtocol.self)
+        defer { URLProtocol.unregisterClass(MockURLProtocol.self) }
+
+        MockURLProtocol.requestHandler = { url in
+            let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            if url.absoluteString.contains("geocoding-api") {
+                // 纽约：负经度
+                let json = """
+                {"results":[{"name":"New York","latitude":40.7128,"longitude":-74.0060}]}
+                """
+                return (json.data(using: .utf8)!, response)
+            } else {
+                let json = """
+                {"current":{"temperature_2m":15,"relative_humidity_2m":55,"weather_code":1,"wind_speed_10m":8}}
+                """
+                return (json.data(using: .utf8)!, response)
+            }
+        }
+
+        let result = try await tool.execute(arguments: ["city": "New York"])
+        XCTAssertTrue(result.contains("城市：New York"), "应返回城市名，实际：\(result)")
+        XCTAssertTrue(result.contains("温度："), "应含温度字段")
+        XCTAssertTrue(result.contains("天气：多云"), "weather_code=1 应映射为多云，实际：\(result)")
+    }
+
+    // MARK: - 完整输出格式
+
+    /// execute 输出温度为浮点数时应正确格式化（25.5 → "25.5"）
+    func testExecuteFormatFloatTemperature() async throws {
+        URLProtocol.registerClass(MockURLProtocol.self)
+        defer { URLProtocol.unregisterClass(MockURLProtocol.self) }
+
+        MockURLProtocol.requestHandler = { url in
+            let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            if url.absoluteString.contains("geocoding-api") {
+                let json = """
+                {"results":[{"name":"测试","latitude":30.0,"longitude":120.0}]}
+                """
+                return (json.data(using: .utf8)!, response)
+            } else {
+                let json = """
+                {"current":{"temperature_2m":25.5,"relative_humidity_2m":65.5,"weather_code":0,"wind_speed_10m":12.3}}
+                """
+                return (json.data(using: .utf8)!, response)
+            }
+        }
+
+        let result = try await tool.execute(arguments: ["city": "测试"])
+        XCTAssertTrue(result.contains("温度：25.5°C"), "浮点温度应保留一位小数，实际：\(result)")
+        XCTAssertTrue(result.contains("湿度：65.5%"), "浮点湿度应保留一位小数")
+        XCTAssertTrue(result.contains("风速：12.3 km/h"), "浮点风速应保留一位小数")
+    }
+
+    /// execute 输出零值应正确格式化（0 → "0"）
+    func testExecuteFormatZeroValues() async throws {
+        URLProtocol.registerClass(MockURLProtocol.self)
+        defer { URLProtocol.unregisterClass(MockURLProtocol.self) }
+
+        MockURLProtocol.requestHandler = { url in
+            let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            if url.absoluteString.contains("geocoding-api") {
+                let json = """
+                {"results":[{"name":"零度城市","latitude":0.0,"longitude":0.0}]}
+                """
+                return (json.data(using: .utf8)!, response)
+            } else {
+                let json = """
+                {"current":{"temperature_2m":0,"relative_humidity_2m":0,"weather_code":0,"wind_speed_10m":0}}
+                """
+                return (json.data(using: .utf8)!, response)
+            }
+        }
+
+        let result = try await tool.execute(arguments: ["city": "零度城市"])
+        XCTAssertTrue(result.contains("温度：0°C"), "零温度应显示为 0，实际：\(result)")
+        XCTAssertTrue(result.contains("湿度：0%"), "零湿度应显示为 0")
+        XCTAssertTrue(result.contains("风速：0 km/h"), "零风速应显示为 0")
+    }
+
+    // MARK: - Geocoding 返回多个结果
+
+    /// Geocoding 返回多个结果时应使用第一个结果
+    func testGeocodingMultipleResultsUsesFirst() async throws {
+        URLProtocol.registerClass(MockURLProtocol.self)
+        defer { URLProtocol.unregisterClass(MockURLProtocol.self) }
+
+        MockURLProtocol.requestHandler = { url in
+            let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            if url.absoluteString.contains("geocoding-api") {
+                // 返回多个结果，应使用第一个
+                let json = """
+                {"results":[{"name":"第一个城市","latitude":10.0,"longitude":20.0},{"name":"第二个城市","latitude":30.0,"longitude":40.0}]}
+                """
+                return (json.data(using: .utf8)!, response)
+            } else {
+                let json = """
+                {"current":{"temperature_2m":22,"relative_humidity_2m":50,"weather_code":0,"wind_speed_10m":5}}
+                """
+                return (json.data(using: .utf8)!, response)
+            }
+        }
+
+        let result = try await tool.execute(arguments: ["city": "测试"])
+        XCTAssertTrue(result.contains("城市：第一个城市"), "应使用第一个结果的城市名，实际：\(result)")
+    }
+
+    // MARK: - Geocoding 非 200 状态码
+
+    /// Geocoding 返回 301 重定向应返回天气查询失败
+    func testGeocodingRedirectReturnsFailure() async throws {
+        URLProtocol.registerClass(MockURLProtocol.self)
+        defer { URLProtocol.unregisterClass(MockURLProtocol.self) }
+
+        MockURLProtocol.requestHandler = { url in
+            let response = HTTPURLResponse(url: url, statusCode: 301, httpVersion: nil, headerFields: nil)!
+            return (Data(), response)
+        }
+
+        let result = try await tool.execute(arguments: ["city": "任何城市"])
+        XCTAssertTrue(result.contains("天气查询失败"), "301 应返回天气查询失败，实际：\(result)")
+    }
+
+    // MARK: - Forecast 返回 results 为非数组类型
+
+    /// Geocoding 返回 results 为非数组类型（字符串）应返回未找到城市
+    func testGeocodingResultsNonArrayReturnsNotFound() async throws {
+        URLProtocol.registerClass(MockURLProtocol.self)
+        defer { URLProtocol.unregisterClass(MockURLProtocol.self) }
+
+        MockURLProtocol.requestHandler = { url in
+            let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            // results 为字符串而非数组
+            let json = """
+            {"results":"invalid"}
+            """
+            return (json.data(using: .utf8)!, response)
+        }
+
+        let result = try await tool.execute(arguments: ["city": "测试"])
+        XCTAssertTrue(result.contains("未找到城市"), "results 为非数组应返回未找到城市，实际：\(result)")
+    }
 }

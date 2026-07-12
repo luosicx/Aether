@@ -65,4 +65,35 @@ final class ConversationModelTests: XCTestCase {
         XCTAssertEqual(chunk.choices?.count, 0, "空 choices 数组应解码为 0 长度")
         XCTAssertNil(chunk.usage)
     }
+
+    // MARK: - Conversation.userActivity 测试
+
+    func testConversationUserActivityNoMessages() {
+        let conv = Conversation(title: "测试会话")
+        let activity = conv.userActivity
+        XCTAssertEqual(activity.activityType, "com.aether.conversation")
+        XCTAssertEqual(activity.title, "测试会话")
+        XCTAssertEqual(activity.userInfo?["conversationId"] as? String, conv.id.uuidString)
+        XCTAssertEqual(activity.userInfo?["title"] as? String, "测试会话")
+        XCTAssertNil(activity.userInfo?["lastMessage"], "无消息时 lastMessage 应为 nil")
+        XCTAssertTrue(activity.isEligibleForHandoff)
+        XCTAssertTrue(activity.isEligibleForSearch)
+    }
+
+    func testConversationUserActivityWithMessages() {
+        let conv = Conversation(title: "带消息的会话")
+        let msg = ChatMessage(role: "assistant", content: "最后一条消息")
+        msg.conversation = conv
+        conv.messages = [msg]
+        let activity = conv.userActivity
+        XCTAssertEqual(activity.userInfo?["lastMessage"] as? String, "最后一条消息")
+    }
+
+    func testConversationCustomInit() {
+        let conv = Conversation(title: "自定义", systemPrompt: "你是翻译助手")
+        XCTAssertEqual(conv.title, "自定义")
+        XCTAssertEqual(conv.systemPrompt, "你是翻译助手")
+        XCTAssertEqual(conv.unreadCount, 0)
+        XCTAssertFalse(conv.isPinned)
+    }
 }

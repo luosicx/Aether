@@ -77,4 +77,44 @@ final class OnDeviceModelCatalogTests: XCTestCase {
         XCTAssertEqual(DownloadSource.domestic.rawValue, "domestic", "国内源 rawValue 应为 domestic")
         XCTAssertEqual(DownloadSource.international.rawValue, "international", "国外源 rawValue 应为 international")
     }
+
+    // MARK: - 补充小缺口测试
+
+    /// 验证 DownloadSource.displayName 的具体字符串内容。
+    /// 覆盖 OnDeviceModelCatalog.swift 第 10-13 行的 switch case 字符串字面量。
+    func testDownloadSourceDisplayNameContent() {
+        XCTAssertEqual(DownloadSource.domestic.displayName, "国内（ModelScope）",
+                       "domestic displayName 应为 '国内（ModelScope）'")
+        XCTAssertEqual(DownloadSource.international.displayName, "国外（HuggingFace）",
+                       "international displayName 应为 '国外（HuggingFace）'")
+    }
+
+    /// 遍历 OnDeviceModelCatalog.models，对每个模型验证 url(for:) 的两个分支。
+    /// 覆盖 OnDeviceModelEntry.url(for:) 的 domestic 与 international 两个 case 分支。
+    func testURLForDownloadSourceForAllModels() {
+        for model in OnDeviceModelCatalog.models {
+            XCTAssertEqual(model.url(for: .domestic), model.modelScopeURL,
+                           "\(model.id): 国内源应返回 ModelScope URL")
+            XCTAssertEqual(model.url(for: .international), model.huggingFaceURL,
+                           "\(model.id): 国外源应返回 HuggingFace URL")
+        }
+    }
+
+    /// 验证 DownloadSource 的 Codable 往返：编码后解码应与原值相等。
+    func testDownloadSourceCodableRoundTrip() throws {
+        for source in DownloadSource.allCases {
+            let data = try JSONEncoder().encode(source)
+            let decoded = try JSONDecoder().decode(DownloadSource.self, from: data)
+            XCTAssertEqual(decoded, source, "DownloadSource.\(source) Codable 往返应保持一致")
+        }
+    }
+
+    /// 验证 DownloadSource 的 rawValue 正确，且可通过 rawValue 构造对应 case。
+    func testDownloadSourceRawValues() {
+        XCTAssertEqual(DownloadSource.domestic.rawValue, "domestic")
+        XCTAssertEqual(DownloadSource.international.rawValue, "international")
+        XCTAssertEqual(DownloadSource(rawValue: "domestic"), .domestic)
+        XCTAssertEqual(DownloadSource(rawValue: "international"), .international)
+        XCTAssertNil(DownloadSource(rawValue: "unknown"), "未知 rawValue 应构造失败返回 nil")
+    }
 }

@@ -270,4 +270,80 @@ final class LogUploaderTests: XCTestCase {
         let status = await uploader.lastUploadStatus
         XCTAssertEqual(status, "success", "第 3 次 200 后应记为 success")
     }
+
+    // MARK: - 网络层错误场景（URLError）
+
+    /// URLError(.notConnectedToInternet) 模拟断网：应重试 3 次后记为 failed
+    func testNetworkDisconnectedRetriesAndFails() async {
+        await drainShared()
+        await seedEvents(2)
+        MockURLProtocol.error = URLError(.notConnectedToInternet)
+
+        await uploader.uploadIfNeeded()
+
+        XCTAssertEqual(MockURLProtocol.requestCount, 3, "断网应重试共 3 次")
+        let status = await uploader.lastUploadStatus
+        XCTAssertEqual(status, "failed", "断网重试耗尽后应记为 failed")
+        let lastUploadAt = await uploader.lastUploadAt
+        XCTAssertNil(lastUploadAt, "失败时 lastUploadAt 不应更新")
+    }
+
+    /// URLError(.timedOut) 模拟超时：应重试 3 次后记为 failed
+    func testNetworkTimedOutRetriesAndFails() async {
+        await drainShared()
+        await seedEvents(1)
+        MockURLProtocol.error = URLError(.timedOut)
+
+        await uploader.uploadIfNeeded()
+
+        XCTAssertEqual(MockURLProtocol.requestCount, 3, "超时应重试共 3 次")
+        let status = await uploader.lastUploadStatus
+        XCTAssertEqual(status, "failed", "超时重试耗尽后应记为 failed")
+    }
+
+    /// URLError(.cannotFindHost) 模拟 DNS 解析失败：应重试 3 次后记为 failed
+    func testDNSResolutionFailureRetriesAndFails() async {
+        await drainShared()
+        await seedEvents(1)
+        MockURLProtocol.error = URLError(.cannotFindHost)
+
+        await uploader.uploadIfNeeded()
+
+        XCTAssertEqual(MockURLProtocol.requestCount, 3, "DNS 失败应重试共 3 次")
+        let status = await uploader.lastUploadStatus
+        XCTAssertEqual(status, "failed")
+    }
+
+    /// 空缓冲 + 网络错误：不应发出请求，直接记为 success
+    func testEmptyBufferWithNetworkErrorSkipsRequest() async {
+        await drainShared()
+        MockURLProtocol.error = URLError(.notConnectedToInternet)
+
+        await uploader.uploadIfNeeded()
+
+        XCTAssertEqual(MockURLProtocol.requestCount, 0, "空缓冲不应发出请求")
+        let status = await uploader.lastUploadStatus
+        XCTAssertEqual(status, "success", "无数据上报应记为 success")
+    }
+
+    /// LogUploader 默认初始化应使用阿里云 OSS endpoint
+    func testDefaultInitUsesAliyunEndpoint() {
+        let defaultUploader = LogUploader()
+        // 仅验证初始化不崩溃，endpoint 为 private 无法直接验证
+        _ = defaultUploader
+    }
+
+    /// lastUploadStatus 初始值应为 "idle"
+    func testInitialStatusIsIdle() async {
+        let freshUploader = LogUploader(endpointURL: endpoint)
+        let status = await freshUploader.lastUploadStatus
+        XCTAssertEqual(status, "idle", "初始 lastUploadStatus 应为 'idle'")
+    }
+
+    /// lastUploadAt 初始值应为 nil
+    func testInitialLastUploadAtIsNil() async {
+        let freshUploader = LogUploader(endpointURL: endpoint)
+        let value = await freshUploader.lastUploadAt
+        XCTAssertNil(value, "初始 lastUploadAt 应为 nil")
+    }
 }

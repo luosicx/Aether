@@ -191,4 +191,68 @@ final class RemoteConfigServiceTests: XCTestCase {
         // default 的 featureFlags 应等于 FeatureFlags.default
         XCTAssertEqual(def.featureFlags, flags)
     }
+
+    // MARK: - 补充小缺口测试
+
+    /// 拉取失败且本地缓存损坏（非法 JSON）时，loadCachedConfig() 的 catch 块返回 nil，
+    /// applyFallback 走 fallbackConfig() 分支，currentConfig 回退到 .default。
+    /// 覆盖 RemoteConfigService.swift 第 80-83 行的解码失败 catch 块。
+    func testFetchFailureWithCorruptedCacheFallsBackToDefault() async {
+        // 写入损坏的 JSON 数据到 UserDefaults（cacheKey="remote_config_cache"）
+        let corruptedData = Data("{ this is not valid json ".utf8)
+        UserDefaults.standard.set(corruptedData, forKey: cacheKey)
+
+        // 模拟拉取失败：HTTP 500
+        MockURLProtocol.responseData = Data("{}".utf8)
+        MockURLProtocol.statusCode = 500
+        await service.fetch()
+
+        let config = await service.currentConfig
+        // 损坏缓存无法解码 → loadCachedConfig 返回 nil → fallbackConfig() → 字段为 .default
+        XCTAssertEqual(config.defaultSystemPrompt, RemoteConfig.default.defaultSystemPrompt,
+                       "缓存损坏时应回退到 .default 的 defaultSystemPrompt")
+        XCTAssertEqual(config.defaultModel, RemoteConfig.default.defaultModel,
+                       "缓存损坏时应回退到 .default 的 defaultModel")
+        XCTAssertEqual(config.defaultProvider, RemoteConfig.default.defaultProvider,
+                       "缓存损坏时应回退到 .default 的 defaultProvider")
+        XCTAssertEqual(config.configVersion, RemoteConfig.default.configVersion,
+                       "缓存损坏时应回退到 .default 的 configVersion")
+        XCTAssertNotNil(config.fetchedAt, "fallbackConfig 应写入当前时间避免反复尝试拉取")
+    }
+
+    /// 拉取失败且本地缓存的 fetchedAt 为 nil 时，loadCachedConfig() 的 guard 分支返回 nil，
+    /// applyFallback 走 fallbackConfig() 分支，currentConfig 回退到 .default。
+    /// 覆盖 RemoteConfigService.swift 第 72-74 行的 fetchedAt 为 nil 返回 nil 分支。
+    func testFetchFailureWithCacheMissingFetchedAtFallsBackToDefault() async {
+        // 构造 fetchedAt=nil 的 RemoteConfig（模拟旧版本缓存缺失时间戳字段）
+        let cacheConfig = RemoteConfig(
+            defaultSystemPrompt: "无时间戳缓存",
+            defaultProvider: "qwen",
+            defaultModel: "no-fetched-at-model",
+            configVersion: 42,
+            fetchedAt: nil  // 关键：fetchedAt 缺失
+        )
+        guard let cachedData = try? JSONEncoder().encode(cacheConfig) else {
+            XCTFail("编码失败")
+            return
+        }
+        UserDefaults.standard.set(cachedData, forKey: cacheKey)
+
+        // 模拟拉取失败：HTTP 500
+        MockURLProtocol.responseData = Data("{}".utf8)
+        MockURLProtocol.statusCode = 500
+        await service.fetch()
+
+        let config = await service.currentConfig
+        // fetchedAt=nil → loadCachedConfig 返回 nil → fallbackConfig() → 字段为 .default
+        XCTAssertEqual(config.defaultSystemPrompt, RemoteConfig.default.defaultSystemPrompt,
+                       "缓存 fetchedAt 缺失时应回退到 .default 的 defaultSystemPrompt")
+        XCTAssertEqual(config.defaultModel, RemoteConfig.default.defaultModel,
+                       "缓存 fetchedAt 缺失时应回退到 .default 的 defaultModel，而非缓存值")
+        XCTAssertEqual(config.defaultProvider, RemoteConfig.default.defaultProvider,
+                       "缓存 fetchedAt 缺失时应回退到 .default 的 defaultProvider")
+        XCTAssertEqual(config.configVersion, RemoteConfig.default.configVersion,
+                       "缓存 fetchedAt 缺失时应回退到 .default 的 configVersion")
+        XCTAssertNotNil(config.fetchedAt, "fallbackConfig 应写入当前时间避免反复尝试拉取")
+    }
 }

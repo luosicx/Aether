@@ -143,4 +143,83 @@ final class BFFConfigTests: XCTestCase {
         let b = BFFConfig.default
         XCTAssertEqual(a, b, ".default 多次访问应返回相等配置")
     }
+
+    // MARK: - 补充小缺口测试
+
+    /// 全面验证 BFFConfig.default 的所有字段（enabled、endpointURL、userToken、chatRateLimitPerMin、
+    /// embedRateLimitPerMin、userDefaultsKey）。
+    /// 注意：endpointURL 的 `?? URL(fileURLWithPath: "")` 兜底分支（BFFConfig.swift 第 9 行）
+    /// 在默认字符串 "https://aether-bff.example.com" 为合法 URL 时永远不会触发，
+    /// 该分支为防御性代码，无法在不修改实现的前提下被测试覆盖。
+    func testDefaultConfigAllFieldsComprehensive() {
+        let config = BFFConfig.default
+
+        // enabled
+        XCTAssertFalse(config.enabled, "默认 enabled 应为 false")
+
+        // endpointURL
+        XCTAssertEqual(config.endpointURL.absoluteString, "https://aether-bff.example.com",
+                       "默认 endpointURL 应为占位地址")
+        XCTAssertEqual(config.endpointURL.scheme, "https", "默认 endpointURL scheme 应为 https")
+        XCTAssertEqual(config.endpointURL.host, "aether-bff.example.com",
+                       "默认 endpointURL host 应为 aether-bff.example.com")
+
+        // userToken
+        XCTAssertEqual(config.userToken, "", "默认 userToken 应为空字符串")
+
+        // chatRateLimitPerMin
+        XCTAssertEqual(config.chatRateLimitPerMin, 20, "默认 chatRateLimitPerMin 应为 20")
+
+        // embedRateLimitPerMin
+        XCTAssertEqual(config.embedRateLimitPerMin, 10, "默认 embedRateLimitPerMin 应为 10")
+
+        // userDefaultsKey
+        XCTAssertEqual(BFFConfig.userDefaultsKey, "bff_config_cache",
+                       "userDefaultsKey 应为 'bff_config_cache'")
+
+        // 整体应等于 BFFConfig()
+        XCTAssertEqual(config, BFFConfig(), "BFFConfig.default 应与 BFFConfig() 相等")
+    }
+
+    /// 验证自定义 endpointURL 的编解码往返：设置一个自定义 https endpoint，编码后解码应保持一致。
+    func testEncodeAndDecodeWithCustomEndpoint() throws {
+        var config = BFFConfig()
+        let customEndpoint = URL(string: "https://custom-bff.gateway.example.com/v1")!
+        config.endpointURL = customEndpoint
+        config.enabled = true
+        config.userToken = "custom-token-abc"
+
+        let data = try JSONEncoder().encode(config)
+        let decoded = try JSONDecoder().decode(BFFConfig.self, from: data)
+
+        XCTAssertEqual(decoded.endpointURL, customEndpoint, "往返后 endpointURL 应保持一致")
+        XCTAssertEqual(decoded.endpointURL.absoluteString, "https://custom-bff.gateway.example.com/v1",
+                       "往返后 endpointURL 字符串应保持一致")
+        XCTAssertEqual(decoded.enabled, true, "往返后 enabled 应为 true")
+        XCTAssertEqual(decoded.userToken, "custom-token-abc", "往返后 userToken 应保持一致")
+        XCTAssertEqual(decoded, config, "往返后整体应相等")
+    }
+
+    /// 验证两个相同的自定义配置应相等（Equatable 语义）。
+    func testCustomConfigEquality() {
+        var a = BFFConfig()
+        a.enabled = true
+        a.endpointURL = URL(string: "https://eq.example.com")!
+        a.userToken = "same-token"
+        a.chatRateLimitPerMin = 30
+        a.embedRateLimitPerMin = 15
+
+        var b = BFFConfig()
+        b.enabled = true
+        b.endpointURL = URL(string: "https://eq.example.com")!
+        b.userToken = "same-token"
+        b.chatRateLimitPerMin = 30
+        b.embedRateLimitPerMin = 15
+
+        XCTAssertEqual(a, b, "两个字段完全相同的自定义配置应相等")
+
+        // 任一字段不同则不应相等
+        b.chatRateLimitPerMin = 99
+        XCTAssertNotEqual(a, b, "chatRateLimitPerMin 不同时配置不应相等")
+    }
 }
