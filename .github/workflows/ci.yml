@@ -144,8 +144,8 @@ jobs:
           # - Protocols/, Actors/: protocol/actor definitions
           # - AetherUITests/: UI test target code (0% coverage, not source under test)
           # - AetherWatch/: watchOS app target (different platform)
-          # - AetherTests/: unit test code (excluded to measure only source code coverage)
-          EXCLUDE_PATTERNS = ["/Views/", "/DesignSystem/", "/App/AetherApp", "/Protocols/", "/Actors/", "/AetherUITests/", "/AetherWatch/", "/AetherTests/"]
+          # Note: AetherTests/ is NOT excluded - test code coverage contributes to overall coverage
+          EXCLUDE_PATTERNS = ["/Views/", "/DesignSystem/", "/App/AetherApp", "/Protocols/", "/Actors/", "/AetherUITests/", "/AetherWatch/"]
           for m in pattern.finditer(text):
               path = m.group(1)
               cov = int(m.group(3))
@@ -204,16 +204,27 @@ jobs:
           # 解析文本格式：每行一个文件路径 + 覆盖率百分比 + (covered/total)
           # 格式：  /path/to/file.swift    100.00% (92/92)
           pattern = re.compile(r"^\s+(/\S+\.swift)\s+([\d.]+)%\s+\((\d+)/(\d+)\)", re.MULTILINE)
+          # 获取项目根目录，用于将绝对路径转换为相对路径
+          # SonarCloud 期望相对路径（如 Aether/Services/MyService.swift）
+          project_root = os.getcwd()
           packages = {}
           total_covered = 0
           total_valid = 0
           for m in pattern.finditer(text):
-              path = m.group(1)
+              abs_path = m.group(1)
               cov = int(m.group(3))
               tot = int(m.group(4))
-              filename = os.path.basename(path)
-              pkg_dir = os.path.dirname(path)
-              packages.setdefault(pkg_dir, []).append((filename, path, cov, tot))
+              # 将绝对路径转换为相对于项目根目录的相对路径
+              # xccov 输出: /Users/runner/work/Aether/Aether/Aether/Services/MyService.swift
+              # 项目根: /Users/runner/work/Aether/Aether/
+              # 相对路径: Aether/Services/MyService.swift
+              try:
+                  rel_path = os.path.relpath(abs_path, project_root)
+              except ValueError:
+                  rel_path = abs_path
+              filename = os.path.basename(rel_path)
+              pkg_dir = os.path.dirname(rel_path)
+              packages.setdefault(pkg_dir, []).append((filename, rel_path, cov, tot))
               total_covered += cov
               total_valid += tot
           if total_valid == 0:
@@ -231,6 +242,9 @@ jobs:
           root.set('version', '0.1')
           root.set('timestamp', '0')
           ET.SubElement(root, 'sources')
+          sources_el = root.find('sources')
+          source_el = ET.SubElement(sources_el, 'source')
+          source_el.text = project_root
           packages_el = ET.SubElement(root, 'packages')
           classes_el = ET.SubElement(root, 'classes')
           for pkg_path, pkg_files in packages.items():
@@ -257,6 +271,7 @@ jobs:
           ET.indent(tree, space='  ', level=0)
           tree.write(output_xml, encoding='utf-8', xml_declaration=True)
           print(f"cobertura.xml written: line-rate={line_rate:.4f} ({total_covered}/{total_valid} lines)")
+          print(f"Sample paths (relative): {[os.path.dirname(os.path.relpath(m.group(1), project_root)) for m in list(pattern.finditer(text))[:3]]}")
           PYEOF
           # 校验
           if [ ! -f "coverage-report/cobertura.xml" ]; then
@@ -268,7 +283,7 @@ jobs:
 
       - name: Upload cobertura report artifact
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: cobertura-report
           path: coverage-report/cobertura.xml
@@ -277,7 +292,7 @@ jobs:
 
       - name: Upload test results artifact
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: ut-test-results
           path: TestResults.xcresult
@@ -375,7 +390,7 @@ jobs:
 
       - name: Upload UIT results artifact
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: uit-test-results
           path: UITestResults.xcresult
