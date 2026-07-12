@@ -203,7 +203,6 @@ jobs:
               text = f.read()
           pattern = re.compile(r"^\s+(/\S+\.swift)\s+([\d.]+)%\s+\((\d+)/(\d+)\)", re.MULTILINE)
           project_root = os.getcwd()
-          # 路径相对于项目根目录（如 Aether/Services/MyService.swift）
           EXCLUDE_PATTERNS = [
               "/Views/", "/DesignSystem/", "/App/AetherApp",
               "/Protocols/", "/Actors/", "/AetherUITests/",
@@ -224,13 +223,31 @@ jobs:
                   continue
               if any(p in rel_path for p in EXCLUDE_PATTERNS):
                   continue
-              files.append((rel_path, cov, tot))
-              total_covered += cov
-              total_valid += tot
+              # 读取实际源文件行数，确保 lineNumber 不超过文件行数
+              # （xccov 的 tot 是可执行单元数，可能超过实际文件行数）
+              abs_file_path = os.path.join(project_root, rel_path)
+              try:
+                  with open(abs_file_path, 'r') as sf:
+                      actual_lines = sum(1 for _ in sf)
+              except (IOError, OSError):
+                  actual_lines = tot  # fallback
+              # 如果可执行单元数超过文件行数，按比例缩放
+              if actual_lines > 0:
+                  max_lines = min(tot, actual_lines)
+                  if tot > 0:
+                      scaled_cov = int(round(cov * max_lines / tot))
+                  else:
+                      scaled_cov = 0
+                  scaled_tot = max_lines
+              else:
+                  scaled_cov = cov
+                  scaled_tot = tot
+              files.append((rel_path, scaled_cov, scaled_tot))
+              total_covered += scaled_cov
+              total_valid += scaled_tot
           if total_valid == 0:
               print("ERROR: no coverage data found in report", file=sys.stderr)
               sys.exit(1)
-          # 手动写 XML，避免 ElementTree 的 xml_declaration 等格式问题
           with open(output_xml, 'w', encoding='utf-8') as f:
               f.write('<coverage version="1">\n')
               for rel_path, f_cov, f_tot in files:
