@@ -21,40 +21,8 @@ jobs:
         with:
           xcode-version: 'latest'
 
-      - name: Cache Build Products
-        uses: actions/cache@v5
-        with:
-          path: build
-          key: build-ut-${{ runner.os }}-${{ hashFiles('Aether.xcodeproj/project.pbxproj', '**/*.swift') }}
-          restore-keys: |
-            build-ut-${{ runner.os }}-
-
       - name: Setup iOS Simulator
-        run: |
-          # Check if iPhone 17 simulator exists
-          if ! xcrun simctl list devices available | grep -q "iPhone 17"; then
-            # Get latest iOS runtime
-            RUNTIME=$(xcrun simctl list runtimes -j | python3 -c "
-            import json, sys
-            data = json.load(sys.stdin)
-            for r in data['runtimes']:
-                if 'iOS' in r['name'] and r['isAvailable']:
-                    print(r['identifier'])
-            " | tail -1)
-            # Get iPhone device type (prefer iPhone 17, fallback to others)
-            DEVTYPE=$(xcrun simctl list devicetypes -j | python3 -c "
-            import json, sys
-            data = json.load(sys.stdin)
-            for name in ['iPhone 17', 'iPhone 16 Pro', 'iPhone 16', 'iPhone 15 Pro', 'iPhone 15']:
-                for d in data['devicetypes']:
-                    if d['name'] == name:
-                        print(d['identifier'])
-                        sys.exit(0)
-            ")
-            echo "Creating iPhone 17 simulator with device type: $DEVTYPE, runtime: $RUNTIME"
-            xcrun simctl create "iPhone 17" "$DEVTYPE" "$RUNTIME"
-          fi
-          xcrun simctl list devices available | grep iPhone
+        run: bash scripts/ci-setup-simulator.sh
 
       - name: Build for Testing
         run: |
@@ -101,12 +69,6 @@ jobs:
             exit 1
           fi
           echo "xcodebuild exited non-zero but all tests passed (simulator instability)"
-
-      - name: Code Coverage Report
-        if: always()
-        run: |
-          echo "=== Code Coverage Report ==="
-          xcrun xccov view --report TestResults.xcresult || echo "Coverage report unavailable"
 
       - name: Check Coverage Threshold (≥ 90%, excluding Views/DesignSystem/App/Protocols/TestTargets)
         id: coverage
@@ -277,14 +239,6 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: Upload test results artifact
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: ut-test-results
-          path: TestResults.xcresult
-          if-no-files-found: warn
-
   ui-tests:
     runs-on: macos-15
     timeout-minutes: 25
@@ -296,40 +250,8 @@ jobs:
         with:
           xcode-version: 'latest'
 
-      - name: Cache Build Products
-        uses: actions/cache@v5
-        with:
-          path: build
-          key: build-uit-${{ runner.os }}-${{ hashFiles('Aether.xcodeproj/project.pbxproj', '**/*.swift') }}
-          restore-keys: |
-            build-uit-${{ runner.os }}-
-
       - name: Setup iOS Simulator
-        run: |
-          # Check if iPhone 17 simulator exists
-          if ! xcrun simctl list devices available | grep -q "iPhone 17"; then
-            # Get latest iOS runtime
-            RUNTIME=$(xcrun simctl list runtimes -j | python3 -c "
-            import json, sys
-            data = json.load(sys.stdin)
-            for r in data['runtimes']:
-                if 'iOS' in r['name'] and r['isAvailable']:
-                    print(r['identifier'])
-            " | tail -1)
-            # Get iPhone device type (prefer iPhone 17, fallback to others)
-            DEVTYPE=$(xcrun simctl list devicetypes -j | python3 -c "
-            import json, sys
-            data = json.load(sys.stdin)
-            for name in ['iPhone 17', 'iPhone 16 Pro', 'iPhone 16', 'iPhone 15 Pro', 'iPhone 15']:
-                for d in data['devicetypes']:
-                    if d['name'] == name:
-                        print(d['identifier'])
-                        sys.exit(0)
-            ")
-            echo "Creating iPhone 17 simulator with device type: $DEVTYPE, runtime: $RUNTIME"
-            xcrun simctl create "iPhone 17" "$DEVTYPE" "$RUNTIME"
-          fi
-          xcrun simctl list devices available | grep iPhone
+        run: bash scripts/ci-setup-simulator.sh
 
       - name: Build for Testing
         run: |
@@ -377,14 +299,6 @@ jobs:
           fi
           echo "xcodebuild exited non-zero but all UIT tests passed (simulator instability)"
 
-      - name: Upload UIT results artifact
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: uit-test-results
-          path: UITestResults.xcresult
-          if-no-files-found: warn
-
   # Coverage status check: blocks PR merge if coverage < 90%
   coverage-summary:
     needs: [unit-tests, ui-tests]
@@ -421,12 +335,6 @@ jobs:
         with:
           xcode-version: 'latest'
 
-      - name: Cache SonarQube packages
-        uses: actions/cache@v5
-        with:
-          path: ~/.sonar/cache
-          key: ${{ runner.os }}-sonar
-
       - name: Download coverage report
         uses: actions/download-artifact@v7
         with:
@@ -446,33 +354,6 @@ jobs:
             exit 1
           fi
           echo "coverage.xml verified successfully with real coverage data"
-
-      - name: Disable SonarCloud Automatic Analysis
-        # 如果 SonarCloud 开启了 Automatic Analysis，会与 CI 分析冲突
-        # 尝试多个 API 端点禁用 Automatic Analysis
-        run: |
-          echo "Disabling Automatic Analysis on SonarCloud..."
-          # 尝试端点 1: project_analysis/set_automatic_analysis
-          HTTP_CODE=$(curl -s -o /tmp/sonar-api-response.txt -w "%{http_code}" \
-            -X POST "${{ secrets.SONAR_HOST_URL }}/api/project_analysis/set_automatic_analysis" \
-            -u "${{ secrets.SONAR_TOKEN }}:" \
-            -d "project=luosicx_Aether" \
-            -d "automatic_analysis=false" 2>/dev/null)
-          echo "Endpoint 1 (set_automatic_analysis): HTTP $HTTP_CODE"
-          cat /tmp/sonar-api-response.txt 2>/dev/null || true
-
-          # 尝试端点 2: settings/set (sonar.automaticAnalysis setting)
-          HTTP_CODE2=$(curl -s -o /tmp/sonar-api-response2.txt -w "%{http_code}" \
-            -X POST "${{ secrets.SONAR_HOST_URL }}/api/settings/set" \
-            -u "${{ secrets.SONAR_TOKEN }}:" \
-            -d "component=luosicx_Aether" \
-            -d "key=sonar.automaticAnalysis" \
-            -d "value=false" 2>/dev/null)
-          echo "Endpoint 2 (settings/set): HTTP $HTTP_CODE2"
-          cat /tmp/sonar-api-response2.txt 2>/dev/null || true
-
-          # 无论 API 是否成功都继续，如果 API 失败扫描会再次报错
-          echo "Automatic Analysis disable attempted, continuing to scan..."
 
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v8
