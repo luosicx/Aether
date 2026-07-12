@@ -188,50 +188,36 @@ jobs:
         if: always()
         run: |
           mkdir -p coverage-report
-          # 直接在 unit-tests job 中生成 cobertura.xml（避免 xcresult artifact 传输损坏）
-          python3 - TestResults.xcresult coverage-report/cobertura.xml << 'PYEOF'
-          import json, subprocess, os, sys
+          # 使用 xcrun xccov view --report 的文本输出生成 cobertura.xml
+          # （xcrun xccov view --json 在 CI 中返回 "unrecognized file format"，但 --report 可正常工作）
+          xcrun xccov view --report TestResults.xcresult > /tmp/coverage_report.txt 2>/dev/null || {
+            echo "ERROR: xccov view --report failed"
+            cat /tmp/coverage_report.txt
+            exit 1
+          }
+          python3 - /tmp/coverage_report.txt coverage-report/cobertura.xml << 'PYEOF'
+          import re, os, sys
           import xml.etree.ElementTree as ET
-          xcresult_path, output_xml = sys.argv[1], sys.argv[2]
-          proc = subprocess.run(
-              ['xcrun', 'xccov', 'view', '--json', xcresult_path],
-              capture_output=True, text=True
-          )
-          if proc.returncode != 0:
-              print(f"ERROR: xccov view failed: {proc.stderr}", file=sys.stderr)
-              sys.exit(1)
-          data = json.loads(proc.stdout)
+          report_path, output_xml = sys.argv[1], sys.argv[2]
+          with open(report_path, 'r') as f:
+              text = f.read()
+          # 解析文本格式：每行一个文件路径 + 覆盖率百分比 + (covered/total)
+          # 格式：  /path/to/file.swift    100.00% (92/92)
+          pattern = re.compile(r"^\s+(/\S+\.swift)\s+([\d.]+)%\s+\((\d+)/(\d+)\)", re.MULTILINE)
           packages = {}
           total_covered = 0
           total_valid = 0
-          for target in data.get('targets', []):
-              for f in target.get('files', []):
-                  path = f.get('path', '')
-                  if not path:
-                      continue
-                  filename = os.path.basename(path)
-                  pkg_dir = os.path.dirname(path)
-                  lines = f.get('lines', [])
-                  file_cov = 0
-                  file_tot = 0
-                  line_entries = []
-                  for line in lines:
-                      ln = line.get('line', line.get('lineNumber', 0))
-                      if not ln or int(ln) <= 0:
-                          continue
-                      count = line.get('executionCount', 0)
-                      hits = int(count) if count else 0
-                      file_tot += 1
-                      if hits > 0:
-                          file_cov += 1
-                      line_entries.append((int(ln), hits))
-                  total_covered += file_cov
-                  total_valid += file_tot
-                  packages.setdefault(pkg_dir, []).append(
-                      (filename, path, file_cov, file_tot, line_entries)
-                  )
+          for m in pattern.finditer(text):
+              path = m.group(1)
+              cov = int(m.group(3))
+              tot = int(m.group(4))
+              filename = os.path.basename(path)
+              pkg_dir = os.path.dirname(path)
+              packages.setdefault(pkg_dir, []).append((filename, path, cov, tot))
+              total_covered += cov
+              total_valid += tot
           if total_valid == 0:
-              print("ERROR: no coverage lines found in xcresult", file=sys.stderr)
+              print("ERROR: no coverage data found in report", file=sys.stderr)
               sys.exit(1)
           line_rate = total_covered / total_valid
           root = ET.Element('coverage')
@@ -255,26 +241,18 @@ jobs:
               pkg_el.set('name', pkg_path)
               pkg_el.set('line-rate', f'{pkg_rate:.4f}')
               pkg_classes_el = ET.SubElement(pkg_el, 'classes')
-              for filename, path, f_cov, f_tot, line_entries in pkg_files:
+              for filename, path, f_cov, f_tot in pkg_files:
                   f_rate = f_cov / f_tot if f_tot > 0 else 0.0
                   cls_el = ET.SubElement(pkg_classes_el, 'class')
                   cls_el.set('name', filename)
                   cls_el.set('filename', path)
                   cls_el.set('line-rate', f'{f_rate:.4f}')
-                  lines_el = ET.SubElement(cls_el, 'lines')
-                  for ln, hits in sorted(line_entries, key=lambda x: x[0]):
-                      line_el = ET.SubElement(lines_el, 'line')
-                      line_el.set('number', str(ln))
-                      line_el.set('hits', str(hits))
+                  ET.SubElement(cls_el, 'lines')
                   top_cls_el = ET.SubElement(classes_el, 'class')
                   top_cls_el.set('name', filename)
                   top_cls_el.set('filename', path)
                   top_cls_el.set('line-rate', f'{f_rate:.4f}')
-                  top_lines_el = ET.SubElement(top_cls_el, 'lines')
-                  for ln, hits in sorted(line_entries, key=lambda x: x[0]):
-                      line_el = ET.SubElement(top_lines_el, 'line')
-                      line_el.set('number', str(ln))
-                      line_el.set('hits', str(hits))
+                  ET.SubElement(top_cls_el, 'lines')
           tree = ET.ElementTree(root)
           ET.indent(tree, space='  ', level=0)
           tree.write(output_xml, encoding='utf-8', xml_declaration=True)
