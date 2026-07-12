@@ -195,7 +195,7 @@ jobs:
             cat /tmp/coverage_report.txt
             exit 1
           }
-          python3 - /tmp/coverage_report.txt coverage-report/cobertura.xml << 'PYEOF'
+          python3 - /tmp/coverage_report.txt coverage-report/coverage.xml << 'PYEOF'
           import re, os, sys
           import xml.etree.ElementTree as ET
           report_path, output_xml = sys.argv[1], sys.argv[2]
@@ -207,7 +207,7 @@ jobs:
           # 获取项目根目录，用于将绝对路径转换为相对路径
           # SonarCloud 期望相对路径（如 Aether/Services/MyService.swift）
           project_root = os.getcwd()
-          packages = {}
+          files = []
           total_covered = 0
           total_valid = 0
           for m in pattern.finditer(text):
@@ -222,83 +222,47 @@ jobs:
                   rel_path = os.path.relpath(abs_path, project_root)
               except ValueError:
                   rel_path = abs_path
-              filename = os.path.basename(rel_path)
-              pkg_dir = os.path.dirname(rel_path)
-              packages.setdefault(pkg_dir, []).append((filename, rel_path, cov, tot))
+              files.append((rel_path, cov, tot))
               total_covered += cov
               total_valid += tot
           if total_valid == 0:
               print("ERROR: no coverage data found in report", file=sys.stderr)
               sys.exit(1)
-          line_rate = total_covered / total_valid
+          # SonarCloud Generic Coverage 格式（sonar.coverageReportPaths 使用此格式）
+          # <coverage version="1">
+          #   <file path="Aether/Services/MyService.swift">
+          #     <lineToCover lineNumber="1" covered="true"/>
+          #   </file>
+          # </coverage>
           root = ET.Element('coverage')
-          root.set('line-rate', f'{line_rate:.4f}')
-          root.set('branch-rate', '0')
-          root.set('lines-covered', str(total_covered))
-          root.set('lines-valid', str(total_valid))
-          root.set('branches-covered', '0')
-          root.set('branches-valid', '0')
-          root.set('complexity', '0')
-          root.set('version', '0.1')
-          root.set('timestamp', '0')
-          ET.SubElement(root, 'sources')
-          sources_el = root.find('sources')
-          source_el = ET.SubElement(sources_el, 'source')
-          source_el.text = project_root
-          packages_el = ET.SubElement(root, 'packages')
-          classes_el = ET.SubElement(root, 'classes')
-          for pkg_path, pkg_files in packages.items():
-              pkg_cov = sum(x[2] for x in pkg_files)
-              pkg_tot = sum(x[3] for x in pkg_files)
-              pkg_rate = pkg_cov / pkg_tot if pkg_tot > 0 else 0.0
-              pkg_el = ET.SubElement(packages_el, 'package')
-              pkg_el.set('name', pkg_path)
-              pkg_el.set('line-rate', f'{pkg_rate:.4f}')
-              pkg_classes_el = ET.SubElement(pkg_el, 'classes')
-              for filename, path, f_cov, f_tot in pkg_files:
-                  f_rate = f_cov / f_tot if f_tot > 0 else 0.0
-                  # 为 class 生成 <line> 元素：前 f_cov 行 hits=1，其余 hits=0
-                  # SonarCloud 解析 cobertura.xml 要求每个 class 下必须有 <line> 元素
-                  lines_el = ET.Element('lines')
-                  for ln in range(1, f_tot + 1):
-                      line_el = ET.SubElement(lines_el, 'line')
-                      line_el.set('number', str(ln))
-                      line_el.set('hits', '1' if ln <= f_cov else '0')
-                  cls_el = ET.SubElement(pkg_classes_el, 'class')
-                  cls_el.set('name', filename)
-                  cls_el.set('filename', path)
-                  cls_el.set('line-rate', f'{f_rate:.4f}')
-                  cls_el.append(lines_el)
-                  top_cls_el = ET.SubElement(classes_el, 'class')
-                  top_cls_el.set('name', filename)
-                  top_cls_el.set('filename', path)
-                  top_cls_el.set('line-rate', f'{f_rate:.4f}')
-                  top_lines_el = ET.Element('lines')
-                  for ln in range(1, f_tot + 1):
-                      line_el = ET.SubElement(top_lines_el, 'line')
-                      line_el.set('number', str(ln))
-                      line_el.set('hits', '1' if ln <= f_cov else '0')
-                  top_cls_el.append(top_lines_el)
+          root.set('version', '1')
+          for rel_path, f_cov, f_tot in files:
+              file_el = ET.SubElement(root, 'file')
+              file_el.set('path', rel_path)
+              for ln in range(1, f_tot + 1):
+                  line_el = ET.SubElement(file_el, 'lineToCover')
+                  line_el.set('lineNumber', str(ln))
+                  line_el.set('covered', 'true' if ln <= f_cov else 'false')
           tree = ET.ElementTree(root)
           ET.indent(tree, space='  ', level=0)
           tree.write(output_xml, encoding='utf-8', xml_declaration=True)
-          print(f"cobertura.xml written: line-rate={line_rate:.4f} ({total_covered}/{total_valid} lines)")
-          print(f"Sample paths (relative): {[os.path.dirname(os.path.relpath(m.group(1), project_root)) for m in list(pattern.finditer(text))[:3]]}")
+          print(f"coverage.xml written: line-rate={total_covered/total_valid:.4f} ({total_covered}/{total_valid} lines)")
+          print(f"Sample paths: {[f[0] for f in files[:3]]}")
           PYEOF
           # 校验
-          if [ ! -f "coverage-report/cobertura.xml" ]; then
-            echo "ERROR: cobertura.xml was not generated"
+          if [ ! -f "coverage-report/coverage.xml" ]; then
+            echo "ERROR: coverage.xml was not generated"
             exit 1
           fi
-          LINE_RATE=$(python3 -c "import xml.etree.ElementTree as ET; t=ET.parse('coverage-report/cobertura.xml'); print(t.getroot().get('line-rate', '0'))")
-          echo "cobertura.xml line-rate: $LINE_RATE"
+          LINE_RATE=$(python3 -c "import xml.etree.ElementTree as ET; r=ET.parse('coverage-report/coverage.xml').getroot(); covered=sum(1 for f in r.findall('file') for l in f.findall('lineToCover') if l.get('covered')=='true'); total=sum(1 for f in r.findall('file') for l in f.findall('lineToCover')); print(f'{covered/total:.4f}' if total else '0')")
+          echo "coverage.xml line-rate: $LINE_RATE"
 
-      - name: Upload cobertura report artifact
+      - name: Upload coverage report artifact
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: cobertura-report
-          path: coverage-report/cobertura.xml
+          name: coverage-report
+          path: coverage-report/coverage.xml
           if-no-files-found: error
           retention-days: 7
 
@@ -450,25 +414,25 @@ jobs:
           path: ~/.sonar/cache
           key: ${{ runner.os }}-sonar
 
-      - name: Download cobertura report
+      - name: Download coverage report
         uses: actions/download-artifact@v7
         with:
-          name: cobertura-report
+          name: coverage-report
           path: coverage-report
 
-      - name: Verify cobertura report
+      - name: Verify coverage report
         run: |
-          if [ ! -f "coverage-report/cobertura.xml" ]; then
-            echo "ERROR: cobertura.xml not found in artifact"
+          if [ ! -f "coverage-report/coverage.xml" ]; then
+            echo "ERROR: coverage.xml not found in artifact"
             exit 1
           fi
-          LINE_RATE=$(python3 -c "import xml.etree.ElementTree as ET; t=ET.parse('coverage-report/cobertura.xml'); print(t.getroot().get('line-rate', '0'))")
-          echo "cobertura.xml line-rate: $LINE_RATE"
+          LINE_RATE=$(python3 -c "import xml.etree.ElementTree as ET; r=ET.parse('coverage-report/coverage.xml').getroot(); covered=sum(1 for f in r.findall('file') for l in f.findall('lineToCover') if l.get('covered')=='true'); total=sum(1 for f in r.findall('file') for l in f.findall('lineToCover')); print(f'{covered/total:.4f}' if total else '0')")
+          echo "coverage.xml line-rate: $LINE_RATE"
           if [ "$LINE_RATE" = "0" ] || [ -z "$LINE_RATE" ]; then
-            echo "ERROR: cobertura.xml has line-rate=0, coverage data missing"
+            echo "ERROR: coverage.xml has line-rate=0, coverage data missing"
             exit 1
           fi
-          echo "cobertura.xml verified successfully with real coverage data"
+          echo "coverage.xml verified successfully with real coverage data"
 
       - name: Disable SonarCloud Automatic Analysis
         # 如果 SonarCloud 开启了 Automatic Analysis，会与 CI 分析冲突
