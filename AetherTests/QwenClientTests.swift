@@ -210,6 +210,13 @@ data: [DONE]
 
     // MARK: - 6. chat HTTP 错误并发 .llmErrorOccurred 通知
 
+    /// 辅助：消费 chat 流并返回累积内容
+    private func consume(stream: AsyncStream<String>) async -> String {
+        var collected = ""
+        for await chunk in stream { collected += chunk }
+        return collected
+    }
+
     func testChatHTTPErrorPostsNotification() async {
         MockURLProtocol.responseData = Data("{}".utf8)
         MockURLProtocol.statusCode = 401
@@ -228,5 +235,233 @@ data: [DONE]
         for await _ in stream {}
 
         await fulfillment(of: [expectation], timeout: 2.0)
+    }
+
+    // MARK: - 7. chat 5xx 错误
+
+    func testChat5xxErrorPostsNotification() async {
+        MockURLProtocol.responseData = Data("{}".utf8)
+        MockURLProtocol.statusCode = 503
+
+        let expectation = XCTNSNotificationExpectation(name: .llmErrorOccurred, object: nil)
+        expectation.handler = { _ in true }
+
+        let messages = [APIMessage(role: "user", content: "hi", images: nil, toolCallId: nil, toolName: nil, toolCalls: nil)]
+        _ = await consume(stream: client.chat(messages: messages, config: .default, apiKey: apiKey))
+
+        await fulfillment(of: [expectation], timeout: 2.0)
+    }
+
+    // MARK: - 8. chat 网络错误
+
+    func testChatNetworkErrorPostsNotification() async {
+        MockURLProtocol.error = URLError(.notConnectedToInternet)
+        MockURLProtocol.statusCode = 200
+
+        let expectation = XCTNSNotificationExpectation(name: .llmErrorOccurred, object: nil)
+        expectation.handler = { _ in true }
+
+        let messages = [APIMessage(role: "user", content: "hi", images: nil, toolCallId: nil, toolName: nil, toolCalls: nil)]
+        _ = await consume(stream: client.chat(messages: messages, config: .default, apiKey: apiKey))
+
+        await fulfillment(of: [expectation], timeout: 2.0)
+    }
+
+    // MARK: - 9. chat 跳过非 data 行
+
+    func testChatSkipsNonDataLines() async {
+        let sse = """
+        : comment
+
+        event: ping
+
+        data: {"choices":[{"delta":{"content":"OK"}}]}
+
+        data: [DONE]
+
+        """
+        MockURLProtocol.responseData = sse.data(using: .utf8)
+        MockURLProtocol.statusCode = 200
+
+        let messages = [APIMessage(role: "user", content: "hi", images: nil, toolCallId: nil, toolName: nil, toolCalls: nil)]
+        let collected = await consume(stream: client.chat(messages: messages, config: .default, apiKey: apiKey))
+        XCTAssertEqual(collected, "OK")
+    }
+
+    // MARK: - 10. chat 损坏 JSON 跳过
+
+    func testChatHandlesMalformedJSON() async {
+        let sse = """
+        data: {invalid}
+
+        data: {"choices":[{"delta":{"content":"valid"}}]}
+
+        data: [DONE]
+
+        """
+        MockURLProtocol.responseData = sse.data(using: .utf8)
+        MockURLProtocol.statusCode = 200
+
+        let messages = [APIMessage(role: "user", content: "hi", images: nil, toolCallId: nil, toolName: nil, toolCalls: nil)]
+        let collected = await consume(stream: client.chat(messages: messages, config: .default, apiKey: apiKey))
+        XCTAssertEqual(collected, "valid")
+    }
+
+    // MARK: - 11. chat 携带多模态图片
+
+    func testChatWithImagesSendsMultimodalContent() async {
+        MockURLProtocol.responseData = Data("data: [DONE]\n\n".utf8)
+        MockURLProtocol.statusCode = 200
+        MockURLProtocol.lastBody = nil
+
+        let messages = [APIMessage(role: "user", content: "看图", images: ["base64data"], toolCallId: nil, toolName: nil, toolCalls: nil)]
+        _ = await consume(stream: client.chat(messages: messages, config: .default, apiKey: apiKey))
+
+        let bodyStr = String(data: MockURLProtocol.lastBody ?? Data(), encoding: .utf8) ?? ""
+        XCTAssertTrue(bodyStr.contains("image_url"), "请求体应包含 image_url")
+    }
+
+    // MARK: - 12. chat 携带 tool_call_id
+
+    func testChatWithToolCallIdInMessages() async {
+        MockURLProtocol.responseData = Data("data: [DONE]\n\n".utf8)
+        MockURLProtocol.statusCode = 200
+        MockURLProtocol.lastBody = nil
+
+        let messages = [APIMessage(role: "tool", content: "result", images: nil, toolCallId: "call_123", toolName: nil, toolCalls: nil)]
+        _ = await consume(stream: client.chat(messages: messages, config: .default, apiKey: apiKey))
+
+        let bodyStr = String(data: MockURLProtocol.lastBody ?? Data(), encoding: .utf8) ?? ""
+        XCTAssertTrue(bodyStr.contains("tool_call_id"), "请求体应包含 tool_call_id")
+        XCTAssertTrue(bodyStr.contains("call_123"), "应包含 toolCallId 值")
+    }
+
+    // MARK: - 13. chat 携带 tool_calls
+
+    func testChatWithToolCallsInMessages() async {
+        MockURLProtocol.responseData = Data("data: [DONE]\n\n".utf8)
+        MockURLProtocol.statusCode = 200
+        MockURLProtocol.lastBody = nil
+
+        let toolCalls = [ToolCallParam(id: "call_456", type: "function", function: FunctionCall(name: "search", arguments: "{\"q\":\"test\"}"))]
+        let messages = [APIMessage(role: "assistant", content: "", images: nil, toolCallId: nil, toolName: nil, toolCalls: toolCalls)]
+        _ = await consume(stream: client.chat(messages: messages, config: .default, apiKey: apiKey))
+
+        let bodyStr = String(data: MockURLProtocol.lastBody ?? Data(), encoding: .utf8) ?? ""
+        XCTAssertTrue(bodyStr.contains("tool_calls"), "请求体应包含 tool_calls")
+        XCTAssertTrue(bodyStr.contains("call_456"), "应包含 toolCall id")
+    }
+
+    // MARK: - 14. embed 空入参短路
+
+    func testEmbedEmptyInputShortCircuits() async throws {
+        MockURLProtocol.responseData = Data("{}".utf8)
+        MockURLProtocol.statusCode = 200
+        MockURLProtocol.lastRequest = nil
+
+        let result = try await client.embed(texts: [], apiKey: apiKey)
+        XCTAssertEqual(result, [], "空入参应返回空数组")
+    }
+
+    // MARK: - 15. embed HTTP 错误
+
+    func testEmbedHTTPErrorThrows() async {
+        MockURLProtocol.responseData = Data("{}".utf8)
+        MockURLProtocol.statusCode = 401
+
+        let expectation = XCTNSNotificationExpectation(name: .llmErrorOccurred, object: nil)
+        expectation.handler = { _ in true }
+
+        do {
+            _ = try await client.embed(texts: ["x"], apiKey: apiKey)
+            XCTFail("应抛出错误")
+        } catch {
+            XCTAssertTrue(error is LLMError, "应抛 LLMError")
+        }
+
+        await fulfillment(of: [expectation], timeout: 2.0)
+    }
+
+    // MARK: - 16. embed 网络错误
+
+    func testEmbedNetworkErrorThrows() async {
+        MockURLProtocol.error = URLError(.timedOut)
+        MockURLProtocol.statusCode = 200
+
+        let expectation = XCTNSNotificationExpectation(name: .llmErrorOccurred, object: nil)
+        expectation.handler = { _ in true }
+
+        do {
+            _ = try await client.embed(texts: ["test"], apiKey: apiKey)
+            XCTFail("应抛出错误")
+        } catch {
+            XCTAssertTrue(error is LLMError, "应抛 LLMError")
+        }
+
+        await fulfillment(of: [expectation], timeout: 2.0)
+    }
+
+    // MARK: - 17. chatWithTools 5xx 错误
+
+    func testChatWithTools5xxErrorPostsNotification() async {
+        MockURLProtocol.responseData = Data("{}".utf8)
+        MockURLProtocol.statusCode = 503
+
+        let expectation = XCTNSNotificationExpectation(name: .llmErrorOccurred, object: nil)
+        expectation.handler = { _ in true }
+
+        for await _ in client.chat(messages: [APIMessage(role: "user", content: "hi", images: nil, toolCallId: nil, toolName: nil, toolCalls: nil)], config: .default, tools: [], apiKey: apiKey) {}
+
+        await fulfillment(of: [expectation], timeout: 2.0)
+    }
+
+    // MARK: - 18. chatWithTools 网络错误
+
+    func testChatWithToolsNetworkErrorPostsNotification() async {
+        MockURLProtocol.error = URLError(.notConnectedToInternet)
+        MockURLProtocol.statusCode = 200
+
+        let expectation = XCTNSNotificationExpectation(name: .llmErrorOccurred, object: nil)
+        expectation.handler = { _ in true }
+
+        for await _ in client.chat(messages: [APIMessage(role: "user", content: "hi", images: nil, toolCallId: nil, toolName: nil, toolCalls: nil)], config: .default, tools: [], apiKey: apiKey) {}
+
+        await fulfillment(of: [expectation], timeout: 2.0)
+    }
+
+    // MARK: - 19. chatWithTools 跳过非 data 行
+
+    func testChatWithToolsSkipsNonDataLines() async {
+        let sse = """
+        : comment
+
+        data: {"choices":[{"delta":{"content":"OK"}}]}
+
+        data: [DONE]
+
+        """
+        MockURLProtocol.responseData = sse.data(using: .utf8)
+        MockURLProtocol.statusCode = 200
+
+        var chunks: [ParsedChunk] = []
+        for await chunk in client.chat(messages: [APIMessage(role: "user", content: "hi", images: nil, toolCallId: nil, toolName: nil, toolCalls: nil)], config: .default, tools: [], apiKey: apiKey) {
+            chunks.append(chunk)
+        }
+        XCTAssertEqual(chunks.count, 1)
+        XCTAssertEqual(chunks[0].content, "OK")
+    }
+
+    // MARK: - 20. embed 返回按 index 排序
+
+    func testEmbedReturnsSortedVectors() async throws {
+        let json = """
+        {"data":[{"embedding":[0.3,0.4],"index":1},{"embedding":[0.1,0.2],"index":0}]}
+        """
+        MockURLProtocol.responseData = json.data(using: .utf8)
+        MockURLProtocol.statusCode = 200
+
+        let result = try await client.embed(texts: ["a", "b"], apiKey: apiKey)
+        XCTAssertEqual(result[0], [0.1, 0.2], "index 0 应排前")
+        XCTAssertEqual(result[1], [0.3, 0.4], "index 1 应排后")
     }
 }
