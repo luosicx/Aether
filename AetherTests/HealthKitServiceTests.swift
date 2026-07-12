@@ -46,12 +46,52 @@ final class HealthKitServiceTests: XCTestCase {
         let service = HealthKitService()
         do {
             try await service.requestAuthorization()
-            // 若成功授权（真机或支持 HealthKit 的环境），isAuthorized 应为 true
+            // 授权成功后（所有请求的读取类型均为 sharingAuthorized），isAuthorized 才应为 true
             XCTAssertTrue(service.isAuthorized, "授权成功后 isAuthorized 应为 true")
         } catch {
             // 授权失败（模拟器无 HealthKit 或用户拒绝），isAuthorized 应保持 false
             XCTAssertFalse(service.isAuthorized, "授权失败时 isAuthorized 应保持 false")
         }
+    }
+
+    /// 测试 5: 用户拒绝授权时，isAuthorized 必须保持 false。
+    /// 覆盖修复：旧代码在 requestAuthorization 完成后无条件将 isAuthorized 设为 true，
+    /// 导致即使用户拒绝，应用仍会读取健康数据。
+    func testRequestAuthorizationDeniedKeepsIsAuthorizedFalse() async throws {
+        let mockStore = MockHealthStore()
+        mockStore.authorizationStatusValue = .sharingDenied
+        let service = HealthKitService(healthStore: mockStore)
+
+        try await service.requestAuthorization()
+
+        XCTAssertFalse(service.isAuthorized, "用户拒绝授权后 isAuthorized 必须为 false")
+    }
+
+    /// 测试 6: 用户授权全部类型后，isAuthorized 才为 true。
+    func testRequestAuthorizationGrantedSetsIsAuthorizedTrue() async throws {
+        let mockStore = MockHealthStore()
+        mockStore.authorizationStatusValue = .sharingAuthorized
+        let service = HealthKitService(healthStore: mockStore)
+
+        try await service.requestAuthorization()
+
+        XCTAssertTrue(service.isAuthorized, "用户授权后 isAuthorized 应为 true")
+    }
+
+    /// 测试 7: 部分类型未授权时，isAuthorized 为 false。
+    func testRequestAuthorizationPartiallyGrantedKeepsIsAuthorizedFalse() async throws {
+        let mockStore = MockHealthStore()
+        // 只有心率授权，睡眠/步数未授权；使用 type identifier 作为 key 避免实例比较问题
+        mockStore.authorizationStatusByType = [
+            HKQuantityType(.heartRate).identifier: .sharingAuthorized,
+            HKCategoryType(.sleepAnalysis).identifier: .sharingDenied,
+            HKQuantityType(.stepCount).identifier: .notDetermined
+        ]
+        let service = HealthKitService(healthStore: mockStore)
+
+        try await service.requestAuthorization()
+
+        XCTAssertFalse(service.isAuthorized, "部分类型未授权时 isAuthorized 必须为 false")
     }
 
     // MARK: - HealthKitError 枚举
@@ -168,6 +208,33 @@ final class HealthKitServiceTests: XCTestCase {
         // 两个实例的 isAuthorized 应各自独立
         XCTAssertEqual(service1.isAuthorized, service2.isAuthorized,
                        "两个新实例的 isAuthorized 应都为 false")
+    }
+}
+
+// MARK: - MockHealthStore
+
+/// 用于 HealthKitService 单元测试的 HKHealthStore 子类。
+/// 覆盖 requestAuthorization 与 authorizationStatus(for:)，避免依赖真实系统权限弹窗。
+final class MockHealthStore: HKHealthStore {
+    /// 默认返回的授权状态（用于所有 type）
+    var authorizationStatusValue: HKAuthorizationStatus = .notDetermined
+    /// 按 type identifier 返回的授权状态（优先级高于 authorizationStatusValue）
+    var authorizationStatusByType: [String: HKAuthorizationStatus]?
+    /// 是否让 requestAuthorization 抛错
+    var shouldThrowOnRequest = false
+
+    override func authorizationStatus(for type: HKObjectType) -> HKAuthorizationStatus {
+        authorizationStatusByType?[type.identifier] ?? authorizationStatusValue
+    }
+
+    override func requestAuthorization(
+        toShare typesToShare: Set<HKSampleType>?,
+        read typesToRead: Set<HKObjectType>?
+    ) async throws {
+        if shouldThrowOnRequest {
+            throw NSError(domain: "MockHealthStore", code: 1, userInfo: nil)
+        }
+        // 不修改授权状态，由调用方通过 authorizationStatus(for:) 查询
     }
 }
 #endif

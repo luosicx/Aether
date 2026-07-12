@@ -38,7 +38,7 @@ enum HealthKitError: LocalizedError, Sendable {
 /// - `fetchDailySummary()` 聚合最近 1 天数据为 `HealthDailySummary`
 /// - 类标记 `@unchecked Sendable`：HKHealthStore 本身线程安全，isAuthorized 用 OSAllocatedUnfairLock 保护（async 安全）
 final class HealthKitService: @unchecked Sendable {
-    /// HealthKit 存储，设备不支持时为 nil
+    /// HealthKit 存储，设备不支持时为 nil；测试可注入 mock store
     private let healthStore: HKHealthStore?
     /// 授权状态锁，async 安全的 OSAllocatedUnfairLock
     private let isAuthorizedLock = OSAllocatedUnfairLock(initialState: false)
@@ -48,8 +48,8 @@ final class HealthKitService: @unchecked Sendable {
         isAuthorizedLock.withLock { $0 }
     }
 
-    init() {
-        healthStore = HKHealthStore.isHealthDataAvailable() ? HKHealthStore() : nil
+    init(healthStore: HKHealthStore? = nil) {
+        self.healthStore = healthStore ?? (HKHealthStore.isHealthDataAvailable() ? HKHealthStore() : nil)
     }
 
     /// 请求 HealthKit 读取授权（心率 / 睡眠 / 步数）。设备不支持时抛 `.notAvailable`。
@@ -62,7 +62,12 @@ final class HealthKitService: @unchecked Sendable {
         let stepCountType = HKQuantityType(.stepCount)
         let typesToRead: Set<HKObjectType> = [heartRateType, sleepType, stepCountType]
         try await healthStore.requestAuthorization(toShare: [], read: typesToRead)
-        isAuthorizedLock.withLock { $0 = true }
+        // 修正：requestAuthorization 不返回用户是否同意，必须查询各 type 的实际授权状态。
+        // 只有所有请求的读取类型都被授权时，才将 isAuthorized 设为 true；否则保持 false。
+        let allAuthorized = typesToRead.allSatisfy {
+            healthStore.authorizationStatus(for: $0) == .sharingAuthorized
+        }
+        isAuthorizedLock.withLock { $0 = allAuthorized }
     }
 
     /// 按天聚合心率均值。未授权返回空字典。
