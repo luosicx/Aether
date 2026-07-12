@@ -151,4 +151,53 @@ final class ContactsToolTests: XCTestCase {
         XCTAssertTrue(desc.contains("姓名") || desc.contains("号码") || desc.contains("搜索"),
                       "query description 应提及姓名/号码/搜索，实际：\(desc)")
     }
+
+    // MARK: - 新增覆盖率测试
+
+    /// query 为 Dictionary 类型：as? String 失败，应在权限请求前返回参数错误
+    func testExecuteQueryAsDictionaryReturnsError() async throws {
+        let result = try await tool.execute(arguments: ["query": ["name": "张"]])
+        XCTAssertEqual(result, "错误：请提供搜索关键词",
+                       "Dictionary 类型 query 应返回参数错误")
+    }
+
+    /// query 为 NSNull 类型：as? String 失败，应在权限请求前返回参数错误
+    func testExecuteQueryAsNSNullReturnsError() async throws {
+        let result = try await tool.execute(arguments: ["query": NSNull()])
+        XCTAssertEqual(result, "错误：请提供搜索关键词",
+                       "NSNull 类型 query 应返回参数错误")
+    }
+
+    /// query 为 Data 类型：as? String 失败，应在权限请求前返回参数错误
+    func testExecuteQueryAsDataReturnsError() async throws {
+        let result = try await tool.execute(arguments: ["query": Data("test".utf8)])
+        XCTAssertEqual(result, "错误：请提供搜索关键词",
+                       "Data 类型 query 应返回参数错误")
+    }
+
+    /// definition 的 name 应为有效工具标识符（小写、无空格）
+    func testDefinitionNameIsValidIdentifier() {
+        let name = tool.definition.name
+        XCTAssertFalse(name.isEmpty, "工具名不应为空")
+        XCTAssertFalse(name.contains(" "), "工具名不应包含空格")
+        XCTAssertEqual(name, name.lowercased(), "工具名应为小写")
+    }
+
+    /// definition 的 description 应包含"联系人"、"姓名"或"搜索"关键字
+    func testDefinitionDescriptionMentionsContactsOrSearch() {
+        let desc = tool.definition.description
+        let hasKeyword = desc.contains("联系人") || desc.contains("姓名") || desc.contains("搜索")
+        XCTAssertTrue(hasKeyword, "description 应提及联系人/姓名/搜索，实际：\(desc)")
+    }
+
+    /// 真实通讯录搜索返回的结果应符合 "姓名：...，电话：..." 或 "未找到匹配的联系人"
+    func testExecuteRealSearchResultFormat() async throws {
+        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
+                      "跳过：模拟器/CI 环境通讯录权限不可用")
+        let result = try await tool.execute(arguments: ["query": "张"])
+        let isFormattedResult = result.contains("姓名：") && result.contains("电话：")
+        let isNotFound = result == "未找到匹配的联系人"
+        XCTAssertTrue(isFormattedResult || isNotFound,
+                      "搜索结果应为格式化联系人或未找到，实际：\(result)")
+    }
 }

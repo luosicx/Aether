@@ -644,4 +644,240 @@ final class DeepSeekClientTests: XCTestCase {
         // 空 content 字符串也会被 yield（content 非 nil 即通过 guard let）
         XCTAssertEqual(collected, ["", "OK"], "空 content 字符串应被 yield")
     }
+
+    // MARK: - sendRequest payload 中 tool_call_id / tool_calls 覆盖
+
+    /// 非 tools chat 路径中，若 tool 角色消息含 tool_call_id，payload 应包含 tool_call_id
+    func testChatNonToolsPayloadWithToolCallId() async {
+        MockURLProtocol.responseData = Data("data: [DONE]\n\n".utf8)
+        MockURLProtocol.statusCode = 200
+
+        let messages = [APIMessage(
+            role: "tool",
+            content: "3",
+            images: nil,
+            toolCallId: "call_123",
+            toolName: "calculate",
+            toolCalls: nil
+        )]
+        let stream = client.chat(messages: messages, config: .default, apiKey: apiKey)
+        for await _ in stream {}
+
+        guard let body = MockURLProtocol.lastBody else {
+            XCTFail("未捕获请求 body")
+            return
+        }
+        let json = try? JSONSerialization.jsonObject(with: body, options: []) as? [String: Any]
+        let msgs = json?["messages"] as? [[String: Any]]
+        XCTAssertEqual(msgs?.count, 1)
+        XCTAssertEqual(msgs?[0]["tool_call_id"] as? String, "call_123")
+    }
+
+    /// 非 tools chat 路径中，若 assistant 消息含 tool_calls，payload 应完整序列化 arguments 字符串
+    func testChatNonToolsPayloadWithToolCalls() async {
+        MockURLProtocol.responseData = Data("data: [DONE]\n\n".utf8)
+        MockURLProtocol.statusCode = 200
+
+        let toolCall = ToolCallParam(
+            id: "call_456",
+            type: "function",
+            function: FunctionCall(name: "calculate", arguments: "{\"x\":1}")
+        )
+        let messages = [APIMessage(
+            role: "assistant",
+            content: "",
+            images: nil,
+            toolCallId: nil,
+            toolName: nil,
+            toolCalls: [toolCall]
+        )]
+        let stream = client.chat(messages: messages, config: .default, apiKey: apiKey)
+        for await _ in stream {}
+
+        guard let body = MockURLProtocol.lastBody else {
+            XCTFail("未捕获请求 body")
+            return
+        }
+        let json = try? JSONSerialization.jsonObject(with: body, options: []) as? [String: Any]
+        let msgs = json?["messages"] as? [[String: Any]]
+        XCTAssertEqual(msgs?.count, 1)
+        let toolCalls = msgs?[0]["tool_calls"] as? [[String: Any]]
+        XCTAssertEqual(toolCalls?.count, 1)
+        XCTAssertEqual(toolCalls?[0]["id"] as? String, "call_456")
+        XCTAssertEqual(toolCalls?[0]["type"] as? String, "function")
+        let function = toolCalls?[0]["function"] as? [String: Any]
+        XCTAssertEqual(function?["name"] as? String, "calculate")
+        XCTAssertEqual(function?["arguments"] as? String, "{\"x\":1}")
+    }
+
+    // MARK: - 多模态边界
+
+    /// 多模态消息 content 为空字符串时，payload content 数组中应只含 image_url 块（无 text 块）
+    func testChatMultimodalPayloadWithEmptyContent() async {
+        MockURLProtocol.responseData = Data("data: [DONE]\n\n".utf8)
+        MockURLProtocol.statusCode = 200
+
+        let messages = [APIMessage(
+            role: "user",
+            content: "",
+            images: ["base64-img"],
+            toolCallId: nil,
+            toolName: nil,
+            toolCalls: nil
+        )]
+        let stream = client.chat(messages: messages, config: .default, apiKey: apiKey)
+        for await _ in stream {}
+
+        guard let body = MockURLProtocol.lastBody else {
+            XCTFail("未捕获请求 body")
+            return
+        }
+        let json = try? JSONSerialization.jsonObject(with: body, options: []) as? [String: Any]
+        let msgs = json?["messages"] as? [[String: Any]]
+        let content = msgs?[0]["content"] as? [[String: Any]]
+        XCTAssertEqual(content?.count, 1)
+        XCTAssertEqual(content?[0]["type"] as? String, "image_url")
+    }
+
+    // MARK: - embed 错误处理细分
+
+    /// embed 时 session 抛普通网络错误，应包装为 LLMError.networkError 并发通知
+    func testEmbedNetworkErrorPostsNotification() async {
+        MockURLProtocol.error = NSError(domain: NSURLErrorDomain, code: NSURLErrorNotConnectedToInternet)
+
+        let expectation = XCTNSNotificationExpectation(name: .llmErrorOccurred, object: nil)
+        expectation.handler = { note in
+            if let err = note.userInfo?["error"] as? LLMError,
+               case .networkError = err {
+                return true
+            }
+            return false
+        }
+
+        do {
+            _ = try await client.embed(texts: ["x"], apiKey: apiKey)
+            XCTFail("应抛错")
+        } catch let err as LLMError {
+            if case .networkError = err {
+                // ok
+            } else {
+                XCTFail("期望 networkError，实际：\(err)")
+            }
+        } catch {
+            XCTFail("期望 LLMError，实际：\(type(of: error))")
+        }
+        await fulfillment(of: [expectation], timeout: 2.0)
+    }
+
+    // MARK: - chat SSE 解析边界
+
+    /// SSE chunk 解码成功但无 content/choices，应跳过不 yield
+    func testChatStreamSkipsChunksWithoutContent() async {
+        let sse = """
+        data: {"choices":[{"delta":{}}]}
+
+        data: {"choices":[]}
+
+        data: {"choices":[{"delta":{"content":"OK"}}]}
+
+        data: [DONE]
+
+        """
+        MockURLProtocol.responseData = sse.data(using: .utf8)
+        MockURLProtocol.statusCode = 200
+
+        let messages = [APIMessage(role: "user", content: "hi", images: nil, toolCallId: nil, toolName: nil, toolCalls: nil)]
+        let stream = client.chat(messages: messages, config: .default, apiKey: apiKey)
+        var collected: [String] = []
+        for await chunk in stream { collected.append(chunk) }
+        XCTAssertEqual(collected, ["OK"], "无 content 的 chunk 应被跳过")
+    }
+
+    /// chat 流 HTTP 错误响应体含多行时，应完整读取并构造正确 LLMError
+    func testChatStreamHTTPErrorReadsMultilineBody() async {
+        let errorBody = "error: invalid\nerror: key"
+        MockURLProtocol.responseData = errorBody.data(using: .utf8)
+        MockURLProtocol.statusCode = 403
+
+        let expectation = XCTNSNotificationExpectation(name: .llmErrorOccurred, object: nil)
+        expectation.handler = { note in
+            if let err = note.userInfo?["error"] as? LLMError,
+               case .apiError(let code, let message) = err, code == 403 {
+                return message.contains("invalid") && message.contains("key")
+            }
+            return false
+        }
+
+        let messages = [APIMessage(role: "user", content: "hi", images: nil, toolCallId: nil, toolName: nil, toolCalls: nil)]
+        let stream = client.chat(messages: messages, config: .default, apiKey: apiKey)
+        var collected: [String] = []
+        for await chunk in stream { collected.append(chunk) }
+        XCTAssertTrue(collected.isEmpty, "HTTP 错误不应 yield chunk")
+        await fulfillment(of: [expectation], timeout: 2.0)
+    }
+
+    /// chat with tools 流 HTTP 错误响应体含多行时，应完整读取并构造正确 LLMError
+    func testChatWithToolsHTTPErrorReadsMultilineBody() async {
+        let errorBody = "line1\nline2"
+        MockURLProtocol.responseData = errorBody.data(using: .utf8)
+        MockURLProtocol.statusCode = 503
+
+        let expectation = XCTNSNotificationExpectation(name: .llmErrorOccurred, object: nil)
+        expectation.handler = { note in
+            if let err = note.userInfo?["error"] as? LLMError,
+               case .apiError(let code, let message) = err, code == 503 {
+                return message.contains("line1") && message.contains("line2")
+            }
+            return false
+        }
+
+        let messages = [APIMessage(role: "user", content: "hi", images: nil, toolCallId: nil, toolName: nil, toolCalls: nil)]
+        let tools = [ToolDef(type: "function", function: ToolDef.FunctionDef(name: "noop", description: "noop", parameters: ["type": AnyCodable("object")]))]
+        let stream = client.chat(messages: messages, config: .default, tools: tools, apiKey: apiKey)
+        for await _ in stream {}
+        await fulfillment(of: [expectation], timeout: 2.0)
+    }
+
+    // MARK: - 剩余可覆盖错误分支
+
+    /// embed HTTP 错误响应体为非 UTF-8 字节时，fallback 空字符串路径应被覆盖
+    func testEmbedHTTPErrorWithNonUTF8Body() async {
+        MockURLProtocol.responseData = Data([0xFF, 0xFE, 0xFD])
+        MockURLProtocol.statusCode = 401
+
+        let expectation = XCTNSNotificationExpectation(name: .llmErrorOccurred, object: nil)
+        expectation.handler = { note in
+            (note.userInfo?["error"] as? LLMError) != nil
+        }
+
+        do {
+            _ = try await client.embed(texts: ["x"], apiKey: apiKey)
+            XCTFail("应抛错")
+        } catch let err as LLMError {
+            if case .apiKeyInvalid = err {
+                // ok
+            } else {
+                XCTFail("期望 apiKeyInvalid，实际：\(err)")
+            }
+        } catch {
+            XCTFail("期望 LLMError，实际：\(type(of: error))")
+        }
+        await fulfillment(of: [expectation], timeout: 2.0)
+    }
+
+    /// 带 tools chat 路径传入 NaN temperature，JSONEncoder 会抛错，流应直接 finish
+    func testChatWithToolsInvalidTemperatureFinishesWithoutYielding() async {
+        MockURLProtocol.responseData = Data("data: [DONE]\n\n".utf8)
+        MockURLProtocol.statusCode = 200
+
+        var invalidConfig = ChatConfig.default
+        invalidConfig.temperature = .nan
+
+        let messages = [APIMessage(role: "user", content: "hi", images: nil, toolCallId: nil, toolName: nil, toolCalls: nil)]
+        let tools = [ToolDef(type: "function", function: ToolDef.FunctionDef(name: "noop", description: "noop", parameters: ["type": AnyCodable("object")]))]
+        let stream = client.chat(messages: messages, config: invalidConfig, tools: tools, apiKey: apiKey)
+        var collected: [ParsedChunk] = []
+        for await chunk in stream { collected.append(chunk) }
+        XCTAssertTrue(collected.isEmpty, "temperature 为 NaN 时编码失败，带工具流应直接 finish，不 yield")
+    }
 }

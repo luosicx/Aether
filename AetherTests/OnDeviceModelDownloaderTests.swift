@@ -818,7 +818,23 @@ final class OnDeviceModelDownloaderTests: XCTestCase {
                         }
 
                         let path = String(parts[1]).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-                        self.serveFile(named: path, connection: connection)
+
+                        // 解析 Range 请求头（用于断点续传测试）
+                        let headerString = String(data: headerData, encoding: .utf8) ?? ""
+                        let headerLines = headerString.split(separator: "\r\n").dropFirst()
+                        var rangeHeader: String?
+                        for line in headerLines {
+                            let kv = line.split(separator: ":", maxSplits: 1)
+                            guard kv.count == 2 else { continue }
+                            let key = String(kv[0]).trimmingCharacters(in: .whitespaces).lowercased()
+                            let value = String(kv[1]).trimmingCharacters(in: .whitespaces)
+                            if key == "range" {
+                                rangeHeader = value
+                                break
+                            }
+                        }
+
+                        self.serveFile(named: path, range: rangeHeader, connection: connection)
                         return
                     }
 
@@ -834,19 +850,115 @@ final class OnDeviceModelDownloaderTests: XCTestCase {
             receive()
         }
 
-        private func serveFile(named name: String, connection: NWConnection) {
+        private func serveFile(named name: String, range: String? = nil, connection: NWConnection) {
             let fileURL = rootURL.appendingPathComponent(name)
             guard FileManager.default.fileExists(atPath: fileURL.path),
                   let data = try? Data(contentsOf: fileURL) else {
                 sendResponse(connection: connection, status: "404 Not Found", body: Data())
                 return
             }
-            sendResponse(connection: connection, status: "200 OK", body: data)
+
+            // 中断文件：文件名以 abort- 开头且非 Range 请求时，发送部分数据后强制断开连接，
+            // 触发 URLSession 在错误 userInfo 中生成 resumeData，用于覆盖 resumeDownload 路径。
+            if name.hasPrefix("abort-"), range == nil {
+                serveAbortFile(data: data, connection: connection)
+                return
+            }
+
+            // 慢速文件：文件名以 slow- 开头时匀速发送，便于测试取消/断点续传
+            if name.hasPrefix("slow-") {
+                serveSlowFile(data: data, connection: connection)
+                return
+            }
+
+            // 处理 Range 请求（支持断点续传）
+            if let range = range, range.hasPrefix("bytes=") {
+                let rangeValue = String(range.dropFirst("bytes=".count))
+                let bounds = rangeValue.split(separator: "-")
+                let total = data.count
+
+                if bounds.count == 2,
+                   let start = Int(bounds[0]),
+                   let end = Int(bounds[1]),
+                   start >= 0, end < total, start <= end {
+                    let subdata = data.subdata(in: Range(start...end))
+                    let contentRange = "bytes \(start)-\(end)/\(total)"
+                    sendResponse(connection: connection, status: "206 Partial Content",
+                                 body: subdata, extraHeaders: ["Content-Range": contentRange])
+                    return
+                } else if bounds.count == 1,
+                          let start = Int(bounds[0]),
+                          start >= 0, start < total {
+                    let end = total - 1
+                    let subdata = data.subdata(in: Range(start...end))
+                    let contentRange = "bytes \(start)-\(end)/\(total)"
+                    sendResponse(connection: connection, status: "206 Partial Content",
+                                 body: subdata, extraHeaders: ["Content-Range": contentRange])
+                    return
+                }
+            }
+
+            // 正常 200 响应，声明支持断点续传
+            sendResponse(connection: connection, status: "200 OK", body: data,
+                         extraHeaders: ["Accept-Ranges": "bytes"])
         }
 
-        private func sendResponse(connection: NWConnection, status: String, body: Data) {
-            let headers = "HTTP/1.1 \(status)\r\nContent-Length: \(body.count)\r\nConnection: close\r\n\r\n"
-            let headerData = headers.data(using: .utf8)!
+        /// 慢速发送文件（约 1.28 MB/s），用于需要稳定处于下载中的测试场景。
+        private func serveSlowFile(data: Data, connection: NWConnection) {
+            let chunkSize = 64 * 1024
+            let headerString = "HTTP/1.1 200 OK\r\nContent-Length: \(data.count)\r\nAccept-Ranges: bytes\r\nConnection: close\r\n\r\n"
+            guard let headerData = headerString.data(using: .utf8) else {
+                connection.cancel()
+                return
+            }
+
+            func sendChunk(from offset: Int) {
+                let end = min(offset + chunkSize, data.count)
+                let chunk = data.subdata(in: offset..<end)
+                let isLast = end >= data.count
+                connection.send(content: chunk, completion: .contentProcessed { _ in
+                    if isLast {
+                        connection.cancel()
+                    } else {
+                        // 阻塞当前队列 50ms，模拟慢速下载
+                        usleep(50_000)
+                        sendChunk(from: end)
+                    }
+                })
+            }
+
+            connection.send(content: headerData, completion: .contentProcessed { _ in
+                sendChunk(from: 0)
+            })
+        }
+
+        /// 发送部分数据后强制断开连接，模拟网络中断并促使 URLSession 生成 resumeData。
+        private func serveAbortFile(data: Data, connection: NWConnection) {
+            let chunkSize = 64 * 1024
+            let headerString = "HTTP/1.1 200 OK\r\nContent-Length: \(data.count)\r\nAccept-Ranges: bytes\r\nConnection: close\r\n\r\n"
+            guard let headerData = headerString.data(using: .utf8) else {
+                connection.cancel()
+                return
+            }
+
+            connection.send(content: headerData, completion: .contentProcessed { _ in
+                // 先发送 256KB 数据，然后直接断开连接，不发送剩余字节
+                let partialEnd = min(chunkSize * 4, data.count)
+                let chunk = data.subdata(in: 0..<partialEnd)
+                connection.send(content: chunk, completion: .contentProcessed { _ in
+                    connection.cancel()
+                })
+            })
+        }
+
+        private func sendResponse(connection: NWConnection, status: String, body: Data,
+                                  extraHeaders: [String: String] = [:]) {
+            var headerString = "HTTP/1.1 \(status)\r\nContent-Length: \(body.count)\r\n"
+            for (key, value) in extraHeaders {
+                headerString += "\(key): \(value)\r\n"
+            }
+            headerString += "Connection: close\r\n\r\n"
+            let headerData = headerString.data(using: .utf8)!
             connection.send(content: headerData, completion: .contentProcessed { _ in
                 connection.send(content: body, completion: .contentProcessed { _ in
                     connection.cancel()
@@ -1182,22 +1294,23 @@ final class OnDeviceModelDownloaderTests: XCTestCase {
     /// 而不是使用新的 url/destinationURL。
     func testStartDownloadWithResumeDataResumesInsteadOfNewURL() async throws {
         let downloader = OnDeviceModelDownloader()
-        let content = Data(count: 8 * 1024 * 1024)
-        try serveFile(named: "resume-source.bin", data: content)
+        // 使用 slow- 前缀匀速发送，确保取消前已下载足够字节
+        let content = Data(count: 2 * 1024 * 1024)
+        try serveFile(named: "slow-resume-source.bin", data: content)
         try serveFile(named: "should-not-download.bin", data: "unexpected".data(using: .utf8)!)
 
-        let originalURL = baseURL.appendingPathComponent("resume-source.bin")
+        let originalURL = baseURL.appendingPathComponent("slow-resume-source.bin")
         let newURL = baseURL.appendingPathComponent("should-not-download.bin")
         let destURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("resume-\(UUID().uuidString).bin")
         defer { try? FileManager.default.removeItem(at: destURL) }
 
-        // 1) 启动一次大文件下载
+        // 1) 启动一次慢速下载
         let firstTask = Task {
             await downloader.startDownload(url: originalURL, to: destURL, expectedSHA256: "")
         }
 
-        // 2) 等待下载进入进行状态后取消，以获取 resumeData
+        // 2) 等待下载进入进行状态后，再等待约 1 秒以获取足够 resumeData，然后取消
         var didStart = false
         for _ in 0..<200 {
             let isDownloading = await downloader.isDownloading
@@ -1208,6 +1321,7 @@ final class OnDeviceModelDownloaderTests: XCTestCase {
             try await Task.sleep(nanoseconds: 10_000_000)
         }
         XCTAssertTrue(didStart, "下载应在超时前进入 isDownloading=true")
+        try await Task.sleep(nanoseconds: 1_000_000_000)
         await downloader.cancelDownload()
         await firstTask.value
 
@@ -1220,10 +1334,7 @@ final class OnDeviceModelDownloaderTests: XCTestCase {
             }
             try await Task.sleep(nanoseconds: 20_000_000)
         }
-        guard hasResume else {
-            _ = XCTSkip("当前环境与服务器未产生 resumeData，跳过断点续传路径测试")
-            return
-        }
+        try XCTSkipIf(!hasResume, "当前环境未产生 resumeData，跳过断点续传路径测试")
 
         // 4) 再次调用 startDownload，传入不同的 newURL/destURL；
         //    实现会命中 `if resumeData != nil { await resumeDownload(); return }`
@@ -1235,6 +1346,293 @@ final class OnDeviceModelDownloaderTests: XCTestCase {
         XCTAssertFalse(isDownloadingAfter, "resumeDownload 完成后 isDownloading 应为 false")
         // resumeDownload 使用临时目录作为目标，传入的 destURL 不会被写入
         XCTAssertFalse(fileExists, "resumeDownload 路径不应写入传入的 destURL")
+    }
+
+    // MARK: - 31. 下载目标路径无效
+
+    /// 目标路径父目录不存在时，moveItem 失败，应产生 loadFailed 错误。
+    /// 覆盖 DownloadDelegate.didFinishDownloadingTo 的 catch 分支与 handleDownloadDone 的非 URLError 分支。
+    func testStartDownloadInvalidDestinationSetsLoadFailed() async throws {
+        let downloader = OnDeviceModelDownloader()
+        let content = "model content".data(using: .utf8)!
+        try serveFile(named: "invalid-dest.bin", data: content)
+
+        let sourceURL = baseURL.appendingPathComponent("invalid-dest.bin")
+        let destURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("nonexistent-\(UUID().uuidString)")
+            .appendingPathComponent("dest.bin")
+
+        await downloader.startDownload(url: sourceURL, to: destURL, expectedSHA256: "")
+
+        let lastError = await downloader.lastError
+        let isDownloading = await downloader.isDownloading
+        XCTAssertNotNil(lastError, "目标路径无效时应设置 lastError")
+        XCTAssertFalse(isDownloading, "失败后 isDownloading 应为 false")
+        if case .loadFailed = lastError {
+            // expected
+        } else {
+            XCTFail("应返回 loadFailed 错误，实际：\(String(describing: lastError))")
+        }
+    }
+
+    // MARK: - 32. 空文件下载进度守卫
+
+    /// 下载 Content-Length 为 0 的文件时，delegate 进度回调应命中 totalBytesExpectedToWrite <= 0 的守卫。
+    func testStartDownloadZeroLengthFileCompletes() async throws {
+        let downloader = OnDeviceModelDownloader()
+        try serveFile(named: "empty.bin", data: Data())
+
+        let sourceURL = baseURL.appendingPathComponent("empty.bin")
+        let destURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("empty-download-\(UUID().uuidString).bin")
+        defer { try? FileManager.default.removeItem(at: destURL) }
+
+        await downloader.startDownload(url: sourceURL, to: destURL, expectedSHA256: "")
+
+        let progress = await downloader.progress
+        let lastError = await downloader.lastError
+        let isDownloading = await downloader.isDownloading
+        let fileExists = FileManager.default.fileExists(atPath: destURL.path)
+
+        XCTAssertTrue(fileExists, "空文件下载后目标文件应存在")
+        XCTAssertEqual(progress, 1.0, "空文件下载完成后 progress 应为 1.0")
+        XCTAssertNil(lastError, "空文件下载应成功")
+        XCTAssertFalse(isDownloading, "完成后 isDownloading 应为 false")
+    }
+
+    // MARK: - 34. 断点续传成功
+
+    /// 取消下载产生 resumeData 后，resumeDownload 应完成并将 isDownloading 重置为 false。
+    func testResumeDownloadSuccess() async throws {
+        let downloader = OnDeviceModelDownloader()
+        // 使用 slow- 前缀让服务器匀速发送，确保在取消前已下载部分字节
+        let content = Data(count: 2 * 1024 * 1024) // 2MB
+        try serveFile(named: "slow-resume-large.bin", data: content)
+
+        let sourceURL = baseURL.appendingPathComponent("slow-resume-large.bin")
+        let destURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("resume-dest-\(UUID().uuidString).bin")
+        defer { try? FileManager.default.removeItem(at: destURL) }
+
+        let firstTask = Task {
+            await downloader.startDownload(url: sourceURL, to: destURL, expectedSHA256: "")
+        }
+
+        // 等待下载开始
+        var didStart = false
+        for _ in 0..<200 {
+            if await downloader.isDownloading {
+                didStart = true
+                break
+            }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTAssertTrue(didStart, "下载应在超时前开始")
+
+        // 等待已下载足够多的字节（约 1 MB），再取消以获取 resumeData
+        try await Task.sleep(nanoseconds: 1_000_000_000)
+        await downloader.cancelDownload()
+        await firstTask.value
+
+        // 等待 resumeData
+        var hasResume = false
+        for _ in 0..<300 {
+            if await downloader.hasResumeData {
+                hasResume = true
+                break
+            }
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        try XCTSkipIf(!hasResume, "当前环境未产生 resumeData，跳过断点续传测试")
+
+        // 执行断点续传；完成后 isDownloading 应被重置
+        await downloader.resumeDownload()
+
+        let isDownloading = await downloader.isDownloading
+        XCTAssertFalse(isDownloading, "resumeDownload 完成后 isDownloading 应为 false")
+    }
+
+    // MARK: - 34.1 断点续传（服务器中断产生 resumeData）
+
+    /// 服务器发送部分数据后断开连接，URLSession 可能将 resumeData 放入错误 userInfo；
+    /// 此时 resumeDownload 应执行并完成，覆盖 resumeDownload 主路径与 setIsDownloading。
+    func testResumeDownloadAfterServerAbort() async throws {
+        let downloader = OnDeviceModelDownloader()
+        let content = Data(count: 2 * 1024 * 1024) // 2MB
+        try serveFile(named: "abort-resume.bin", data: content)
+
+        let sourceURL = baseURL.appendingPathComponent("abort-resume.bin")
+
+        let task = Task {
+            await downloader.startDownload(url: sourceURL,
+                                           to: FileManager.default.temporaryDirectory
+                                               .appendingPathComponent("abort-resume-\(UUID().uuidString).bin"),
+                                           expectedSHA256: "")
+        }
+
+        // 等待服务器断开连接、下载失败并可能生成 resumeData
+        await task.value
+
+        var hasResume = false
+        for _ in 0..<300 {
+            if await downloader.hasResumeData {
+                hasResume = true
+                break
+            }
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        try XCTSkipIf(!hasResume, "当前环境未产生 resumeData，跳过服务器中断续传测试")
+
+        await downloader.resumeDownload()
+
+        let isDownloading = await downloader.isDownloading
+        XCTAssertFalse(isDownloading, "resumeDownload 完成后 isDownloading 应为 false")
+    }
+
+    /// 服务器中断产生 resumeData 后，再次调用 startDownload 应进入 resumeDownload 路径。
+    func testStartDownloadWithAbortResumeDataResumesInsteadOfNewURL() async throws {
+        let downloader = OnDeviceModelDownloader()
+        let content = Data(count: 2 * 1024 * 1024)
+        try serveFile(named: "abort-start-resume.bin", data: content)
+        try serveFile(named: "should-not-download-resume.bin", data: "unexpected".data(using: .utf8)!)
+
+        let originalURL = baseURL.appendingPathComponent("abort-start-resume.bin")
+        let newURL = baseURL.appendingPathComponent("should-not-download-resume.bin")
+        let destURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("abort-start-resume-\(UUID().uuidString).bin")
+        defer { try? FileManager.default.removeItem(at: destURL) }
+
+        let firstTask = Task {
+            await downloader.startDownload(url: originalURL, to: destURL, expectedSHA256: "")
+        }
+
+        // 等待服务器断开连接、下载失败并可能生成 resumeData
+        await firstTask.value
+
+        var hasResume = false
+        for _ in 0..<300 {
+            if await downloader.hasResumeData {
+                hasResume = true
+                break
+            }
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        try XCTSkipIf(!hasResume, "当前环境未产生 resumeData，跳过 startDownload 续传路径测试")
+
+        // 传入新的 URL/destURL，但实现应优先使用 resumeData 执行 resumeDownload
+        await downloader.startDownload(url: newURL, to: destURL, expectedSHA256: "")
+
+        let isDownloadingAfter = await downloader.isDownloading
+        XCTAssertFalse(isDownloadingAfter, "resumeDownload 完成后 isDownloading 应为 false")
+    }
+
+    // MARK: - 35. 镜像回退在存在 resumeData 时跳过
+
+    /// 主地址下载被取消并产生 resumeData 时，startDownload 不应再回退到 mirrorURL。
+    func testStartDownloadMirrorFallbackSkipsWhenResumeDataExists() async throws {
+        let downloader = OnDeviceModelDownloader()
+        // 使用 slow- 前缀让服务器匀速发送，确保在取消前已下载部分字节
+        let primaryContent = Data(count: 2 * 1024 * 1024)
+        let mirrorContent = "mirror content".data(using: .utf8)!
+        try serveFile(named: "slow-primary-resume.bin", data: primaryContent)
+        try serveFile(named: "mirror-used.bin", data: mirrorContent)
+
+        let primaryURL = baseURL.appendingPathComponent("slow-primary-resume.bin")
+        let mirrorURL = baseURL.appendingPathComponent("mirror-used.bin")
+        let destURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("mirror-skip-\(UUID().uuidString).bin")
+        defer { try? FileManager.default.removeItem(at: destURL) }
+
+        let firstTask = Task {
+            await downloader.startDownload(url: primaryURL, to: destURL,
+                                           expectedSHA256: "", mirrorURL: mirrorURL)
+        }
+
+        var didStart = false
+        for _ in 0..<200 {
+            if await downloader.isDownloading {
+                didStart = true
+                break
+            }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+        XCTAssertTrue(didStart, "下载应在超时前开始")
+
+        // 等待已下载足够多的字节（约 1 MB），再取消以获取 resumeData
+        try await Task.sleep(nanoseconds: 1_000_000_000)
+        await downloader.cancelDownload()
+        await firstTask.value
+
+        var hasResume = false
+        for _ in 0..<300 {
+            if await downloader.hasResumeData {
+                hasResume = true
+                break
+            }
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        try XCTSkipIf(!hasResume, "当前环境未产生 resumeData，跳过镜像回退跳过测试")
+
+        // 再次调用 startDownload，存在 resumeData 时应走 resumeDownload 而非 mirror 回退
+        await downloader.startDownload(url: primaryURL, to: destURL,
+                                       expectedSHA256: "", mirrorURL: mirrorURL)
+
+        let fileData = try? Data(contentsOf: destURL)
+        // 由于 resumeDownload 使用临时目录，destURL 不应被写入 mirrorContent
+        XCTAssertNotEqual(fileData, mirrorContent, "存在 resumeData 时不应回退到镜像地址")
+    }
+
+    // MARK: - 36. deleteModel 删除失败
+
+    /// 文件存在但 removeItem 失败时，deleteModel 应抛出 loadFailed。
+    func testDeleteModelWhenRemoveItemFails() async throws {
+        let tempDir = FileManager.default.temporaryDirectory
+        let parentDir = tempDir.appendingPathComponent("readonly-\(UUID().uuidString)")
+        let testFile = parentDir.appendingPathComponent("model.bin")
+        try FileManager.default.createDirectory(at: parentDir, withIntermediateDirectories: false)
+        try "model data".data(using: .utf8)!.write(to: testFile)
+
+        // 将父目录设为只读，使 removeItem 失败
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: parentDir.path)
+        defer {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: parentDir.path)
+            try? FileManager.default.removeItem(at: parentDir)
+        }
+
+        do {
+            try await downloader.deleteModel(at: testFile)
+            XCTFail("删除只读目录中的文件应失败")
+        } catch let error as OnDeviceError {
+            if case .loadFailed = error {
+                // expected
+            } else {
+                XCTFail("应抛出 loadFailed，实际：\(error)")
+            }
+        } catch {
+            XCTFail("应抛出 OnDeviceError，实际：\(error)")
+        }
+    }
+
+    // MARK: - 37. 下载覆盖已存在目标文件
+
+    /// 目标文件已存在时，下载应先移除旧文件再移动新文件。
+    func testStartDownloadOverwritesExistingDestination() async throws {
+        let downloader = OnDeviceModelDownloader()
+        let content = "new content".data(using: .utf8)!
+        try serveFile(named: "overwrite.bin", data: content)
+
+        let sourceURL = baseURL.appendingPathComponent("overwrite.bin")
+        let destURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("overwrite-\(UUID().uuidString).bin")
+        defer { try? FileManager.default.removeItem(at: destURL) }
+
+        // 先写入旧内容
+        try "old content".data(using: .utf8)!.write(to: destURL)
+
+        await downloader.startDownload(url: sourceURL, to: destURL, expectedSHA256: "")
+
+        let fileData = try? Data(contentsOf: destURL)
+        XCTAssertEqual(fileData, content, "下载应覆盖已存在的目标文件")
     }
 
     // MARK: - 辅助

@@ -291,4 +291,52 @@ final class AlarmToolTests: XCTestCase {
         XCTAssertTrue(result.contains("已创建闹钟") || result.hasPrefix("错误"),
                       "最晚时间应返回成功或错误，实际：\(result)")
     }
+
+    // MARK: - 新增覆盖率测试
+
+    /// time 为 NSNull 类型：as? String 失败，应在权限请求前返回参数错误
+    func testExecuteTimeAsNSNullReturnsError() async throws {
+        let result = try await tool.execute(arguments: ["time": NSNull()])
+        XCTAssertEqual(result, "错误：请提供闹钟时间",
+                       "NSNull 类型 time 应返回参数错误")
+    }
+
+    /// 同时缺失 time 与提供 label：仍应返回参数错误
+    func testExecuteMissingTimeWithLabelStillReturnsError() async throws {
+        let result = try await tool.execute(arguments: ["label": "测试标签"])
+        XCTAssertEqual(result, "错误：请提供闹钟时间",
+                       "缺 time 时 label 不应影响参数校验")
+    }
+
+    /// definition 的 name 应为有效工具标识符（小写、无空格）
+    func testDefinitionNameIsValidIdentifier() {
+        let name = tool.definition.name
+        XCTAssertFalse(name.isEmpty, "工具名不应为空")
+        XCTAssertFalse(name.contains(" "), "工具名不应包含空格")
+        XCTAssertEqual(name, name.lowercased(), "工具名应为小写")
+    }
+
+    /// definition 的 description 应包含"闹钟"、"提醒"或"日历"关键字
+    func testDefinitionDescriptionMentionsAlarmOrCalendar() {
+        let desc = tool.definition.description
+        let hasKeyword = desc.contains("闹钟") || desc.contains("提醒") || desc.contains("日历")
+        XCTAssertTrue(hasKeyword, "description 应提及闹钟/提醒/日历，实际：\(desc)")
+    }
+
+    /// time 为单数字小时 "8:30"：通过 as? String，但 DateFormatter 可能解析失败，需权限后校验
+    func testExecuteSingleDigitHourTimeFormat() async throws {
+        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil,
+                      "跳过：模拟器环境下 EventKit 权限请求挂起")
+        let result = try await tool.execute(arguments: ["time": "8:30"])
+        XCTAssertTrue(result.contains("已创建闹钟") || result.hasPrefix("错误"),
+                      "单数字小时时间应返回成功或错误，实际：\(result)")
+    }
+
+    /// time 含秒 "08:30:00"：DateFormatter 按 HH:mm 解析应失败
+    func testExecuteTimeWithSecondsReturnsError() async throws {
+        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil,
+                      "跳过：模拟器环境下 EventKit 权限请求挂起")
+        let result = try await tool.execute(arguments: ["time": "08:30:00"])
+        XCTAssertTrue(result.hasPrefix("错误"), "含秒时间应返回错误，实际：\(result)")
+    }
 }

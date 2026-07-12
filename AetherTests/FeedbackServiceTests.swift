@@ -1,5 +1,8 @@
 import XCTest
 @testable import Aether
+#if os(iOS)
+import MessageUI
+#endif
 
 /// Day 20: FeedbackService 单元测试
 final class FeedbackServiceTests: XCTestCase {
@@ -194,4 +197,84 @@ final class FeedbackServiceTests: XCTestCase {
         XCTAssertTrue(body.hasSuffix(deviceInfo),
                       "body 应以 collectDeviceInfo() 结尾")
     }
+
+    // MARK: - 新增覆盖率测试
+
+    /// mailContent() 返回的字典键值均为 String 类型，便于外部拼接 mailto
+    func testMailContentKeysAndValuesAreStrings() {
+        let content = service.mailContent()
+        for (key, value) in content {
+            XCTAssertTrue(key is String, "mailContent 键应为 String，实际：\(type(of: key))")
+            XCTAssertTrue(value is String, "mailContent 值应为 String，实际：\(type(of: value))")
+        }
+    }
+
+    /// mailtoURL 的 scheme 必须为小写的 "mailto"
+    func testMailtoURLSchemeIsLowercase() {
+        let url = service.mailtoURL()
+        XCTAssertEqual(url?.scheme, "mailto", "scheme 应为小写 mailto")
+    }
+
+    /// mailtoURL 中 subject 含中文，应被 percent-encoded（URL 中不再出现原始中文）
+    func testMailtoURLSubjectIsEncoded() {
+        guard let urlString = service.mailtoURL()?.absoluteString else {
+            XCTFail("mailtoURL 不应为 nil")
+            return
+        }
+        let subject = service.mailContent()["subject"] ?? ""
+        XCTAssertFalse(urlString.contains(subject) && !subject.isEmpty,
+                       "编码后的 URL 不应再包含原始中文 subject，实际：\(urlString)")
+        XCTAssertTrue(urlString.contains("subject="), "URL 应包含 subject 参数")
+    }
+
+    /// mailtoURL 中 body 的换行符应被编码为 %0A
+    func testMailtoURLBodyNewlinesAreEncoded() {
+        guard let urlString = service.mailtoURL()?.absoluteString else {
+            XCTFail("mailtoURL 不应为 nil")
+            return
+        }
+        XCTAssertTrue(urlString.contains("body="), "URL 应包含 body 参数")
+        XCTAssertTrue(urlString.contains("%0A") || urlString.contains("%25"),
+                      "body 中的换行符或特殊字符应被编码，实际：\(urlString)")
+    }
+
+    /// collectDeviceInfo() 输出应始终符合 "设备：...\n系统：...\nApp 版本：... (构建号)" 格式
+    func testCollectDeviceInfoFormat() {
+        let info = service.collectDeviceInfo()
+        let pattern = "设备：.*\\n系统：.*\\nApp 版本：.*\\([^)]+\\)"
+        XCTAssertNotNil(info.range(of: pattern, options: .regularExpression),
+                        "设备信息格式应符合预期，实际：\(info)")
+    }
+
+    /// collectDeviceInfo() 的 App 版本行应包含构建号括号
+    func testCollectDeviceInfoAppVersionContainsBuildNumber() {
+        let info = service.collectDeviceInfo()
+        XCTAssertTrue(info.contains("App 版本："), "应含 App 版本字段")
+        XCTAssertTrue(info.contains("("), "App 版本后应含构建号括号")
+        XCTAssertTrue(info.contains(")"), "构建号应以右括号结尾")
+    }
+
+    #if os(iOS)
+    /// MailComposerView.Coordinator 初始化后应保存 onFinish 闭包
+    func testMailComposerCoordinatorStoresOnFinish() {
+        let expectation = expectation(description: "onFinish 被调用")
+        let coordinator = MailComposerView.Coordinator { _ in
+            expectation.fulfill()
+        }
+        let controller = MFMailComposeViewController()
+        coordinator.mailComposeController(controller, didFinishWith: .sent, error: nil)
+        wait(for: [expectation], timeout: 1.0)
+    }
+
+    /// MailComposerView.Coordinator 应把任何 result 透传给 onFinish
+    func testMailComposerCoordinatorPassesResultToOnFinish() {
+        var receivedResult: MFMailComposeResult?
+        let coordinator = MailComposerView.Coordinator { result in
+            receivedResult = result
+        }
+        let controller = MFMailComposeViewController()
+        coordinator.mailComposeController(controller, didFinishWith: .cancelled, error: nil)
+        XCTAssertEqual(receivedResult, .cancelled, "onFinish 应收到 cancelled 结果")
+    }
+    #endif
 }

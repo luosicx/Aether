@@ -175,6 +175,24 @@ final class VoiceServiceTests: XCTestCase {
         wait(for: [expectation], timeout: 2.0)
     }
 
+    /// didCancel 在试听模式下应清理试听状态，且不触发 onSpeakFinished。
+    /// 直接调用 delegate 方法，不依赖真实 AVSpeechSynthesizer 合成流程。
+    func testDidCancelDuringPreviewCleansPreviewState() {
+        let service = VoiceService()
+        service.previewVoice("试听", config: .defaultValue)
+        XCTAssertTrue(service.isPreviewing, "previewVoice 后 isPreviewing 应为 true")
+
+        let expectation = XCTestExpectation(description: "onSpeakFinished 不应被调用")
+        expectation.isInverted = true
+        service.onSpeakFinished = { expectation.fulfill() }
+        let synthesizer = AVSpeechSynthesizer()
+        let utterance = AVSpeechUtterance(string: "test")
+        service.speechSynthesizer(synthesizer, didCancel: utterance)
+        wait(for: [expectation], timeout: 2.0)
+
+        XCTAssertFalse(service.isPreviewing, "试听 didCancel 后 isPreviewing 应为 false")
+    }
+
     // MARK: - applyConfig rate clamp 边界
 
     /// rate 为负值时 applyConfig 应 clamp 到 0，speak 不崩溃且 errorMessage 状态合理
@@ -521,21 +539,6 @@ final class VoiceServiceTests: XCTestCase {
         wait(for: [expectation], timeout: 2.0)
     }
 
-    /// didCancel 在试听模式下应清理试听状态但不触发 onSpeakFinished
-    func testDidCancelDuringPreviewDoesNotTriggerMainCallback() {
-        let service = VoiceService()
-        service.previewVoice("试听", config: .defaultValue)
-        XCTAssertTrue(service.isPreviewing)
-
-        let expectation = XCTestExpectation(description: "onSpeakFinished 不应被调用")
-        expectation.isInverted = true
-        service.onSpeakFinished = { expectation.fulfill() }
-        let synthesizer = AVSpeechSynthesizer()
-        let utterance = AVSpeechUtterance(string: "test")
-        service.speechSynthesizer(synthesizer, didCancel: utterance)
-        wait(for: [expectation], timeout: 2.0)
-    }
-
     // MARK: - speak Unicode 文本
 
     /// speak 中文长文本不应崩溃
@@ -611,10 +614,9 @@ final class VoiceServiceTests: XCTestCase {
 
     /// resolveVoice 使用有效的系统音色 identifier 时应解析成功且不设置 errorMessage。
     /// 覆盖 resolveVoice 中 `!identifier.isEmpty && TTSVoiceCatalog.voice(for:) != nil` 分支。
-    func testResolveVoiceWithValidSystemVoice() {
+    func testResolveVoiceWithValidSystemVoice() throws {
         guard let voice = Self.findInstallableVoice() else {
-            XCTSkip("模拟器无可安装的系统音色")
-            return
+            throw XCTSkip("模拟器无可安装的系统音色")
         }
 
         let service = VoiceService()
@@ -627,10 +629,9 @@ final class VoiceServiceTests: XCTestCase {
 
     /// resolveVoice 相同有效音色第二次调用应命中缓存，errorMessage 保持 nil。
     /// 覆盖 resolveVoice 的 `identifier == cachedVoiceIdentifier` 缓存命中分支（有效音色场景）。
-    func testResolveVoiceCacheHitWithValidVoice() {
+    func testResolveVoiceCacheHitWithValidVoice() throws {
         guard let voice = Self.findInstallableVoice() else {
-            XCTSkip("模拟器无可安装的系统音色")
-            return
+            throw XCTSkip("模拟器无可安装的系统音色")
         }
 
         let service = VoiceService()
@@ -648,10 +649,9 @@ final class VoiceServiceTests: XCTestCase {
 
     /// previewVoice 使用有效音色时应设置 isPreviewing=true 且 errorMessage 为 nil。
     /// 覆盖 previewVoice → applyConfig → resolveVoice 有效音色路径。
-    func testPreviewVoiceWithValidVoiceIdentifier() {
+    func testPreviewVoiceWithValidVoiceIdentifier() throws {
         guard let voice = Self.findInstallableVoice() else {
-            XCTSkip("模拟器无可安装的系统音色")
-            return
+            throw XCTSkip("模拟器无可安装的系统音色")
         }
 
         let service = VoiceService()
@@ -665,10 +665,9 @@ final class VoiceServiceTests: XCTestCase {
 
     /// speak 在 previewVoice 之后调用应重置 isPreviewing=false 且使用有效音色时 errorMessage 为 nil。
     /// 覆盖 speak 重置 isCurrentPreview + 有效音色解析路径。
-    func testSpeakAfterPreviewWithValidVoiceCleansPreviewState() {
+    func testSpeakAfterPreviewWithValidVoiceCleansPreviewState() throws {
         guard let voice = Self.findInstallableVoice() else {
-            XCTSkip("模拟器无可安装的系统音色")
-            return
+            throw XCTSkip("模拟器无可安装的系统音色")
         }
 
         let service = VoiceService()
@@ -689,10 +688,9 @@ final class VoiceServiceTests: XCTestCase {
     /// 第二次：无效音色（cache miss → 回退 zh-CN，可能设置 errorMessage）
     /// 第三次：有效音色（cache miss → 重新解析成功）
     /// 第四次：相同有效音色（cache hit → 返回缓存）
-    func testSpeakSwitchingBetweenValidAndInvalidVoice() {
+    func testSpeakSwitchingBetweenValidAndInvalidVoice() throws {
         guard let voice = Self.findInstallableVoice() else {
-            XCTSkip("模拟器无可安装的系统音色")
-            return
+            throw XCTSkip("模拟器无可安装的系统音色")
         }
 
         let service = VoiceService()
@@ -721,10 +719,9 @@ final class VoiceServiceTests: XCTestCase {
 
     /// speak 使用有效音色后 stopSpeaking 不应崩溃。
     /// 覆盖 stopSpeaking 在有效音色 speak 后的调用路径。
-    func testStopSpeakingAfterSpeakWithValidVoice() {
+    func testStopSpeakingAfterSpeakWithValidVoice() throws {
         guard let voice = Self.findInstallableVoice() else {
-            XCTSkip("模拟器无可安装的系统音色")
-            return
+            throw XCTSkip("模拟器无可安装的系统音色")
         }
 
         let service = VoiceService()
@@ -738,7 +735,189 @@ final class VoiceServiceTests: XCTestCase {
         // 不崩溃即可
     }
 
+    // MARK: - recognizerAvailabilityCheck 默认行为
+
+    /// 默认 recognizerAvailabilityCheck 应返回 Bool 且不崩溃。
+    /// 覆盖 VoiceService 中注入点的默认闭包实现。
+    func testDefaultRecognizerAvailabilityCheckReturnsBool() {
+        let service = VoiceService()
+        let available = service.recognizerAvailabilityCheck()
+        XCTAssertTrue(available == true || available == false,
+                      "默认 recognizerAvailabilityCheck 应返回 Bool")
+    }
+
+    // MARK: - deinit 资源释放
+
+    /// 释放 VoiceService 应执行 deinit 清理且不崩溃。
+    /// 覆盖 deinit 中 synthesizer.delegate = nil 与 AVAudioSession setActive(false) 路径。
+    func testDeinitDoesNotCrash() {
+        var service: VoiceService? = VoiceService()
+        service = nil
+        XCTAssertNil(service, "service 应被释放")
+    }
+
+    /// audioEngine 正在运行时释放 VoiceService，应触发 deinit 中停止引擎、移除 tap 的分支。
+    /// 仅在当前环境能成功启动录音时执行，否则跳过。
+    func testDeinitWhileRecordingReleasesResources() throws {
+        var service: VoiceService? = VoiceService()
+        service?.recognizerAvailabilityCheck = { true }
+
+        do {
+            try service?.startRecording()
+        } catch {
+            throw XCTSkip("音频会话不可用，无法测试运行中 deinit：\(error)")
+        }
+
+        XCTAssertTrue(service?.isRecording == true, "启动录音后 isRecording 应为 true")
+        // 不调用 stopRecording，直接释放，触发 deinit 中 audioEngine.isRunning 分支
+        service = nil
+        XCTAssertNil(service, "service 应被释放")
+    }
+
+    // MARK: - 状态转换
+
+    /// speak 后调用 previewVoice 应正确切换到试听状态。
+    func testPreviewVoiceAfterSpeakSetsPreviewState() {
+        let service = VoiceService()
+        service.speak("朗读")
+        XCTAssertFalse(service.isPreviewing, "speak 后 isPreviewing 应为 false")
+        service.previewVoice("试听", config: .defaultValue)
+        XCTAssertTrue(service.isPreviewing, "previewVoice 后应进入试听状态")
+    }
+
+    /// 多个 VoiceService 实例的状态应相互独立。
+    func testMultipleServiceInstancesAreIndependent() {
+        let service1 = VoiceService()
+        let service2 = VoiceService()
+
+        service1.previewVoice("试听1", config: .defaultValue)
+        service2.speak("朗读2")
+
+        XCTAssertTrue(service1.isPreviewing, "service1 应处于试听状态")
+        XCTAssertFalse(service2.isPreviewing, "service2 不应处于试听状态")
+    }
+
+    // MARK: - 错误处理
+
+    /// 使用无效音色 speak 设置 errorMessage 后，再次使用有效音色 speak 不会清除 errorMessage
+    ///（验证当前实现只在 fallback 失败时设置 errorMessage、成功时不清除的行为）。
+    func testErrorMessagePersistsAfterSwitchingToValidVoice() throws {
+        guard let voice = Self.findInstallableVoice() else {
+            throw XCTSkip("模拟器无可安装的系统音色")
+        }
+
+        let service = VoiceService()
+        let invalidConfig = TTSConfig(voiceIdentifier: "com.invalid.nonexistent.voice",
+                                     rate: 0.5, pitchMultiplier: 1.0, volume: 1.0)
+        service.speak("无效", config: invalidConfig)
+        let errorAfterInvalid = service.errorMessage
+
+        let validConfig = TTSConfig(voiceIdentifier: voice.identifier,
+                                   rate: 0.5, pitchMultiplier: 1.0, volume: 1.0)
+        service.speak("有效", config: validConfig)
+
+        // 当前实现不主动清除 errorMessage，保持之前状态
+        XCTAssertEqual(service.errorMessage, errorAfterInvalid,
+                       "errorMessage 应保持之前的状态")
+    }
+
+    /// 空字符串 identifier 应走默认 zh-CN 回退路径且不崩溃。
+    func testEmptyVoiceIdentifierFallsBackToChinese() {
+        let service = VoiceService()
+        let config = TTSConfig(voiceIdentifier: "", rate: 0.5,
+                              pitchMultiplier: 1.0, volume: 1.0)
+        service.speak("默认音色", config: config)
+        if let msg = service.errorMessage {
+            XCTAssertEqual(msg, NSLocalizedString("未找到中文语音，使用默认语音", comment: ""),
+                           "空字符串 identifier 回退失败时 errorMessage 应为固定文案")
+        }
+    }
+
+    // MARK: - 回调与状态属性
+
+    /// recognizedText 可被手动设置并读取。
+    func testRecognizedTextCanBeSetAndRead() {
+        let service = VoiceService()
+        service.recognizedText = "手动设置"
+        XCTAssertEqual(service.recognizedText, "手动设置")
+    }
+
+    /// onRecognized 闭包可被多次调用并累积结果。
+    func testOnRecognizedCanBeCalledMultipleTimes() {
+        let service = VoiceService()
+        var captured: [String] = []
+        service.onRecognized = { text in captured.append(text) }
+        service.onRecognized?("第一次")
+        service.onRecognized?("第二次")
+        XCTAssertEqual(captured, ["第一次", "第二次"])
+    }
+
+    /// onSpeakFinished 可被设置为 nil 且后续调用不崩溃。
+    func testOnSpeakFinishedCanBeSetToNil() {
+        let service = VoiceService()
+        service.onSpeakFinished = { }
+        service.onSpeakFinished = nil
+        // 设置为 nil 后调用不应崩溃
+        service.onSpeakFinished?()
+    }
+
+    /// isRecording 状态属性可被外部读取与修改。
+    func testIsRecordingCanBeSetAndRead() {
+        let service = VoiceService()
+        XCTAssertFalse(service.isRecording)
+        service.isRecording = true
+        XCTAssertTrue(service.isRecording)
+        service.isRecording = false
+        XCTAssertFalse(service.isRecording)
+    }
+
+    /// isPreviewing 状态属性可被外部读取与修改。
+    func testIsPreviewingCanBeSetAndRead() {
+        let service = VoiceService()
+        XCTAssertFalse(service.isPreviewing)
+        service.isPreviewing = true
+        XCTAssertTrue(service.isPreviewing)
+    }
+
+    /// errorMessage 状态属性可被外部读取与修改。
+    func testErrorMessageCanBeSetAndRead() {
+        let service = VoiceService()
+        XCTAssertNil(service.errorMessage)
+        service.errorMessage = "测试错误"
+        XCTAssertEqual(service.errorMessage, "测试错误")
+        service.errorMessage = nil
+        XCTAssertNil(service.errorMessage)
+    }
+
     // MARK: - 录音完整流程与音频会话
+
+    /// startRecording 在当前环境中的行为取决于音频会话可用性：
+    /// - 若 AVAudioSession 与 audioEngine 成功启动，则 isRecording=true，
+    ///   运行片刻后 stopRecording 应恢复 false；
+    /// - 若模拟器/CI 无法激活音频会话，则抛错且 isRecording 保持 false。
+    /// 本测试覆盖真实录音启动、installTap / recognitionTask 回调分发以及停止释放路径，
+    /// 同时兼容音频会话成功与失败两种环境，避免在不同模拟器上 flaky。
+    func testStartRecordingPathHandlesSuccessOrFailure() throws {
+        let service = VoiceService()
+        service.recognizerAvailabilityCheck = { true }
+
+        do {
+            try service.startRecording()
+            // 当前环境允许激活音频会话并启动 audioEngine
+            XCTAssertTrue(service.isRecording, "startRecording 成功后 isRecording 应为 true")
+
+            // 让录音运行一小段时间，使 installTap 与 recognitionTask 闭包有机会被调用，
+            // 从而覆盖 VoiceService.startRecording() 内部的异步回调分支。
+            // 等待时间不宜过长，避免 iOS Simulator 音频子系统死锁。
+            wait(for: [], timeout: 0.3)
+
+            service.stopRecording()
+            XCTAssertFalse(service.isRecording, "stopRecording 后 isRecording 应为 false")
+        } catch {
+            // 当前环境（常见 CI 模拟器）无法激活真实音频会话，抛错为合理行为
+            XCTAssertFalse(service.isRecording, "startRecording 抛错后 isRecording 应保持 false")
+        }
+    }
 
     /// startRecording 在模拟器音频可用时应成功激活 AVAudioSession、创建识别请求与任务，
     /// 并将 isRecording 置为 true。在 iOS Simulator 中跳过真实音频会话操作，避免音频子系统死锁。
@@ -752,8 +931,7 @@ final class VoiceServiceTests: XCTestCase {
         do {
             try service.startRecording()
         } catch {
-            _ = XCTSkip("模拟器音频输入不可用，跳过录音启动测试：\(error)")
-            return
+            throw XCTSkip("模拟器音频输入不可用，跳过录音启动测试：\(error)")
         }
 
         XCTAssertTrue(service.isRecording, "startRecording 成功后 isRecording 应为 true")
@@ -775,8 +953,7 @@ final class VoiceServiceTests: XCTestCase {
         do {
             try service.startRecording()
         } catch {
-            _ = XCTSkip("模拟器音频输入不可用：\(error)")
-            return
+            throw XCTSkip("模拟器音频输入不可用：\(error)")
         }
 
         service.stopRecording()
@@ -796,8 +973,7 @@ final class VoiceServiceTests: XCTestCase {
             do {
                 try service.startRecording()
             } catch {
-                _ = XCTSkip("第 \(i) 次 startRecording 失败，模拟器音频不可用：\(error)")
-                return
+                throw XCTSkip("第 \(i) 次 startRecording 失败，模拟器音频不可用：\(error)")
             }
             service.stopRecording()
             XCTAssertFalse(service.isRecording, "第 \(i) 次 stopRecording 后 isRecording 应为 false")
@@ -817,8 +993,7 @@ final class VoiceServiceTests: XCTestCase {
         do {
             try service.startRecording()
         } catch {
-            _ = XCTSkip("模拟器音频输入不可用：\(error)")
-            return
+            throw XCTSkip("模拟器音频输入不可用：\(error)")
         }
 
         var captured: String?

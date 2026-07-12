@@ -271,4 +271,46 @@ final class LocationToolTests: XCTestCase {
             XCTAssertFalse(result.isEmpty, "串行 execute 应每次返回非空字符串")
         }
     }
+
+    // MARK: - 新增覆盖率测试
+
+    /// definition 的 name 仅含小写字母与下划线，符合工具标识符规范
+    func testDefinitionNameIsValidToolIdentifier() {
+        let name = tool.definition.name
+        let allowed = CharacterSet.lowercaseLetters.union(.decimalDigits).union(CharacterSet(charactersIn: "_"))
+        XCTAssertFalse(name.isEmpty, "工具名不应为空")
+        XCTAssertNil(name.rangeOfCharacter(from: allowed.inverted), "工具名应仅含小写、数字、下划线，实际：\(name)")
+    }
+
+    /// definition 的 description 应明确提及「位置」或「经纬度」
+    func testDefinitionDescriptionMentionsLocationKeywords() {
+        let desc = tool.definition.description
+        let hasKeyword = desc.contains("位置") || desc.contains("经纬度") || desc.contains("地理") || desc.contains("定位")
+        XCTAssertTrue(hasKeyword, "描述应提及位置/经纬度/地理/定位，实际：\(desc)")
+    }
+
+    /// execute 传入非字典值参数（如数组作为 value）不应崩溃，仍返回字符串
+    func testExecuteWithArrayValueArguments() async throws {
+        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
+                      "跳过：模拟器/CI 环境下 CLLocationManager 定位耗时过长")
+        let result = try await tool.execute(arguments: ["list": ["a", "b"]])
+        XCTAssertFalse(result.isEmpty, "execute 应始终返回非空字符串")
+    }
+
+    /// execute 在模拟器/CI 外若成功，返回字符串应包含格式化为 4 位小数的经纬度
+    func testExecuteResultContainsFormattedCoordinatesWhenSuccessful() async throws {
+        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
+                      "跳过：模拟器/CI 环境下定位结果不稳定")
+        let result = try await tool.execute(arguments: [:])
+        // 若定位成功，结果形如 "当前位置：...，经纬度 31.1234, 121.5678"
+        XCTAssertTrue(result.contains("当前位置") || result.contains("定位"),
+                      "结果应包含位置或定位关键词，实际：\(result)")
+        // 成功时才校验坐标格式
+        if result.contains("当前位置") {
+            let regex = try? NSRegularExpression(pattern: #"\d+\.\d{4}"#, options: [])
+            let range = NSRange(result.startIndex..., in: result)
+            let matches = regex?.matches(in: result, options: [], range: range) ?? []
+            XCTAssertGreaterThanOrEqual(matches.count, 2, "成功结果应至少含 2 个 4 位小数坐标，实际：\(result)")
+        }
+    }
 }
