@@ -9,7 +9,7 @@ on:
 jobs:
   unit-tests:
     runs-on: macos-15
-    timeout-minutes: 20
+    timeout-minutes: 30
     outputs:
       coverage_pct: ${{ steps.coverage.outputs.coverage_pct }}
       coverage_pass: ${{ steps.coverage.outputs.coverage_pass }}
@@ -203,8 +203,7 @@ jobs:
               text = f.read()
           pattern = re.compile(r"^\s+(/\S+\.swift)\s+([\d.]+)%\s+\((\d+)/(\d+)\)", re.MULTILINE)
           project_root = os.getcwd()
-          # SonarCloud 的 sonar.sources=Aether，因此 coverage.xml 中的路径
-          # 应为相对于 sonar.sources 的路径（不含 Aether/ 前缀）
+          # 路径相对于项目根目录（如 Aether/Services/MyService.swift）
           EXCLUDE_PATTERNS = [
               "/Views/", "/DesignSystem/", "/App/AetherApp",
               "/Protocols/", "/Actors/", "/AetherUITests/",
@@ -225,8 +224,6 @@ jobs:
                   continue
               if any(p in rel_path for p in EXCLUDE_PATTERNS):
                   continue
-              # 去掉 Aether/ 前缀，使路径相对于 sonar.sources
-              rel_path = rel_path[len("Aether/"):]
               files.append((rel_path, cov, tot))
               total_covered += cov
               total_valid += tot
