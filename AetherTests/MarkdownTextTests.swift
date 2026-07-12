@@ -163,4 +163,30 @@ final class MarkdownTextTests: XCTestCase {
         let view = MarkdownText(content: "   \n  \n   ")
         _ = view.body
     }
+
+    /// 标题或任务列表文本中包含 emoji / 多字节 Unicode 时不应崩溃
+    /// 回归测试：解析器曾强制解包 Range(match.range(at:), in: line)，
+    /// 当 NSRegularExpression 返回的 UTF-16 range 无法对齐 Swift String 的
+    /// grapheme cluster 边界时会触发崩溃。
+    func testParseEmojiInHeadingAndTaskListDoesNotCrash() {
+        let content = """
+        # 标题 👨‍👩‍👧‍👦
+
+        - [x] 完成家庭任务 🏠
+        - [ ] 购买牛奶 🥛
+        ## 二级标题 🚀
+        """
+        let view = MarkdownText(content: content)
+        _ = view.body
+    }
+
+    /// 肤色修饰符、国旗、组合字符等复杂 grapheme cluster 不应导致崩溃
+    func testParseComplexGraphemeClustersDoesNotCrash() {
+        let content = """
+        # 👋🏽 你好 🇨🇳
+        - [x] 测试 ✍🏻
+        """
+        let view = MarkdownText(content: content)
+        _ = view.body
+    }
 }

@@ -143,11 +143,11 @@ struct MarkdownText: View {
 
             // 检查是否为标题行（# ~ ######）
             if let match = headingRegex?.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)),
-               match.numberOfRanges >= 3 {
+               match.numberOfRanges >= 3,
+               let levelRange = Range(match.range(at: 1), in: line),
+               let textRange = Range(match.range(at: 2), in: line) {
                 flushText()
                 flushTaskList()
-                let levelRange = Range(match.range(at: 1), in: line)!
-                let textRange = Range(match.range(at: 2), in: line)!
                 let level = line[levelRange].count  // # 的数量即为标题层级
                 let headingText = String(line[textRange])
                 blocks.append(.heading(level: level, text: headingText))
@@ -158,10 +158,10 @@ struct MarkdownText: View {
             // 检查是否为任务列表项
             if let regex = taskRegex,
                let match = regex.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)),
-               match.numberOfRanges >= 3 {
+               match.numberOfRanges >= 3,
+               let checkRange = Range(match.range(at: 1), in: line),
+               let textRange = Range(match.range(at: 2), in: line) {
                 flushText()
-                let checkRange = Range(match.range(at: 1), in: line)!
-                let textRange = Range(match.range(at: 2), in: line)!
                 let checkChar = line[checkRange]
                 let isCompleted = checkChar == "x" || checkChar == "X"
                 let taskText = String(line[textRange])
