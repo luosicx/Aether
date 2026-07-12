@@ -12,6 +12,20 @@ final class ChatStorage {
         self.modelContext = modelContext
     }
 
+    // MARK: - 私有 helper
+
+    /// 统一执行 modelContext.save()，避免 `try?` 静默吞掉持久化错误。
+    /// 触发场景：磁盘已满、模型校验失败、并发上下文冲突等。
+    /// 生产环境打印日志，Debug 环境通过 assertionFailure 暴露问题。
+    private func save(_ context: String) {
+        do {
+            try modelContext.save()
+        } catch {
+            print("ChatStorage save failed (\(context)): \(error)")
+            assertionFailure("ChatStorage save failed (\(context)): \(error)")
+        }
+    }
+
     /// 创建会话并插入 modelContext。不立即 save（首次 save 触发 schema migration check 阻塞 200-500ms），
     /// save 延迟到首次发消息时。默认 title="新对话"，systemPrompt="你是一个有帮助的AI助手。"
     func createConversation(title: String = "新对话", systemPrompt: String = "你是一个有帮助的AI助手。") -> Conversation {
@@ -28,7 +42,7 @@ final class ChatStorage {
     func deleteConversation(_ conversation: Conversation) {
         let conversationId = conversation.id
         modelContext.delete(conversation)
-        try? modelContext.save()
+        save("deleteConversation")
         // Day 18: 从 Spotlight 索引中移除该会话
         SpotlightIndexer.removeIndex(conversationId: conversationId)
     }
@@ -36,7 +50,7 @@ final class ChatStorage {
     /// 重命名并 save
     func renameConversation(_ conversation: Conversation, to newTitle: String) {
         conversation.title = newTitle
-        try? modelContext.save()
+        save("renameConversation")
         // Day 18: 标题变更后重新索引 Spotlight
         SpotlightIndexer.index(conversation)
     }
@@ -45,7 +59,7 @@ final class ChatStorage {
     /// Day 9: 翻转会话置顶状态并保存
     func togglePin(_ conversation: Conversation) {
         conversation.isPinned.toggle()
-        try? modelContext.save()
+        save("togglePin")
     }
 
     /// 添加消息，关联 conversation，save
@@ -53,7 +67,7 @@ final class ChatStorage {
         let message = ChatMessage(role: role, content: content, imageData: imageData)
         message.conversation = conversation
         conversation.messages.append(message)
-        try? modelContext.save()
+        save("addMessage")
         // Day 18: 消息更新后重新索引 Spotlight（contentDescription 取最后一条消息）
         SpotlightIndexer.index(conversation)
         return message
@@ -87,7 +101,7 @@ final class ChatStorage {
             // 同步清理 Spotlight 索引
             SpotlightIndexer.removeIndex(conversationId: convId)
         }
-        try? modelContext.save()
+        save("cleanupEmptyConversations")
     }
 
     /// 清空所有 SwiftData 数据（仅供 UITEST_RESET_DATA 使用）
@@ -119,7 +133,7 @@ final class ChatStorage {
         if let prefs = try? modelContext.fetch(preferenceDescriptor) {
             for pref in prefs { modelContext.delete(pref) }
         }
-        try? modelContext.save()
+        save("wipeAllData")
     }
 
     // MARK: - Day 9: 用户偏好读写
@@ -132,7 +146,7 @@ final class ChatStorage {
         // 无则创建默认实例并保存
         let preference = UserPreference()
         modelContext.insert(preference)
-        try? modelContext.save()
+        save("fetchPreference")
         return preference
     }
 
@@ -142,7 +156,7 @@ final class ChatStorage {
         preference.preferredTone = tone
         preference.preferredTools = tools
         preference.customFact = fact
-        try? modelContext.save()
+        save("savePreference")
     }
 
     // MARK: - Day 12: 消息反馈与 RAG 权重闭环
@@ -161,7 +175,7 @@ final class ChatStorage {
                 chunk.weight *= 0.8
             }
         }
-        try? modelContext.save()
+        save("saveFeedback")
     }
 
     /// 查询某条消息的反馈记录
@@ -187,6 +201,6 @@ final class ChatStorage {
                 }
             }
         }
-        try? modelContext.save()
+        save("updateFeedback")
     }
 }
