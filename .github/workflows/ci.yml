@@ -485,5 +485,4 @@ jobs:
           # 详见 doc/plans/sonarcloud-setup-guide.md
           args: >
             -Dsonar.qualitygate.wait=true
-            -Dsonar.scm.provider=github
             ${{ github.event_name == 'pull_request' && format('-Dsonar.pullrequest.key={0} -Dsonar.pullrequest.branch={1} -Dsonar.pullrequest.base={2}', github.event.pull_request.number, github.head_ref, github.base_ref) || '' }}
