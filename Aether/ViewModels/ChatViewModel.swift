@@ -97,6 +97,8 @@ final class ChatViewModel {
     // Task 7: 提示注入弹窗用户选择回调（true=继续发送）
     @ObservationIgnored
     var pendingInjectionDecision: (@MainActor (Bool) -> Void)?
+    /// Task 4: Watch 发来的快速对话消息（非 nil 时 ChatView 应将其写入当前会话并发送）
+    var pendingWatchMessage: String?
 
     // 测试性调整：把 client / cache 暴露为 internal 并支持注入，便于单元测试预置缓存命中或注入 Mock LLMProvider
     // 生产侧行为不变：默认参数 DeepSeekClient() / SemanticCache() 兜底
@@ -124,6 +126,8 @@ final class ChatViewModel {
     private let toolTimeout: TimeInterval = 15
     /// Day 10: 通知中心观察者，deinit 中移除
     nonisolated private let errorObserver = ErrorObserver()
+    /// Task 4: Watch 快速对话消息观察者，deinit 中移除
+    nonisolated private let quickChatObserver = ErrorObserver()
     /// 补充 D：灵动岛 Live Activity 引用
     #if os(iOS)
     private var liveActivity: Activity<TimerActivityAttributes>?
@@ -204,13 +208,29 @@ final class ChatViewModel {
         if onDeviceConfig.autoSwitchOnNetworkLoss {
             startNetworkMonitoring()
         }
+        // Task 4: 订阅 Watch 快速对话消息通知。WatchConnectivityService 收到 Watch 消息后广播此通知，
+        // ChatViewModel 设置 pendingWatchMessage，ChatView 观察后将其写入当前会话并发送。
+        quickChatObserver.token = NotificationCenter.default.addObserver(
+            forName: .wcQuickChatReceived,
+            object: nil,
+            queue: OperationQueue.main
+        ) { [weak self] notification in
+            guard let self = self else { return }
+            if let msg = notification.object as? String {
+                Task { @MainActor [weak self] in
+                    self?.pendingWatchMessage = msg
+                }
+            }
+        }
     }
 
     /// Day 10: 释放 errorObserver 避免泄漏
     deinit {
-        // Day 10: 释放 errorObserver，避免泄漏
-        // streamingTask 通过 .cancel() 在 switchTo / 新消息发送时已处理
+        // streamingTask 已使用 [weak self]，无需在 deinit 中显式取消
         if let observer = errorObserver.token {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        if let observer = quickChatObserver.token {
             NotificationCenter.default.removeObserver(observer)
         }
     }
@@ -409,9 +429,9 @@ final class ChatViewModel {
         // 补充 D：启动灵动岛
         startLiveActivity(query: userInput)
         // 立即持久化用户消息，防止流式中途崩溃丢失
-        try? modelContext.save()
-        streamingTask = Task {
-            await processMessage(userInput, conversation: conversation, modelContext: modelContext)
+        do { try modelContext.save() } catch { print("持久化用户消息失败: \(error)") }
+        streamingTask = Task { [weak self] in
+            await self?.processMessage(userInput, conversation: conversation, modelContext: modelContext)
         }
     }
 
@@ -441,7 +461,7 @@ final class ChatViewModel {
         messages.removeAll { $0.id == assistantMessage.id }
         // 注意：不删除 modelContext 中的 ChatMessage 实体，避免破坏 index；
         //      sendMessage 会重新 save 覆盖状态
-        try? modelContext.save()
+        do { try modelContext.save() } catch { print("重新生成-删除消息后保存失败: \(error)") }
         // 重发用户消息触发新的 AI 回复
         inputText = userInput
         sendMessage(in: conversation, modelContext: modelContext)
@@ -483,7 +503,7 @@ final class ChatViewModel {
             messages.append(assistantMsg)
             streamingText = ""
             isLoading = false
-            try? modelContext.save()
+            do { try modelContext.save() } catch { print("UITest 桩回复保存失败: \(error)") }
             endLiveActivity()
             return
         }
@@ -612,7 +632,7 @@ final class ChatViewModel {
             messages.append(assistantMsg)
             streamingText = ""
             isLoading = false
-            try? modelContext.save()
+            do { try modelContext.save() } catch { print("缓存命中回复保存失败: \(error)") }
             return
         }
 
@@ -730,7 +750,7 @@ final class ChatViewModel {
                 assistantMsg.conversation = conversation
                 conversation.messages.append(assistantMsg)
                 messages.append(assistantMsg)
-                try? modelContext.save()
+                do { try modelContext.save() } catch { print("工具调用助手消息保存失败: \(error)") }
                 var toolResults: [APIMessage] = []
                 // Day 8: thought 为 chunkContent（非空时显示思维链）
                 let thought = chunkContent.isEmpty ? nil : chunkContent
@@ -805,7 +825,7 @@ final class ChatViewModel {
                         toolMsg.conversation = conversation
                         conversation.messages.append(toolMsg)
                         messages.append(toolMsg)
-                        try? modelContext.save()
+                        do { try modelContext.save() } catch { print("工具结果消息保存失败: \(error)") }
                     } catch {
                         // Task 7: 工具调用失败/未授权也记录审计日志
                         ToolAuditLogger.shared.log(toolName: tc.name, argumentsSummary: argsSummary, authorized: toolAuthorized, timestamp: toolStartTime)
@@ -825,7 +845,7 @@ final class ChatViewModel {
                         toolMsg.conversation = conversation
                         conversation.messages.append(toolMsg)
                         messages.append(toolMsg)
-                        try? modelContext.save()
+                        do { try modelContext.save() } catch { print("工具失败消息保存失败: \(error)") }
                         errorMessage = String(format: NSLocalizedString("工具 %@ 执行失败: %@", comment: ""), tc.name, errMsg)
                     }
                 }
@@ -863,7 +883,7 @@ final class ChatViewModel {
         messages.append(assistantMsg)
         streamingText = ""
         isLoading = false
-        try? modelContext.save()
+        do { try modelContext.save() } catch { print("最终助手回复保存失败: \(error)") }
 
         // Day 6: 语义缓存写入（仅非工具模式且响应非空且 embedding 有效）
         // 说明：仅非工具模式且响应非空且 embedding 有效才写缓存，

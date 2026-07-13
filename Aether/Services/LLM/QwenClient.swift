@@ -3,7 +3,7 @@ import Foundation
 /// Day 13: Qwen（阿里云百炼 DashScope）API 客户端，实现 LLMProvider 协议。
 /// 通过 OpenAI 兼容模式端点提供 chat 流式对话和 embed 向量嵌入能力。
 /// nonisolated 设计允许跨 actor 调用。
-nonisolated final class QwenClient: LLMProvider {
+nonisolated final class QwenClient: LLMProvider, @unchecked Sendable {
     /// URLSession 实例，lazy 加载默认用 .shared
     private lazy var session: URLSession = .shared
     /// SSE 流解析器

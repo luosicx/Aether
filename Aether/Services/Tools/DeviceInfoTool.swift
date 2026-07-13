@@ -9,7 +9,7 @@ import UIKit
 #endif
 
 /// 设备信息工具，返回设备型号、OS 版本、电量、可用存储空间
-final class DeviceInfoTool: ToolProtocol {
+final class DeviceInfoTool: ToolProtocol, @unchecked Sendable {
     /// 工具定义（name/description/parameters）
     var definition: ToolDefinition {
         ToolDefinition(

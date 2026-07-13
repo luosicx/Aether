@@ -6,12 +6,15 @@ struct PrivacyPolicyView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 // 标题
-                Text("以太隐私政策")
+                Text("以太隐私政策", comment: "")
                     .font(.title2)
                     .bold()
-                Text("更新日期：2026年7月")
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityLabel("以太隐私政策")
+                Text("更新日期：2026年7月", comment: "")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .accessibilityLabel("更新日期：2026年7月")
 
                 // 数据收集范围
                 policySection(
@@ -53,6 +56,7 @@ struct PrivacyPolicyView: View {
             .padding()
         }
         .navigationTitle("隐私政策")
+        .accessibilityLabel("隐私政策")
         .accessibilityIdentifier("PrivacyPolicyView")
     }
 
@@ -64,8 +68,12 @@ struct PrivacyPolicyView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .font(.headline)
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityLabel(title)
             Text(content)
                 .font(.body)
+                .accessibilityLabel(content)
         }
+        .accessibilityElement(children: .contain)
     }
 }

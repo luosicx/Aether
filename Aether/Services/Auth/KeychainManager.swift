@@ -208,7 +208,8 @@ final class KeychainManager {
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: provider.keychainAccount,
-            kSecValueData as String: data
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         ]
         // 先删后加：幂等保存，避免重复 key 报 errSecDuplicateItem
         _ = backend.secItemDelete(query as CFDictionary)

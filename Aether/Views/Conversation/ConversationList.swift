@@ -209,7 +209,7 @@ struct ConversationList: View {
                                 }
                                 .disabled(selectedConversations.isEmpty)
                                 .accessibilityLabel("删除选中")
-                                .accessibilityHint(String(format: "删除选中的 %d 个会话", selectedConversations.count))
+                                .accessibilityHint(String(format: NSLocalizedString("删除选中的 %d 个会话", comment: "批量删除按钮无障碍提示"), selectedConversations.count))
                                 .accessibilityIdentifier("deleteSelectedConversationsButton")
                             }
                             .padding(.horizontal)
@@ -297,7 +297,7 @@ struct ConversationList: View {
                     deleteIndexSet = nil
                 }
             } message: {
-                Text("确定删除此对话？删除后无法恢复。")
+                Text("确定删除此对话？删除后无法恢复。", comment: "")
             }
             .alert("批量删除", isPresented: $showBatchDeleteConfirm) {
                 Button("取消", role: .cancel) {}

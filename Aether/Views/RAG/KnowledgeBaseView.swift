@@ -226,8 +226,29 @@ struct KnowledgeBaseView: View {
     // MARK: - 分块预览 (Regular / Detail)
 
     private func chunkPreview(for doc: KnowledgeBaseVM.DocumentRow) -> some View {
-        let chunks = chunksForSource(doc.source)
-        return ScrollView {
+        ChunkPreviewList(source: doc.source, doc: doc)
+    }
+}
+
+/// 文档分块预览子视图，使用 @Query 按 source 过滤，避免在 body 中直接 fetch
+private struct ChunkPreviewList: View {
+    let source: String
+    let doc: KnowledgeBaseVM.DocumentRow
+
+    @Query private var chunks: [DocumentChunk]
+
+    init(source: String, doc: KnowledgeBaseVM.DocumentRow) {
+        self.source = source
+        self.doc = doc
+        // 使用 @Query 的 predicate 参数，而非在 body 中执行 modelContext.fetch()
+        _chunks = Query(
+            filter: #Predicate<DocumentChunk> { $0.source == source },
+            sort: \.chunkIndex
+        )
+    }
+
+    var body: some View {
+        ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(doc.source)
@@ -270,15 +291,5 @@ struct KnowledgeBaseView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
-    }
-
-    // MARK: - 查询指定 source 的全部分块
-
-    private func chunksForSource(_ source: String) -> [DocumentChunk] {
-        let descriptor = FetchDescriptor<DocumentChunk>(
-            predicate: #Predicate { $0.source == source },
-            sortBy: [SortDescriptor(\.chunkIndex)]
-        )
-        return (try? modelContext.fetch(descriptor)) ?? []
     }
 }

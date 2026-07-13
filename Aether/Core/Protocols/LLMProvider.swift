@@ -1,7 +1,7 @@
 import Foundation
 
 /// 定义 LLM 客户端契约，抽象 chat 流式对话与 embed 向量嵌入两个核心能力。
-protocol LLMProvider {
+protocol LLMProvider: Sendable {
     /// 纯文本 chat 流：以 `AsyncStream<String>` 形式逐 chunk yield 内容。
     func chat(messages: [APIMessage], config: ChatConfig, apiKey: String) -> AsyncStream<String>
     /// 带工具调用 chat 流：以 `AsyncStream<ParsedChunk>` 形式 yield，包含 content 与累积后的 toolCalls。

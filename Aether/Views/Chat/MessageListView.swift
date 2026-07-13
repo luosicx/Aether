@@ -43,15 +43,12 @@ struct MessageListView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    /// Task 25-28: 从 SwiftData 读取用户偏好（主题/气泡样式/字体大小/行距/AI头像）
-    private var userPreference: UserPreference {
-        ChatStorage(modelContext: modelContext).fetchPreference()
-    }
+    /// Task 25-28: 用户偏好，在 onAppear 中加载，避免计算属性每次创建 ChatStorage 实例
+    @State private var userPreference: UserPreference?
 
     var body: some View {
-        // 缓存用户偏好查询结果，避免在 ForEach 中为每条消息重复触发 SwiftData fetch
-        // 原先 userPreference 计算属性每次访问都会创建 ChatStorage 并查询，流式输出时性能损耗严重
-        let preference = userPreference
+        // 安全解包用户偏好，未加载时使用默认值
+        let prefs = userPreference
         return ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 18) {
@@ -114,10 +111,10 @@ struct MessageListView: View {
                                     }
                                 }
                             },
-                            bubbleStyle: BubbleStyleType.current(preference.bubbleStyle),
-                            fontSize: preference.fontSize,
-                            lineHeight: preference.lineHeight,
-                            aiAvatarData: preference.avatarData
+                            bubbleStyle: BubbleStyleType.current(prefs?.bubbleStyle ?? "liquidGlass"),
+                            fontSize: prefs?.fontSize ?? 16.0,
+                            lineHeight: prefs?.lineHeight ?? 1.5,
+                            aiAvatarData: prefs?.avatarData
                         )
                             .id(message.id.uuidString)
                             .transition(reduceMotion ? .opacity : .asymmetric(
@@ -137,7 +134,7 @@ struct MessageListView: View {
                                 Image(systemName: "text.quote")
                                     .font(.captionAI)
                                     .foregroundStyle(.tertiary)
-                                Text("引用来源")
+                                Text("引用来源", comment: "")
                                     .font(.toolLabel)
                                     .foregroundStyle(.tertiary)
                                 Spacer()
@@ -155,7 +152,7 @@ struct MessageListView: View {
                             Image(systemName: "wrench.and.screwdriver")
                                 .font(.captionAI)
                                 .foregroundStyle(.tertiary)
-                            Text("工具调用流程")
+                            Text("工具调用流程", comment: "")
                                 .font(.toolLabel)
                                 .foregroundStyle(.tertiary)
                             Spacer()
@@ -184,6 +181,10 @@ struct MessageListView: View {
                 .animation(reduceMotion ? nil : AnimationTokens.messageAppear, value: viewModel.messages.count)
             }
             .frame(maxHeight: .infinity)
+            #if os(iOS)
+            // Task 3: 向下滑动消息列表时交互式收起键盘
+            .scrollDismissesKeyboard(.interactively)
+            #endif
             .onChange(of: viewModel.messages.count) {
                 if reduceMotion {
                     if let lastId = viewModel.messages.last?.id {
@@ -218,6 +219,14 @@ struct MessageListView: View {
                 }
             }
             .animation(reduceMotion ? nil : AnimationTokens.transition, value: viewModel.feedbackToast)
+        }
+        .onAppear {
+            // 在 onAppear 中加载用户偏好，只创建一次 ChatStorage 实例
+            userPreference = ChatStorage(modelContext: modelContext).fetchPreference()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .settingsDidUpdate)) { _ in
+            // 设置页关闭后重新加载用户偏好，确保气泡样式、字体大小、行距等立即生效
+            userPreference = ChatStorage(modelContext: modelContext).fetchPreference()
         }
     }
 

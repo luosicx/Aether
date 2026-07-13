@@ -154,6 +154,145 @@ final class ToolRegistryTests: XCTestCase {
         XCTAssertTrue(json.contains("\"name\""), "JSON 应含 name 字段")
         XCTAssertTrue(json.contains("\"parameters\""), "JSON 应含 parameters 字段")
     }
+
+    // MARK: - unregister / registerBatch 方法测试
+
+    /// unregister 已注册工具后，getTool 应返回 nil
+    func testUnregisterRemovesTool() {
+        let name = "calculate"
+        XCTAssertNotNil(registry.getTool(named: name), "注销前应能取到工具")
+        registry.unregister(name: name)
+        XCTAssertNil(registry.getTool(named: name), "注销后应返回 nil")
+        // 恢复
+        registry.register(tool: CalculatorTool())
+    }
+
+    /// unregister 未注册的工具名应不报错（no-op）
+    func testUnregisterNonExistentToolIsNoOp() {
+        let countBefore = registry.toolCount
+        registry.unregister(name: "non_existent_tool")
+        XCTAssertEqual(registry.toolCount, countBefore, "注销不存在的工具应为 no-op")
+    }
+
+    /// unregister 后 toolCount 应减少 1
+    func testUnregisterDecrementsToolCount() {
+        let countBefore = registry.toolCount
+        registry.unregister(name: "calculate")
+        XCTAssertEqual(registry.toolCount, countBefore - 1, "注销后工具数应减 1")
+        // 恢复
+        registry.register(tool: CalculatorTool())
+    }
+
+    /// unregister 后 allToolDefs 不应包含该工具
+    func testUnregisterRemovesFromAllToolDefs() {
+        registry.unregister(name: "calculate")
+        let names = registry.allToolDefs.map { $0.function.name }
+        XCTAssertFalse(names.contains("calculate"), "注销后 allToolDefs 不应包含该工具")
+        // 恢复
+        registry.register(tool: CalculatorTool())
+    }
+
+    /// registerBatch 应批量注册多个工具
+    func testRegisterBatchRegistersMultipleTools() {
+        let dummy1 = DummyTool(name: "batch_tool_1", result: "r1")
+        let dummy2 = DummyTool(name: "batch_tool_2", result: "r2")
+        registry.registerBatch(tools: [dummy1, dummy2])
+        XCTAssertNotNil(registry.getTool(named: "batch_tool_1"), "registerBatch 后应能取到 tool_1")
+        XCTAssertNotNil(registry.getTool(named: "batch_tool_2"), "registerBatch 后应能取到 tool_2")
+        // 清理
+        registry.unregister(name: "batch_tool_1")
+        registry.unregister(name: "batch_tool_2")
+    }
+
+    /// registerBatch 空数组应为 no-op
+    func testRegisterBatchEmptyArrayIsNoOp() {
+        let countBefore = registry.toolCount
+        registry.registerBatch(tools: [])
+        XCTAssertEqual(registry.toolCount, countBefore, "空数组 registerBatch 应为 no-op")
+    }
+
+    /// registerBatch 同名工具应覆盖
+    func testRegisterBatchOverridesSameName() async throws {
+        let dummy = DummyTool(name: "calculate", result: "BATCH_OVERRIDE")
+        registry.registerBatch(tools: [dummy])
+        let tool = registry.getTool(named: "calculate")
+        XCTAssertNotNil(tool, "registerBatch 覆盖后应能取到工具")
+        let result = try await tool!.execute(arguments: [:])
+        XCTAssertEqual(result, "BATCH_OVERRIDE", "registerBatch 同名应覆盖")
+        // 恢复
+        registry.register(tool: CalculatorTool())
+    }
+
+    /// registerBatch 后 toolCount 应增加对应数量
+    func testRegisterBatchIncrementsToolCount() {
+        let countBefore = registry.toolCount
+        let dummy1 = DummyTool(name: "batch_count_1", result: "r1")
+        let dummy2 = DummyTool(name: "batch_count_2", result: "r2")
+        let dummy3 = DummyTool(name: "batch_count_3", result: "r3")
+        registry.registerBatch(tools: [dummy1, dummy2, dummy3])
+        XCTAssertEqual(registry.toolCount, countBefore + 3, "registerBatch 3 个工具后 toolCount 应增 3")
+        // 清理
+        registry.unregister(name: "batch_count_1")
+        registry.unregister(name: "batch_count_2")
+        registry.unregister(name: "batch_count_3")
+    }
+
+    /// getToolNames 应返回所有已注册工具名
+    func testGetToolNamesReturnsAllRegisteredNames() {
+        let names = registry.getToolNames()
+        XCTAssertFalse(names.isEmpty, "getToolNames 不应为空")
+        XCTAssertTrue(names.contains("calculate"), "getToolNames 应包含 calculate")
+    }
+
+    /// DateTimeTool 与 CalculatorTool 应遵循 Sendable 协议（新代码：@unchecked Sendable）
+    func testDateTimeAndCalculatorConformToSendable() {
+        // 编译期即可验证 Sendable 遵循，运行时仅做 sanity check
+        let dateTime = DateTimeTool()
+        let calculator = CalculatorTool()
+        XCTAssertFalse(dateTime.definition.name.isEmpty, "DateTimeTool 应可实例化")
+        XCTAssertFalse(calculator.definition.name.isEmpty, "CalculatorTool 应可实例化")
+        XCTAssertEqual(dateTime.definition.name, "get_current_time")
+        XCTAssertEqual(calculator.definition.name, "calculate")
+    }
+
+    // MARK: - @unchecked Sendable 并发执行测试
+
+    /// DateTimeTool 和 CalculatorTool 标记为 @unchecked Sendable，
+    /// 应可在 Task.detached（@Sendable 闭包）中安全捕获并正确执行。
+    /// 若移除 @unchecked Sendable，此测试将无法编译。
+    func testSendableToolsExecuteInDetachedTasks() async throws {
+        let dateTime = DateTimeTool()
+        let calculator = CalculatorTool()
+
+        // Task.detached 的闭包必须为 @Sendable — @unchecked Sendable 允许捕获实例
+        let dtTask = Task.detached { try await dateTime.execute(arguments: [:]) }
+        let calcTask = Task.detached {
+            try await calculator.execute(arguments: ["expression": "12 + 30"])
+        }
+
+        let dt = try await dtTask.value
+        let calc = try await calcTask.value
+
+        XCTAssertFalse(dt.isEmpty, "DateTimeTool 在 detached Task 中应返回非空结果")
+        XCTAssertEqual(calc, "42", "CalculatorTool 在 detached Task 中应正确求值 12 + 30 = 42")
+    }
+
+    /// DateTimeTool 在多次并发 detached 调用中应保持稳定（验证 @unchecked Sendable 线程安全性）
+    func testDateTimeToolSendableMultipleDetachedInvocations() async throws {
+        let tool = DateTimeTool()
+
+        let task1 = Task.detached { try await tool.execute(arguments: ["timezone": "Asia/Shanghai"]) }
+        let task2 = Task.detached { try await tool.execute(arguments: ["timezone": "America/New_York"]) }
+        let task3 = Task.detached { try await tool.execute(arguments: [:]) }
+
+        let result1 = try await task1.value
+        let result2 = try await task2.value
+        let result3 = try await task3.value
+
+        XCTAssertFalse(result1.isEmpty, "第一次并发调用应返回非空结果")
+        XCTAssertFalse(result2.isEmpty, "第二次并发调用应返回非空结果")
+        XCTAssertFalse(result3.isEmpty, "第三次并发调用应返回非空结果")
+    }
 }
 
 /// 测试用占位工具：name 与 result 可配置，execute 返回固定字符串

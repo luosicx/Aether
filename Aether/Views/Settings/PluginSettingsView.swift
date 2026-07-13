@@ -20,7 +20,7 @@ struct PluginSettingsView: View {
             // MARK: - 已安装插件列表
             Section {
                 if pluginManager.installedPluginList.isEmpty {
-                    Text("暂无已安装插件")
+                    Text("暂无已安装插件", comment: "")
                         .foregroundStyle(.secondary)
                         .font(.callout)
                         .accessibilityIdentifier("pluginEmptyState")
@@ -30,9 +30,9 @@ struct PluginSettingsView: View {
                     }
                 }
             } header: {
-                Text("已安装插件")
+                Text("已安装插件", comment: "")
             } footer: {
-                Text("插件工具会动态注册到工具注册中心，供 AI 调用。")
+                Text("插件工具会动态注册到工具注册中心，供 AI 调用。", comment: "")
                     .font(.captionAI)
             }
 
@@ -47,9 +47,9 @@ struct PluginSettingsView: View {
                 .accessibilityHint("安装一个示例插件用于演示")
                 .accessibilityIdentifier("installSamplePluginButton")
             } header: {
-                Text("安装")
+                Text("安装", comment: "")
             } footer: {
-                Text("安装示例插件用于演示插件系统功能。")
+                Text("安装示例插件用于演示插件系统功能。", comment: "")
                     .font(.captionAI)
             }
 
@@ -106,7 +106,7 @@ struct PluginSettingsView: View {
             // 工具列表
             if !plugin.tools.isEmpty {
                 HStack {
-                    Text("工具：")
+                    Text("工具：", comment: "")
                         .font(.captionAI)
                         .foregroundStyle(.secondary)
                     Text(plugin.tools.map(\.name).joined(separator: ", "))
@@ -125,7 +125,7 @@ struct PluginSettingsView: View {
                 )
             ) {
                 if plugin.permissions.isEmpty {
-                    Text("无权限声明")
+                    Text("无权限声明", comment: "")
                         .font(.captionAI)
                         .foregroundStyle(.secondary)
                 } else {
@@ -146,7 +146,7 @@ struct PluginSettingsView: View {
                     }
                 }
             } label: {
-                Text("权限（\(plugin.permissions.count)）")
+                Text("权限（\(plugin.permissions.count)）", comment: "")
                     .font(.captionAI)
             }
             .accessibilityIdentifier("pluginPermissionsDisclosure_\(plugin.id)")
@@ -188,9 +188,9 @@ struct PluginSettingsView: View {
         do {
             try pluginManager.install(manifest: samplePlugin)
             try pluginManager.loadPluginTools(pluginID: samplePlugin.id)
-            actionMessage = "安装成功：\(samplePlugin.name)"
+            actionMessage = String(localized: "安装成功：\(samplePlugin.name)")
         } catch {
-            actionMessage = "安装失败：\(error.localizedDescription)"
+            actionMessage = String(localized: "安装失败：\(error.localizedDescription)")
         }
     }
 
@@ -203,7 +203,7 @@ struct PluginSettingsView: View {
                 expandedPluginID = nil
             }
         } catch {
-            actionMessage = "卸载失败：\(error.localizedDescription)"
+            actionMessage = String(localized: "卸载失败：\(error.localizedDescription)")
         }
     }
 
@@ -224,12 +224,12 @@ struct PluginSettingsView: View {
     /// 权限类型的中文标签
     private func permissionLabel(_ type: PluginPermission.PermissionType) -> String {
         switch type {
-        case .network: return "网络访问"
-        case .fileSystem: return "文件系统"
-        case .clipboard: return "剪贴板"
-        case .notifications: return "通知"
-        case .contacts: return "通讯录"
-        case .location: return "位置"
+        case .network: return String(localized: "网络访问")
+        case .fileSystem: return String(localized: "文件系统")
+        case .clipboard: return String(localized: "剪贴板")
+        case .notifications: return String(localized: "通知")
+        case .contacts: return String(localized: "通讯录")
+        case .location: return String(localized: "位置")
         }
     }
 }

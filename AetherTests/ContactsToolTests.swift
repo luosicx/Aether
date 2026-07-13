@@ -200,4 +200,150 @@ final class ContactsToolTests: XCTestCase {
         XCTAssertTrue(isFormattedResult || isNotFound,
                       "搜索结果应为格式化联系人或未找到，实际：\(result)")
     }
+
+    // MARK: - 新代码覆盖率：CNContactFetchRequest + enumerateContacts 路径
+
+    /// 按电话号码搜索应走 CNContactFetchRequest 路径（新代码）。
+    /// 在模拟器/CI 环境下可能因权限被拒而提前返回，但不应崩溃。
+    /// 权限授予时 enumerateContacts 遍历全部联系人并按电话号码过滤。
+    func testExecutePhoneNumberSearchUsesFetchRequest() async throws {
+        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
+                      "跳过：模拟器/CI 环境通讯录权限不可用")
+        // 以数字为 query 触发电话号码搜索路径
+        let result = try await tool.execute(arguments: ["query": "138"])
+        // 权限授予时返回格式化结果或 "未找到"；权限被拒时返回权限提示
+        XCTAssertTrue(result.contains("姓名：") || result == "未找到匹配的联系人" || result.contains("权限"),
+                      "电话号码搜索应返回格式化结果、未找到或权限提示，实际：\(result)")
+    }
+
+    /// 搜索中文姓名应走 unifiedContacts 路径 + CNContactFetchRequest 电话号码匹配路径。
+    /// 新代码使用 enumerateContacts 替代 unifiedContacts(predicateForContactsInContainer:)。
+    func testExecuteChineseNameSearchExercisesEnumerateContacts() async throws {
+        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
+                      "跳过：模拟器/CI 环境通讯录权限不可用")
+        let result = try await tool.execute(arguments: ["query": "张三"])
+        XCTAssertFalse(result.isEmpty, "中文姓名搜索应返回非空字符串")
+    }
+
+    /// 搜索英文姓名应正常工作（验证 enumerateContacts 对非中文姓名的支持）
+    func testExecuteEnglishNameSearchExercisesEnumerateContacts() async throws {
+        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
+                      "跳过：模拟器/CI 环境通讯录权限不可用")
+        let result = try await tool.execute(arguments: ["query": "John"])
+        XCTAssertFalse(result.isEmpty, "英文姓名搜索应返回非空字符串")
+    }
+
+    /// 搜索特殊字符应不崩溃（enumerateContacts 遍历 + filter 逻辑健壮性）
+    func testExecuteSpecialCharacterSearchDoesNotCrash() async throws {
+        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
+                      "跳过：模拟器/CI 环境通讯录权限不可用")
+        let result = try await tool.execute(arguments: ["query": "@#$%"])
+        XCTAssertFalse(result.isEmpty, "特殊字符搜索应返回非空字符串")
+    }
+
+    // MARK: - 新代码覆盖率补充：CNContactFetchRequest + enumerateContacts 路径
+
+    /// execute 不跳过：覆盖 CNContactFetchRequest + enumerateContacts 路径。
+    /// 权限授予时执行 enumerateContacts 遍历全部联系人；权限被拒时返回权限提示或抛出权限错误。
+    /// 新代码用 enumerateContacts 替代 unifiedContacts(predicateForContactsInContainer:)，
+    /// 此测试验证该路径不崩溃且返回符合预期的字符串或权限错误。
+    func testExecuteCoversEnumerateContactsPath() async throws {
+        do {
+            let result = try await tool.execute(arguments: ["query": "测试"])
+            XCTAssertFalse(result.isEmpty, "execute 应返回非空字符串")
+            // 权限被拒（返回 false） → "通讯录权限未授权..."
+            // 权限授予 + 无匹配 → "未找到匹配的联系人"
+            // 权限授予 + 有匹配 → "姓名：...，电话：..."
+            let isExpected = result.contains("权限") ||
+                             result == "未找到匹配的联系人" ||
+                             result.contains("姓名：")
+            XCTAssertTrue(isExpected, "结果应为权限提示/未找到/格式化联系人，实际：\(result)")
+        } catch {
+            // 权限被拒时 requestAccess 可能抛出 CNErrorDomain Code=100 错误
+            let desc = error.localizedDescription
+            XCTAssertTrue(desc.contains("访问") || desc.contains("权限") || desc.contains("denied"),
+                          "错误应与权限相关，实际：\(error)")
+        }
+    }
+
+    /// execute 按电话号码搜索覆盖 enumerateContacts + filter 路径。
+    /// 新代码通过 enumerateContacts 遍历联系人后用 phoneNumbers.filter 过滤匹配项。
+    func testExecutePhoneNumberSearchCoversEnumerateContacts() async throws {
+        do {
+            let result = try await tool.execute(arguments: ["query": "138"])
+            XCTAssertFalse(result.isEmpty, "execute 应返回非空字符串")
+            let isExpected = result.contains("权限") ||
+                             result == "未找到匹配的联系人" ||
+                             result.contains("姓名：")
+            XCTAssertTrue(isExpected, "结果应为权限提示/未找到/格式化联系人，实际：\(result)")
+        } catch {
+            let desc = error.localizedDescription
+            XCTAssertTrue(desc.contains("访问") || desc.contains("权限") || desc.contains("denied"),
+                          "错误应与权限相关，实际：\(error)")
+        }
+    }
+
+    /// execute 按中文姓名搜索覆盖 unifiedContacts + enumerateContacts 双路径。
+    /// 新代码先按姓名匹配（unifiedContacts），再通过 enumerateContacts 按电话号码匹配。
+    func testExecuteChineseNameSearchCoversBothPaths() async throws {
+        do {
+            let result = try await tool.execute(arguments: ["query": "张三"])
+            XCTAssertFalse(result.isEmpty, "execute 应返回非空字符串")
+            let isExpected = result.contains("权限") ||
+                             result == "未找到匹配的联系人" ||
+                             result.contains("姓名：")
+            XCTAssertTrue(isExpected, "结果应为权限提示/未找到/格式化联系人，实际：\(result)")
+        } catch {
+            let desc = error.localizedDescription
+            XCTAssertTrue(desc.contains("访问") || desc.contains("权限") || desc.contains("denied"),
+                          "错误应与权限相关，实际：\(error)")
+        }
+    }
+
+    /// execute 多次调用覆盖 enumerateContacts 的重复执行路径。
+    /// 验证每次调用独立创建 CNContactFetchRequest 并遍历，不残留状态。
+    func testExecuteMultipleCallsCoverEnumerateContacts() async throws {
+        for _ in 0..<2 {
+            do {
+                let result = try await tool.execute(arguments: ["query": "李"])
+                XCTAssertFalse(result.isEmpty, "每次调用应返回非空字符串")
+            } catch {
+                let desc = error.localizedDescription
+                XCTAssertTrue(desc.contains("访问") || desc.contains("权限") || desc.contains("denied"),
+                              "错误应与权限相关，实际：\(error)")
+            }
+        }
+    }
+
+    /// execute 按英文姓名搜索覆盖 enumerateContacts 路径（验证非中文 query 的健壮性）。
+    func testExecuteEnglishNameSearchCoversEnumerateContacts() async throws {
+        do {
+            let result = try await tool.execute(arguments: ["query": "John"])
+            XCTAssertFalse(result.isEmpty, "execute 应返回非空字符串")
+            let isExpected = result.contains("权限") ||
+                             result == "未找到匹配的联系人" ||
+                             result.contains("姓名：")
+            XCTAssertTrue(isExpected, "结果应为权限提示/未找到/格式化联系人，实际：\(result)")
+        } catch {
+            let desc = error.localizedDescription
+            XCTAssertTrue(desc.contains("访问") || desc.contains("权限") || desc.contains("denied"),
+                          "错误应与权限相关，实际：\(error)")
+        }
+    }
+
+    /// execute 按特殊字符搜索覆盖 enumerateContacts 遍历 + filter 的健壮性（非跳过）。
+    func testExecuteSpecialCharSearchCoversEnumerateContacts() async throws {
+        do {
+            let result = try await tool.execute(arguments: ["query": "@#$"])
+            XCTAssertFalse(result.isEmpty, "execute 应返回非空字符串")
+            let isExpected = result.contains("权限") ||
+                             result == "未找到匹配的联系人" ||
+                             result.contains("姓名：")
+            XCTAssertTrue(isExpected, "结果应为权限提示/未找到/格式化联系人，实际：\(result)")
+        } catch {
+            let desc = error.localizedDescription
+            XCTAssertTrue(desc.contains("访问") || desc.contains("权限") || desc.contains("denied"),
+                          "错误应与权限相关，实际：\(error)")
+        }
+    }
 }

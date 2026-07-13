@@ -2,7 +2,7 @@ import Foundation
 import EventKit
 
 /// 提醒工具，通过 EventKit 创建带 dueDate 的提醒事项
-final class ReminderTool: ToolProtocol {
+final class ReminderTool: ToolProtocol, @unchecked Sendable {
     private let eventStore = EKEventStore()
 
     /// 工具定义（name/description/parameters）

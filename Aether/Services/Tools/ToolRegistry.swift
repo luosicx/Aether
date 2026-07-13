@@ -238,7 +238,7 @@ final class ToolRegistry {
 
 // MARK: - Day 11: DateTimeTool
 /// 获取当前日期与时间工具，支持可选时区参数
-final class DateTimeTool: ToolProtocol {
+final class DateTimeTool: ToolProtocol, @unchecked Sendable {
     /// 工具定义（name/description/parameters）
     var definition: ToolDefinition {
         ToolDefinition(
@@ -267,7 +267,7 @@ final class DateTimeTool: ToolProtocol {
 
 // MARK: - Day 11: CalculatorTool
 /// 数学表达式求值工具，用 NSExpression 实现，不引入第三方库
-final class CalculatorTool: ToolProtocol {
+final class CalculatorTool: ToolProtocol, @unchecked Sendable {
     /// 工具定义（name/description/parameters）
     var definition: ToolDefinition {
         ToolDefinition(

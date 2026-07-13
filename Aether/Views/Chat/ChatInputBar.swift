@@ -11,7 +11,8 @@ struct ChatInputBar: View {
     // Day 5 补充A：相册图片选择回调，把图片数据回传给 ChatViewModel
     let onImagePicked: (Data?) -> Void
     @State private var selectedItem: PhotosPickerItem?
-    @FocusState private var isFocused: Bool
+    // Task 3: 由父视图 ChatView 持有 FocusState 并以 binding 注入，便于父级统一控制键盘收起
+    var isFocused: FocusState<Bool>.Binding
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -54,7 +55,7 @@ struct ChatInputBar: View {
                 )
                 .overlay(alignment: .topLeading) {
                     if inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                        Text("输入消息…")
+                        Text("输入消息…", comment: "")
                             .font(.body)
                             .foregroundColor(Color.duskGray)
                             .padding(.horizontal, 12)
@@ -62,7 +63,7 @@ struct ChatInputBar: View {
                             .allowsHitTesting(false)
                     }
                 }
-                .focused($isFocused)
+                .focused(isFocused)
                 .accessibilityLabel("消息输入框")
                 .accessibilityHint("输入要发送的消息")
                 .accessibilityIdentifier("messageInputField")
@@ -84,7 +85,7 @@ struct ChatInputBar: View {
                 Image(systemName: "arrow.up")
                     .font(.system(.body, design: .rounded).weight(.bold))
                     .foregroundStyle(.white)
-                    .frame(width: 36, height: 36)
+                    .frame(width: 44, height: 44)
                     .background {
                         if canSend {
                             Color.aetherGradient

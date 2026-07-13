@@ -109,7 +109,7 @@ final class MLXInferenceEngineTests: XCTestCase {
     // MARK: - loadModel: 模拟器占位分支（无 MLX）
 
     func testLoadModelThrowsLoadFailedWhenMLXUnavailable() async throws {
-        #if canImport(MLX)
+        #if canImport(MLXLLM)
         throw XCTSkip("MLX 可用，跳过占位分支测试")
         #else
         let tmpURL = FileManager.default.temporaryDirectory
@@ -144,7 +144,7 @@ final class MLXInferenceEngineTests: XCTestCase {
     // MARK: - generate: 占位流
 
     func testGenerateReturnsPlaceholderStreamWhenMLXUnavailable() async throws {
-        #if canImport(MLX)
+        #if canImport(MLXLLM)
         throw XCTSkip("MLX 可用，跳过占位分支测试")
         #else
         let stream = await engine.generate(prompt: "hello", maxTokens: 10, temperature: 0.7)
@@ -161,7 +161,7 @@ final class MLXInferenceEngineTests: XCTestCase {
     }
 
     func testGenerateWithModelPathStillReturnsPlaceholderWhenMLXUnavailable() async throws {
-        #if canImport(MLX)
+        #if canImport(MLXLLM)
         throw XCTSkip("MLX 可用，跳过占位分支测试")
         #else
         let fakePath = URL(fileURLWithPath: "/fake/path/model.mlpackage")

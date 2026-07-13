@@ -4,7 +4,7 @@ import Foundation
 /// 将设备端请求转发到 BFF 网关（Cloudflare Workers），由服务端持有上游 API Key，
 /// 设备仅携带 X-BFF-Token 鉴权。请求体结构与 DeepSeekClient 一致，SSE 解析复用 SSEParser。
 /// nonisolated 设计允许跨 actor 调用。
-nonisolated final class BFFProxyClient: LLMProvider {
+nonisolated final class BFFProxyClient: LLMProvider, @unchecked Sendable {
     /// 路由目标上游供应商（写入 X-Provider Header，服务端据此选择上游 key/endpoint）
     private let provider: ModelProvider
     /// BFF 配置（endpoint / token / 限流参数）
@@ -54,7 +54,8 @@ nonisolated final class BFFProxyClient: LLMProvider {
             "input": texts
         ]
         guard let jsonData = try? JSONSerialization.data(withJSONObject: body),
-              let url = URL(string: config.endpointURL.appending(path: "v1/embeddings").absoluteString) else {
+              let endpointURL = config.endpointURL,
+              let url = URL(string: endpointURL.appending(path: "v1/embeddings").absoluteString) else {
             throw LLMError.unknown(NSLocalizedString("无效的 BFF embedding 请求", comment: ""))
         }
         var request = URLRequest(url: url)
@@ -152,7 +153,8 @@ nonisolated final class BFFProxyClient: LLMProvider {
     /// 逐行解析 `data: ` 前缀，跳过 [DONE]，yield content。
     private func sendRequest(body: ChatRequestBody, apiKey: String, continuation: AsyncStream<String>.Continuation) async {
         // BFF 模式下 apiKey 不使用（服务端持有上游 key）
-        guard let url = URL(string: config.endpointURL.appending(path: "v1/chat/completions").absoluteString) else {
+        guard let endpointURL = config.endpointURL,
+              let url = URL(string: endpointURL.appending(path: "v1/chat/completions").absoluteString) else {
             continuation.finish()
             return
         }
@@ -245,7 +247,8 @@ nonisolated final class BFFProxyClient: LLMProvider {
     /// 发送带工具的 chat 请求并流式解析 SSE。用 SSEParser.parseWithToolAccumulation 累积 tool_calls。
     private func sendRequestWithTools(body: ChatRequestBody, apiKey: String, continuation: AsyncStream<ParsedChunk>.Continuation) async {
         // BFF 模式下 apiKey 不使用（服务端持有上游 key）
-        guard let url = URL(string: config.endpointURL.appending(path: "v1/chat/completions").absoluteString),
+        guard let endpointURL = config.endpointURL,
+              let url = URL(string: endpointURL.appending(path: "v1/chat/completions").absoluteString),
               let jsonData = try? JSONEncoder().encode(body) else {
             continuation.finish()
             return

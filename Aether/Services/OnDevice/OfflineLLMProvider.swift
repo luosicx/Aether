@@ -5,13 +5,13 @@ import Foundation
 /// - chat(tools:)：端侧模型不支持工具调用，发 .llmErrorOccurred 通知并结束流
 /// - embed：返回基于 hash 的 384 维占位向量（端侧不调用远程 embedding）
 /// nonisolated 设计允许跨 actor 调用，与 DeepSeekClient/QwenClient 一致。
-nonisolated final class OfflineLLMProvider: LLMProvider {
+nonisolated final class OfflineLLMProvider: LLMProvider, @unchecked Sendable {
 
     /// 纯文本 chat 流：拼接 Llama-3 prompt → 调用 MLXInferenceEngine.generate 流式生成。
     /// 若模型未加载且 OnDeviceConfig 中有 modelPath，会先自动加载模型。
     func chat(messages: [APIMessage], config: ChatConfig, apiKey: String) -> AsyncStream<String> {
         AsyncStream { continuation in
-            Task {
+            let task = Task {
                 let storedPath = Self.loadStoredModelPath()
                 // 自动加载：模型未加载且有路径时，先加载（失败则交由 generate 输出占位提示）
                 var effectivePath = storedPath
@@ -38,6 +38,10 @@ nonisolated final class OfflineLLMProvider: LLMProvider {
                 }
                 continuation.finish()
             }
+            // 流被外部终止时取消内部 Task，释放 MLX 推理资源
+            continuation.onTermination = { _ in
+                task.cancel()
+            }
         }
     }
 
@@ -60,7 +64,7 @@ nonisolated final class OfflineLLMProvider: LLMProvider {
                 return
             }
             // tools 为空：退化为纯文本 chat，包装为 ParsedChunk
-            Task {
+            let task = Task {
                 let storedPath = Self.loadStoredModelPath()
                 // 自动加载：模型未加载且有路径时，先加载
                 var effectivePath = storedPath
@@ -84,12 +88,20 @@ nonisolated final class OfflineLLMProvider: LLMProvider {
                 }
                 continuation.finish()
             }
+            // 流被外部终止时取消内部 Task，释放 MLX 推理资源
+            continuation.onTermination = { _ in
+                task.cancel()
+            }
         }
     }
 
     /// 批量文本嵌入：返回基于 hash 的 384 维占位向量。
-    /// 端侧不调用远程 embedding API，用确定性 hash 为每条文本生成固定向量，
-    /// 归一化后可作为语义缓存的键（精度有限，仅用于离线兜底）。
+    ///
+    /// **占位实现说明**：端侧 LLM 模型（Llama/Qwen/Phi）为生成模型，不直接提供 embedding 输出。
+    /// 真实 embedding 需加载专用嵌入模型（如 `mlx-community/all-MiniLM-L6-v2-4bit`），
+    /// 通过 MLXLMCommon ModelContainer 加载后取模型隐藏层输出。当前为离线兜底方案，
+    /// 用确定性 hash 为每条文本生成固定向量，归一化后可作为语义缓存的键（精度有限）。
+    /// 若需高精度语义搜索，建议启用云端 embedding API。
     func embed(texts: [String], apiKey: String) async throws -> [[Float]] {
         // 空入参短路返回空数组
         guard !texts.isEmpty else { return [] }

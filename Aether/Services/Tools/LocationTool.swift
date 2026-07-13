@@ -18,7 +18,7 @@ private enum LocationError: Error {
 /// 获取设备地理位置与逆地理编码结果的工具。
 /// 通过 CLLocationManager 获取当前位置（10 秒超时），再用 CLGeocoder 反查地址，
 /// 跨平台支持 iOS + macOS。
-final class LocationTool: ToolProtocol {
+final class LocationTool: ToolProtocol, @unchecked Sendable {
     /// 工具定义（name/description/parameters）。无入参。
     var definition: ToolDefinition {
         ToolDefinition(
@@ -135,17 +135,23 @@ private final class LocationFetcher: NSObject, CLLocationManagerDelegate, @unche
     }
 
     /// 安全地 resume returning（防重复 resume 导致崩溃）
+    /// 统一在 DispatchQueue.main 上执行，与 continuation 的设置线程一致，避免数据竞争
     private func resume(returning location: CLLocation) {
-        guard let continuation = continuation else { return }
-        self.continuation = nil
-        continuation.resume(returning: location)
+        DispatchQueue.main.async {
+            guard let continuation = self.continuation else { return }
+            self.continuation = nil
+            continuation.resume(returning: location)
+        }
     }
 
     /// 安全地 resume throwing（防重复 resume 导致崩溃）
+    /// 统一在 DispatchQueue.main 上执行，与 continuation 的设置线程一致，避免数据竞争
     private func resume(throwing error: Error) {
-        guard let continuation = continuation else { return }
-        self.continuation = nil
-        continuation.resume(throwing: error)
+        DispatchQueue.main.async {
+            guard let continuation = self.continuation else { return }
+            self.continuation = nil
+            continuation.resume(throwing: error)
+        }
     }
 
     // MARK: CLLocationManagerDelegate

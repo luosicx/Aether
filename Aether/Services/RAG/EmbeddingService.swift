@@ -16,8 +16,7 @@ class EmbeddingService {
     static func resolveEmbedding(for provider: ModelProvider) -> (LLMProvider, ModelProvider)? {
         switch provider {
         case .qwen, .onDevice:
-            let client: LLMProvider = provider == .qwen ? QwenClient() : DeepSeekClient()
-            return (client, provider)
+            return (QwenClient(), provider)
         case .deepseek:
             let qwenKey = KeychainManager.shared.getAPIKey(for: .qwen) ?? ""
             guard !qwenKey.isEmpty else { return nil }

@@ -9,7 +9,7 @@ import AppKit
 import Vision
 
 /// macOS 文字识别工具，使用 Vision 框架对截图或图片文件做 OCR
-final class OCRTool: ToolProtocol {
+final class OCRTool: ToolProtocol, @unchecked Sendable {
     /// 工具定义
     /// - name: `extract_text_from_image`
     /// - parameters: `image_path`（可选，String）— 图片文件路径，不传则截取当前屏幕

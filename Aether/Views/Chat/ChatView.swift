@@ -10,7 +10,7 @@ struct ChatView: View {
     @Environment(\.openWindow) private var openWindow
     @Environment(\.conversationID) private var initialConversationID
     #endif
-    @State private var viewModel = ChatViewModel()
+    @State private var viewModel = ChatViewModel() // ChatViewModel 使用 @Observable 宏，@State 是正确的
     @State private var conversationListVM = ConversationListVM()
     @State private var settingsVM = SettingsViewModel()
     @State private var currentConversation: Conversation?
@@ -23,6 +23,8 @@ struct ChatView: View {
     // 统一 Toast：操作成功/复制/撤销反馈
     @State private var showToast = false
     @State private var toastMessage = ""
+    // Task 3: 集中管理输入框焦点，便于在消息列表滑动/点击时统一收起键盘
+    @FocusState private var isInputFocused: Bool
 
     var body: some View {
         Group {
@@ -250,6 +252,15 @@ struct ChatView: View {
                 showConversationList = true
                 // TODO: 后续可通过 FocusState 进一步聚焦到搜索框
             }
+            // Task 4: Watch 快速对话——将 Watch 发来的消息写入当前会话并发送
+            .onChange(of: viewModel.pendingWatchMessage) { _, newMessage in
+                guard let message = newMessage else { return }
+                viewModel.pendingWatchMessage = nil
+                viewModel.inputText = message
+                if let conversation = currentConversation {
+                    viewModel.sendMessage(in: conversation, modelContext: modelContext)
+                }
+            }
             #if os(macOS)
             // Task 20: macOS 监听「新建窗口」(Cmd+Shift+N) 通知——打开新窗口
             .onReceive(NotificationCenter.default.publisher(for: .newWindowRequested)) { _ in
@@ -279,6 +290,12 @@ struct ChatView: View {
     private var chatMainContent: some View {
         VStack(spacing: 0) {
             MessageListView(viewModel: viewModel, conversation: currentConversation)
+                #if os(iOS)
+                // Task 3: 点击消息列表空白区域收起键盘
+                .onTapGesture {
+                    isInputFocused = false
+                }
+                #endif
             Rectangle()
                 .fill(Color.separator)
                 .frame(height: 0.5)
@@ -315,7 +332,8 @@ struct ChatView: View {
                 },
                 onImagePicked: { data in
                     viewModel.pendingImage = data
-                }
+                },
+                isFocused: $isInputFocused
             )
         }
         // Task 19: 响应式布局——macOS 超宽屏限制最大宽度并居中
@@ -349,13 +367,28 @@ struct ChatView: View {
     }
 
     /// Day 18: 解析 deep link URL 并切换到对应会话。
-    /// 支持格式：`aether://conversation/<uuid>`
+    /// 支持格式：
+    /// - `aether://conversation/<uuid>` —— 切换到指定会话
+    /// - `aether://ask?query=<encoded>` —— 填入问题并发送（Widget 快速对话入口）
     private func handleDeepLink(_ url: URL) {
-        // 校验 host 为 conversation，且 path 含合法 UUID
-        guard url.host == "conversation" else { return }
-        let uuidString = url.lastPathComponent
-        guard let conversationId = UUID(uuidString: uuidString) else { return }
-        switchToConversation(id: conversationId)
+        switch url.host {
+        case "conversation":
+            // 切换到指定会话
+            let uuidString = url.lastPathComponent
+            guard let conversationId = UUID(uuidString: uuidString) else { return }
+            switchToConversation(id: conversationId)
+        case "ask":
+            // Task 5: Widget 快速对话入口——填入问题并发送
+            let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+            let query = components?.queryItems?.first(where: { $0.name == "query" })?.value ?? ""
+            guard !query.isEmpty else { return }
+            viewModel.inputText = query
+            if let conversation = currentConversation {
+                viewModel.sendMessage(in: conversation, modelContext: modelContext)
+            }
+        default:
+            break
+        }
     }
 }
 

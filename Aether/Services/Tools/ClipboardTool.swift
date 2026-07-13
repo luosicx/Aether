@@ -13,7 +13,7 @@ import AppKit
 #endif
 
 /// 读取系统剪贴板文本内容的工具
-final class ReadClipboardTool: ToolProtocol {
+final class ReadClipboardTool: ToolProtocol, @unchecked Sendable {
     /// 工具定义
     /// - name: `read_clipboard`
     /// - parameters: 无入参
@@ -45,7 +45,7 @@ final class ReadClipboardTool: ToolProtocol {
 }
 
 /// 将文本写入系统剪贴板的工具
-final class WriteClipboardTool: ToolProtocol {
+final class WriteClipboardTool: ToolProtocol, @unchecked Sendable {
     /// 工具定义
     /// - name: `write_clipboard`
     /// - parameters: `text`（必填，String）— 要写入剪贴板的文本

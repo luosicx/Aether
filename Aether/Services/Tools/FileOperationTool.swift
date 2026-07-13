@@ -9,7 +9,7 @@ import Foundation
 import AppKit
 
 /// macOS 文件操作工具
-final class FileOperationTool: ToolProtocol {
+final class FileOperationTool: ToolProtocol, @unchecked Sendable {
     /// 工具定义
     /// - name: `manage_file`
     /// - parameters: `action`（必填，String）— 操作类型；`path`/`src`/`dst`/`name` 按需传入

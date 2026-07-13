@@ -1,7 +1,7 @@
 import Foundation
 
 /// 工具的元信息（name + description + parameters JSON Schema），用于告知 LLM 可调用的工具。
-struct ToolDefinition {
+struct ToolDefinition: @unchecked Sendable {
     /// 工具名，需唯一。
     let name: String
     /// 工具描述，供 LLM 判断是否调用。
@@ -11,7 +11,7 @@ struct ToolDefinition {
 }
 
 /// 工具定义与执行契约：`definition` 暴露给 LLM，`execute` 接收参数执行实际逻辑。
-protocol ToolProtocol {
+protocol ToolProtocol: Sendable {
     /// 暴露给 LLM 的工具元信息。
     var definition: ToolDefinition { get }
     /// 执行工具。

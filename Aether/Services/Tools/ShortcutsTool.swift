@@ -13,7 +13,7 @@ import AppKit
 
 // MARK: - RunShortcutTool
 /// 快捷指令执行工具，跨平台
-final class RunShortcutTool: ToolProtocol {
+final class RunShortcutTool: ToolProtocol, @unchecked Sendable {
     /// 工具定义
     /// - name: `run_shortcut`
     /// - parameters: `name`（必填，String）— 快捷指令名称；
@@ -94,7 +94,7 @@ final class RunShortcutTool: ToolProtocol {
 
 // MARK: - ListShortcutsTool
 /// 快捷指令列表工具，跨平台
-final class ListShortcutsTool: ToolProtocol {
+final class ListShortcutsTool: ToolProtocol, @unchecked Sendable {
     /// 工具定义
     /// - name: `list_shortcuts`
     /// - parameters: 无入参
@@ -148,7 +148,7 @@ final class ListShortcutsTool: ToolProtocol {
 
 // MARK: - CreateShortcutTool
 /// 快捷指令创建工具，跨平台。生成 .shortcut 文件并打开 Shortcuts 应用导入
-final class CreateShortcutTool: ToolProtocol {
+final class CreateShortcutTool: ToolProtocol, @unchecked Sendable {
     /// 工具定义
     /// - name: `create_shortcut`
     /// - parameters: `name`（必填）— 快捷指令名称；`action`（必填）— 动作类型；
@@ -186,13 +186,13 @@ final class CreateShortcutTool: ToolProtocol {
             return "该 action 已被移除"
         }
         // 构建 WFWorkflow plist
-        let workflowAction = buildWorkflowAction(action: actionType, arguments: arguments)
-        guard let action = workflowAction else {
+        let workflowActions = buildWorkflowAction(action: actionType, arguments: arguments)
+        guard let actions = workflowActions else {
             return "错误：不支持的动作类型，支持 open_url/show_text/copy_to_clipboard"
         }
         // 构建 .shortcut 文件（WFWorkflow plist 格式）
         let workflow: [String: Any] = [
-            "WFWorkflowActions": [action],
+            "WFWorkflowActions": actions,
             "WFWorkflowImportQuestions": [],
             "WFWorkflowTypes": ["NCWidget", "WatchKit"],
             "WFWorkflowInputContentItemClasses": ["WFStringContentItem"],
@@ -223,28 +223,28 @@ final class CreateShortcutTool: ToolProtocol {
     }
 
     /// 根据 action 类型构建对应的 WFWorkflowAction 字典
-    private func buildWorkflowAction(action: String, arguments: [String: Any]) -> [String: Any]? {
+    private func buildWorkflowAction(action: String, arguments: [String: Any]) -> [[String: Any]]? {
         switch action {
         case "open_url":
             guard let url = arguments["url"] as? String else { return nil }
-            return [
+            return [[
                 "WFWorkflowActionIdentifier": "is.workflow.actions.openurl",
                 "WFWorkflowActionParameters": [
                     "URL": url,
                     "WFWorkflowActionText": "Opening URL: \(url)"
                 ]
-            ]
+            ]]
         case "show_text":
             guard let text = arguments["text"] as? String else { return nil }
-            return [
+            return [[
                 "WFWorkflowActionIdentifier": "is.workflow.actions.showresult",
                 "WFWorkflowActionParameters": [
                     "Text": text
                 ]
-            ]
+            ]]
         case "copy_to_clipboard":
             guard let text = arguments["text"] as? String else { return nil }
-            // 先设置文本，再拷贝到剪贴板
+            // 先设置文本变量，再拷贝到剪贴板
             let setTextAction: [String: Any] = [
                 "WFWorkflowActionIdentifier": "is.workflow.actions.setvariable",
                 "WFWorkflowActionParameters": [
@@ -252,13 +252,13 @@ final class CreateShortcutTool: ToolProtocol {
                     "WFTextActionText": text
                 ]
             ]
-            _ = setTextAction
-            return [
+            let copyAction: [String: Any] = [
                 "WFWorkflowActionIdentifier": "is.workflow.actions.copytoclipboard",
                 "WFWorkflowActionParameters": [
                     "WFClipboardContent": text
                 ]
             ]
+            return [setTextAction, copyAction]
         default:
             return nil
         }

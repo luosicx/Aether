@@ -171,7 +171,7 @@ final class SettingsViewModelTests: XCTestCase {
     func testSaveAndLoadBFFConfigRoundTrip() {
         var config = vm.bffConfig
         config.enabled = true
-        config.endpointURL = URL(string: "https://bff.example.com")!
+        config.endpointURL = URL(string: "https://bff.example.com")
         config.userToken = "test-bff-token-123"
         config.chatRateLimitPerMin = 50
         config.embedRateLimitPerMin = 30
@@ -185,7 +185,7 @@ final class SettingsViewModelTests: XCTestCase {
         vm.loadBFFConfig()
 
         XCTAssertEqual(vm.bffConfig.enabled, true, "loadBFFConfig 后 enabled 应为 true")
-        XCTAssertEqual(vm.bffConfig.endpointURL.absoluteString, "https://bff.example.com",
+        XCTAssertEqual(vm.bffConfig.endpointURL?.absoluteString, "https://bff.example.com",
                        "loadBFFConfig 后 endpointURL 应保持一致")
         XCTAssertEqual(vm.bffConfig.userToken, "test-bff-token-123",
                        "loadBFFConfig 后 userToken 应保持一致")
@@ -516,13 +516,13 @@ final class SettingsViewModelTests: XCTestCase {
 
     /// saveBFFConfig 应持久化 endpointURL 字段
     func testSaveBFFConfigPersistsEndpointURL() {
-        vm.bffConfig.endpointURL = URL(string: "https://field-level.test")!
+        vm.bffConfig.endpointURL = URL(string: "https://field-level.test")
         vm.saveBFFConfig()
         vm.bffConfig = .default
 
         vm.loadBFFConfig()
 
-        XCTAssertEqual(vm.bffConfig.endpointURL.absoluteString, "https://field-level.test",
+        XCTAssertEqual(vm.bffConfig.endpointURL?.absoluteString, "https://field-level.test",
                        "endpointURL 字段应能持久化往返")
     }
 

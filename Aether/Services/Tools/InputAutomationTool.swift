@@ -9,7 +9,7 @@ import Foundation
 import CoreGraphics
 
 /// macOS 输入自动化工具：模拟鼠标移动/点击/拖拽、键盘输入、滚轮滚动
-final class InputAutomationTool: ToolProtocol {
+final class InputAutomationTool: ToolProtocol, @unchecked Sendable {
     /// 工具定义
     /// - name: `simulate_input`
     /// - parameters: `action`（必填，String）— 操作类型；坐标、文本、按键、修饰键等按需传入

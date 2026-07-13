@@ -70,7 +70,7 @@ struct InlineChartView: View {
     @ViewBuilder
     private var chartContent: some View {
         if data.isEmpty {
-            Text("暂无数据")
+            Text("暂无数据", comment: "")
                 .font(.captionAI)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -259,7 +259,7 @@ struct InlineChartView: View {
                         }
                     }
                 } else {
-                    Text("暂无数据")
+                    Text("暂无数据", comment: "")
                         .font(.captionAI)
                         .foregroundStyle(.secondary)
                 }

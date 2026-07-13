@@ -30,6 +30,10 @@
    - 4.20 [macOS 系统集成](#420-macos-系统集成)
    - 4.21 [性能监控与调试](#421-性能监控与调试)
    - 4.22 [语言切换](#422-语言切换)
+   - 4.23 [键盘关闭手势](#423-键盘关闭手势)
+   - 4.24 [Watch App](#424-watch-app)
+   - 4.25 [桌面 Widget](#425-桌面-widget)
+   - 4.26 [DeepLink](#426-deeplink)
 5. [多平台支持](#5-多平台支持)
 6. [工具能力清单](#6-工具能力清单)
 7. [开发工作流](#7-开发工作流)
@@ -504,12 +508,66 @@ open Aether.xcodeproj
 ### 4.22 语言切换
 
 1. 打开设置页 → 顶部「语言」Section。
-2. 选择「跟随系统 / 简体中文 / 繁体中文 / 英文」。
+2. 选择「跟随系统 / 简体中文 / 繁体中文 / 英文 / 日文 / 韩文 / 法文 / 德文 / 西班牙文」。
 3. 点击「完成」，按提示重启 App 生效。
 
-> **i18n 覆盖**：`Localizable.xcstrings` String Catalog 当前包含 **387 个 key**，覆盖 Views / ViewModels / Services / AppIntents / Core 全部用户可见文本，提供 zh-Hans（源语言）/ zh-Hant / en 三种语言翻译。
+> **i18n 覆盖**：`Localizable.xcstrings` String Catalog 当前包含 **387 个 key**，覆盖 Views / ViewModels / Services / AppIntents / Core 全部用户可见文本，提供 **8 种语言**翻译：zh-Hans（源语言）/ zh-Hant / en / ja / ko / fr / de / es。
 
 对应代码：`Aether/Services/Language/LanguageManager.swift`、`Aether/Views/Settings/SettingsView.swift`、`Aether/Resources/Localizable.xcstrings`。
+
+### 4.23 键盘关闭手势
+
+在聊天界面中，可以通过以下方式关闭键盘：
+
+- **下拉手势**：在消息列表区域向下拖拽，键盘自动收起。
+- **点击空白区域**：点击消息列表空白区域（非消息气泡、非输入栏）关闭键盘。
+- **滚动关闭**：向上滚动消息列表到顶部后继续拖拽，键盘自动收起（`UIScrollView` intercept 触摸机制）。
+
+对应代码：`Aether/Views/Chat/ChatView.swift`（`@FocusState` 管理 + 手势识别器）。
+
+### 4.24 Watch App
+
+> ⚠️ **前置条件**：Watch target 需在 Xcode 中手动创建并关联 `AetherWatch/` 目录下的源文件。
+
+Aether Watch App 提供 watchOS 独立体验：
+
+1. **快速对话**：在 Watch 上直接输入或语音输入消息，通过 `WatchConnectivityService.sendQuickChat` 发送到 iPhone 主 App 处理，AI 回复同步回 Watch。
+2. **健康洞察**：浏览 iPhone 端生成的健康洞察摘要，通过 `transferUserInfo` 自动推送新洞察到 Watch。
+3. **设置**：查看 Watch 连接状态与基本信息。
+
+**配对要求**：需 iPhone 主 App 运行并配对 Apple Watch（`WatchConnectivity` 仅 iOS 端激活），macOS 不支持。
+
+对应代码：`AetherWatch/WatchApp.swift`、`AetherWatch/Views/WatchQuickChatView.swift`、`AetherWatch/Views/WatchHealthInsightView.swift`、`Aether/Services/Connectivity/WatchConnectivityService.swift`。
+
+### 4.25 桌面 Widget
+
+> ⚠️ **前置条件**：Widget target 需在 Xcode 中手动创建并关联 `AetherWidgets/` 目录下的源文件，并配置 App Group capability（`group.com.aether.shared`）。
+
+Aether 提供三个桌面 Widget：
+
+1. **QuickChatWidget**：在桌面/今日视图放置快捷提问入口，点击后通过 DeepLink `aether://ask?query=<文本>` 跳转到主 App 并自动发送消息。
+2. **HealthInsightWidget**：展示最新健康洞察摘要，通过 App Group 共享 SwiftData 读取 `HealthInsight` @Model 数据。
+3. **RecentConversationsWidget**：展示最近 3-5 个会话标题，点击通过 DeepLink `aether://conversation/<uuid>` 跳转到指定会话。
+
+**数据共享**：Widget 与主 App 通过 App Group（`group.com.aether.shared`）共享同一 SwiftData 数据库，Widget 可直接读取主 App 写入的会话与健康洞察数据。
+
+对应代码：`AetherWidgets/QuickChatWidget.swift`、`AetherWidgets/HealthInsightWidget.swift`、`AetherWidgets/RecentConversationsWidget.swift`。
+
+### 4.26 DeepLink
+
+Aether 支持 `aether://` URL Scheme 的 DeepLink：
+
+| DeepLink | 用途 | 入口 |
+|----------|------|------|
+| `aether://ask?query=<URL编码文本>` | 打开主界面并自动发送指定文本 | Widget 点击 / Shortcuts / 外部 App |
+| `aether://conversation/<uuid>` | 跳转到指定 UUID 的会话 | Widget 点击 / Spotlight / Shortcuts |
+
+**使用方式**：
+- 在 Safari 或其他 App 中输入 `aether://ask?query=你好` 即可触发快捷提问。
+- 通过 Shortcuts App 创建自定义快捷指令调用 DeepLink。
+- Widget 点击自动触发 DeepLink 跳转。
+
+对应代码：`Aether/App/AetherApp.swift`（`.onOpenURL` 处理）、`Aether/Services/Intents/IntentChatService.swift`。
 
 ---
 

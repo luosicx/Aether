@@ -32,7 +32,7 @@ struct MCPSettingsView: View {
             // 已配置的 Server 列表
             Section {
                 if configs.isEmpty {
-                    Text("尚未配置 MCP Server")
+                    Text("尚未配置 MCP Server", comment: "")
                         .foregroundStyle(.secondary)
                         .font(.callout)
                         .accessibilityIdentifier("emptyMCPConfigHint")
@@ -54,9 +54,9 @@ struct MCPSettingsView: View {
                     }
                 }
             } header: {
-                Text("MCP Server 列表")
+                Text("MCP Server 列表", comment: "")
             } footer: {
-                Text("点击 Server 编辑配置，左滑删除。")
+                Text("点击 Server 编辑配置，左滑删除。", comment: "")
                     .font(.captionAI)
             }
 
@@ -141,29 +141,29 @@ struct MCPSettingsView: View {
             let info = manager.serverInfos[config.id]
             switch info?.status {
             case .connected:
-                Text("已连接")
+                Text("已连接", comment: "")
                     .font(.captionAI)
                     .foregroundStyle(.green)
             case .connecting:
-                Text("连接中")
+                Text("连接中", comment: "")
                     .font(.captionAI)
                     .foregroundStyle(.orange)
             case .error:
-                Text("错误")
+                Text("错误", comment: "")
                     .font(.captionAI)
                     .foregroundStyle(.red)
             case .disconnected, nil:
-                Text("未连接")
+                Text("未连接", comment: "")
                     .font(.captionAI)
                     .foregroundStyle(.secondary)
             }
         } else {
             if config.enabled {
-                Text("已启用")
+                Text("已启用", comment: "")
                     .font(.captionAI)
                     .foregroundStyle(.secondary)
             } else {
-                Text("已禁用")
+                Text("已禁用", comment: "")
                     .font(.captionAI)
                     .foregroundStyle(.secondary)
             }
@@ -256,7 +256,7 @@ struct MCPServerEditView: View {
                         .accessibilityHint("启用或禁用此 Server")
                         .accessibilityIdentifier("serverEnabledToggle")
                 } header: {
-                    Text("基本信息")
+                    Text("基本信息", comment: "")
                 }
 
                 // 传输配置
@@ -301,7 +301,7 @@ struct MCPServerEditView: View {
                             #endif
                     }
                 } header: {
-                    Text("传输配置")
+                    Text("传输配置", comment: "")
                 } footer: {
                     Text(transportType == .stdio
                          ? "stdio 传输通过启动子进程并经 stdin/stdout 通信（仅 macOS）。"

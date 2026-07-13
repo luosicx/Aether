@@ -7,7 +7,7 @@
 import Foundation
 
 /// macOS 命令行执行工具，仅执行白名单内的命令并返回输出
-final class TerminalCommandTool: ToolProtocol {
+final class TerminalCommandTool: ToolProtocol, @unchecked Sendable {
     /// 允许执行的命令白名单（仅基础命令名，不含路径）。
     /// 注：已移除 `cat`，因其可读取任意文件（如 ~/.ssh/id_rsa），造成敏感信息泄露。
     private static let allowedCommands: Set<String> = [

@@ -37,7 +37,10 @@ actor LogUploader {
     ///   - endpointURL: 上传端点，nil 则使用 `APIConfig.telemetryUploadEndpoint`
     ///   - authorizationHeader: 上传凭证，nil 或空字符串则拒绝上传
     init(endpointURL: URL? = nil, authorizationHeader: String? = nil) {
-        self.endpointURL = endpointURL ?? URL(string: APIConfig.telemetryUploadEndpoint)!
+        guard let url = endpointURL ?? URL(string: APIConfig.telemetryUploadEndpoint) else {
+            fatalError("遥测上传端点 URL 无效，无法初始化 LogUploader")
+        }
+        self.endpointURL = url
         self.authorizationHeader = authorizationHeader
     }
 

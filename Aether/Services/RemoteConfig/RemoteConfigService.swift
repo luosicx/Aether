@@ -20,9 +20,10 @@ actor RemoteConfigService {
 
     /// 允许测试注入 endpoint
     init(endpointURL: URL? = nil) {
-        self.endpointURL = endpointURL ?? URL(
-            string: "https://aether-config.oss-cn-hangzhou.aliyuncs.com/remote_config.json"
-        )!
+        guard let url = endpointURL ?? URL(string: "https://aether-config.oss-cn-hangzhou.aliyuncs.com/remote_config.json") else {
+            fatalError("远程配置 URL 无效，无法初始化 RemoteConfigService")
+        }
+        self.endpointURL = url
     }
 
     /// 异步拉取远程配置：请求 endpoint → 解码 RemoteConfig → 写入 fetchedAt → 缓存到 UserDefaults → 更新 currentConfig。

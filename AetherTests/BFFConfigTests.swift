@@ -16,7 +16,7 @@ final class BFFConfigTests: XCTestCase {
     /// 默认 endpointURL 应为占位地址
     func testDefaultEndpointURL() {
         let config = BFFConfig.default
-        XCTAssertEqual(config.endpointURL.absoluteString,
+        XCTAssertEqual(config.endpointURL?.absoluteString,
                        "https://aether-bff.example.com",
                        "默认 endpointURL 应为占位地址")
     }
@@ -68,7 +68,7 @@ final class BFFConfigTests: XCTestCase {
         let decoded = try JSONDecoder().decode(BFFConfig.self, from: data)
 
         XCTAssertEqual(decoded.enabled, true, "往返后 enabled 应为 true")
-        XCTAssertEqual(decoded.endpointURL.absoluteString, "https://my-bff.gateway.com",
+        XCTAssertEqual(decoded.endpointURL?.absoluteString, "https://my-bff.gateway.com",
                        "往返后 endpointURL 应保持一致")
         XCTAssertEqual(decoded.userToken, "user-token-xyz-789", "往返后 userToken 应保持一致")
         XCTAssertEqual(decoded.chatRateLimitPerMin, 60, "往返后 chatRateLimitPerMin 应为 60")
@@ -108,7 +108,7 @@ final class BFFConfigTests: XCTestCase {
         config.embedRateLimitPerMin = 50
 
         XCTAssertTrue(config.enabled)
-        XCTAssertEqual(config.endpointURL.absoluteString, "https://new.endpoint")
+        XCTAssertEqual(config.endpointURL?.absoluteString, "https://new.endpoint")
         XCTAssertEqual(config.userToken, "new-token")
         XCTAssertEqual(config.chatRateLimitPerMin, 100)
         XCTAssertEqual(config.embedRateLimitPerMin, 50)
@@ -148,9 +148,8 @@ final class BFFConfigTests: XCTestCase {
 
     /// 全面验证 BFFConfig.default 的所有字段（enabled、endpointURL、userToken、chatRateLimitPerMin、
     /// embedRateLimitPerMin、userDefaultsKey）。
-    /// 注意：endpointURL 的 `?? URL(fileURLWithPath: "")` 兜底分支（BFFConfig.swift 第 9 行）
-    /// 在默认字符串 "https://aether-bff.example.com" 为合法 URL 时永远不会触发，
-    /// 该分支为防御性代码，无法在不修改实现的前提下被测试覆盖。
+    /// 注意：endpointURL 已改为 `URL?` 可选类型（BFFConfig.swift 第 9 行），
+    /// 默认值为 `URL(string: "https://aether-bff.example.com")`，不再使用硬编码 fallback。
     func testDefaultConfigAllFieldsComprehensive() {
         let config = BFFConfig.default
 
@@ -158,10 +157,10 @@ final class BFFConfigTests: XCTestCase {
         XCTAssertFalse(config.enabled, "默认 enabled 应为 false")
 
         // endpointURL
-        XCTAssertEqual(config.endpointURL.absoluteString, "https://aether-bff.example.com",
+        XCTAssertEqual(config.endpointURL?.absoluteString, "https://aether-bff.example.com",
                        "默认 endpointURL 应为占位地址")
-        XCTAssertEqual(config.endpointURL.scheme, "https", "默认 endpointURL scheme 应为 https")
-        XCTAssertEqual(config.endpointURL.host, "aether-bff.example.com",
+        XCTAssertEqual(config.endpointURL?.scheme, "https", "默认 endpointURL scheme 应为 https")
+        XCTAssertEqual(config.endpointURL?.host, "aether-bff.example.com",
                        "默认 endpointURL host 应为 aether-bff.example.com")
 
         // userToken
@@ -193,7 +192,7 @@ final class BFFConfigTests: XCTestCase {
         let decoded = try JSONDecoder().decode(BFFConfig.self, from: data)
 
         XCTAssertEqual(decoded.endpointURL, customEndpoint, "往返后 endpointURL 应保持一致")
-        XCTAssertEqual(decoded.endpointURL.absoluteString, "https://custom-bff.gateway.example.com/v1",
+        XCTAssertEqual(decoded.endpointURL?.absoluteString, "https://custom-bff.gateway.example.com/v1",
                        "往返后 endpointURL 字符串应保持一致")
         XCTAssertEqual(decoded.enabled, true, "往返后 enabled 应为 true")
         XCTAssertEqual(decoded.userToken, "custom-token-abc", "往返后 userToken 应保持一致")

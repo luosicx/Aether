@@ -19,6 +19,16 @@ final class LanguageManager: ObservableObject {
         case zhHant = "zh-Hant"
         /// 英文
         case en = "en"
+        /// 日语
+        case ja = "ja"
+        /// 韩语
+        case ko = "ko"
+        /// 法语
+        case fr = "fr"
+        /// 德语
+        case de = "de"
+        /// 西班牙语
+        case es = "es"
 
         var id: String { rawValue }
 
@@ -29,6 +39,11 @@ final class LanguageManager: ObservableObject {
             case .zhHans: return String(localized: "简体中文")
             case .zhHant: return String(localized: "繁体中文")
             case .en: return String(localized: "英文")
+            case .ja: return String(localized: "日本語")
+            case .ko: return String(localized: "한국어")
+            case .fr: return String(localized: "Français")
+            case .de: return String(localized: "Deutsch")
+            case .es: return String(localized: "Español")
             }
         }
 
@@ -39,6 +54,11 @@ final class LanguageManager: ObservableObject {
             case .zhHans: return "character.bubble"
             case .zhHant: return "character.bubble"
             case .en: return "e.bubble"
+            case .ja: return "character.bubble"
+            case .ko: return "character.bubble"
+            case .fr: return "character.bubble"
+            case .de: return "character.bubble"
+            case .es: return "character.bubble"
             }
         }
     }
@@ -73,7 +93,7 @@ final class LanguageManager: ObservableObject {
         case .system:
             // 跟随系统：移除自定义偏好，回退到设备系统语言
             UserDefaults.standard.removeObject(forKey: "AppleLanguages")
-        case .zhHans, .zhHant, .en:
+        case .zhHans, .zhHant, .en, .ja, .ko, .fr, .de, .es:
             // 设置首选语言数组，首元素为用户选择
             UserDefaults.standard.set([language.rawValue], forKey: "AppleLanguages")
         }

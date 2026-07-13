@@ -54,15 +54,15 @@ final class OnDeviceConfigTests: XCTestCase {
         XCTAssertNil(config.modelPath, "默认 modelPath 应为 nil")
 
         // downloadURL 应为非空 https URL
-        XCTAssertEqual(config.downloadURL.scheme, "https", "默认 downloadURL scheme 应为 https")
-        XCTAssertFalse(config.downloadURL.absoluteString.isEmpty, "默认 downloadURL 不应为空")
-        XCTAssertTrue(config.downloadURL.absoluteString.contains("huggingface.co"),
+        XCTAssertEqual(config.downloadURL?.scheme, "https", "默认 downloadURL scheme 应为 https")
+        XCTAssertFalse(config.downloadURL?.absoluteString.isEmpty ?? true, "默认 downloadURL 不应为空")
+        XCTAssertTrue(config.downloadURL?.absoluteString.contains("huggingface.co") ?? false,
                       "默认 downloadURL 应指向 HuggingFace CDN")
 
         // mirrorDownloadURL 应为非空 https URL
-        XCTAssertEqual(config.mirrorDownloadURL.scheme, "https", "默认 mirrorDownloadURL scheme 应为 https")
-        XCTAssertFalse(config.mirrorDownloadURL.absoluteString.isEmpty, "默认 mirrorDownloadURL 不应为空")
-        XCTAssertTrue(config.mirrorDownloadURL.absoluteString.contains("modelscope.cn"),
+        XCTAssertEqual(config.mirrorDownloadURL?.scheme, "https", "默认 mirrorDownloadURL scheme 应为 https")
+        XCTAssertFalse(config.mirrorDownloadURL?.absoluteString.isEmpty ?? true, "默认 mirrorDownloadURL 不应为空")
+        XCTAssertTrue(config.mirrorDownloadURL?.absoluteString.contains("modelscope.cn") ?? false,
                       "默认 mirrorDownloadURL 应指向 ModelScope 镜像")
 
         // expectedSHA256 默认应为空字符串

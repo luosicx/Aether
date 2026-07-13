@@ -13,7 +13,7 @@ final class MessageFeedback {
     /// 创建时间
     var createdAt: Date
     /// 反向关联所属 Conversation
-    var conversation: Conversation?
+    @Relationship(inverse: \Conversation.messages) var conversation: Conversation?
 
     init(messageId: UUID, isPositive: Bool) {
         self.id = UUID()

@@ -2,7 +2,7 @@ import Foundation
 import EventKit
 
 /// 闹钟工具，通过 EventKit 创建提醒事项
-final class AlarmTool: ToolProtocol {
+final class AlarmTool: ToolProtocol, @unchecked Sendable {
     private let eventStore = EKEventStore()
 
     /// 工具定义（name/description/parameters）
@@ -29,15 +29,15 @@ final class AlarmTool: ToolProtocol {
             return "错误：请提供闹钟时间"
         }
         let label = arguments["label"] as? String ?? "闹钟"
-        let granted = try await eventStore.requestFullAccessToEvents()
-        guard granted else { return "错误：无法访问日历" }
-        let alarm = EKAlarm()
+        // 时间格式校验放在权限请求之前，避免无效输入弹出权限弹窗
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm"
-        // 注意：时间格式 guard 在权限请求之后（历史实现，可改为之前以提前失败）
         guard let date = formatter.date(from: time) else {
             return "错误：时间格式无效"
         }
+        let granted = try await eventStore.requestFullAccessToEvents()
+        guard granted else { return "错误：无法访问日历" }
+        let alarm = EKAlarm()
         let calendar = Calendar.current
         let components = calendar.dateComponents([.hour, .minute], from: date)
         alarm.absoluteDate = calendar.nextDate(after: Date(), matching: components, matchingPolicy: .nextTime)

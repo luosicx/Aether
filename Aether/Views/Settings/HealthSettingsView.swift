@@ -27,7 +27,7 @@ struct HealthSettingsView: View {
             // MARK: - 授权状态
             Section("授权状态") {
                 HStack {
-                    Text("当前状态")
+                    Text("当前状态", comment: "")
                     Spacer()
                     Text(authorizationStatus)
                         .foregroundStyle(authorizationStatus == "已授权" ? .green : .secondary)
@@ -59,9 +59,9 @@ struct HealthSettingsView: View {
                     .accessibilityHint("发送消息时注入最近健康数据")
                     .accessibilityIdentifier("injectHealthContextToggle")
             } header: {
-                Text("健康上下文")
+                Text("健康上下文", comment: "")
             } footer: {
-                Text("开启后发送消息时会注入最近 24 小时的睡眠/心率/步数数据，AI 将给出针对性建议。")
+                Text("开启后发送消息时会注入最近 24 小时的睡眠/心率/步数数据，AI 将给出针对性建议。", comment: "")
                     .font(.captionAI)
             }
 
@@ -78,7 +78,7 @@ struct HealthSettingsView: View {
                 if isGenerating {
                     HStack {
                         ProgressView()
-                        Text("生成中...")
+                        Text("生成中...", comment: "")
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -109,9 +109,9 @@ struct HealthSettingsView: View {
                     }
                 }
             } header: {
-                Text("洞察")
+                Text("洞察", comment: "")
             } footer: {
-                Text("每天 09:00 自动生成一次，也可手动触发。")
+                Text("每天 09:00 自动生成一次，也可手动触发。", comment: "")
                     .font(.captionAI)
             }
         }

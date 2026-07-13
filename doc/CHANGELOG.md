@@ -7,10 +7,16 @@
 ## [Unreleased]
 
 ### Added
+- **多语言扩展至 8 种语言**：`Localizable.xcstrings` 从 3 种语言（zh-Hans / zh-Hant / en）扩展至 8 种（新增 ja 日语 / ko 韩语 / fr 法语 / de 德语 / es 西班牙语），i18n keys 覆盖全部核心 UI 文案
+- **Watch App 源代码**：新增 `AetherWatch/` 目录，包含 `WatchApp.swift`（TabView 三标签：快速对话 / 健康洞察 / 设置）、`WatchQuickChatView.swift`（快捷对话发送）、`WatchHealthInsightView.swift`（健康洞察浏览）；通过 `WatchConnectivityService` 与 iOS 主 App 双向同步（transferUserInfo 推送健康洞察）。⚠️ Watch target 需在 Xcode 中手动创建并关联源文件
+- **Widget Extension 源代码**：新增 `AetherWidgets/` 目录，包含三个 Widget：`QuickChatWidget`（桌面快捷提问，点击直达对话）、`HealthInsightWidget`（健康洞察摘要展示）、`RecentConversationsWidget`（最近会话列表快捷入口）；使用 `TimelineProvider` + `AppIntentConfiguration`。⚠️ Widget target 需在 Xcode 中手动创建并关联源文件
+- **App Group 共享 SwiftData**：新增 App Group 配置（`group.com.aether.shared`），主 App 与 Widget Extension 通过共享 `ModelContainer` 读取同一 SwiftData 数据库，Widget 可直接展示最近会话与健康洞察
+- **DeepLink 支持**：新增 `aether://` URL Scheme，支持两种 DeepLink：`aether://ask?query=<编码文本>`（快捷提问，打开主界面并自动发送）与 `aether://conversation/<uuid>`（跳转到指定会话）；在 `AetherApp.swift` 中通过 `.onOpenURL` 处理
+- **端侧 MLX 真实推理**：集成 `mlx-swift` SPM 依赖，`MLXInferenceEngine` 使用真实 `ModelContainer.load` 加载 GGUF 模型，支持 token 级流式输出（非假流式）；`OnDeviceModelDownloader` 从 HuggingFace CDN 下载 Llama-3.2-1B-Instruct Q4_K_M 量化模型并 SHA256 校验
+- **无障碍增强**：Watch App 与 LaunchScreen 补充 `accessibilityLabel`；新增 `accessibilityIdentifier` 覆盖全部关键交互控件（sendButton / messageInputField / voiceInputButton 等 12+ 标识符），VoiceOver 与 UITest 可靠性提升
 - **国际化基础设施**：新增 `Localizable.xcstrings` String Catalog（zh-Hans 源语言 + zh-Hant 繁体中文 + en 英文翻译，55 个核心 key）；`developmentRegion` 更新为 `zh-Hans`，`knownRegions` 新增 `zh-Hans`/`zh-Hant`/`en`；SwiftUI `Text`/`Button`/`TextField`/`accessibilityLabel` 字面量由 Xcode 自动提取
-- **App 内语言切换**：新增 `LanguageManager`（ObservableObject）与设置页「语言」Section，支持跟随系统 / 简体中文 / 繁体中文 / 英文 四选项，切换后写入 `AppleLanguages` UserDefaults 并提示重启 App 生效
+- **App 内语言切换**：新增 `LanguageManager`（ObservableObject）与设置页「语言」Section，支持跟随系统 / 简体中文 / 繁体中文 / 英文 / 日语 / 韩语 / 法语 / 德语 / 西班牙语 九选项，切换后写入 `AppleLanguages` UserDefaults 并提示重启 App 生效
 - **macOS 应用图标**：基于 1024x1024 源图，通过 `sips` 生成 16/32/64/128/256/512 + @2x 全套 macOS 图标，`AppIcon.appiconset/Contents.json` 新增 10 个 `idiom: "mac"` 条目
-- **无障碍支持强化**：13 个缺失视图新增 `accessibilityLabel`/`accessibilityHint`/`accessibilityElement(children:)`（MarkdownText / CodeBlockView / MarkdownTableView / HeadingView / ErrorOverlay / CitationCard / ConversationRow / OnDeviceModelView / KnowledgeBaseView / HealthSettingsView / PrivacyPolicyView / DocumentPickerView / PresetPrompts）；关键交互元素新增 `accessibilityIdentifier`（sendButton / messageInputField / voiceInputButton / knowledgeBaseButton / settingsButton / conversationListButton / newConversationButton / importDocumentButton / downloadModelButton / deleteModelButton / requestHealthAuthButton / thumbsUpButton / thumbsDownButton），VoiceOver 与 UITest 可靠性提升
 - **截图目录**：新增 `screenshots/` 目录与 `README.md` 占位（含截图清单、截图方法、注意事项）
 - CONTRIBUTING.md / CHANGELOG.md / API.md 三份开发者文档
 - ARCHITECTURE.md 与 BFF_DEPLOYMENT.md 架构图全部 Mermaid 化
@@ -20,24 +26,36 @@
 - **完整国际化补全**：`Localizable.xcstrings` 从 55 核心 key 扩展至 387 keys，覆盖 Views / ViewModels / Services / AppIntents / Core；新增 `scripts/` 提取/翻译/合并工具链
 - **无障碍全面增强**：7 个核心视图新增约 75 个 `accessibilityLabel` / `accessibilityHint` / `accessibilityIdentifier`
 - **项目截图**：`screenshots/` 新增 8 张 iOS / macOS 核心页面截图
-- **后续规划文档**：新增 `doc/ROADMAP.md`、`doc/OPTIMIZATION.md`、`doc/DESIGN_UPDATE.md`
+- **后续规划文档**：新增 `doc/ROADMAP.md`、`doc/OPTIMIZATION.md`
 - **工程质量工具链**：`.swiftlint.yml` 配置完成，启用 `force_unwrapping` / `force_cast` / `force_try` / `implicitly_unwrapped_optional` / `empty_count` / `empty_string` / `explicit_init` 等 opt-in 规则；`.swiftformat` 配置完成（Swift 5.9 / 4 空格缩进）；新增 `scripts/run_swiftlint.sh` CI 集成脚本（未安装时跳过不报错，有 error 时退出码 1 阻断合并）；全量代码格式修复
 
 ### Changed
 - **Aether 品牌重塑**：AIBuilder → Aether（以太），确立液态玻璃（Liquid Glass）+ 深空（Deep Space）主题设计语言。新增色彩体系（AetherPurple / ElectricBlue / NebulaGlow / Starlight / LiquidGlass / DeepSpace 色板）、字体体系（TypographyTokens）、设计令牌（DesignTokens / ColorTokens）；App 入口 `AIBuilderApp` → `AetherApp`，AppIntent `AskAIBuilderIntent` → `AskAetherIntent`，UITests → `AetherUITests`；新增 `BrandSplash` 开屏品牌动画与 `DesignSystem/` 目录
-- **性能优化**：BGTask 调度从 `init()` 延迟到首次进入后台触发（懒调度），减少冷启动耗时；远程配置拉取从 `init()` 移到首屏 `.task` 出现后执行；`CodeBlockView` 语法高亮结果通过 NSCache 缓存，避免重复解析；`ConversationList` `.id` 稳定化，避免列表刷新时全量重建；MLX 模型加载通过 `Task.detached` 在后台线程执行，不阻塞 actor 与 UI 线程
+- **性能优化**：BGTask 调度从 `init()` 延迟到首次进入后台触发（懒调度），减少冷启动耗时；远程配置拉取从 `init()` 移到首屏 `.task` 出现后执行；`CodeBlockView` 语法高亮结果通过 NSCache 缓存，避免重复解析；`ConversationList` `.id` 稳定化，避免列表刷新时全量重建；MLX 模型加载通过 `Task.detached` 在后台线程执行，不阻塞 actor 与 UI 线程；`TTSVoiceCatalog` 静态缓存 `speechVoices()` 结果避免主线程阻塞；`VoiceService` 使用实例级 `cachedVoice` / `cachedVoiceIdentifier` 避免重复音色解析
 - **体验优化**：API Key 空值预检——发起对话前检测 Key 是否为空，为空时直接展示 `ErrorBanner` 提示「请先在设置中配置 API Key」而不发起无效网络请求；`ErrorBanner` 组件支持可选「重试」与「前往设置」按钮，便于用户快速恢复；`EmptyStateView` 统一空态展示（会话列表 / 知识库 / 端侧模型管理等场景复用）；macOS 新增 ⌘Shift+F 快捷键聚焦搜索输入框
+- **主题持久化同步**：Theme 从 SwiftData 同步，切换主题后立即持久化并在下次启动恢复
 
 ### Fixed
+- **设置 UI 6 项 Bug 修复**：
+  1. macOS 设置页显示异常（`regularLayout` detail 包 `NavigationStack` 修复二级页返回按钮）
+  2. API Key 保存失败（Keychain account 按 provider 隔离，保存策略先 Delete 再 Add 幂等）
+  3. 主题切换不生效（ThemeManager 环境崩溃修复 + SwiftData 持久化同步）
+  4. 头像选择器无法打开（`PhotosPicker` 替代 `fileImporter` 跨平台兼容）
+  5. 对话气泡样式切换无响应（`@Binding` 传递修复 + UI 即时刷新）
+  6. 字体与间距设置不生效（DesignTokens 绑定修复 + `@AppStorage` 持久化）
+- **设备调试 entitlements 修复**：补充 `get-task-allow` 与 `keychain-access-groups` entitlements，解决真机调试时 Keychain 写入失败与断点不生效问题
+- **启动性能优化**：`speechVoices()` 调用移到后台线程避免阻塞主线程；`RemoteConfig` 延迟到首屏 `.task` 后拉取；移除启动时 `createConversation` 调用避免 body 重算打断 TextField 焦点
+- **键盘关闭手势**：新增下拉手势与点击空白区域关闭键盘（`@FocusState` 管理 + `UIScrollView` intercept 触摸），解决聊天界面键盘无法关闭问题
 - **BGTaskScheduler 强制向下转型崩溃风险修复**：`AetherApp.swift` 中 3 处 `task as! BGAppRefreshTask` 改为 `guard let refreshTask = task as? BGAppRefreshTask else { task.setTaskCompleted(success: false); return }`，任务类型不匹配时安全退出而非崩溃
 - **UT/UIT 全部 0 skip**：修复 `testUserPreferencePersistence` 根因（`UserPreference` @Model 未注册到 App `ModelContainer` schema）；修复 7 处 `XCTSkip`
 - **Swift 6 并发警告**：修复 `VoiceService` / `ChatViewModel` / `ConversationListVM` / `ClipboardTool` / `OpenURLTool` / `LocationTool` / `SSEParser` 等 7 类警告
 - **macOS AppIcon 警告**：清理 3 个未分配子图标
 
 ### Removed
-- **清理**：移除 9 个根目录一次性临时脚本（pbxproj 注册 / 路径修复等 Ruby 脚本）与 `.wolf/buglog.json.tmp` 临时文件；合并 `doc/plans/` 目录（历史 Day 计划文档统一归档）；清理代码与文档中残留的「灵枢」/「LingShu」品牌 KEY，统一为 Aether（以太）
+- **文档清理**：删除 `doc/DESIGN_UPDATE.md`（内容已被 `Style Guide.md` 完全覆盖）；清空 `doc/plans/` 目录（7 个已完成的过期计划文档：Day 1 / Day 2 / 设计系统优化 / 灵枢品牌系统 / i18n 打磨 / 文档更新 / SonarCloud 配置指南）
+- **清理**：移除 9 个根目录一次性临时脚本（pbxproj 注册 / 路径修复等 Ruby 脚本）与 `.wolf/buglog.json.tmp` 临时文件；清理代码与文档中残留的「灵枢」/「LingShu」品牌 KEY，统一为 Aether（以太）
 
-（详见 spec：[enhance-docs-architecture-diagrams](../.trae/specs/enhance-docs-architecture-diagrams/spec.md)）
+（详见 spec：[finalize-docs-release](../.trae/specs/finalize-docs-release/spec.md)）
 
 ---
 

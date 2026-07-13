@@ -14,13 +14,13 @@ struct TTSVoicePickerView: View {
             Section {
                 voiceRow(
                     identifier: "",
-                    name: "系统默认",
+                    name: String(localized: "系统默认"),
                     language: "zh-CN",
                     quality: .compact,
                     isDownloaded: true
                 )
             } header: {
-                Text("默认")
+                Text("默认", comment: "")
             }
 
             // 按 language 分组的系统音色
@@ -67,7 +67,7 @@ struct TTSVoicePickerView: View {
                         .font(.bodyAI)
                     qualityTag(quality)
                     if !isDownloaded && !identifier.isEmpty {
-                        Text("需下载")
+                        Text("需下载", comment: "")
                             .font(.captionAI)
                             .foregroundStyle(.orange)
                             .padding(.horizontal, 6)
@@ -116,10 +116,10 @@ struct TTSVoicePickerView: View {
     /// 质量枚举转 (文本, 颜色) 元组
     private func qualityStyling(_ quality: TTSVoice.Quality) -> (String, Color) {
         switch quality {
-        case .compact: return ("标准", .secondary)
-        case .enhanced: return ("增强", .blue)
-        case .premium: return ("优质", .purple)
-        case .unknown: return ("未知", .secondary)
+        case .compact: return (String(localized: "标准"), .secondary)
+        case .enhanced: return (String(localized: "增强"), .blue)
+        case .premium: return (String(localized: "优质"), .purple)
+        case .unknown: return (String(localized: "未知"), .secondary)
         }
     }
 
@@ -141,10 +141,10 @@ struct TTSVoicePickerView: View {
     /// 质量枚举转可读名称
     private func qualityLabel(_ quality: TTSVoice.Quality) -> String {
         switch quality {
-        case .compact: return "标准"
-        case .enhanced: return "增强"
-        case .premium: return "优质"
-        case .unknown: return "未知"
+        case .compact: return String(localized: "标准")
+        case .enhanced: return String(localized: "增强")
+        case .premium: return String(localized: "优质")
+        case .unknown: return String(localized: "未知")
         }
     }
 }

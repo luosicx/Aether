@@ -9,7 +9,7 @@ import Foundation
 /// 天气查询工具，使用 Open-Meteo 免费 API（无需 API Key）。
 /// 支持按城市名或当前定位查询：城市名经 Geocoding API 转坐标，
 /// 不传城市则调用 LocationTool 获取当前位置，再调用 Forecast API 取当前天气。
-final class WeatherTool: ToolProtocol {
+final class WeatherTool: ToolProtocol, @unchecked Sendable {
     /// 工具定义（name/description/parameters）
     var definition: ToolDefinition {
         ToolDefinition(

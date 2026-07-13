@@ -9,7 +9,7 @@ import AppKit
 import CoreGraphics
 
 /// macOS 截屏工具
-final class ScreenshotTool: ToolProtocol {
+final class ScreenshotTool: ToolProtocol, @unchecked Sendable {
     /// 工具定义
     /// - name: `take_screenshot`
     /// - parameters: `display_id`（可选，Integer）— 显示器 ID，不传则截取主显示器

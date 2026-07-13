@@ -65,7 +65,8 @@ final class PreferenceExtractor {
             maxTokens: 1024,
             temperature: 0.3
         )
-        let stream = llmProvider.chat(messages: apiMessages, config: config, apiKey: "")
+        let apiKey = KeychainManager.shared.getAPIKey() ?? ""
+        let stream = llmProvider.chat(messages: apiMessages, config: config, apiKey: apiKey)
         var responseText = ""
         for await chunk in stream {
             responseText += chunk

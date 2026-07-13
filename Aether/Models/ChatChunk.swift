@@ -141,7 +141,7 @@ struct ToolDef: Codable {
 
 /// 动态类型包装器，用于 ToolDef.parameters 的 JSON Schema 字典
 /// （Swift Codable 不直接支持 [String: Any]，用此包装器实现动态编解码）
-struct AnyCodable: Codable {
+struct AnyCodable: Codable, @unchecked Sendable {
     let value: Any
 
     init(_ value: Any) {

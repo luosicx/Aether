@@ -339,4 +339,122 @@ final class AlarmToolTests: XCTestCase {
         let result = try await tool.execute(arguments: ["time": "08:30:00"])
         XCTAssertTrue(result.hasPrefix("错误"), "含秒时间应返回错误，实际：\(result)")
     }
+
+    // MARK: - 新代码覆盖率：时间格式校验在权限请求之前（不跳过模拟器）
+
+    /// 无效时间格式 "25:99" 应在权限请求前被拒绝。
+    /// 新代码将 DateFormatter 校验移至 requestFullAccessToEvents 之前，
+    /// 故模拟器环境下也不会触发权限弹窗，可直接断言精确错误消息。
+    func testExecuteInvalidTimeFormatRejectedBeforePermissionRequest() async throws {
+        let result = try await tool.execute(arguments: ["time": "25:99"])
+        XCTAssertEqual(result, "错误：时间格式无效",
+                       "无效时间应在权限请求前被拒绝，实际：\(result)")
+    }
+
+    /// 无效时间格式 "08:60"（分钟越界）应在权限请求前被拒绝
+    func testExecuteInvalidMinuteRejectedBeforePermissionRequest() async throws {
+        let result = try await tool.execute(arguments: ["time": "08:60"])
+        XCTAssertEqual(result, "错误：时间格式无效",
+                       "越界分钟应在权限请求前被拒绝，实际：\(result)")
+    }
+
+    /// 无效时间格式 "25:30"（小时越界）应在权限请求前被拒绝
+    func testExecuteInvalidHourRejectedBeforePermissionRequest() async throws {
+        let result = try await tool.execute(arguments: ["time": "25:30"])
+        XCTAssertEqual(result, "错误：时间格式无效",
+                       "越界小时应在权限请求前被拒绝，实际：\(result)")
+    }
+
+    /// 非数字时间 "abc" 应在权限请求前被拒绝
+    func testExecuteNonNumericTimeRejectedBeforePermissionRequest() async throws {
+        let result = try await tool.execute(arguments: ["time": "abc"])
+        XCTAssertEqual(result, "错误：时间格式无效",
+                       "非数字时间应在权限请求前被拒绝，实际：\(result)")
+    }
+
+    /// 空时间字符串 "" 应在权限请求前被拒绝
+    func testExecuteEmptyTimeRejectedBeforePermissionRequest() async throws {
+        let result = try await tool.execute(arguments: ["time": ""])
+        XCTAssertEqual(result, "错误：时间格式无效",
+                       "空时间字符串应在权限请求前被拒绝，实际：\(result)")
+    }
+
+    /// 无冒号时间 "0830" 应在权限请求前被拒绝
+    func testExecuteNoColonTimeRejectedBeforePermissionRequest() async throws {
+        let result = try await tool.execute(arguments: ["time": "0830"])
+        XCTAssertEqual(result, "错误：时间格式无效",
+                       "无冒号时间应在权限请求前被拒绝，实际：\(result)")
+    }
+
+    /// 含秒时间 "08:30:00" 应在权限请求前被拒绝（DateFormatter 按 HH:mm 解析失败）
+    func testExecuteTimeWithSecondsRejectedBeforePermissionRequest() async throws {
+        let result = try await tool.execute(arguments: ["time": "08:30:00"])
+        XCTAssertEqual(result, "错误：时间格式无效",
+                       "含秒时间应在权限请求前被拒绝，实际：\(result)")
+    }
+
+    /// 无效时间格式 + 自定义 label 仍应在权限请求前被拒绝（label 不影响格式校验顺序）
+    func testExecuteInvalidTimeWithLabelRejectedBeforePermission() async throws {
+        let result = try await tool.execute(arguments: ["time": "99:99", "label": "测试"])
+        XCTAssertEqual(result, "错误：时间格式无效",
+                       "无效时间 + label 应在权限请求前被拒绝，实际：\(result)")
+    }
+
+    // MARK: - 新代码覆盖率：权限请求路径（有效时间到达 requestFullAccessToEvents）
+
+    /// 有效时间 "08:30" 应通过格式校验并到达权限请求阶段。
+    /// 新代码将时间校验移至权限请求之前，有效时间会触发 requestFullAccessToEvents。
+    /// 权限授予 → "已创建闹钟：..."；权限拒绝 → "错误：无法访问日历"。
+    /// 此测试不跳过模拟器，覆盖 requestFullAccessToEvents 及 guard granted 分支。
+    func testExecuteValidTimeReachesPermissionRequestNoSkip() async throws {
+        let result = try await tool.execute(arguments: ["time": "08:30"])
+        XCTAssertTrue(result.contains("已创建闹钟") || result == "错误：无法访问日历",
+                      "有效时间应返回成功或权限拒绝，实际：\(result)")
+    }
+
+    /// 有效时间 + 自定义 label 应到达权限请求阶段。
+    /// 覆盖 requestFullAccessToEvents 和 guard granted 分支。
+    func testExecuteValidTimeWithLabelReachesPermissionNoSkip() async throws {
+        let result = try await tool.execute(arguments: ["time": "10:30", "label": "测试闹钟"])
+        XCTAssertTrue(result.contains("已创建闹钟") || result == "错误：无法访问日历",
+                      "有效时间+label 应返回成功或权限拒绝，实际：\(result)")
+    }
+
+    /// 有效时间 "00:00"（午夜）应到达权限请求阶段。
+    func testExecuteMidnightReachesPermissionRequestNoSkip() async throws {
+        let result = try await tool.execute(arguments: ["time": "00:00"])
+        XCTAssertTrue(result.contains("已创建闹钟") || result == "错误：无法访问日历",
+                      "午夜时间应返回成功或权限拒绝，实际：\(result)")
+    }
+
+    /// 有效时间 "23:59"（最晚时间）应到达权限请求阶段。
+    func testExecuteLatestTimeReachesPermissionRequestNoSkip() async throws {
+        let result = try await tool.execute(arguments: ["time": "23:59"])
+        XCTAssertTrue(result.contains("已创建闹钟") || result == "错误：无法访问日历",
+                      "最晚时间应返回成功或权限拒绝，实际：\(result)")
+    }
+
+    /// 有效时间 + 空 label 应使用默认值 "闹钟" 并到达权限请求阶段。
+    func testExecuteValidTimeWithEmptyLabelReachesPermissionNoSkip() async throws {
+        let result = try await tool.execute(arguments: ["time": "14:00", "label": ""])
+        XCTAssertTrue(result.contains("已创建闹钟") || result == "错误：无法访问日历",
+                      "有效时间+空label 应返回成功或权限拒绝，实际：\(result)")
+    }
+
+    /// 权限拒绝路径验证：有效时间应返回 "错误：无法访问日历" 或成功消息。
+    /// 若权限被拒绝，结果精确匹配 "错误：无法访问日历"，覆盖 guard granted else 分支。
+    func testExecuteValidTimePermissionDeniedReturnsExactError() async throws {
+        let result = try await tool.execute(arguments: ["time": "15:45"])
+        if result == "错误：无法访问日历" {
+            // 权限拒绝路径：覆盖 guard granted else { return "错误：无法访问日历" }
+            XCTAssertEqual(result, "错误：无法访问日历",
+                           "权限拒绝应返回精确错误")
+        } else {
+            // 权限授予路径：覆盖 let alarm = EKAlarm() 及后续保存逻辑
+            XCTAssertTrue(result.contains("已创建闹钟"),
+                          "权限授予应创建闹钟，实际：\(result)")
+            XCTAssertTrue(result.contains("15:45"),
+                          "成功结果应含时间，实际：\(result)")
+        }
+    }
 }

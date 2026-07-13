@@ -11,10 +11,14 @@
 
 - iOS / iPad / macOS 三端原生 SwiftUI 渲染，`#if os(iOS)` 条件编译优雅降级
 - **25 个工具**（14 跨平台 + 11 macOS 独有），ReAct 循环最大 5 轮
-- **387 keys** 完整 i18n（en / zh-Hans / zh-Hant）
+- **8 种语言** i18n（zh-Hans / zh-Hant / en / ja / ko / fr / de / es），387 keys
 - **266 UT** + 13 UIT，0 failures / 0 skips
 - 多 Provider（DeepSeek / Qwen / MLX 端侧）+ SmartRouter + Fallback 自动降级
 - SwiftLint + SwiftFormat 代码质量工具链，CI 集成脚本
+- **Watch App 源代码**就绪（`AetherWatch/`，⚠️ 需手动创建 Xcode target）
+- **Widget Extension 源代码**就绪（`AetherWidgets/`，⚠️ 需手动创建 Xcode target）
+- **DeepLink 支持**（`aether://ask?query=` / `aether://conversation/<uuid>`）
+- **App Group 共享 SwiftData**（`group.com.aether.shared`）
 
 ### 品牌与设计基线
 
@@ -113,10 +117,10 @@
 
 ### H.3 个性化
 
-- [ ] 主题切换（深空 / 黎明 / 极光等多套色彩主题）
-- [ ] 自定义头像与 AI 人设
-- [ ] 对话气泡样式可选（液态玻璃 / 极简 / 卡片）
-- [ ] 字体大小与行距可调
+- [x] 主题切换（深空 / 黎明 / 极光等多套色彩主题）（已完成基础主题切换）
+- [x] 自定义头像与 AI 人设（已完成 PhotosPicker 头像选择器）
+- [x] 对话气泡样式可选（液态玻璃 / 极简 / 卡片）（已完成气泡样式切换）
+- [x] 字体大小与行距可调（已完成字体与间距设置）
 
 ---
 
@@ -133,7 +137,7 @@
 
 ### I.2 本地化扩展
 
-- [ ] 新增日语 / 韩语 / 法语 / 德语 / 西班牙语支持
+- [x] 新增日语 / 韩语 / 法语 / 德语 / 西班牙语支持（已完成 8 种语言）
 - [ ] 区域化模型推荐（中国区推荐 Qwen，海外推荐 Llama）
 - [ ] RTL 语言支持（阿拉伯语 / 希伯来语）
 - [ ] 本地化文案质量审计（母语审校）
@@ -148,7 +152,7 @@
 
 - [ ] 对话历史 iCloud 同步（CloudKit / NSPersistentCloudKitContainer）
 - [ ] 跨设备连续对话（Handoff）
-- [ ] watchOS 独立 App（无需 iPhone 配对）
+- [~] watchOS 独立 App（无需 iPhone 配对）（源代码已就绪，需手动创建 Xcode target）
 - [ ] visionOS 适配（空间计算体验）
 
 ### J.2 协作与分享
@@ -161,7 +165,7 @@
 ### J.3 开发者生态
 
 - [ ] Aether SDK（第三方应用集成 Aether AI 能力）
-- [ ] URL Scheme 与 x-callback-url 支持
+- [x] URL Scheme 与 x-callback-url 支持（已完成 `aether://` DeepLink）
 - [ ] Shortcuts 深度集成（更多 App Intents）
 - [ ] 开发者文档与示例代码
 
