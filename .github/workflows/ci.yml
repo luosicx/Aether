@@ -28,6 +28,27 @@ jobs:
       - name: Setup iOS Simulator
         run: bash scripts/ci-setup-simulator.sh
 
+      - name: Cache DerivedData (build artifacts)
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/Build
+            build/ModuleCache.noindex
+            build/Intermediates.noindex
+          key: ${{ runner.os }}-deriveddata-${{ hashFiles('**/*.swift', '**/*.xcodeproj', '**/*.xcworkspace') }}
+          restore-keys: |
+            ${{ runner.os }}-deriveddata-
+
+      - name: Cache SPM Packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Developer/Xcode/DerivedData/Aether-*/SourcePackages
+            ~/.cache/org.swift.swiftpm/repositories
+          key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved', '**/Package.swift') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+
       - name: Build for Testing
         run: |
           xcodebuild build-for-testing \
@@ -183,6 +204,27 @@ jobs:
 
       - name: Setup iOS Simulator
         run: bash scripts/ci-setup-simulator.sh
+
+      - name: Cache DerivedData (build artifacts)
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/Build
+            build/ModuleCache.noindex
+            build/Intermediates.noindex
+          key: ${{ runner.os }}-deriveddata-${{ hashFiles('**/*.swift', '**/*.xcodeproj', '**/*.xcworkspace') }}
+          restore-keys: |
+            ${{ runner.os }}-deriveddata-
+
+      - name: Cache SPM Packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Developer/Xcode/DerivedData/Aether-*/SourcePackages
+            ~/.cache/org.swift.swiftpm/repositories
+          key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved', '**/Package.swift') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
 
       - name: Build for Testing
         run: |
