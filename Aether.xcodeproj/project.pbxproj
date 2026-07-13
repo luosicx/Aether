@@ -88,6 +88,7 @@
 		4EEF75AC31F89970F08313D0 /* BFFProxyClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29F6D11EC132F8F84C1D3650 /* BFFProxyClientTests.swift */; };
 		4FB2D21DB3478B58BB84D0AC /* LocationToolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5E9C9877A632DA648C4F970 /* LocationToolTests.swift */; };
 		4FBDA8DB67B4B7EC9A66800D /* AetherUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83DE3F8404C4A45F1F8D97F7 /* AetherUITests.swift */; };
+		4FBDA8DC67B4B7EC9A66800E /* BaseUITestCase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83DE3F8504C4A45F1F8D97F8 /* BaseUITestCase.swift */; };
 		508A778917B5B73E2C2526F8 /* FeedbackBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = F28A1CFC98C7601B399A721C /* FeedbackBar.swift */; };
 		51DD52F96542D7CDDCDCB4CB /* ConversationList.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AF59624B6F92514E3E2971E /* ConversationList.swift */; };
 		5542BF511D58214997F69C65 /* TTSVoiceCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8BDBC1D3678EF29FE935E3B /* TTSVoiceCatalogTests.swift */; };
@@ -425,6 +426,7 @@
 		80555A529238E0F789A6EFB6 /* AppleScriptToolTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppleScriptToolTests.swift; sourceTree = "<group>"; };
 		809A61237168F207C54CD1BF /* ChatChunk.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatChunk.swift; sourceTree = "<group>"; };
 		83DE3F8404C4A45F1F8D97F7 /* AetherUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AetherUITests.swift; sourceTree = "<group>"; };
+		83DE3F8504C4A45F1F8D97F8 /* BaseUITestCase.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BaseUITestCase.swift; sourceTree = "<group>"; };
 		867DB7023461324048A8BCD1 /* ChatMessageTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatMessageTests.swift; sourceTree = "<group>"; };
 		86DD2D4602965E479772082A /* ErrorBanner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ErrorBanner.swift; sourceTree = "<group>"; };
 		878C578467218EC7BC842C1D /* VoiceServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VoiceServiceTests.swift; sourceTree = "<group>"; };
@@ -981,6 +983,7 @@
 			isa = PBXGroup;
 			children = (
 				83DE3F8404C4A45F1F8D97F7 /* AetherUITests.swift */,
+				83DE3F8504C4A45F1F8D97F8 /* BaseUITestCase.swift */,
 				58F00D3C33FDF8C0E086A75B /* AetherUITestsLaunchUITests.swift */,
 				E2D3C4B5A697886950414243 /* MultiWindowUITests.swift */,
 				PLUG1N000000000000000011 /* PluginSettingsUITests.swift */,
@@ -1578,6 +1581,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				4FBDA8DB67B4B7EC9A66800D /* AetherUITests.swift in Sources */,
+				4FBDA8DC67B4B7EC9A66800E /* BaseUITestCase.swift in Sources */,
 				444B93B8D9697FC13D3E9CD6 /* AetherUITestsLaunchUITests.swift in Sources */,
 				2B3C4D5E6F7A8B9C0D1E2F3A /* MultiWindowUITests.swift in Sources */,
 				PLUG1N00000000000000012 /* PluginSettingsUITests.swift in Sources */,
