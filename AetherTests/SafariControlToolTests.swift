@@ -23,20 +23,23 @@ final class SafariControlToolTests: XCTestCase {
 
     /// 验证 appleScriptEscaped 会转义双引号，防止字符串边界被突破。
     func testAppleScriptEscapingEscapesQuotes() {
-        let input = "http://example.com\"; do shell script \"rm -rf ~"; --"
+        // 使用原始字符串字面量避免转义混乱；输入含未转义双引号企图跳出 AppleScript 字面量
+        let input = #"http://example.com"; do shell script "rm -rf ~"; --"#
         let output = SafariControlTool.appleScriptEscaped(input)
-        XCTAssertFalse(output.contains("\"; do shell script"))
-        XCTAssertTrue(output.contains("\\\""))
-        // 转义后字符串中不应再存在未转义的双引号
-        XCTAssertNil(output.range(of: "(?<!\\\\)\"", options: .regularExpression))
+        // 输出中所有双引号都必须被反斜杠转义（即不存在未转义的双引号）
+        XCTAssertNil(output.range(of: #"(?<!\\)\""#, options: .regularExpression),
+                     "存在未转义的双引号: \(output)")
     }
 
     /// 验证反斜杠先被转义，避免与后续转义的双引号组合成新的转义序列。
     func testAppleScriptEscapingEscapesBackslashesBeforeQuotes() {
-        let input = "http://example.com\\\"; do shell script \"echo pwned"; --"
+        // 输入: http://example.com\"; do shell script "echo pwned"; --
+        let input = #"http://example.com\"; do shell script "echo pwned"; --"#
         let output = SafariControlTool.appleScriptEscaped(input)
-        XCTAssertTrue(output.hasPrefix("http://example.com\\\\\\\""))
-        XCTAssertFalse(output.contains("\\\"; do shell script"))
+        // 期望输出前缀: http://example.com + 三个反斜杠 + 引号
+        // （原反斜杠 → \\，原引号 → \"，合计 \\\"）
+        XCTAssertTrue(output.hasPrefix(#"http://example.com\\\""#),
+                      "反斜杠应先转义为 \\，引号再转义为 \": \(output)")
     }
 
     /// 验证换行、回车、制表符被转义，避免注入多行 AppleScript。
