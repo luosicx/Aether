@@ -117,5 +117,51 @@ final class WindowManagementToolTests: XCTestCase {
         let result = try await tool.execute(arguments: ["action": 123])
         XCTAssertEqual(result, "错误：请提供 action 参数")
     }
+
+    // MARK: - AppleScript 注入防护测试
+
+    /// minimize 传入不存在的应用名应返回错误，不执行 AppleScript
+    func testMinimizeNonExistentApp() async throws {
+        let result = try await tool.execute(arguments: [
+            "action": "minimize",
+            "app": "NonExistentApp12345"
+        ])
+        XCTAssertTrue(result.contains("错误") || result.contains("未找到"),
+                      "不存在的应用应返回错误：\(result)")
+    }
+
+    /// minimize 传入包含双引号的应用名（注入尝试）应被拒绝
+    func testMinimizeRejectsInjectionAttempt() async throws {
+        let result = try await tool.execute(arguments: [
+            "action": "minimize",
+            "app": "\" to do shell script \"id"
+        ])
+        XCTAssertTrue(result.contains("错误") || result.contains("未找到"),
+                      "包含双引号的 app 名不应执行注入：\(result)")
+    }
+
+    /// move 传入不存在的应用名应返回错误
+    func testMoveNonExistentApp() async throws {
+        let result = try await tool.execute(arguments: [
+            "action": "move",
+            "app": "NonExistentApp12345",
+            "x": 100,
+            "y": 100
+        ])
+        XCTAssertTrue(result.contains("错误") || result.contains("未找到"),
+                      "不存在的应用应返回错误：\(result)")
+    }
+
+    /// resize 传入不存在的应用名应返回错误
+    func testResizeNonExistentApp() async throws {
+        let result = try await tool.execute(arguments: [
+            "action": "resize",
+            "app": "NonExistentApp12345",
+            "width": 800,
+            "height": 600
+        ])
+        XCTAssertTrue(result.contains("错误") || result.contains("未找到"),
+                      "不存在的应用应返回错误：\(result)")
+    }
 }
 #endif
