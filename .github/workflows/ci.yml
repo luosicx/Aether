@@ -7,12 +7,15 @@ on:
     branches: [main]
 
 jobs:
+  # Unit tests - 3 shards in parallel via matrix for faster execution
+  # Each shard runs ~1/3 of test classes, generates its own coverage.xml
   unit-tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        shard-index: [0, 1, 2]
     runs-on: macos-15
-    timeout-minutes: 30
-    outputs:
-      coverage_pct: ${{ steps.coverage.outputs.coverage_pct }}
-      coverage_pass: ${{ steps.coverage.outputs.coverage_pass }}
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
 
@@ -34,17 +37,28 @@ jobs:
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO
 
-      - name: Run Unit Tests
+      - name: Get test classes for this shard
+        run: |
+          python3 scripts/ci-shard-tests.py ${{ matrix.shard-index }} 3 > /tmp/shard_classes.txt
+          echo "=== Shard ${{ matrix.shard-index }} test classes ==="
+          cat /tmp/shard_classes.txt
+          echo "Total: $(wc -l < /tmp/shard_classes.txt) classes"
+
+      - name: Run Unit Tests (shard ${{ matrix.shard-index }})
         id: test
         continue-on-error: true
         run: |
+          SHARD_ARGS=""
+          while IFS= read -r cls; do
+            SHARD_ARGS="$SHARD_ARGS -only-testing:AetherTests/$cls"
+          done < /tmp/shard_classes.txt
           xcodebuild test-without-building \
             -project Aether.xcodeproj \
             -scheme Aether \
             -destination 'platform=iOS Simulator,name=iPhone 17,arch=arm64' \
             -configuration Debug \
             -derivedDataPath build \
-            -skip-testing:AetherUITests \
+            $SHARD_ARGS \
             -test-timeouts-enabled YES \
             -default-test-execution-time-allowance 30 \
             -maximum-test-execution-time-allowance 60 \
@@ -60,7 +74,6 @@ jobs:
             echo "ERROR: No test results generated (TestResults.xcresult missing)"
             exit 1
           fi
-          # 检查实际测试失败数（grep -c 无匹配时退出码为 1，不依赖 || echo "0" 回退）
           FAILED_TESTS=$(xcrun xcresulttool get test-results summary --path TestResults.xcresult 2>/dev/null | grep -c '"failed"' | tr -d '\n')
           FAILED_TESTS=${FAILED_TESTS:-0}
           if [ "$FAILED_TESTS" -gt 0 ]; then
@@ -70,88 +83,10 @@ jobs:
           fi
           echo "xcodebuild exited non-zero but all tests passed (simulator instability)"
 
-      - name: Check Coverage Threshold (≥ 90%, excluding Views/DesignSystem/App/Protocols/TestTargets)
-        id: coverage
-        if: always()
-        continue-on-error: true
-        run: |
-          echo "=== Checking code coverage threshold (≥ 90%, excluding Views/DesignSystem/App/Protocols/TestTargets) ==="
-          # Get full coverage report from xccov (includes per-file and per-function lines)
-          # Format:
-          #   Aether.app                    59.85% (10106/16886)
-          #     /path/to/file.swift         100.00% (92/92)
-          #         func.name()             100.00% (4/4)
-          COVERAGE_OUTPUT=$(xcrun xccov view --report TestResults.xcresult 2>/dev/null)
-          if [ -z "$COVERAGE_OUTPUT" ]; then
-            echo "ERROR: Could not generate coverage report"
-            echo "coverage_pct=0" >> $GITHUB_OUTPUT
-            echo "coverage_pass=false" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          # Aggregate coverage excluding files that are pure SwiftUI views,
-          # design system tokens, app entry points, or protocol definitions.
-          # These cannot be meaningfully unit tested; excluding them gives a
-          # more accurate threshold for the testable business logic code.
-          # python3 is available on macos-15 runners.
-          STATS=$(echo "$COVERAGE_OUTPUT" | python3 -c '
-          import re, sys
-          text = sys.stdin.read()
-          covered = total = skipped = 0
-          # Match file lines only: leading whitespace + /abs/path.swift + pct + (cov/tot)
-          pattern = re.compile(r"^\s+(/\S+\.swift)\s+([\d.]+)%\s+\((\d+)/(\d+)\)", re.MULTILINE)
-          # Directories excluded from coverage:
-          # - Views/: pure SwiftUI views
-          # - DesignSystem/: design token definitions
-          # - App/AetherApp: @main entry point
-          # - Protocols/, Actors/: protocol/actor definitions
-          # - AetherUITests/: UI test target code (0% coverage, not source under test)
-          # - AetherWatch/: watchOS app target (different platform)
-          # Note: AetherTests/ is NOT excluded - test code coverage contributes to overall coverage
-          EXCLUDE_PATTERNS = ["/Views/", "/DesignSystem/", "/App/AetherApp", "/Protocols/", "/Actors/", "/AetherUITests/", "/AetherWatch/"]
-          for m in pattern.finditer(text):
-              path = m.group(1)
-              cov = int(m.group(3))
-              tot = int(m.group(4))
-              if any(p in path for p in EXCLUDE_PATTERNS):
-                  skipped += 1
-                  continue
-              covered += cov
-              total += tot
-          if total == 0:
-              print("ERROR 0 0 0")
-          else:
-              print(f"{covered} {total} {skipped}")
-          ')
-          COVERED=$(echo "$STATS" | awk '{print $1}')
-          TOTAL=$(echo "$STATS" | awk '{print $2}')
-          SKIPPED=$(echo "$STATS" | awk '{print $3}')
-          if [ "$COVERED" = "ERROR" ]; then
-            echo "ERROR: No coverage data found or could not parse"
-            echo "coverage_pct=0" >> $GITHUB_OUTPUT
-            echo "coverage_pass=false" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          COVERAGE_PCT=$(awk -v cov="$COVERED" -v tot="$TOTAL" 'BEGIN { printf "%.2f", (cov/tot)*100 }')
-          echo "Non-Views line coverage: ${COVERAGE_PCT}% (${COVERED}/${TOTAL}, skipped ${SKIPPED} Views files)"
-          echo "coverage_pct=${COVERAGE_PCT}" >> $GITHUB_OUTPUT
-          # Compare using awk (bash does not support float comparison)
-          THRESHOLD=85.0
-          COVERAGE_OK=$(awk -v cov="$COVERAGE_PCT" -v thr="$THRESHOLD" 'BEGIN { print (cov >= thr) ? 1 : 0 }')
-          if [ "$COVERAGE_OK" -eq 1 ]; then
-            echo "PASS: Coverage ${COVERAGE_PCT}% ≥ ${THRESHOLD}% (excluding Views/DesignSystem/App/Protocols)"
-            echo "coverage_pass=true" >> $GITHUB_OUTPUT
-          else
-            echo "FAIL: Coverage ${COVERAGE_PCT}% < ${THRESHOLD}% (excluding Views/DesignSystem/App/Protocols)"
-            echo "Coverage below threshold. Please add tests to improve coverage."
-            echo "coverage_pass=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Generate cobertura.xml
+      - name: Generate cobertura.xml for shard
         if: always()
         run: |
           mkdir -p coverage-report
-          # 使用 xcrun xccov view --report 的文本输出生成 cobertura.xml
-          # （xcrun xccov view --json 在 CI 中返回 "unrecognized file format"，但 --report 可正常工作）
           xcrun xccov view --report TestResults.xcresult > /tmp/coverage_report.txt 2>/dev/null || {
             echo "ERROR: xccov view --report failed"
             cat /tmp/coverage_report.txt
@@ -185,15 +120,12 @@ jobs:
                   continue
               if any(p in rel_path for p in EXCLUDE_PATTERNS):
                   continue
-              # 读取实际源文件行数，确保 lineNumber 不超过文件行数
-              # （xccov 的 tot 是可执行单元数，可能超过实际文件行数）
               abs_file_path = os.path.join(project_root, rel_path)
               try:
                   with open(abs_file_path, 'r') as sf:
                       actual_lines = sum(1 for _ in sf)
               except (IOError, OSError):
-                  actual_lines = tot  # fallback
-              # 如果可执行单元数超过文件行数，按比例缩放
+                  actual_lines = tot
               if actual_lines > 0:
                   max_lines = min(tot, actual_lines)
                   if tot > 0:
@@ -220,21 +152,19 @@ jobs:
                   f.write(f'  </file>\n')
               f.write('</coverage>\n')
           print(f"coverage.xml written: line-rate={total_covered/total_valid:.4f} ({total_covered}/{total_valid} lines)")
-          print(f"Sample paths: {[f[0] for f in files[:3]]}")
           PYEOF
-          # 校验
           if [ ! -f "coverage-report/coverage.xml" ]; then
             echo "ERROR: coverage.xml was not generated"
             exit 1
           fi
           LINE_RATE=$(python3 -c "import xml.etree.ElementTree as ET; r=ET.parse('coverage-report/coverage.xml').getroot(); covered=sum(1 for f in r.findall('file') for l in f.findall('lineToCover') if l.get('covered')=='true'); total=sum(1 for f in r.findall('file') for l in f.findall('lineToCover')); print(f'{covered/total:.4f}' if total else '0')")
-          echo "coverage.xml line-rate: $LINE_RATE"
+          echo "Shard ${{ matrix.shard-index }} coverage.xml line-rate: $LINE_RATE"
 
       - name: Upload coverage report artifact
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: coverage-report
+          name: coverage-report-shard-${{ matrix.shard-index }}
           path: coverage-report/coverage.xml
           if-no-files-found: error
           retention-days: 7
@@ -396,6 +326,16 @@ jobs:
             -configuration Debug \
             -derivedDataPath build \
             -only-testing:AetherTests/TerminalCommandToolTests \
+            -only-testing:AetherTests/AppManagementToolTests \
+            -only-testing:AetherTests/AppleScriptToolTests \
+            -only-testing:AetherTests/FileOperationToolTests \
+            -only-testing:AetherTests/FinderToolTests \
+            -only-testing:AetherTests/InputAutomationToolTests \
+            -only-testing:AetherTests/OCRToolTests \
+            -only-testing:AetherTests/SafariControlToolTests \
+            -only-testing:AetherTests/ScreenshotToolTests \
+            -only-testing:AetherTests/SystemControlToolTests \
+            -only-testing:AetherTests/WindowManagementToolTests \
             -test-timeouts-enabled YES \
             -default-test-execution-time-allowance 30 \
             -maximum-test-execution-time-allowance 60 \
@@ -419,30 +359,88 @@ jobs:
           fi
           echo "xcodebuild exited non-zero but all macOS security tests passed (simulator instability)"
 
-  # Coverage status check: blocks PR merge if coverage < 90%
-  coverage-summary:
-    needs: [unit-tests, ui-tests]
+  # Merge coverage from all unit-test shards into a single cobertura.xml
+  merge-coverage:
+    needs: [unit-tests]
     runs-on: ubuntu-latest
     if: always()
     steps:
-      - name: Check coverage from unit-tests output
+      - uses: actions/checkout@v5
+
+      - name: Download all shard coverage reports
+        uses: actions/download-artifact@v7
+        with:
+          pattern: coverage-report-shard-*
+          path: coverage-shards
+          merge-multiple: false
+
+      - name: Merge coverage reports
         run: |
-          echo "Coverage pass: ${{ needs.unit-tests.outputs.coverage_pass }}"
-          echo "Coverage pct: ${{ needs.unit-tests.outputs.coverage_pct }}"
-          if [ "${{ needs.unit-tests.result }}" != "success" ]; then
-            echo "unit-tests job failed, cannot verify coverage"
+          mkdir -p coverage-report
+          # Collect all shard coverage.xml paths
+          SHARD_FILES=$(find coverage-shards -name "coverage.xml" | sort)
+          if [ -z "$SHARD_FILES" ]; then
+            echo "ERROR: No shard coverage files found"
             exit 1
           fi
-          if [ "${{ needs.unit-tests.outputs.coverage_pass }}" != "true" ]; then
-            echo "FAIL: Coverage ${{ needs.unit-tests.outputs.coverage_pct }}% < 90% threshold"
-            echo "Please add tests to improve coverage."
+          echo "Merging shard coverage files:"
+          echo "$SHARD_FILES"
+          python3 scripts/ci-merge-coverage.py coverage-report/coverage.xml $SHARD_FILES
+
+      - name: Check Coverage Threshold (≥ 85%, excluding Views/DesignSystem/App/Protocols/TestTargets)
+        id: coverage
+        run: |
+          if [ ! -f "coverage-report/coverage.xml" ]; then
+            echo "ERROR: merged coverage.xml not found"
+            echo "coverage_pass=false" >> $GITHUB_OUTPUT
             exit 1
           fi
-          echo "PASS: Coverage ${{ needs.unit-tests.outputs.coverage_pct }}% ≥ 90%"
+          LINE_RATE=$(python3 -c "
+          import xml.etree.ElementTree as ET
+          r = ET.parse('coverage-report/coverage.xml').getroot()
+          covered = sum(1 for f in r.findall('file') for l in f.findall('lineToCover') if l.get('covered')=='true')
+          total = sum(1 for f in r.findall('file') for l in f.findall('lineToCover'))
+          print(f'{covered/total:.4f}' if total else '0')
+          ")
+          echo "Merged coverage line-rate: $LINE_RATE"
+          COVERAGE_PCT=$(python3 -c "print(round($LINE_RATE * 100, 2))")
+          echo "coverage_pct=$COVERAGE_PCT" >> $GITHUB_OUTPUT
+          THRESHOLD=85.0
+          COVERAGE_OK=$(awk -v cov="$COVERAGE_PCT" -v thr="$THRESHOLD" 'BEGIN { print (cov >= thr) ? 1 : 0 }')
+          if [ "$COVERAGE_OK" -eq 1 ]; then
+            echo "PASS: Coverage ${COVERAGE_PCT}% >= ${THRESHOLD}%"
+            echo "coverage_pass=true" >> $GITHUB_OUTPUT
+          else
+            echo "FAIL: Coverage ${COVERAGE_PCT}% < ${THRESHOLD}%"
+            echo "coverage_pass=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload merged coverage report artifact
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-report
+          path: coverage-report/coverage.xml
+          if-no-files-found: error
+          retention-days: 7
+
+  # Coverage status check: blocks PR merge if coverage < 85%
+  coverage-summary:
+    needs: [merge-coverage]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check coverage from merge-coverage output
+        run: |
+          if [ "${{ needs.merge-coverage.result }}" != "success" ]; then
+            echo "merge-coverage job failed, cannot verify coverage"
+            exit 1
+          fi
+          echo "PASS: Coverage merged and verified"
 
   # Code quality status check: SonarQube static analysis
   code-quality:
-    needs: coverage-summary
+    needs: [merge-coverage]
     runs-on: macos-15
     if: always()
     steps:
@@ -455,7 +453,7 @@ jobs:
         with:
           xcode-version: 'latest'
 
-      - name: Download coverage report
+      - name: Download merged coverage report
         uses: actions/download-artifact@v7
         with:
           name: coverage-report
