@@ -29,7 +29,8 @@ final class AppleScriptTool: ToolProtocol {
     ///
     /// - Parameter arguments: 含 `script` 键的参数字典
     /// - Returns: 脚本执行输出，或错误信息字符串
-    /// - Throws: 不抛异常，错误以字符串形式返回
+    /// - Throws: 工具未启用或用户未确认时抛出错误
+    @MainActor
     func execute(arguments: [String: Any]) async throws -> String {
         guard let script = arguments["script"] as? String, !script.isEmpty else {
             return "错误：请提供 AppleScript 脚本"

@@ -106,6 +106,9 @@ struct AetherApp: App {
             UserDefaults.standard.set(newId, forKey: "anonymous_user_id")
             CrashReportService.shared.setUserId(newId)
         }
+
+        // Task 5: 启动时迁移可能遗留的 BFF Token 到 Keychain，并清理 UserDefaults 中的完整配置
+        SettingsViewModel.migrateLegacyBFFConfigIfNeeded()
     }
 
     /// UITest 数据重置：创建独立的 ModelContainer（使用与主 App 相同的默认 store URL），

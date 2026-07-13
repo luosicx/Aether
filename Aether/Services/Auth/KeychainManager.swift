@@ -80,10 +80,69 @@ final class KeychainManager {
     private let legacyService = "com.aibuilder.apikey"
     /// 底层存储后端（生产用 SystemKeychainBackend，测试可注入 InMemoryKeychainBackend）
     internal var backend: KeychainBackend = SystemKeychainBackend()
+    /// 通用敏感数据 Keychain service
+    private let secretsService = "com.aether.secrets"
 
     /// 私有初始化，外部只能用 shared
     private init() {
         migrateLegacyKeychainIfNeeded()
+    }
+
+    // MARK: - 通用字符串/数据存取
+
+    /// 通用：将字符串保存到 Keychain（account = key，service = secretsService）。
+    /// 先删后加保证幂等，失败抛出 keychainError。
+    func save(key: String, value: String) throws {
+        guard let data = value.data(using: .utf8) else { return }
+        try save(key: key, value: data)
+    }
+
+    /// 通用：将 Data 保存到 Keychain（account = key，service = secretsService）。
+    /// 先删后加保证幂等，失败抛出 keychainError。
+    func save(key: String, value: Data) throws {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: secretsService,
+            kSecAttrAccount as String: key,
+            kSecValueData as String: value,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        ]
+        _ = backend.secItemDelete(query as CFDictionary)
+        let status = backend.secItemAdd(query as CFDictionary)
+        guard status == errSecSuccess else {
+            throw AppError.keychainError(String(format: NSLocalizedString("保存失败: %@", comment: ""), String(status)))
+        }
+    }
+
+    /// 通用：从 Keychain 读取字符串。无记录返回 nil。
+    func read(key: String) -> String? {
+        guard let data = readData(key: key) else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
+    /// 通用：从 Keychain 读取原始 Data。无记录返回 nil。
+    func readData(key: String) -> Data? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: secretsService,
+            kSecAttrAccount as String: key,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        var result: CFTypeRef?
+        let status = backend.secItemCopyMatching(query as CFDictionary, &result)
+        guard status == errSecSuccess, let data = result as? Data else { return nil }
+        return data
+    }
+
+    /// 通用：从 Keychain 删除指定 key。幂等，无记录不报错。
+    func delete(key: String) {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: secretsService,
+            kSecAttrAccount as String: key
+        ]
+        _ = backend.secItemDelete(query as CFDictionary)
     }
 
     /// 迁移旧 Keychain service 到新 service（com.aibuilder.apikey → com.aether.apikey）。

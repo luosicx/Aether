@@ -35,6 +35,7 @@ final class LocationTool: ToolProtocol {
     /// 执行定位。流程：1) 请求定位权限并获取当前位置（10s 超时）；
     /// 2) 未授权返回提示；3) 成功后用 CLGeocoder 反查地址；
     /// 4) 拼装格式化字符串返回。用户可见错误以字符串返回而非抛错。
+    @MainActor
     func execute(arguments: [String: Any]) async throws -> String {
         let fetcher = LocationFetcher()
         let location: CLLocation

@@ -30,7 +30,7 @@ final class ShortcutsToolTests: XCTestCase {
 
     func testCreateUnsupportedAction() async throws {
         let result = try await createTool.execute(arguments: ["name": "test", "action": "unknown"])
-        XCTAssertEqual(result, "错误：不支持的动作类型，支持 open_url/run_script/show_text/copy_to_clipboard")
+        XCTAssertEqual(result, "错误：不支持的动作类型，支持 open_url/show_text/copy_to_clipboard")
     }
 
     func testCreateMissingAction() async throws {
@@ -108,14 +108,14 @@ final class ShortcutsToolTests: XCTestCase {
 
     // MARK: - CreateShortcutTool definition 详细验证
 
-    /// create_shortcut 的 properties 应包含 name/action/url/script/text
+    /// create_shortcut 的 properties 应包含 name/action/url/text（run_script 已移除，不再含 script）
     func testCreateDefinitionProperties() {
         let properties = createTool.definition.parameters["properties"] as? [String: [String: Any]]
         XCTAssertNotNil(properties, "properties 应为字典")
         XCTAssertNotNil(properties?["name"], "应包含 name 属性")
         XCTAssertNotNil(properties?["action"], "应包含 action 属性")
         XCTAssertNotNil(properties?["url"], "应包含 url 属性")
-        XCTAssertNotNil(properties?["script"], "应包含 script 属性")
+        XCTAssertNil(properties?["script"], "run_script 已移除，不应再包含 script 属性")
         XCTAssertNotNil(properties?["text"], "应包含 text 属性")
     }
 
@@ -130,25 +130,25 @@ final class ShortcutsToolTests: XCTestCase {
     /// open_url 动作缺 url 参数 → buildWorkflowAction 返回 nil → 不支持动作错误
     func testCreateOpenUrlWithoutUrl() async throws {
         let result = try await createTool.execute(arguments: ["name": "test", "action": "open_url"])
-        XCTAssertEqual(result, "错误：不支持的动作类型，支持 open_url/run_script/show_text/copy_to_clipboard")
+        XCTAssertEqual(result, "错误：不支持的动作类型，支持 open_url/show_text/copy_to_clipboard")
     }
 
-    /// run_script 动作缺 script 参数
-    func testCreateRunScriptWithoutScript() async throws {
+    /// run_script 动作已被移除
+    func testCreateRunScriptIsRejected() async throws {
         let result = try await createTool.execute(arguments: ["name": "test", "action": "run_script"])
-        XCTAssertEqual(result, "错误：不支持的动作类型，支持 open_url/run_script/show_text/copy_to_clipboard")
+        XCTAssertEqual(result, "该 action 已被移除")
     }
 
     /// show_text 动作缺 text 参数
     func testCreateShowTextWithoutText() async throws {
         let result = try await createTool.execute(arguments: ["name": "test", "action": "show_text"])
-        XCTAssertEqual(result, "错误：不支持的动作类型，支持 open_url/run_script/show_text/copy_to_clipboard")
+        XCTAssertEqual(result, "错误：不支持的动作类型，支持 open_url/show_text/copy_to_clipboard")
     }
 
     /// copy_to_clipboard 动作缺 text 参数
     func testCreateCopyToClipboardWithoutText() async throws {
         let result = try await createTool.execute(arguments: ["name": "test", "action": "copy_to_clipboard"])
-        XCTAssertEqual(result, "错误：不支持的动作类型，支持 open_url/run_script/show_text/copy_to_clipboard")
+        XCTAssertEqual(result, "错误：不支持的动作类型，支持 open_url/show_text/copy_to_clipboard")
     }
 
     /// name 为空字符串应返回错误
@@ -180,7 +180,7 @@ final class ShortcutsToolTests: XCTestCase {
     /// create_shortcut description 应提及动作类型
     func testCreateDefinitionDescriptionMentionsActions() {
         let desc = createTool.definition.description
-        XCTAssertTrue(desc.contains("open_url") || desc.contains("run_script"),
+        XCTAssertTrue(desc.contains("open_url") || desc.contains("show_text") || desc.contains("copy_to_clipboard"),
                       "description 应提及动作类型，实际：\(desc)")
     }
 
@@ -222,7 +222,7 @@ final class ShortcutsToolTests: XCTestCase {
         let actionProp = properties?["action"]
         let desc = actionProp?["description"] as? String ?? ""
         XCTAssertFalse(desc.isEmpty, "action description 不应为空")
-        XCTAssertTrue(desc.contains("open_url") || desc.contains("run_script"),
+        XCTAssertTrue(desc.contains("open_url") || desc.contains("show_text") || desc.contains("copy_to_clipboard"),
                       "action description 应提及动作类型")
     }
 
@@ -255,16 +255,14 @@ final class ShortcutsToolTests: XCTestCase {
         XCTAssertTrue(result.contains("TestOpenURL"))
     }
 
-    /// run_script 动作成功路径：应返回创建成功消息
-    func testCreateRunScriptSuccess() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["CI"] != nil,
-                      "跳过：CI 环境下 UIApplication.shared.open 可能不可用")
+    /// run_script 动作成功路径：应被移除并拒绝
+    func testCreateRunScriptSuccessIsRejected() async throws {
         let result = try await createTool.execute(arguments: [
             "name": "TestRunScript",
             "action": "run_script",
             "script": "echo hello"
         ])
-        XCTAssertTrue(result.contains("已创建快捷指令"), "run_script 成功应返回创建消息，实际：\(result)")
+        XCTAssertEqual(result, "该 action 已被移除", "run_script 应已被移除，实际：\(result)")
     }
 
     /// show_text 动作成功路径：应返回创建成功消息

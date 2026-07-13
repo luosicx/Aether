@@ -16,6 +16,36 @@ final class ToolRegistry {
     /// 工具字典，key 为工具名
     private var tools: [String: ToolProtocol] = [:]
 
+    // MARK: - 启用状态与敏感工具
+
+    /// UserDefaults 键前缀
+    private let enabledToolDefaultsKeyPrefix = "aether.tool.enabled."
+    /// 默认禁用的 macOS 高危工具（注册名）。
+    /// 注：任务中的 `control_safari.run_js` 与 `create_shortcut.run_script` 是子操作概念，
+    /// 这里以父工具 `control_safari` / `create_shortcut` 为粒度进行启用/禁用控制。
+    let defaultDisabledTools: Set<String> = [
+        "run_terminal_command",
+        "run_applescript",
+        "control_safari",
+        "create_shortcut"
+    ]
+    /// 敏感工具集合，包含需要显式授权才能启用的工具或子操作标识。
+    /// 同时包含任务中的 `ocr_screen` 与实际注册名 `extract_text_from_image`，保证两端都能匹配。
+    let sensitiveTools: Set<String> = [
+        "read_clipboard",
+        "search_contacts",
+        "get_location",
+        "take_screenshot",
+        "ocr_screen",
+        "extract_text_from_image",
+        "run_terminal_command",
+        "run_applescript",
+        "control_safari.run_js",
+        "create_shortcut.run_script"
+    ]
+    /// 当前已启用的工具名集合。初始化时从 UserDefaults 恢复默认值。
+    private(set) var enabledTools: Set<String> = []
+
     /// 私有初始化，注册全部工具（跨平台 + macOS 独有条件注册）
     private init() {
         // 原有 4 个工具
@@ -49,6 +79,9 @@ final class ToolRegistry {
         register(tool: SystemControlTool())
         register(tool: InputAutomationTool())
         #endif
+
+        // 注册完成后，按默认值 + UserDefaults 恢复启用状态
+        restoreEnabledStates()
     }
 
     /// 注册工具，同名覆盖
@@ -61,10 +94,13 @@ final class ToolRegistry {
         tools[name]
     }
 
-    /// 执行工具。未注册抛 NSError。返回工具执行结果字符串。
+    /// 执行工具。未注册或已禁用抛 NSError。返回工具执行结果字符串。
     func execute(name: String, arguments: [String: Any]) async throws -> String {
         guard let tool = tools[name] else {
             throw NSError(domain: "ToolRegistry", code: 1, userInfo: [NSLocalizedDescriptionKey: "工具 \(name) 未注册"])
+        }
+        guard isEnabled(name: name) else {
+            throw NSError(domain: "ToolRegistry", code: 3, userInfo: [NSLocalizedDescriptionKey: "工具 \(name) 未启用"])
         }
         return try await tool.execute(arguments: arguments)
     }
@@ -81,6 +117,93 @@ final class ToolRegistry {
                 )
             )
         }
+    }
+
+    /// 仅返回已启用工具的 ToolDefinition 数组
+    func availableTools() -> [ToolDefinition] {
+        tools.values
+            .filter { isEnabled(name: $0.definition.name) }
+            .map { $0.definition }
+    }
+
+    /// 仅返回已启用工具的 LLM ToolDef 数组
+    var availableToolDefs: [ToolDef] {
+        tools.values
+            .filter { isEnabled(name: $0.definition.name) }
+            .map { tool in
+                ToolDef(
+                    type: "function",
+                    function: ToolDef.FunctionDef(
+                        name: tool.definition.name,
+                        description: tool.definition.description,
+                        parameters: tool.definition.parameters.mapValues(AnyCodable.init)
+                    )
+                )
+            }
+    }
+
+    /// 返回当前已注册且属于高危/敏感的工具定义，供设置页展示开关。
+    /// 仅包含实际已注册的工具（macOS 独占工具在 iOS 上不会出现在结果中）。
+    var dangerousToolDefs: [ToolDefinition] {
+        tools.values
+            .filter { defaultDisabledTools.contains($0.definition.name) }
+            .map { $0.definition }
+            .sorted { $0.name < $1.name }
+    }
+
+    // MARK: - 启用状态管理
+
+    /// 指定工具是否已启用。未注册工具返回 false。
+    func isEnabled(name: String) -> Bool {
+        guard tools[name] != nil else { return false }
+        return enabledTools.contains(name)
+    }
+
+    /// 设置指定工具的启用状态，并持久化到 UserDefaults。
+    func setEnabled(name: String, value: Bool) {
+        guard tools[name] != nil else { return }
+        if value {
+            enabledTools.insert(name)
+        } else {
+            enabledTools.remove(name)
+        }
+        UserDefaults.standard.set(value, forKey: userDefaultsKey(for: name))
+    }
+
+    /// 指定工具是否需要显式授权（敏感工具）。
+    /// 支持父工具名匹配其敏感子操作（如 `control_safari` 匹配 `control_safari.run_js`）。
+    func requiresAuthorization(name: String) -> Bool {
+        if sensitiveTools.contains(name) { return true }
+        return sensitiveTools.contains { $0.hasPrefix("\(name).") }
+    }
+
+    // MARK: - Private Helpers
+
+    /// 从 UserDefaults 恢复所有已注册工具的启用状态。无记录时按 defaultDisabledTools 决定默认值。
+    private func restoreEnabledStates() {
+        var result = Set<String>()
+        for name in tools.keys {
+            let key = userDefaultsKey(for: name)
+            if UserDefaults.standard.object(forKey: key) == nil {
+                // 无持久化记录时：高危工具默认关闭，其余默认开启
+                if !defaultDisabledTools.contains(name) {
+                    result.insert(name)
+                    UserDefaults.standard.set(true, forKey: key)
+                } else {
+                    UserDefaults.standard.set(false, forKey: key)
+                }
+            } else {
+                if UserDefaults.standard.bool(forKey: key) {
+                    result.insert(name)
+                }
+            }
+        }
+        enabledTools = result
+    }
+
+    /// 构造指定工具在 UserDefaults 中的键名
+    private func userDefaultsKey(for name: String) -> String {
+        "\(enabledToolDefaultsKeyPrefix)\(name)"
     }
 }
 

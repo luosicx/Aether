@@ -92,11 +92,24 @@ actor TelemetryService {
     static let shared = TelemetryService()
 
     /// 记录一条事件：转为 TelemetryRecord 写入 buffer；超出上限移除最旧的一条（removeFirst）。
+    /// 对于 `.errorOccurred`，会先对 `userMessage` 调用 `TelemetrySanitizer.redact` 脱敏，
+    /// 确保原始敏感上下文不进入遥测事件。
     func track(_ event: TelemetryEvent) {
+        let sanitizedEvent: TelemetryEvent
+        switch event {
+        case let .errorOccurred(errorType, userMessage):
+            sanitizedEvent = .errorOccurred(
+                errorType: errorType,
+                userMessage: TelemetrySanitizer.redact(userMessage)
+            )
+        default:
+            sanitizedEvent = event
+        }
+
         let record = TelemetryRecord(
             id: UUID(),
-            event: event.name,
-            payload: event.payload,
+            event: sanitizedEvent.name,
+            payload: sanitizedEvent.payload,
             timestamp: Date()
         )
         buffer.append(record)

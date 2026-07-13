@@ -369,4 +369,48 @@ final class KeychainManagerTests: XCTestCase {
         _ = backend.secItemCopyMatching(readQuery as CFDictionary, &result)
         XCTAssertEqual(result as? Data, data2, "先删后加后应为 data2")
     }
+
+    // MARK: - 通用字符串/数据安全存储测试
+
+    /// `save(key:value:)` 与 `read(key:)` 正确读写字符串
+    func testSaveAndReadGenericKeyRoundTrip() throws {
+        let key = "test-secret-token"
+        manager.delete(key: key)
+        defer { manager.delete(key: key) }
+
+        try manager.save(key: key, value: "secret-value-123")
+        XCTAssertEqual(manager.read(key: key), "secret-value-123", "应能读回保存的字符串")
+    }
+
+    /// `delete(key:)` 后 `read(key:)` 返回 nil
+    func testDeleteGenericKeyReturnsNil() throws {
+        let key = "test-delete-key"
+        try manager.save(key: key, value: "to-be-deleted")
+        XCTAssertEqual(manager.read(key: key), "to-be-deleted")
+
+        manager.delete(key: key)
+        XCTAssertNil(manager.read(key: key), "删除后应返回 nil")
+    }
+
+    /// 保存的 Token 不应出现在 UserDefaults 中
+    func testTokenNotStoredInUserDefaults() throws {
+        let key = "test-token-isolation"
+        let token = "sk-test-token-should-not-be-in-userdefaults"
+        manager.delete(key: key)
+        defer { manager.delete(key: key) }
+
+        // 清理可能与 token 冲突的 UserDefaults 条目
+        UserDefaults.standard.removeObject(forKey: key)
+
+        try manager.save(key: key, value: token)
+        XCTAssertEqual(manager.read(key: key), token, "Keychain 中应能读回 token")
+
+        // 遍历 UserDefaults，确认没有任何值包含该 token
+        let defaults = UserDefaults.standard.dictionaryRepresentation()
+        for (_, value) in defaults {
+            if let stringValue = value as? String {
+                XCTAssertFalse(stringValue.contains(token), "Token 不应出现在 UserDefaults 中")
+            }
+        }
+    }
 }

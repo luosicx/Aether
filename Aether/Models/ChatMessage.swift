@@ -22,6 +22,8 @@ final class ChatMessage {
     var toolCallId: String?
     /// tool 角色消息对应的工具名
     var toolName: String?
+    /// Task 7: 标记该消息是否已通过提示注入检测并继续发送
+    var injectionChecked: Bool?
     /// 反向关联所属 Conversation
     var conversation: Conversation?
 
