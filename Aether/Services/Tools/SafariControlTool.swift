@@ -8,7 +8,7 @@
 import Foundation
 
 /// macOS Safari 浏览器自动化工具，通过 AppleScript 控制 Safari
-final class SafariControlTool: ToolProtocol {
+final class SafariControlTool: ToolProtocol, @unchecked Sendable {
     /// 工具定义
     /// - name: `control_safari`
     /// - parameters: `action`（必填，String）— 操作类型；

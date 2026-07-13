@@ -44,6 +44,8 @@ enum BubbleStyleType: String, CaseIterable, Identifiable {
 struct BubbleStyleModifier: ViewModifier {
     let style: BubbleStyleType
     let isUser: Bool
+    // 通过 @Environment 注入主题管理器，避免直接访问单例
+    @Environment(ThemeManager.self) private var themeManager
 
     func body(content: Content) -> some View {
         switch style {
@@ -81,12 +83,12 @@ struct BubbleStyleModifier: ViewModifier {
                 .background(
                     RoundedRectangle(cornerRadius: CornerRadius.large)
                         .fill(isUser
-                              ? ThemeManager.shared.currentTheme.bubbleUserColor.opacity(0.2)
-                              : ThemeManager.shared.currentTheme.bubbleAIColor.opacity(0.6))
+                              ? themeManager.currentTheme.bubbleUserColor.opacity(0.2)
+                              : themeManager.currentTheme.bubbleAIColor.opacity(0.6))
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: CornerRadius.large)
-                        .stroke(ThemeManager.shared.currentTheme.primaryColor.opacity(0.4), lineWidth: 1)
+                        .stroke(themeManager.currentTheme.primaryColor.opacity(0.4), lineWidth: 1)
                 )
                 .shadow(color: Color.black.opacity(0.15), radius: 6, x: 0, y: 2)
         }

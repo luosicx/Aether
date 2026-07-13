@@ -7,7 +7,7 @@ import Foundation
 import Contacts
 
 /// 通讯录搜索工具，通过 Contacts 框架按姓名或电话号码搜索联系人
-final class ContactsTool: ToolProtocol {
+final class ContactsTool: ToolProtocol, @unchecked Sendable {
     /// 工具定义（name/description/parameters）
     var definition: ToolDefinition {
         ToolDefinition(
@@ -45,10 +45,12 @@ final class ContactsTool: ToolProtocol {
         let namePredicate = CNContact.predicateForContacts(matchingName: query)
         let nameMatches = try store.unifiedContacts(matching: namePredicate, keysToFetch: keys)
         results.append(contentsOf: nameMatches)
-        // Search by phone number - fetch all contacts with phone numbers and filter
-        // (CNContact doesn't have a direct phone predicate; fetch all and filter)
-        let allContactsPredicate = CNContact.predicateForContactsInContainer(withIdentifier: store.defaultContainerIdentifier())
-        let allContacts = try store.unifiedContacts(matching: allContactsPredicate, keysToFetch: keys)
+        // 按电话号码搜索：用 CNContactFetchRequest 逐条遍历，避免一次性拉取全部联系人
+        let fetchRequest = CNContactFetchRequest(keysToFetch: keys)
+        var allContacts: [CNContact] = []
+        try store.enumerateContacts(with: fetchRequest) { contact, _ in
+            allContacts.append(contact)
+        }
         let phoneMatches = allContacts.filter { contact in
             contact.phoneNumbers.contains { $0.value.stringValue.contains(query) }
         }

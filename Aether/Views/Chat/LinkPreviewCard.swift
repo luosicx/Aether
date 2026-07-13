@@ -12,6 +12,8 @@ struct LinkPreviewCard: View {
     @State private var isLoading = false
     /// 加载错误信息
     @State private var errorMessage: String?
+    /// 当前 fetch Task 句柄，用于管理竞态条件
+    @State private var fetchTask: Task<Void, Never>?
 
     /// 链接预览数据结构
     struct LinkPreview {
@@ -27,6 +29,9 @@ struct LinkPreviewCard: View {
         cardContent
             .task {
                 await fetchPreview()
+            }
+            .onDisappear {
+                fetchTask?.cancel()
             }
     }
 
@@ -153,33 +158,42 @@ struct LinkPreviewCard: View {
 
     /// 从 URL 异步加载 OpenGraph 元数据。
     /// 抓取 HTML 并解析 og:title / og:description / og:image 标签。
+    /// 使用 Task 句柄管理竞态条件，避免重复请求。
     func fetchPreview() async {
+        // 取消之前的 fetch 任务，防止竞态
+        fetchTask?.cancel()
         guard !isLoading, preview == nil else { return }
         isLoading = true
-        defer { isLoading = false }
+        let task = Task { @MainActor [url] in
+            defer { isLoading = false }
 
-        var request = URLRequest(url: url)
-        request.timeoutInterval = 10
-        // 模拟浏览器 User-Agent，部分网站需要
-        request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15", forHTTPHeaderField: "User-Agent")
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 10
+            // 模拟浏览器 User-Agent，部分网站需要
+            request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15", forHTTPHeaderField: "User-Agent")
 
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            // 检查 HTTP 状态码
-            if let httpResponse = response as? HTTPURLResponse,
-               !(200...299).contains(httpResponse.statusCode) {
-                errorMessage = "无法加载预览（HTTP \(httpResponse.statusCode)）"
-                return
+            do {
+                let (data, response) = try await URLSession.shared.data(for: request)
+                // 检查 HTTP 状态码
+                if let httpResponse = response as? HTTPURLResponse,
+                   !(200...299).contains(httpResponse.statusCode) {
+                    errorMessage = "无法加载预览（HTTP \(httpResponse.statusCode)）"
+                    return
+                }
+                guard let html = String(data: data, encoding: .utf8) else {
+                    errorMessage = "无法解析页面内容"
+                    return
+                }
+                let parsed = parseOpenGraph(from: html, baseURL: url)
+                preview = parsed
+            } catch {
+                if !Task.isCancelled {
+                    errorMessage = "加载失败：\(error.localizedDescription)"
+                }
             }
-            guard let html = String(data: data, encoding: .utf8) else {
-                errorMessage = "无法解析页面内容"
-                return
-            }
-            let parsed = parseOpenGraph(from: html, baseURL: url)
-            preview = parsed
-        } catch {
-            errorMessage = "加载失败：\(error.localizedDescription)"
         }
+        fetchTask = task
+        await task.value
     }
 
     /// 从 HTML 中解析 OpenGraph 元数据。

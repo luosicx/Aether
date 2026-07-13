@@ -6,7 +6,7 @@ struct BFFConfig: Codable, Sendable, Equatable {
     /// 是否启用 BFF 代理（默认 false，启用后请求经服务端中转，API Key 不落设备）
     var enabled: Bool = false
     /// BFF 网关 endpoint（默认占位地址，部署后替换为真实域名）
-    var endpointURL: URL = URL(string: "https://aether-bff.example.com") ?? URL(fileURLWithPath: "")
+    var endpointURL: URL? = URL(string: "https://aether-bff.example.com")
     /// 用户级 BFF Token（用于服务端鉴权，替代上游 API Key）
     var userToken: String = ""
     /// chat 接口客户端限流（每分钟令牌数，默认 20）
@@ -31,7 +31,7 @@ extension BFFConfig {
         /// 是否启用 BFF 代理
         var enabled: Bool = false
         /// BFF 网关 endpoint
-        var endpointURL: URL = URL(string: "https://aether-bff.example.com") ?? URL(fileURLWithPath: "")
+        var endpointURL: URL? = URL(string: "https://aether-bff.example.com")
         /// chat 接口客户端限流（每分钟令牌数）
         var chatRateLimitPerMin: Int = 20
         /// embed 接口客户端限流（每分钟令牌数）

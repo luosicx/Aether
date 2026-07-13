@@ -56,12 +56,12 @@ final class OnDeviceModelDownloaderTests: XCTestCase {
         let config = OnDeviceConfig.default
         XCTAssertEqual(config.downloadSource, .domestic, "默认下载源应为国内 ModelScope")
         XCTAssertEqual(
-            config.mirrorDownloadURL.absoluteString,
+            config.mirrorDownloadURL?.absoluteString,
             "https://www.modelscope.cn/api/v1/models/mlx-community/Llama-3.2-1B-Instruct-4bit/repo?Revision=master&FilePath=model.safetensors",
             "默认镜像地址应指向 ModelScope 的 model.safetensors"
         )
         XCTAssertEqual(
-            config.downloadURL.absoluteString,
+            config.downloadURL?.absoluteString,
             "https://huggingface.co/mlx-community/Llama-3.2-1B-Instruct-4bit/resolve/main/model.safetensors",
             "默认主下载地址应指向 HuggingFace 的 model.safetensors（不再是 model.mlpackage）"
         )
@@ -574,9 +574,9 @@ final class OnDeviceModelDownloaderTests: XCTestCase {
     /// OnDeviceModelCatalog 所有模型应有有效的 HuggingFace 和 ModelScope URL
     func testModelCatalogAllModelsHaveValidURLs() {
         for model in OnDeviceModelCatalog.models {
-            XCTAssertTrue(model.huggingFaceURL.absoluteString.hasPrefix("https://"),
+            XCTAssertTrue(model.huggingFaceURL?.absoluteString.hasPrefix("https://") ?? false,
                           "模型 \(model.id) 的 HuggingFace URL 应为 https")
-            XCTAssertTrue(model.modelScopeURL.absoluteString.hasPrefix("https://"),
+            XCTAssertTrue(model.modelScopeURL?.absoluteString.hasPrefix("https://") ?? false,
                           "模型 \(model.id) 的 ModelScope URL 应为 https")
         }
     }

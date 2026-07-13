@@ -8,7 +8,7 @@
 import Foundation
 
 /// macOS 系统控制工具：调节屏幕亮度 / 系统音量
-final class SystemControlTool: ToolProtocol {
+final class SystemControlTool: ToolProtocol, @unchecked Sendable {
     /// 工具定义
     /// - name: `system_control`
     /// - parameters: `action`（必填，String）— 操作类型；
@@ -78,7 +78,11 @@ final class SystemControlTool: ToolProtocol {
     private func setBrightnessViaGamma(_ brightness: Double) -> String {
         // 用 AppleScript 设置亮度（需要辅助功能权限）
         let script = "tell application \"System Events\" to key code 107"
-        _ = runAppleScript(script)
+        let result = runAppleScript(script)
+        // 检查 AppleScript 执行结果，失败时返回错误信息
+        if result.hasPrefix("错误：") {
+            return "设置亮度失败：\(result)"
+        }
         return "已尝试设置亮度（可能需要辅助功能权限）"
     }
 
@@ -86,11 +90,8 @@ final class SystemControlTool: ToolProtocol {
     private func getVolume() -> String {
         let script = """
         tell application "System Events"
-            if exists process "CoreAudio" then
-                -- 获取音量
-            end if
+            return output volume of (get volume settings)
         end tell
-        return output volume of (get volume settings)
         """
         return runAppleScript(script)
     }

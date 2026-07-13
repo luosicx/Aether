@@ -879,6 +879,12 @@
         }
       }
     },
+    "AI 人设" : {
+
+    },
+    "AI 头像" : {
+
+    },
     "AI 正在输入" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1063,6 +1069,29 @@
         }
       }
     },
+    "AppleScript" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AppleScript"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AppleScript"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "AppleScript"
+          }
+        }
+      }
+    },
     "BFF Token 无效" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1230,6 +1259,12 @@
         }
       }
     },
+    "MCP Server 列表" : {
+
+    },
+    "MCP 配置" : {
+
+    },
     "mlx-swift 未集成，端侧推理不可用" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1282,6 +1317,29 @@
     "Reasoner" : {
 
     },
+    "Safari 控制" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Safari Control"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Safari 控制"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Safari 控制"
+          }
+        }
+      }
+    },
     "SHA256 校验" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1330,6 +1388,16 @@
     },
     "Thought" : {
 
+    },
+    "v%@ · %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "v%1$@ · %2$@"
+          }
+        }
+      }
     },
     "一、数据收集范围" : {
       "extractionState" : "manual",
@@ -1590,6 +1658,9 @@
         }
       }
     },
+    "主题" : {
+
+    },
     "二、第三方 SDK" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1635,6 +1706,9 @@
           }
         }
       }
+    },
+    "人设名称与性格描述会注入到系统提示词，影响 AI 的回复风格。" : {
+
     },
     "从文件选择 PDF 或文本文档导入知识库" : {
       "extractionState" : "manual",
@@ -1728,6 +1802,29 @@
         }
       }
     },
+    "以下工具可执行系统命令、控制其他应用或访问敏感信息，默认关闭。启用前请阅读风险提示。" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "These tools can execute system commands, control other apps, or access sensitive information. They are disabled by default. Please read the risk warning before enabling."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "以下工具可执行系统命令、控制其他应用或访问敏感信息，默认关闭。启用前请阅读风险提示。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "以下工具可執行系統命令、控制其他應用或存取敏感資訊，預設關閉。啟用前請閱讀風險提示。"
+          }
+        }
+      }
+    },
     "以下是最近 %d 天的健康数据：" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1815,6 +1912,9 @@
         }
       }
     },
+    "传输配置" : {
+
+    },
     "你好,我是 AI Builder,很高兴为你服务。" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1837,6 +1937,9 @@
           }
         }
       }
+    },
+    "你好，我是以太。这是字体大小与行距的预览效果。" : {
+
     },
     "你的智能助手" : {
       "extractionState" : "manual",
@@ -2390,6 +2493,9 @@
         }
       }
     },
+    "切换主题将改变背景、气泡、文字配色。深空为默认深色主题，黎明为暖色浅色主题，极光为青绿深色主题。" : {
+
+    },
     "切换会话" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2689,6 +2795,29 @@
         }
       }
     },
+    "危险工具" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dangerous Tools"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "危险工具"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "危險工具"
+          }
+        }
+      }
+    },
     "参数：%@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2920,6 +3049,9 @@
       }
     },
     "可用模型" : {
+
+    },
+    "名称：%@" : {
 
     },
     "向 AI Builder 发送问题并获取回复" : {
@@ -3198,6 +3330,29 @@
         }
       }
     },
+    "启用高危工具" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enable Dangerous Tool"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启用高危工具"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "啟用高危工具"
+          }
+        }
+      }
+    },
     "四、联系方式" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3296,6 +3451,9 @@
         }
       }
     },
+    "在上方输入问题开始" : {
+
+    },
     "在下方输入消息，或点击右上角设置 API Key" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3318,6 +3476,9 @@
           }
         }
       }
+    },
+    "基本信息" : {
+
     },
     "增强" : {
       "extractionState" : "manual",
@@ -3457,6 +3618,9 @@
         }
       }
     },
+    "如：温和耐心、善于鼓励、回答简洁…" : {
+
+    },
     "如有任何隐私相关问题，请通过邮件联系：feedback@aether.app" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3479,6 +3643,9 @@
           }
         }
       }
+    },
+    "字体与行距" : {
+
     },
     "学习导师" : {
       "extractionState" : "manual",
@@ -3525,6 +3692,12 @@
           }
         }
       }
+    },
+    "安装" : {
+
+    },
+    "安装示例插件用于演示插件系统功能。" : {
+
     },
     "完成" : {
       "extractionState" : "manual",
@@ -3664,6 +3837,9 @@
         }
       }
     },
+    "尚未配置 MCP Server" : {
+
+    },
     "展开" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3755,6 +3931,9 @@
           }
         }
       }
+    },
+    "工具：" : {
+
     },
     "工具执行失败: %@" : {
       "extractionState" : "manual",
@@ -3943,6 +4122,9 @@
     "已下载✓" : {
 
     },
+    "已启用" : {
+
+    },
     "已复制" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3965,6 +4147,9 @@
           }
         }
       }
+    },
+    "已安装插件" : {
+
     },
     "已完成" : {
       "extractionState" : "manual",
@@ -4037,6 +4222,12 @@
           }
         }
       }
+    },
+    "已禁用" : {
+
+    },
+    "已连接" : {
+
     },
     "已通过" : {
       "extractionState" : "manual",
@@ -4340,6 +4531,29 @@
     "录音启动失败: %@" : {
 
     },
+    "快捷指令" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shortcuts"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "快捷指令"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "快捷指令"
+          }
+        }
+      }
+    },
     "思考中" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4385,6 +4599,9 @@
           }
         }
       }
+    },
+    "性格描述：%@" : {
+
     },
     "性能指标" : {
       "extractionState" : "manual",
@@ -4823,6 +5040,12 @@
         }
       }
     },
+    "插件工具会动态注册到工具注册中心，供 AI 调用。" : {
+
+    },
+    "插件管理" : {
+
+    },
     "搜索会话" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5102,6 +5325,9 @@
         }
       }
     },
+    "无权限声明" : {
+
+    },
     "无法读取文档内容：%@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5171,6 +5397,12 @@
         }
       }
     },
+    "暂无最近对话" : {
+
+    },
+    "暂无已安装插件" : {
+
+    },
     "暂无性能数据" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5193,6 +5425,9 @@
           }
         }
       }
+    },
+    "暂无数据" : {
+
     },
     "暂无文档" : {
       "extractionState" : "manual",
@@ -5539,6 +5774,9 @@
         }
       }
     },
+    "未连接" : {
+
+    },
     "未配置" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5607,6 +5845,9 @@
           }
         }
       }
+    },
+    "权限（%@）" : {
+
     },
     "查看 AI Builder 隐私政策" : {
       "extractionState" : "manual",
@@ -5768,6 +6009,9 @@
           }
         }
       }
+    },
+    "检测到当前输入可能包含提示注入指令，继续发送可能导致工具被异常调用。是否继续？" : {
+
     },
     "模型" : {
       "extractionState" : "manual",
@@ -5956,6 +6200,9 @@
         }
       }
     },
+    "气泡样式" : {
+
+    },
     "注入健康上下文" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6048,6 +6295,9 @@
         }
       }
     },
+    "液态玻璃为默认毛玻璃效果，极简为无背景纯文本，卡片为带边框阴影样式。" : {
+
+    },
     "清除性能指标" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6116,6 +6366,9 @@
           }
         }
       }
+    },
+    "点击 Server 编辑配置，左滑删除。" : {
+
     },
     "点击关闭错误提示" : {
       "extractionState" : "manual",
@@ -6564,8 +6817,34 @@
         }
       }
     },
+    "确认删除「%@」？删除后无法恢复。" : {
+
+    },
     "确认删除「%@」？删除后需重新下载。" : {
 
+    },
+    "确认启用" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enable"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "确认启用"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "確認啟用"
+          }
+        }
+      }
     },
     "立即上报" : {
       "extractionState" : "manual",
@@ -6937,6 +7216,32 @@
           }
         }
       }
+    },
+    "终端命令" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Terminal Command"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "终端命令"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "終端命令"
+          }
+        }
+      }
+    },
+    "继续发送" : {
+
     },
     "维护模式" : {
       "extractionState" : "manual",
@@ -7375,6 +7680,29 @@
         }
       }
     },
+    "该工具可执行系统命令或控制其他应用，存在安全风险。确定要启用吗？" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This tool can execute system commands or control other apps. Are you sure?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "该工具可执行系统命令或控制其他应用，存在安全风险。确定要启用吗？"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "該工具可執行系統命令或控制其他應用，存在安全風險。確定要啟用嗎？"
+          }
+        }
+      }
+    },
     "语气" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7746,6 +8074,9 @@
         }
       }
     },
+    "调整对话正文的字体大小和行距，设置后立即生效。" : {
+
+    },
     "调试" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7953,6 +8284,9 @@
         }
       }
     },
+    "输入安全提醒" : {
+
+    },
     "输入消息..." : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8113,6 +8447,9 @@
           }
         }
       }
+    },
+    "连接中" : {
+
     },
     "选「自动」时由智能路由根据消息特征决定；选具体模型时禁用智能路由。" : {
       "extractionState" : "manual",
@@ -8413,6 +8750,9 @@
         }
       }
     },
+    "选择预设头像或上传自定义图片。自定义头像将显示在对话气泡旁。" : {
+
+    },
     "选自动时智能路由，选具体模型则固定使用" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8666,6 +9006,9 @@
         }
       }
     },
+    "错误" : {
+
+    },
     "错误提示" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -8896,6 +9239,9 @@
         }
       }
     },
+    "预览" : {
+
+    },
     "预设提示词" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9007,213 +9353,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "預設助手"
-          }
-        }
-      }
-    },
-    "AppleScript" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AppleScript"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AppleScript"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "AppleScript"
-          }
-        }
-      }
-    },
-    "Safari 控制" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Safari Control"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Safari 控制"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Safari 控制"
-          }
-        }
-      }
-    },
-    "以下工具可执行系统命令、控制其他应用或访问敏感信息，默认关闭。启用前请阅读风险提示。" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "These tools can execute system commands, control other apps, or access sensitive information. They are disabled by default. Please read the risk warning before enabling."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "以下工具可执行系统命令、控制其他应用或访问敏感信息，默认关闭。启用前请阅读风险提示。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "以下工具可執行系統命令、控制其他應用或存取敏感資訊，預設關閉。啟用前請閱讀風險提示。"
-          }
-        }
-      }
-    },
-    "快捷指令" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Shortcuts"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "快捷指令"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "快捷指令"
-          }
-        }
-      }
-    },
-    "危险工具" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dangerous Tools"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "危险工具"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "危險工具"
-          }
-        }
-      }
-    },
-    "启用高危工具" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Enable Dangerous Tool"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "启用高危工具"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "啟用高危工具"
-          }
-        }
-      }
-    },
-    "确认启用" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Enable"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "确认启用"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "確認啟用"
-          }
-        }
-      }
-    },
-    "该工具可执行系统命令或控制其他应用，存在安全风险。确定要启用吗？" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "This tool can execute system commands or control other apps. Are you sure?"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "该工具可执行系统命令或控制其他应用，存在安全风险。确定要启用吗？"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "該工具可執行系統命令或控制其他應用，存在安全風險。確定要啟用嗎？"
-          }
-        }
-      }
-    },
-    "终端命令" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Terminal Command"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "终端命令"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "終端命令"
           }
         }
       }

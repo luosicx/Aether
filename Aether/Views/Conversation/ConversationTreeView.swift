@@ -13,6 +13,8 @@ struct ConversationTreeView: View {
     @Environment(\.modelContext) private var modelContext
     /// 当前展开的对话节点集合
     @State private var expandedConversations: Set<UUID> = []
+    /// 子对话映射表：parentConversationID → 子对话列表，一次性加载后缓存，避免递归查询
+    @State private var childrenMap: [UUID: [Conversation]] = [:]
 
     var body: some View {
         ScrollView {
@@ -23,7 +25,7 @@ struct ConversationTreeView: View {
                     isRoot: true,
                     expandedConversations: $expandedConversations,
                     onSelect: onSelect,
-                    fetchChildren: fetchChildren
+                    childrenMap: childrenMap
                 )
             }
             .padding(.vertical, Spacing.md)
@@ -35,18 +37,31 @@ struct ConversationTreeView: View {
         .onAppear {
             // 默认展开根节点
             expandedConversations.insert(rootConversation.id)
+            // 一次性加载所有子对话映射表，避免子节点递归触发 DB 查询
+            loadAllChildren()
         }
     }
 
-    /// 获取指定对话的所有直接子对话（parentConversationID 匹配）
-    /// - Parameter conversationID: 父对话 ID
-    /// - Returns: 子对话列表，按 createdAt 升序排列
-    func fetchChildren(of conversationID: UUID) -> [Conversation] {
+    /// 一次性加载所有对话并按 parentConversationID 分组，子节点直接从映射表读取，避免 body 重算时重复 fetch
+    func loadAllChildren() {
         let descriptor = FetchDescriptor<Conversation>(
             sortBy: [SortDescriptor(\.createdAt, order: .forward)]
         )
-        guard let all = try? modelContext.fetch(descriptor) else { return [] }
-        return all.filter { $0.parentConversationID == conversationID }
+        guard let all = try? modelContext.fetch(descriptor) else { return }
+        // 将 nil parentConversationID 映射到一个哨兵 UUID，确保根节点子对话也能正确分组
+        childrenMap = Dictionary(grouping: all, by: { $0.parentConversationID ?? UUID() })
+    }
+
+    /// 使用 #Predicate 在数据库层过滤子对话，避免全量 fetch + 内存 filter
+    /// - Parameter conversationID: 父对话 ID
+    /// - Returns: 子对话列表，按 createdAt 升序排列
+    func fetchChildren(of conversationID: UUID) -> [Conversation] {
+        let parentID = conversationID
+        let descriptor = FetchDescriptor<Conversation>(
+            predicate: #Predicate<Conversation> { $0.parentConversationID == parentID },
+            sortBy: [SortDescriptor(\.createdAt, order: .forward)]
+        )
+        return (try? modelContext.fetch(descriptor)) ?? []
     }
 }
 
@@ -57,18 +72,24 @@ struct ConversationTreeNode: View {
     let isRoot: Bool
     @Binding var expandedConversations: Set<UUID>
     let onSelect: (Conversation) -> Void
-    let fetchChildren: (UUID) -> [Conversation]
+    /// 子对话映射表，从父视图传入，避免在 body 中直接触发 DB 查询
+    let childrenMap: [UUID: [Conversation]]
 
     private var isExpanded: Bool {
         expandedConversations.contains(conversation.id)
     }
 
+    /// 从映射表中读取当前节点的子对话，O(1) 字典查找，不再触发任何 DB 操作
+    private var children: [Conversation] {
+        childrenMap[conversation.id] ?? []
+    }
+
+    private var hasChildren: Bool {
+        !children.isEmpty
+    }
+
     var body: some View {
-        // 缓存子节点查询结果，避免在 body 中重复触发 DB fetch
-        // 原先 children/hasChildren 计算属性每次访问都会全表查询，body 重算时被多次访问
-        let children = fetchChildren(conversation.id)
-        let hasChildren = !children.isEmpty
-        return VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 0) {
             nodeRow(hasChildren: hasChildren)
             if isExpanded && hasChildren {
                 VStack(alignment: .leading, spacing: 0) {
@@ -79,7 +100,7 @@ struct ConversationTreeNode: View {
                             isRoot: false,
                             expandedConversations: $expandedConversations,
                             onSelect: onSelect,
-                            fetchChildren: fetchChildren
+                            childrenMap: childrenMap
                         )
                     }
                 }

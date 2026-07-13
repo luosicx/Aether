@@ -14,7 +14,7 @@ struct MenuBarPanel: View {
     /// 最近对话列表（最多 5 个）
     @State private var recentConversations: [Conversation] = []
     /// 独立的 ChatViewModel 实例——处理菜单栏发出的快捷消息
-    @State private var viewModel = ChatViewModel()
+    @State private var viewModel = ChatViewModel() // ChatViewModel 使用 @Observable 宏，@State 是正确的
     @Environment(\.modelContext) private var modelContext
 
     var body: some View {

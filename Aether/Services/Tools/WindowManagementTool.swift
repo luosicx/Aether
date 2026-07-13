@@ -10,7 +10,7 @@ import AppKit
 import ApplicationServices
 
 /// macOS 窗口管理工具
-final class WindowManagementTool: ToolProtocol {
+final class WindowManagementTool: ToolProtocol, @unchecked Sendable {
     /// 工具定义
     /// - name: `manage_window`
     /// - parameters: `action`（必填，String）— 操作类型；

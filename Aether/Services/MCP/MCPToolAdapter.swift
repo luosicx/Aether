@@ -7,7 +7,7 @@ import Foundation
 ///
 /// - Note: client 类型使用 `any MCPClientProtocol`（而非具体 `MCPClient`），
 ///   与 MCPClientManager 的客户端抽象保持一致，便于注入 Mock 进行单元测试。
-final class MCPToolAdapter: ToolProtocol {
+final class MCPToolAdapter: ToolProtocol, @unchecked Sendable {
     /// 暴露给 LLM 的工具元信息（由 MCPTool 转换而来）
     let definition: ToolDefinition
     /// 关联的 MCP 客户端，execute 时调用其 callTool

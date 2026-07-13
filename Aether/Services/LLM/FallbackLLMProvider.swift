@@ -3,7 +3,7 @@ import Foundation
 /// Day 13: 自动降级装饰器。主 provider 抛 LLMError 时自动用备用 provider 重试一次。
 /// chat / chatWithTools 路径会降级；embed 路径不降级（避免双倍调用）。
 /// lastUsedProvider 暴露实际命中的 provider，供 DebugInfo 展示。
-final class FallbackLLMProvider: LLMProvider {
+final class FallbackLLMProvider: LLMProvider, @unchecked Sendable {
     /// 主 provider
     private let primary: LLMProvider
     /// 备用 provider

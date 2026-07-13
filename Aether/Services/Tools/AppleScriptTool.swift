@@ -7,7 +7,7 @@
 import Foundation
 
 /// macOS AppleScript 执行工具
-final class AppleScriptTool: ToolProtocol {
+final class AppleScriptTool: ToolProtocol, @unchecked Sendable {
     /// 工具定义
     /// - name: `run_applescript`
     /// - parameters: `script`（必填，String）— 要执行的 AppleScript 脚本

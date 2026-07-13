@@ -5,7 +5,7 @@ import Foundation
 /// 与 MCPToolAdapter 类似的适配器模式，把 PluginToolDef 的元信息映射为 ToolDefinition，
 /// execute 时通过 JavaScriptCore 或 HTTP 调用插件入口点。
 /// 当前为简化实现：返回模拟结果字符串。
-final class PluginToolAdapter: ToolProtocol {
+final class PluginToolAdapter: ToolProtocol, @unchecked Sendable {
     /// 暴露给 LLM 的工具元信息（由 PluginToolDef 转换而来）
     let definition: ToolDefinition
     /// 关联的插件清单

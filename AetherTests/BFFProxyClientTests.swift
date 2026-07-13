@@ -63,7 +63,7 @@ final class BFFProxyClientTests: XCTestCase {
         mockSession = URLSession(configuration: config)
         let bffConfig = BFFConfig(
             enabled: true,
-            endpointURL: URL(string: "https://bff.example.com")!,
+            endpointURL: URL(string: "https://bff.example.com"),
             userToken: bffToken,
             chatRateLimitPerMin: 20,
             embedRateLimitPerMin: 10

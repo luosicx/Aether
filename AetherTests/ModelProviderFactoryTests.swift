@@ -31,7 +31,7 @@ final class ModelProviderFactoryTests: XCTestCase {
     func testMakeWithBFFEnabledReturnsBFFProxyClient() {
         let bffConfig = BFFConfig(
             enabled: true,
-            endpointURL: URL(string: "https://bff.example.com")!,
+            endpointURL: URL(string: "https://bff.example.com"),
             userToken: "test-token",
             chatRateLimitPerMin: 20,
             embedRateLimitPerMin: 10
@@ -75,7 +75,7 @@ final class ModelProviderFactoryTests: XCTestCase {
     func testMakeWithBFFDisabledButNonDefaultFieldsStillDirectConnect() {
         let bffConfig = BFFConfig(
             enabled: false,
-            endpointURL: URL(string: "https://non-default.example.com")!,
+            endpointURL: URL(string: "https://non-default.example.com"),
             userToken: "non-default-token",
             chatRateLimitPerMin: 99,
             embedRateLimitPerMin: 88

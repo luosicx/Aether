@@ -43,8 +43,6 @@ enum DeviceType: Equatable {
 /// 响应式布局修饰器：根据可用宽度自动限制内容最大宽度并居中
 /// 使用方式：`content.responsiveLayout()`
 struct ResponsiveModifier: ViewModifier {
-    @Environment(\.horizontalSizeClass) private var hSizeClass
-
     func body(content: Content) -> some View {
         GeometryReader { geo in
             let device = DeviceType.current(width: geo.size.width)

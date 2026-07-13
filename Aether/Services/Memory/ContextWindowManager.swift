@@ -116,7 +116,7 @@ final class ContextWindowManager {
             APIMessage(role: "system", content: "你是一个对话摘要助手，请简洁地总结对话内容。", images: nil, toolCallId: nil, toolName: nil, toolCalls: nil),
             APIMessage(role: "user", content: prompt, images: nil, toolCallId: nil, toolName: nil, toolCalls: nil)
         ]
-        let config = ChatConfig(model: "", systemPrompt: "", maxTokens: 512, temperature: 0.3)
+        let config = ChatConfig(model: ChatConfig.default.model, systemPrompt: "", maxTokens: 512, temperature: 0.3)
         // 收集流式输出拼接为完整摘要
         var summary = ""
         for await chunk in llmProvider.chat(messages: apiMessages, config: config, apiKey: "") {

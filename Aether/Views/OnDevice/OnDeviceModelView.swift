@@ -12,6 +12,8 @@ struct OnDeviceModelView: View {
     @State private var progress: Double = 0.0
     /// 是否正在下载
     @State private var isDownloading = false
+    /// 独立的 task id，用于触发 .task 轮询，避免在 task 闭包内修改 isDownloading 导致重建
+    @State private var downloadTaskId: Int = 0
     /// 当前下载中的模型 ID（用于在列表中定位进度条与取消按钮）
     @State private var downloadingModelId: String?
     /// 已下载到本地的模型 ID 集合
@@ -100,8 +102,9 @@ struct OnDeviceModelView: View {
         .onAppear {
             refreshDownloadedStatus()
         }
-        // 轮询下载进度：下载中时每 200ms 从 downloader 读取最新进度
-        .task(id: isDownloading) {
+        // 轮询下载进度：下载中时每 200ms 从 downloader 读取最新进度。
+        // 使用独立 downloadTaskId 作为 task id，避免在闭包内修改 isDownloading 导致 task 被取消并重建
+        .task(id: downloadTaskId) {
             guard isDownloading else { return }
             while !Task.isCancelled {
                 progress = await OnDeviceModelDownloader.shared.progress
@@ -236,7 +239,13 @@ struct OnDeviceModelView: View {
         try? FileManager.default.createDirectory(at: modelDirectory, withIntermediateDirectories: true)
         isDownloading = true
         downloadingModelId = model.id
-        let url = model.url(for: settingsVM.onDeviceConfig.downloadSource)
+        downloadTaskId += 1 // 触发 .task(id: downloadTaskId) 轮询
+        guard let url = model.url(for: settingsVM.onDeviceConfig.downloadSource) else {
+            errorMessage = "模型下载地址无效"
+            isDownloading = false
+            downloadingModelId = nil
+            return
+        }
         // 国内源：主地址为 ModelScope，无需镜像；国外源：主地址为 HuggingFace，镜像回退到 ModelScope
         let mirrorURL: URL? = settingsVM.onDeviceConfig.downloadSource == .international ? model.modelScopeURL : nil
         await OnDeviceModelDownloader.shared.startDownload(
@@ -261,6 +270,7 @@ struct OnDeviceModelView: View {
         guard let modelId = downloadingModelId, let model = OnDeviceModelCatalog.find(id: modelId) else { return }
         errorMessage = nil
         isDownloading = true
+        downloadTaskId += 1 // 触发 .task(id: downloadTaskId) 轮询
         await OnDeviceModelDownloader.shared.resumeDownload()
         settingsVM.onDeviceConfig.modelPath = modelPath(for: model)
         settingsVM.saveOnDeviceConfig()

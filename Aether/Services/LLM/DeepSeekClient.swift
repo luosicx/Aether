@@ -2,7 +2,7 @@ import Foundation
 
 /// DeepSeek API 客户端，实现 LLMProvider 协议，提供 chat 流式对话和 embed 向量嵌入两个核心能力。
 /// nonisolated 设计允许跨 actor 调用。
-nonisolated final class DeepSeekClient: LLMProvider {
+nonisolated final class DeepSeekClient: LLMProvider, @unchecked Sendable {
     /// URLSession 实例，lazy 加载默认用 .shared
     private lazy var session: URLSession = .shared
     /// SSE 流解析器

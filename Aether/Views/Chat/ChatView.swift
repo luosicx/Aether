@@ -10,7 +10,7 @@ struct ChatView: View {
     @Environment(\.openWindow) private var openWindow
     @Environment(\.conversationID) private var initialConversationID
     #endif
-    @State private var viewModel = ChatViewModel()
+    @State private var viewModel = ChatViewModel() // ChatViewModel 使用 @Observable 宏，@State 是正确的
     @State private var conversationListVM = ConversationListVM()
     @State private var settingsVM = SettingsViewModel()
     @State private var currentConversation: Conversation?

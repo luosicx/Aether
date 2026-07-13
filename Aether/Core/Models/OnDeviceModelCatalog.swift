@@ -19,12 +19,12 @@ struct OnDeviceModelEntry: Identifiable, Sendable, Equatable {
     let name: String                  // 模型名
     let description: String           // 中文简介
     let estimatedSizeMB: Int          // 估计文件大小（MB）
-    let huggingFaceURL: URL            // HuggingFace 下载 URL
-    let modelScopeURL: URL             // ModelScope 下载 URL
+    let huggingFaceURL: URL?            // HuggingFace 下载 URL
+    let modelScopeURL: URL?             // ModelScope 下载 URL
     let sha256: String                // SHA256 校验值
 
     /// 根据下载源返回对应 URL
-    func url(for source: DownloadSource) -> URL {
+    func url(for source: DownloadSource) -> URL? {
         switch source {
         case .domestic: return modelScopeURL
         case .international: return huggingFaceURL
@@ -41,8 +41,8 @@ enum OnDeviceModelCatalog {
             name: "Llama-3.2-1B-Instruct-4bit",
             description: "Meta Llama 3.2 1B 参数指令模型，4bit 量化。轻量通用对话模型，适合日常问答与文本生成。",
             estimatedSizeMB: 695,
-            huggingFaceURL: URL(string: "https://huggingface.co/mlx-community/Llama-3.2-1B-Instruct-4bit/resolve/main/model.safetensors") ?? URL(fileURLWithPath: ""),
-            modelScopeURL: URL(string: "https://www.modelscope.cn/api/v1/models/mlx-community/Llama-3.2-1B-Instruct-4bit/repo?Revision=master&FilePath=model.safetensors") ?? URL(fileURLWithPath: ""),
+            huggingFaceURL: URL(string: "https://huggingface.co/mlx-community/Llama-3.2-1B-Instruct-4bit/resolve/main/model.safetensors"),
+            modelScopeURL: URL(string: "https://www.modelscope.cn/api/v1/models/mlx-community/Llama-3.2-1B-Instruct-4bit/repo?Revision=master&FilePath=model.safetensors"),
             sha256: "35e396644bca888eec399f9c0f843ec7fa78b8f8c5e06841661be62b4edf96dd"
         ),
         OnDeviceModelEntry(
@@ -50,8 +50,8 @@ enum OnDeviceModelCatalog {
             name: "Qwen2-0.5B-Instruct-4bit",
             description: "阿里通义千问 Qwen2 0.5B 参数指令模型，4bit 量化。超轻量模型，推理速度最快，适合资源受限设备。",
             estimatedSizeMB: 278,
-            huggingFaceURL: URL(string: "https://huggingface.co/mlx-community/Qwen2-0.5B-Instruct-4bit/resolve/main/model.safetensors") ?? URL(fileURLWithPath: ""),
-            modelScopeURL: URL(string: "https://www.modelscope.cn/api/v1/models/mlx-community/Qwen2-0.5B-Instruct-4bit/repo?Revision=master&FilePath=model.safetensors") ?? URL(fileURLWithPath: ""),
+            huggingFaceURL: URL(string: "https://huggingface.co/mlx-community/Qwen2-0.5B-Instruct-4bit/resolve/main/model.safetensors"),
+            modelScopeURL: URL(string: "https://www.modelscope.cn/api/v1/models/mlx-community/Qwen2-0.5B-Instruct-4bit/repo?Revision=master&FilePath=model.safetensors"),
             sha256: "961b4727c18aec86456a213028e08f54cbe0081ad7b9e3e5eccfd967e47387dd"
         ),
         OnDeviceModelEntry(
@@ -59,8 +59,8 @@ enum OnDeviceModelCatalog {
             name: "Phi-3-mini-4k-instruct-4bit",
             description: "微软 Phi-3-mini 3.8B 参数指令模型，4bit 量化，4k 上下文。推理能力更强但体积较大，适合高质量推理场景。",
             estimatedSizeMB: 2150,
-            huggingFaceURL: URL(string: "https://huggingface.co/mlx-community/Phi-3-mini-4k-instruct-4bit/resolve/main/model.safetensors") ?? URL(fileURLWithPath: ""),
-            modelScopeURL: URL(string: "https://www.modelscope.cn/api/v1/models/mlx-community/Phi-3-mini-4k-instruct-4bit/repo?Revision=master&FilePath=model.safetensors") ?? URL(fileURLWithPath: ""),
+            huggingFaceURL: URL(string: "https://huggingface.co/mlx-community/Phi-3-mini-4k-instruct-4bit/resolve/main/model.safetensors"),
+            modelScopeURL: URL(string: "https://www.modelscope.cn/api/v1/models/mlx-community/Phi-3-mini-4k-instruct-4bit/repo?Revision=master&FilePath=model.safetensors"),
             sha256: "8d75680621a09474f6601e9176f2f61f92a5e4c079d68d583901f51699fda50a"
         )
     ]

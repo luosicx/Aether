@@ -200,16 +200,20 @@ final class VoiceService: NSObject {
     }
 
     /// 释放音频资源
+    /// AVAudioEngine 的 deinit 可能非主线程触发，通过 Task 异步调度到 @MainActor 执行清理
     deinit {
-        // Day 10: 释放音频资源，避免后台音频残留
-        if audioEngine.isRunning {
-            audioEngine.stop()
-            audioEngine.inputNode.removeTap(onBus: 0)
+        let audioEngine = self.audioEngine
+        let synthesizer = self.synthesizer
+        Task { @MainActor [audioEngine, synthesizer] in
+            if audioEngine.isRunning {
+                audioEngine.stop()
+                audioEngine.inputNode.removeTap(onBus: 0)
+            }
+            synthesizer.delegate = nil
+            #if os(iOS)
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+            #endif
         }
-        synthesizer.delegate = nil
-        #if os(iOS)
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-        #endif
     }
 
 }

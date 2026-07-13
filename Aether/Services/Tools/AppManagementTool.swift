@@ -8,7 +8,7 @@ import Foundation
 import AppKit
 
 /// macOS 应用管理工具
-final class AppManagementTool: ToolProtocol {
+final class AppManagementTool: ToolProtocol, @unchecked Sendable {
     /// 工具定义
     /// - name: `manage_app`
     /// - parameters: `action`（必填，String）— 操作类型；

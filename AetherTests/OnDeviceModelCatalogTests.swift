@@ -29,18 +29,18 @@ final class OnDeviceModelCatalogTests: XCTestCase {
     func testModelURLsValid() {
         for model in OnDeviceModelCatalog.models {
             // HuggingFace URL
-            XCTAssertEqual(model.huggingFaceURL.scheme, "https", "HuggingFace URL 应为 https：\(model.id)")
-            XCTAssertEqual(model.huggingFaceURL.host, "huggingface.co", "HuggingFace URL host 应为 huggingface.co：\(model.id)")
+            XCTAssertEqual(model.huggingFaceURL?.scheme, "https", "HuggingFace URL 应为 https：\(model.id)")
+            XCTAssertEqual(model.huggingFaceURL?.host, "huggingface.co", "HuggingFace URL host 应为 huggingface.co：\(model.id)")
             XCTAssertTrue(
-                model.huggingFaceURL.path.contains("model.safetensors"),
+                model.huggingFaceURL?.path.contains("model.safetensors") ?? false,
                 "HuggingFace URL 路径应包含 model.safetensors：\(model.id)"
             )
 
             // ModelScope URL
-            XCTAssertEqual(model.modelScopeURL.scheme, "https", "ModelScope URL 应为 https：\(model.id)")
-            XCTAssertEqual(model.modelScopeURL.host, "www.modelscope.cn", "ModelScope URL host 应为 www.modelscope.cn：\(model.id)")
+            XCTAssertEqual(model.modelScopeURL?.scheme, "https", "ModelScope URL 应为 https：\(model.id)")
+            XCTAssertEqual(model.modelScopeURL?.host, "www.modelscope.cn", "ModelScope URL host 应为 www.modelscope.cn：\(model.id)")
             XCTAssertTrue(
-                model.modelScopeURL.absoluteString.contains("model.safetensors"),
+                model.modelScopeURL?.absoluteString.contains("model.safetensors") ?? false,
                 "ModelScope URL 应包含 model.safetensors：\(model.id)"
             )
         }

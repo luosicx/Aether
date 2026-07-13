@@ -64,6 +64,8 @@ final class Conversation {
 /// 持久化用户的语气偏好、偏好工具与自定义事实，注入系统提示词以个性化 AI 回复
 @Model
 final class UserPreference {
+    /// 唯一标识
+    @Attribute(.unique) var id: UUID = UUID()
     /// 偏好语气："正式" / "轻松" / "默认"
     var preferredTone: String = "默认"
     /// 偏好工具名数组（来自 ToolRegistry.allToolDefs 的 function.name）

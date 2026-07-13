@@ -143,7 +143,7 @@ struct AetherApp: App {
             let config = ModelConfiguration(isStoredInMemoryOnly: false)
             let container = try ModelContainer(
                 for: Conversation.self, ChatMessage.self, DocumentChunk.self,
-                    MessageFeedback.self, HealthInsight.self, UserPreference.self, AgentTask.self,
+                    MessageFeedback.self, HealthInsight.self, UserPreference.self, AgentTask.self, Memory.self,
                 configurations: config
             )
             let context = ModelContext(container)
@@ -247,7 +247,7 @@ struct AetherApp: App {
             do {
                 // 创建独立的 ModelContainer/Context（后台任务无法访问主 App 的 ModelContext）
                 let container = try ModelContainer(
-                    for: Conversation.self, ChatMessage.self, DocumentChunk.self, MessageFeedback.self, HealthInsight.self, AgentTask.self, Memory.self
+                    for: Conversation.self, ChatMessage.self, DocumentChunk.self, MessageFeedback.self, HealthInsight.self, UserPreference.self, AgentTask.self, Memory.self
                 )
                 let context = ModelContext(container)
                 let generator = HealthInsightGenerator.make(modelContext: context)

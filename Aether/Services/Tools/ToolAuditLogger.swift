@@ -3,7 +3,7 @@ import os
 
 /// 工具调用审计日志器。
 /// 记录每次工具调用的工具名、授权状态、时间戳以及参数键摘要（不记录完整敏感内容）。
-final class ToolAuditLogger: @unchecked Sendable {
+final class ToolAuditLogger {
     static let shared = ToolAuditLogger()
 
     private let logQueue = DispatchQueue(label: "com.aether.toolauditlogger", qos: .utility)

@@ -6,34 +6,39 @@ struct MarkdownTableView: View {
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 0) {
-                // 表头
-                HStack(spacing: 0) {
-                    ForEach(Array(table.headers.enumerated()), id: \.offset) { index, header in
-                        let alignment = index < table.alignments.count ? table.alignments[index] : .left
-                        cellView(text: header, alignment: alignment, isHeader: true)
-                            .frame(minWidth: 80)
-                    }
-                }
-                .background(Color.backgroundSecondary)
-
-                // 数据行
-                ForEach(Array(table.rows.enumerated()), id: \.offset) { rowIndex, row in
+            GeometryReader { geometry in
+                let columnCount = max(table.headers.count, 1)
+                let dynamicMinWidth: CGFloat = max(geometry.size.width / CGFloat(columnCount), 60)
+                VStack(alignment: .leading, spacing: 0) {
+                    // 表头
                     HStack(spacing: 0) {
-                        ForEach(Array(row.enumerated()), id: \.offset) { colIndex, cell in
-                            let alignment = colIndex < table.alignments.count ? table.alignments[colIndex] : .left
-                            cellView(text: cell, alignment: alignment, isHeader: false)
-                                .frame(minWidth: 80)
+                        ForEach(Array(table.headers.enumerated()), id: \.offset) { index, header in
+                            let alignment = index < table.alignments.count ? table.alignments[index] : .left
+                            cellView(text: header, alignment: alignment, isHeader: true)
+                                .frame(minWidth: dynamicMinWidth)
                         }
                     }
-                    .background(rowIndex % 2 == 0 ? Color.clear : Color.backgroundTertiary.opacity(0.5))
+                    .background(Color.backgroundSecondary)
+
+                    // 数据行
+                    ForEach(Array(table.rows.enumerated()), id: \.offset) { rowIndex, row in
+                        HStack(spacing: 0) {
+                            ForEach(Array(row.enumerated()), id: \.offset) { colIndex, cell in
+                                let alignment = colIndex < table.alignments.count ? table.alignments[colIndex] : .left
+                                cellView(text: cell, alignment: alignment, isHeader: false)
+                                    .frame(minWidth: dynamicMinWidth)
+                            }
+                        }
+                        .background(rowIndex % 2 == 0 ? Color.clear : Color.backgroundTertiary.opacity(0.5))
+                    }
                 }
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.separator, lineWidth: 0.5)
+                )
             }
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color.separator, lineWidth: 0.5)
-            )
+            .frame(minHeight: 44) // 为 GeometryReader 提供最小高度，避免布局崩溃
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(Text(String(format: NSLocalizedString("表格，%d 列 %d 行", comment: ""), table.headers.count, table.rows.count)))

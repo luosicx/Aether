@@ -53,8 +53,8 @@ struct SettingsView: View {
     @Environment(\.openURL) private var openURL
     // iPad/macOS 双栏:size class 判断
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    // 语言切换管理器
-    @StateObject private var languageManager = LanguageManager.shared
+    // 语言切换管理器（单例对象，使用 @ObservedObject 而非 @StateObject）
+    @ObservedObject private var languageManager = LanguageManager.shared
     // 语言切换后是否需要提示重启
     @State private var showRestartAlert = false
 
@@ -374,7 +374,7 @@ struct SettingsView: View {
                 .accessibilityHint("启用后端代理转发 API 请求")
                 .accessibilityIdentifier("bffToggle")
             TextField("BFF endpoint", text: Binding(
-                get: { settingsVM.bffConfig.endpointURL.absoluteString },
+                get: { settingsVM.bffConfig.endpointURL?.absoluteString ?? "" },
                 set: { newValue in
                     // 输入合法 URL 时回写，非法输入保持原值
                     if let url = URL(string: newValue) {

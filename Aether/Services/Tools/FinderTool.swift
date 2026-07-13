@@ -9,7 +9,7 @@ import Foundation
 import AppKit
 
 /// macOS Finder 操作工具
-final class FinderTool: ToolProtocol {
+final class FinderTool: ToolProtocol, @unchecked Sendable {
     /// 工具定义
     /// - name: `finder_action`
     /// - parameters: `action`（必填，String）— 操作类型 get_selection/reveal/open；
