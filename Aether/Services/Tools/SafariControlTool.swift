@@ -81,14 +81,34 @@ final class SafariControlTool: ToolProtocol {
         return runAppleScript(script)
     }
 
+    /// 将字符串安全转义为 AppleScript 字符串字面量，防止注入。
+    /// 转义双引号和反斜杠，防止攻击者闭合字符串并注入任意 AppleScript 代码。
+    private func escapeForAppleScript(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+    }
+
+    /// 校验 URL scheme 是否在允许的白名单内（仅 http/https），防止 file:// 等危险 scheme。
+    private func validateURLScheme(_ urlString: String) -> Bool {
+        guard let url = URL(string: urlString), let scheme = url.scheme?.lowercased() else {
+            return false
+        }
+        return scheme == "http" || scheme == "https"
+    }
+
     /// 将前台窗口当前标签页导航到指定 URL
     private func navigate(_ arguments: [String: Any]) -> String {
         guard let url = arguments["url"] as? String else {
             return "错误：请提供 url 参数"
         }
+        guard validateURLScheme(url) else {
+            return "错误：仅允许 http/https URL"
+        }
+        let escapedURL = escapeForAppleScript(url)
         let script = """
         tell application "Safari"
-            set URL of current tab of front window to "\(url)"
+            set URL of current tab of front window to "\(escapedURL)"
         end tell
         """
         return runAppleScript(script)
@@ -102,9 +122,10 @@ final class SafariControlTool: ToolProtocol {
         guard let host = currentPageHost(), allowedDomains.contains(host) else {
             return "错误：当前页面所在域不在 run_js 白名单中"
         }
+        let escapedJS = escapeForAppleScript(jsCode)
         let script = """
         tell application "Safari"
-            do JavaScript "\(jsCode)" in current tab of front window
+            do JavaScript "\(escapedJS)" in current tab of front window
         end tell
         """
         return runAppleScript(script)
@@ -130,9 +151,13 @@ final class SafariControlTool: ToolProtocol {
             end tell
             """
         } else {
+            guard validateURLScheme(url) else {
+                return "错误：仅允许 http/https URL"
+            }
+            let escapedURL = escapeForAppleScript(url)
             script = """
             tell application "Safari"
-                make new document with properties {URL:"\(url)"}
+                make new document with properties {URL:"\(escapedURL)"}
             end tell
             """
         }

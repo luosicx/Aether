@@ -9,7 +9,8 @@ final class ToolRegistryTests: XCTestCase {
         "run_terminal_command",
         "run_applescript",
         "control_safari",
-        "create_shortcut"
+        "create_shortcut",
+        "simulate_input"
     ]
     private var originalEnabledStates: [String: Bool] = [:]
 
@@ -72,6 +73,18 @@ final class ToolRegistryTests: XCTestCase {
         XCTAssertTrue(registry.requiresAuthorization(name: "control_safari.run_js"), "control_safari.run_js 应需授权")
         XCTAssertFalse(registry.requiresAuthorization(name: "calculate"), "calculate 不应需授权")
         XCTAssertFalse(registry.requiresAuthorization(name: "get_current_time"), "get_current_time 不应需授权")
+    }
+
+    /// 新增敏感工具 manage_file/manage_window/simulate_input 应需授权
+    func testNewSensitiveToolsRequireAuthorization() {
+        XCTAssertTrue(registry.requiresAuthorization(name: "manage_file"), "manage_file 应需授权")
+        XCTAssertTrue(registry.requiresAuthorization(name: "manage_window"), "manage_window 应需授权")
+        XCTAssertTrue(registry.requiresAuthorization(name: "simulate_input"), "simulate_input 应需授权")
+    }
+
+    /// simulate_input 应在默认禁用列表中
+    func testSimulateInputDefaultDisabled() {
+        XCTAssertFalse(registry.isEnabled(name: "simulate_input"), "simulate_input 默认应被禁用")
     }
 
     /// `execute(name:arguments:)` 对未启用工具抛出错误（domain = ToolRegistry，code = 3）

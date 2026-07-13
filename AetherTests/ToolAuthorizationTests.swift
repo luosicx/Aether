@@ -4,19 +4,26 @@ import XCTest
 /// ToolAuthorization 单元测试：验证敏感工具授权状态生命周期
 final class ToolAuthorizationTests: XCTestCase {
     private let auth = ToolAuthorization.shared
-    private let toolName = "run_terminal_command"
+    /// 使用非高危工具名测试常规授权逻辑
+    private let toolName = "read_clipboard"
+    /// 高危工具名，用于验证 neverAlwaysAllow 行为
+    private let dangerousToolName = "run_terminal_command"
     private let alwaysAuthorizedKeyPrefix = "aether.tool.auth.always."
 
     override func setUp() {
         super.setUp()
         // 清理测试工具的授权状态，避免单例状态跨测试污染
         auth.revokeAuthorization(toolName: toolName)
+        auth.revokeAuthorization(toolName: dangerousToolName)
         UserDefaults.standard.removeObject(forKey: "\(alwaysAuthorizedKeyPrefix)\(toolName)")
+        UserDefaults.standard.removeObject(forKey: "\(alwaysAuthorizedKeyPrefix)\(dangerousToolName)")
     }
 
     override func tearDown() {
         auth.revokeAuthorization(toolName: toolName)
+        auth.revokeAuthorization(toolName: dangerousToolName)
         UserDefaults.standard.removeObject(forKey: "\(alwaysAuthorizedKeyPrefix)\(toolName)")
+        UserDefaults.standard.removeObject(forKey: "\(alwaysAuthorizedKeyPrefix)\(dangerousToolName)")
         super.tearDown()
     }
 
@@ -126,5 +133,41 @@ final class ToolAuthorizationTests: XCTestCase {
         // 再次 grant always
         auth.grantAlwaysAuthorization(toolName: toolName)
         XCTAssertEqual(auth.authorizationStatus(for: toolName), .authorized(sessionOnly: false))
+    }
+
+    // MARK: - 高危工具 neverAlwaysAllow 测试
+
+    /// run_terminal_command 不应被持久化授权（始终允许），每次调用都需确认
+    func testDangerousToolCannotBeAlwaysAuthorized() {
+        auth.grantAlwaysAuthorization(toolName: dangerousToolName)
+
+        // 状态不应变为 authorized
+        XCTAssertEqual(auth.authorizationStatus(for: dangerousToolName), .denied,
+                       "高危工具不应被持久化授权")
+
+        // UserDefaults 中不应写入持久化标记
+        let persisted = UserDefaults.standard.bool(forKey: "\(alwaysAuthorizedKeyPrefix)\(dangerousToolName)")
+        XCTAssertFalse(persisted, "高危工具不应写入 UserDefaults 持久化标记")
+    }
+
+    /// run_terminal_command 仍可通过 session 授权（仅本次有效）
+    func testDangerousToolCanBeSessionAuthorized() {
+        auth.grantSessionAuthorization(toolName: dangerousToolName)
+        XCTAssertEqual(auth.authorizationStatus(for: dangerousToolName), .authorized(sessionOnly: true),
+                       "高危工具仍可被 session 授权（仅本次有效）")
+    }
+
+    /// run_applescript 同样不应被持久化授权
+    func testAppleScriptToolCannotBeAlwaysAuthorized() {
+        let appleScriptTool = "run_applescript"
+        auth.revokeAuthorization(toolName: appleScriptTool)
+        UserDefaults.standard.removeObject(forKey: "\(alwaysAuthorizedKeyPrefix)\(appleScriptTool)")
+
+        auth.grantAlwaysAuthorization(toolName: appleScriptTool)
+        XCTAssertEqual(auth.authorizationStatus(for: appleScriptTool), .denied,
+                       "run_applescript 不应被持久化授权")
+
+        auth.revokeAuthorization(toolName: appleScriptTool)
+        UserDefaults.standard.removeObject(forKey: "\(alwaysAuthorizedKeyPrefix)\(appleScriptTool)")
     }
 }
