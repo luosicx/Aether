@@ -62,6 +62,69 @@ final class ChatStorage {
         save("togglePin")
     }
 
+    /// Day 23: 拖拽排序后更新 order 字段并持久化。
+    /// 按传入的列表顺序依次赋值 order = 0, 1, 2…，保证排序稳定。
+    func reorder(_ conversations: [Conversation]) {
+        for (index, conv) in conversations.enumerated() {
+            conv.order = index
+        }
+        save("reorder")
+    }
+
+    /// Task 21: 从父对话的指定消息处分叉创建新对话。
+    /// 新对话的 parentConversationID 设为父对话 ID，parentMessageID 设为分叉点消息 ID。
+    /// 复制父对话中从开头到分叉点（含）的所有消息到新对话。
+    /// - Parameters:
+    ///   - parent: 父对话（分叉来源）
+    ///   - messageID: 分叉点消息 ID
+    /// - Returns: 新创建的分叉对话
+    /// - Throws: ForkError.messageNotFound 如果分叉点消息不存在于父对话中
+    func forkConversation(from parent: Conversation, at messageID: UUID) throws -> Conversation {
+        // 查找分叉点消息在父对话消息列表中的位置
+        guard let forkIndex = parent.messages.firstIndex(where: { $0.id == messageID }) else {
+            throw ForkError.messageNotFound
+        }
+
+        // 创建新对话，继承父对话的标题与系统提示词
+        let forkedTitle = "\(parent.title)（分叉）"
+        let forkedConversation = Conversation(title: forkedTitle, systemPrompt: parent.systemPrompt)
+        forkedConversation.parentConversationID = parent.id
+        forkedConversation.parentMessageID = messageID
+        modelContext.insert(forkedConversation)
+
+        // 复制从开头到分叉点（含）的所有消息到新对话
+        // 使用 0...forkIndex 确保包含分叉点消息本身
+        for originalMessage in parent.messages[0...forkIndex] {
+            let copiedMessage = ChatMessage(
+                role: originalMessage.role,
+                content: originalMessage.content,
+                imageData: originalMessage.imageData,
+                attachedImage: originalMessage.attachedImage,
+                toolCallData: originalMessage.toolCallData,
+                toolCallId: originalMessage.toolCallId,
+                toolName: originalMessage.toolName
+            )
+            copiedMessage.conversation = forkedConversation
+            forkedConversation.messages.append(copiedMessage)
+        }
+
+        save("forkConversation")
+        // Day 18: 同步 Spotlight 索引
+        SpotlightIndexer.index(forkedConversation)
+        return forkedConversation
+    }
+
+    /// Task 21: 获取指定对话的所有直接子对话（分叉版本）
+    /// - Parameter conversationID: 父对话 ID
+    /// - Returns: 子对话列表，按 createdAt 升序排列
+    func fetchChildConversations(of conversationID: UUID) -> [Conversation] {
+        let descriptor = FetchDescriptor<Conversation>(
+            sortBy: [SortDescriptor(\.createdAt, order: .forward)]
+        )
+        guard let all = try? modelContext.fetch(descriptor) else { return [] }
+        return all.filter { $0.parentConversationID == conversationID }
+    }
+
     /// 添加消息，关联 conversation，save
     func addMessage(to conversation: Conversation, role: String, content: String, imageData: Data? = nil) -> ChatMessage {
         let message = ChatMessage(role: role, content: content, imageData: imageData)
@@ -76,16 +139,21 @@ final class ChatStorage {
     /// 获取所有会话。为何内存排序：SwiftData SortDescriptor 不直接支持 Bool 排序（需 NSObject），
     /// 先按 createdAt 降序 fetch，再在内存按 isPinned 降序排（置顶在前）。
     /// Day 9: 排序规则——先按 isPinned 降序，再按 createdAt 降序
+    /// Day 23: 排序规则——先按 isPinned 降序，再按 order 升序，再按 createdAt 降序
+    /// （order 默认 0，未手动排序时退化为 createdAt 降序，保持向后兼容）
     func fetchConversations() -> [Conversation] {
         let descriptor = FetchDescriptor<Conversation>(
             sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
         )
         let raw = (try? modelContext.fetch(descriptor)) ?? []
         // SwiftData 的 SortDescriptor 不直接支持 Bool 排序（需 NSObject），
-        // 在内存中按 isPinned 降序排（置顶在前），同组内已按 createdAt 降序
+        // 在内存中按 isPinned 降序排（置顶在前），同组内按 order 升序，再按 createdAt 降序
         return raw.sorted { a, b in
             if a.isPinned != b.isPinned {
                 return a.isPinned && !b.isPinned
+            }
+            if a.order != b.order {
+                return a.order < b.order
             }
             return a.createdAt > b.createdAt
         }
@@ -203,4 +271,10 @@ final class ChatStorage {
         }
         save("updateFeedback")
     }
+}
+
+/// Task 21: 分叉操作错误类型
+enum ForkError: Error {
+    /// 分叉点消息在父对话中不存在
+    case messageNotFound
 }

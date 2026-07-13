@@ -12,7 +12,7 @@ struct BrandSplash: View {
                     .opacity(fadeOut ? 0 : 1)
                     .onAppear {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-                            withAnimation(.easeInOut(duration: 0.4)) {
+                            withAnimation(AnimationTokens.transition) {
                                 fadeOut = true
                             }
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {

@@ -3,6 +3,10 @@ import SwiftUI
 /// Markdown 渲染组件：将文本分段为代码块、表格、任务列表与普通文本
 struct MarkdownText: View {
     let content: String
+    /// Task 28: 字体大小（pt），默认 16
+    var fontSize: Double = 16.0
+    /// Task 28: 行距倍数，默认 1.5
+    var lineHeight: Double = 1.5
 
     /// 缓存 parseBlocks 结果的包装类（NSCache value 要求 NSObject 子类）
     private final class CachedBlocks: NSObject {
@@ -44,9 +48,13 @@ struct MarkdownText: View {
                         options: AttributedString.MarkdownParsingOptions(interpretedSyntax: .full)
                     ) {
                         Text(attributed)
+                            .font(.system(size: fontSize))
+                            .lineSpacing(CGFloat(fontSize) * CGFloat(lineHeight - 1))
                             .textSelection(.enabled)
                     } else {
                         Text(text)
+                            .font(.system(size: fontSize))
+                            .lineSpacing(CGFloat(fontSize) * CGFloat(lineHeight - 1))
                             .textSelection(.enabled)
                     }
                 case .table(let table):

@@ -107,7 +107,7 @@ struct StepCardView: View {
                                 if reduceMotion {
                                     isObservationExpanded.toggle()
                                 } else {
-                                    withAnimation(.easeInOut(duration: 0.15)) {
+                                    withAnimation(AnimationTokens.messageAppear) {
                                         isObservationExpanded.toggle()
                                     }
                                 }

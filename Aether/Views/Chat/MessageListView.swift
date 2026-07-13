@@ -43,8 +43,16 @@ struct MessageListView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    /// Task 25-28: 从 SwiftData 读取用户偏好（主题/气泡样式/字体大小/行距/AI头像）
+    private var userPreference: UserPreference {
+        ChatStorage(modelContext: modelContext).fetchPreference()
+    }
+
     var body: some View {
-        ScrollViewReader { proxy in
+        // 缓存用户偏好查询结果，避免在 ForEach 中为每条消息重复触发 SwiftData fetch
+        // 原先 userPreference 计算属性每次访问都会创建 ChatStorage 并查询，流式输出时性能损耗严重
+        let preference = userPreference
+        return ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 18) {
                     if viewModel.messages.isEmpty && viewModel.streamingText.isEmpty {
@@ -87,7 +95,29 @@ struct MessageListView: View {
                                 if let conv = conversation {
                                     viewModel.resendMessage(content: message.content, in: conv, modelContext: modelContext)
                                 }
-                            }
+                            },
+                            onRegenerate: {
+                                // Task 23.2: 重新生成——仅 AI 消息
+                                if let conv = conversation, message.role == "assistant" {
+                                    viewModel.regenerateResponse(assistantMessage: message, in: conv, modelContext: modelContext)
+                                }
+                            },
+                            onBranch: {
+                                // Task 23.2: 从此处分叉——创建新会话并显示提示
+                                if let conv = conversation {
+                                    if let _ = viewModel.branch(from: message, in: conv, modelContext: modelContext) {
+                                        viewModel.feedbackToast = "已创建分叉会话"
+                                        Task { @MainActor in
+                                            try? await Task.sleep(for: .seconds(2))
+                                            viewModel.feedbackToast = nil
+                                        }
+                                    }
+                                }
+                            },
+                            bubbleStyle: BubbleStyleType.current(preference.bubbleStyle),
+                            fontSize: preference.fontSize,
+                            lineHeight: preference.lineHeight,
+                            aiAvatarData: preference.avatarData
                         )
                             .id(message.id.uuidString)
                             .transition(reduceMotion ? .opacity : .asymmetric(
@@ -151,6 +181,7 @@ struct MessageListView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 14)
+                .animation(reduceMotion ? nil : AnimationTokens.messageAppear, value: viewModel.messages.count)
             }
             .frame(maxHeight: .infinity)
             .onChange(of: viewModel.messages.count) {

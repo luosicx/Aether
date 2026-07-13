@@ -5,6 +5,11 @@ struct ChatView: View {
     @Environment(\.modelContext) private var modelContext
     // Day 19: iPad 适配——检测 size class，regular 用 NavigationSplitView 双栏
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #if os(macOS)
+    // Task 20: macOS 多窗口——openWindow 用于打开新窗口，conversationID 用于多窗口初始对话
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.conversationID) private var initialConversationID
+    #endif
     @State private var viewModel = ChatViewModel()
     @State private var conversationListVM = ConversationListVM()
     @State private var settingsVM = SettingsViewModel()
@@ -49,8 +54,14 @@ struct ChatView: View {
             }
         )) {
             ForEach(conversationListVM.conversations) { conv in
+                #if os(macOS)
+                // Task 20: macOS 支持拖拽会话到其他窗口
+                DraggableConversation(conversation: conv)
+                    .tag(conv)
+                #else
                 ConversationRow(conversation: conv)
                     .tag(conv)
+                #endif
             }
         }
         .navigationTitle("对话")
@@ -174,7 +185,14 @@ struct ChatView: View {
                 Task { @MainActor in
                     try? await Task.sleep(nanoseconds: 33_000_000)
                     conversationListVM.load(modelContext: modelContext)
-                    // 自动选中最近会话（若 currentConversation 为 nil 且存在已有会话）
+                    // Task 20: macOS 多窗口——若通过 WindowGroup(for: UUID.self) 打开且指定了对话 ID，
+                    // 则切换到该对话；否则自动选中最近会话
+                    #if os(macOS)
+                    if let targetID = initialConversationID {
+                        switchToConversation(id: targetID)
+                        return
+                    }
+                    #endif
                     if currentConversation == nil, let recent = conversationListVM.conversations.first {
                         currentConversation = recent
                         settingsVM.loadSystemPrompt(from: recent)
@@ -232,6 +250,27 @@ struct ChatView: View {
                 showConversationList = true
                 // TODO: 后续可通过 FocusState 进一步聚焦到搜索框
             }
+            #if os(macOS)
+            // Task 20: macOS 监听「新建窗口」(Cmd+Shift+N) 通知——打开新窗口
+            .onReceive(NotificationCenter.default.publisher(for: .newWindowRequested)) { _ in
+                openWindow(value: UUID())
+            }
+            // Task 24: 菜单栏面板点击最近对话时——在主窗口打开指定会话
+            .onReceive(NotificationCenter.default.publisher(for: .openConversationFromMenuBar)) { note in
+                guard let idStr = note.userInfo?["conversationId"] as? String,
+                      let conversationId = UUID(uuidString: idStr) else { return }
+                // 重新加载会话列表以获取菜单栏创建的新会话
+                conversationListVM.load(modelContext: modelContext, cleanupEmpty: false)
+                // 在列表中查找目标会话
+                if let conv = conversationListVM.conversations.first(where: { $0.id == conversationId }) {
+                    conversationListVM.autoTitleIfNeeded(for: conv)
+                    currentConversation = conv
+                    settingsVM.loadSystemPrompt(from: conv)
+                    viewModel.switchTo(conversation: conv)
+                    showConversationList = false
+                }
+            }
+            #endif
         }
     }
 
@@ -279,6 +318,8 @@ struct ChatView: View {
                 }
             )
         }
+        // Task 19: 响应式布局——macOS 超宽屏限制最大宽度并居中
+        .responsiveLayout()
     }
 
     /// Day 19: 创建新对话的公共逻辑（侧栏与 sheet 复用）

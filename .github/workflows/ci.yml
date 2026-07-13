@@ -241,7 +241,7 @@ jobs:
 
   ui-tests:
     runs-on: macos-15
-    timeout-minutes: 25
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v5
 

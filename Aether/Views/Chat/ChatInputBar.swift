@@ -23,6 +23,7 @@ struct ChatInputBar: View {
                     .foregroundStyle(.secondary)
                     .frame(width: 44, height: 44)
             }
+            .buttonStyle(PressableButtonStyle())
             .accessibilityLabel("知识库")
             .accessibilityHint("打开知识库管理文档")
             .accessibilityIdentifier("knowledgeBaseButton")
@@ -76,6 +77,7 @@ struct ChatInputBar: View {
             .accessibilityLabel(isRecording ? "停止录音" : "开始录音")
             .accessibilityHint(isRecording ? "停止语音输入" : "开始语音输入")
             .accessibilityIdentifier("voiceInputButton")
+            .buttonStyle(PressableButtonStyle())
             Button {
                 onSend()
             } label: {
@@ -95,7 +97,8 @@ struct ChatInputBar: View {
             }
             .contentShape(Circle().inset(by: -4))
             .disabled(!canSend)
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: canSend)
+            .buttonStyle(PressableButtonStyle())
+            .animation(reduceMotion ? nil : AnimationTokens.buttonPress, value: canSend)
             .accessibilityLabel("发送")
             .accessibilityHint("发送消息")
             .accessibilityIdentifier("sendButton")
