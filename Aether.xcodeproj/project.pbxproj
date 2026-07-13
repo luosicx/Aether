@@ -299,9 +299,6 @@
 		DEADBEEF0011223344550C01 /* MenuBarUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEADBEEF0011223344550C02 /* MenuBarUITests.swift */; };
 		25A1B2C3D4E5F6000100A006 /* ThemeManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25A1B2C3D4E5F6000100A007 /* ThemeManagerTests.swift */; };
 		26A1B2C3D4E5F6000100A001 /* AIPersonaTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26A1B2C3D4E5F6000100A002 /* AIPersonaTests.swift */; };
-		AA1100000000000000000001 /* MLX in Frameworks */ = {isa = PBXBuildFile; productName = MLX; };
-		AA1100000000000000000002 /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productName = MLXLMCommon; };
-		AA1100000000000000000003 /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productName = MLXLLM; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -651,9 +648,6 @@
 				0F63204971E2348BD9FD957B /* NaturalLanguage.framework in Frameworks */,
 				A782AE6C523DF2A4CB75F054 /* Security.framework in Frameworks */,
 				9B325E89B5C1BE3A3456BC16 /* HealthKit.framework in Frameworks */,
-				AA1100000000000000000001 /* MLX in Frameworks */,
-				AA1100000000000000000002 /* MLXLMCommon in Frameworks */,
-				AA1100000000000000000003 /* MLXLLM in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1494,9 +1488,6 @@
 			);
 			name = Aether;
 			packageProductDependencies = (
-				AA1100000000000000000004 /* MLX */,
-				AA1100000000000000000005 /* MLXLMCommon */,
-				AA1100000000000000000006 /* MLXLLM */,
 			);
 			productName = Aether;
 			productReference = 20B22D10ECFBB76EED3D2065 /* Aether.app */;
@@ -1546,7 +1537,6 @@
 			);
 			mainGroup = F6EDA5921F96C29E03FAE5B7;
 			packageReferences = (
-				AA1100000000000000000007 /* XCRemoteSwiftPackageReference "mlx-swift-examples" */,
 			);
 			productRefGroup = C72E2CD02F9E5E945F8318E8 /* Products */;
 			projectDirPath = "";
@@ -2212,35 +2202,6 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
-
-/* Begin XCRemoteSwiftPackageReference section */
-		AA1100000000000000000007 /* XCRemoteSwiftPackageReference "mlx-swift-examples" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/ml-explore/mlx-swift-examples";
-			requirement = {
-				kind = upToNextMajor;
-				minimumVersion = 2.29.1;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		AA1100000000000000000004 /* MLX */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = AA1100000000000000000007 /* XCRemoteSwiftPackageReference "mlx-swift-examples" */;
-			productName = MLX;
-		};
-		AA1100000000000000000005 /* MLXLMCommon */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = AA1100000000000000000007 /* XCRemoteSwiftPackageReference "mlx-swift-examples" */;
-			productName = MLXLMCommon;
-		};
-		AA1100000000000000000006 /* MLXLLM */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = AA1100000000000000000007 /* XCRemoteSwiftPackageReference "mlx-swift-examples" */;
-			productName = MLXLLM;
-		};
-/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 7C5EF9114C3CBE2937F8D8FA /* Project object */;
 }
