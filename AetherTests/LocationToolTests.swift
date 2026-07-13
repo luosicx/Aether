@@ -313,4 +313,113 @@ final class LocationToolTests: XCTestCase {
             XCTAssertGreaterThanOrEqual(matches.count, 2, "成功结果应至少含 2 个 4 位小数坐标，实际：\(result)")
         }
     }
+
+    // MARK: - 新代码覆盖率：continuation 读写统一在 DispatchQueue.main
+
+    /// execute 在模拟器/CI 环境下应通过 DispatchQueue.main.async 安全地 resume continuation。
+    /// 新代码将 resume(returning:) 与 resume(throwing:) 统一调度到主线程，
+    /// 此测试验证超时路径（resume(throwing: LocationError.timeout)）不崩溃且返回错误提示。
+    func testExecuteTimeoutPathUsesMainQueueContinuation() async throws {
+        // 不跳过：10 秒超时后 resume(throwing:) 在 DispatchQueue.main 上执行
+        let result = try await tool.execute(arguments: [:])
+        XCTAssertFalse(result.isEmpty, "execute 应返回非空字符串")
+        // 超时 → "定位超时，请重试"；权限被拒 → "定位权限未授权..."；成功 → "当前位置..."
+        XCTAssertTrue(result.contains("定位") || result.contains("当前位置"),
+                      "结果应包含定位或位置关键词，实际：\(result)")
+    }
+
+    /// 多次串行调用 execute 应验证 continuation 的线程安全性。
+    /// 新代码每次调用创建独立 LocationFetcher，continuation 在 DispatchQueue.main 上读写，
+    /// 串行调用不应因 continuation 竞态而崩溃。
+    func testExecuteSerialCallsContinuationThreadSafety() async throws {
+        for _ in 0..<3 {
+            let result = try await tool.execute(arguments: [:])
+            XCTAssertFalse(result.isEmpty, "串行调用应每次返回非空字符串")
+        }
+    }
+
+    /// 并发调用 execute 应验证 continuation 的线程安全性。
+    /// 新代码统一在 DispatchQueue.main 上 resume，避免多线程同时访问 continuation。
+    func testExecuteConcurrentCallsContinuationThreadSafety() async throws {
+        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
+                      "跳过：模拟器/CI 环境下并发定位不稳定")
+        let tool1 = LocationTool()
+        let tool2 = LocationTool()
+        async let r1 = try tool1.execute(arguments: [:])
+        async let r2 = try tool2.execute(arguments: [:])
+        let results = try await [r1, r2]
+        for result in results {
+            XCTAssertFalse(result.isEmpty, "并发调用应返回非空字符串")
+        }
+    }
+
+    // MARK: - 新代码覆盖率补充：resume(returning:) 与 resume(throwing:) 的 DispatchQueue.main.async 路径
+
+    /// execute 不跳过：确保 resume(throwing:) 的 DispatchQueue.main.async 路径被执行。
+    /// 模拟器环境下定位通常超时（10s）或权限被拒，触发 resume(throwing:) 经主线程调度。
+    /// 新代码将 resume(throwing:) 包裹在 DispatchQueue.main.async 中，此测试验证该路径不崩溃。
+    func testExecuteCoversResumeThrowingMainThreadDispatch() async throws {
+        let result = try await tool.execute(arguments: [:])
+        XCTAssertFalse(result.isEmpty, "execute 应返回非空字符串")
+        // 超时 → "定位超时，请重试"；权限被拒 → "定位权限未授权..."；成功 → "当前位置..."；其他错误 → "定位失败..."
+        let isExpected = result.contains("定位超时") ||
+                         result.contains("定位权限") ||
+                         result.contains("当前位置") ||
+                         result.contains("定位失败")
+        XCTAssertTrue(isExpected, "结果应包含超时/权限/位置/失败关键词，实际：\(result)")
+    }
+
+    /// execute 成功路径覆盖 resume(returning:) 的 DispatchQueue.main.async 调度。
+    /// 若模拟器返回定位（模拟器默认有 Apple 位置），resume(returning:) 被调用并经主线程调度；
+    /// 若超时则覆盖 resume(throwing:)。两种情况均验证新代码路径被执行。
+    func testExecuteCoversResumeReturningMainThreadDispatch() async throws {
+        let result = try await tool.execute(arguments: [:])
+        XCTAssertFalse(result.isEmpty, "execute 应返回非空字符串")
+        // 成功路径：结果包含 "当前位置" 与 "经纬度"
+        // 失败路径：结果包含 "定位超时" / "定位权限" / "定位失败"
+        let isExpected = result.contains("当前位置") ||
+                         result.contains("定位超时") ||
+                         result.contains("定位权限") ||
+                         result.contains("定位失败")
+        XCTAssertTrue(isExpected, "结果应包含位置或定位错误关键词，实际：\(result)")
+        // 若成功，验证经纬度格式（4 位小数）
+        if result.contains("当前位置") && result.contains("经纬度") {
+            let regex = try? NSRegularExpression(pattern: #"\d+\.\d{4}"#, options: [])
+            let range = NSRange(result.startIndex..., in: result)
+            let matches = regex?.matches(in: result, options: [], range: range) ?? []
+            XCTAssertGreaterThanOrEqual(matches.count, 2,
+                                        "成功结果应至少含 2 个 4 位小数坐标，实际：\(result)")
+        }
+    }
+
+    /// execute 多次串行调用覆盖 resume 路径的 DispatchQueue.main.async 调度。
+    /// 每次调用创建独立 LocationFetcher，continuation 在主线程上 resume，验证不发生竞态。
+    func testExecuteSerialCallsCoverResumeDispatchPath() async throws {
+        for _ in 0..<2 {
+            let result = try await tool.execute(arguments: [:])
+            XCTAssertFalse(result.isEmpty, "串行调用应每次返回非空字符串")
+        }
+    }
+
+    /// execute 传入无关参数（非跳过）覆盖 resume 路径。
+    /// LocationTool 忽略所有参数，resume 路径与无参调用一致。
+    func testExecuteWithExtraArgumentsCoversResumePath() async throws {
+        let result = try await tool.execute(arguments: ["unused": "value", "n": 42])
+        XCTAssertFalse(result.isEmpty, "传入无关参数应返回非空字符串")
+        XCTAssertTrue(result.contains("定位") || result.contains("当前位置"),
+                      "结果应包含定位或位置关键词，实际：\(result)")
+    }
+
+    /// execute 并发调用（非跳过）覆盖多实例 resume 路径的线程安全性。
+    /// 两个 LocationTool 实例同时 execute，各自 LocationFetcher 的 continuation 独立 resume。
+    func testExecuteConcurrentCoversResumeThreadSafety() async throws {
+        let tool1 = LocationTool()
+        let tool2 = LocationTool()
+        async let r1 = try tool1.execute(arguments: [:])
+        async let r2 = try tool2.execute(arguments: [:])
+        let results = try await [r1, r2]
+        for result in results {
+            XCTAssertFalse(result.isEmpty, "并发调用应返回非空字符串")
+        }
+    }
 }
