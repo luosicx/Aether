@@ -12,6 +12,7 @@
 		A1B2C3D4E5F6071809AB1008 /* ToolAuthorization.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB1007 /* ToolAuthorization.swift */; };
 		A1B2C3D4E5F6071809AB1006 /* PromptInjectionDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB1003 /* PromptInjectionDetectorTests.swift */; };
 		A1B2C3D4E5F6071809AB2001 /* ToolAuthorizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB2002 /* ToolAuthorizationTests.swift */; };
+		A1B2C3D4E5F6071809AB2009 /* ToolAuditLoggerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB200A /* ToolAuditLoggerTests.swift */; };
 		A1B2C3D4E5F6071809AB2003 /* ChatViewModelToolSecurityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB2004 /* ChatViewModelToolSecurityTests.swift */; };
 		01816DD644C823C301E3482E /* SmartRouterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C42CB93D5F359C823B79BD26 /* SmartRouterTests.swift */; };
 		02B8CC1E8A5ACE3D6F9222FD /* ChatActor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56D4D47C336265C381D1679A /* ChatActor.swift */; };
@@ -487,6 +488,7 @@
 		FA6FB322AC0A5F31625473D1 /* KeychainManagerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeychainManagerTests.swift; sourceTree = "<group>"; };
 		FAF92749FCE229D0E7C27266 /* RAGService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RAGService.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6071809AB2002 /* ToolAuthorizationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ToolAuthorizationTests.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6071809AB200A /* ToolAuditLoggerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ToolAuditLoggerTests.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6071809AB2004 /* ChatViewModelToolSecurityTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatViewModelToolSecurityTests.swift; sourceTree = "<group>"; };
 		FC8BFC59FBB15DF83CA1F50C /* HealthInsightGeneratorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HealthInsightGeneratorTests.swift; sourceTree = "<group>"; };
 		FE90D28BEADDDCC3803A3180 /* HeadingView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HeadingView.swift; sourceTree = "<group>"; };
@@ -905,6 +907,7 @@
 				D9C45C4B1AE1A1D0B62559D3 /* ReminderToolTests.swift */,
 				C41ED6555734365803CF2CE4 /* ToolRegistryTests.swift */,
 				A1B2C3D4E5F6071809AB2002 /* ToolAuthorizationTests.swift */,
+				A1B2C3D4E5F6071809AB200A /* ToolAuditLoggerTests.swift */,
 				A1B2C3D4E5F6071809AB2004 /* ChatViewModelToolSecurityTests.swift */,
 				EBC97AC964782C385A85278D /* NotificationServiceTests.swift */,
 				878C578467218EC7BC842C1D /* VoiceServiceTests.swift */,
@@ -1318,6 +1321,7 @@
 				2E0A1DB5E6747FCB38B0BDD6 /* ReminderToolTests.swift in Sources */,
 				E09F2F60710E5F8A1E9F5CB5 /* ToolRegistryTests.swift in Sources */,
 				A1B2C3D4E5F6071809AB2001 /* ToolAuthorizationTests.swift in Sources */,
+				A1B2C3D4E5F6071809AB2009 /* ToolAuditLoggerTests.swift in Sources */,
 				A1B2C3D4E5F6071809AB2003 /* ChatViewModelToolSecurityTests.swift in Sources */,
 				752BE95DA53BA27016059599 /* NotificationServiceTests.swift in Sources */,
 				1C4E4E55C94FA33B562F19FA /* VoiceServiceTests.swift in Sources */,
