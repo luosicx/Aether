@@ -9,9 +9,24 @@ import Foundation
 /// macOS 命令行执行工具，仅执行白名单内的命令并返回输出
 final class TerminalCommandTool: ToolProtocol {
     /// 允许执行的命令白名单（仅基础命令名，不含路径）。
+    /// 注：已移除 `cat`，因其可读取任意文件（如 ~/.ssh/id_rsa），造成敏感信息泄露。
     private static let allowedCommands: Set<String> = [
-        "ls", "pwd", "cat", "which", "echo", "ps", "top", "df", "du"
+        "ls", "pwd", "which", "echo", "ps", "top", "df", "du"
     ]
+
+    /// 敏感路径黑名单前缀：禁止通过命令参数访问这些目录下的文件。
+    private static let sensitivePathPrefixes: [String] = {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        return [
+            "\(home)/.ssh",
+            "\(home)/.gnupg",
+            "\(home)/.config",
+            "\(home)/.aws",
+            "\(home)/.docker",
+            "\(home)/Library/Keychains",
+            "\(home)/Library/Cookies"
+        ]
+    }()
 
     /// 危险命令模式列表（作用于规范化后的命令）。
     /// 包含常见绕过形式：多余空格、$HOME 引用、--no-preserve-root、引号包裹等。
@@ -122,6 +137,13 @@ final class TerminalCommandTool: ToolProtocol {
         let arguments = Array(tokens.dropFirst())
         for argument in arguments {
             if argument.contains("..") { throw ValidationError.pathTraversal }
+            // 检查参数是否指向敏感路径
+            let standardized = (argument as NSString).standardizingPath
+            for prefix in sensitivePathPrefixes {
+                if standardized == prefix || standardized.hasPrefix(prefix + "/") {
+                    throw ValidationError.pathTraversal
+                }
+            }
         }
 
         guard let executableURL = resolveExecutable(named: executable) else {

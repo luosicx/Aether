@@ -33,6 +33,39 @@ final class FileOperationTool: ToolProtocol {
 
     private let fm = FileManager.default
 
+    /// 敏感目录黑名单：禁止访问这些目录下的任何文件，防止泄露密钥、凭证等。
+    private let sensitivePathPrefixes: [String] = {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        return [
+            "\(home)/.ssh",
+            "\(home)/.gnupg",
+            "\(home)/.config",
+            "\(home)/.aws",
+            "\(home)/.docker",
+            "\(home)/Library/Keychains",
+            "\(home)/Library/Cookies",
+            "\(home)/Library/Application Support/Google/Chrome",
+            "\(home)/Library/Application Support/Firefox",
+            "\(home)/Library/Application Support/1Password"
+        ]
+    }()
+
+    /// 校验路径是否安全：不在敏感目录黑名单内。
+    /// 对路径做标准化（解析 `..`、符号链接、冗余分隔符）后检查前缀。
+    /// - Parameter path: 用户提供的原始路径
+    /// - Returns: 通过校验的标准化路径，或 nil 表示路径被拒绝
+    private func validatePath(_ path: String) -> String? {
+        // 标准化路径：解析 .. 和 . 等
+        let standardized = (path as NSString).standardizingPath
+        // 检查是否命中敏感目录黑名单
+        for prefix in sensitivePathPrefixes {
+            if standardized == prefix || standardized.hasPrefix(prefix + "/") {
+                return nil
+            }
+        }
+        return standardized
+    }
+
     /// 执行文件操作
     ///
     /// - Parameter arguments: 含 `action` 及其所需路径参数的字典
@@ -59,7 +92,10 @@ final class FileOperationTool: ToolProtocol {
         guard let path = arguments["path"] as? String else {
             return "错误：请提供 path 参数"
         }
-        guard let items = try? fm.contentsOfDirectory(atPath: path) else {
+        guard let safePath = validatePath(path) else {
+            return "错误：拒绝访问敏感路径"
+        }
+        guard let items = try? fm.contentsOfDirectory(atPath: safePath) else {
             return "错误：无法读取目录：\(path)"
         }
         if items.isEmpty { return "目录为空" }
@@ -72,7 +108,10 @@ final class FileOperationTool: ToolProtocol {
               let namePattern = arguments["name"] as? String else {
             return "错误：请提供 path 和 name 参数"
         }
-        let url = URL(fileURLWithPath: path)
+        guard let safePath = validatePath(path) else {
+            return "错误：拒绝访问敏感路径"
+        }
+        let url = URL(fileURLWithPath: safePath)
         var results: [String] = []
         // 用 FileManager enumerator 递归遍历目录树
         let enumerator = fm.enumerator(at: url, includingPropertiesForKeys: nil)
@@ -90,8 +129,14 @@ final class FileOperationTool: ToolProtocol {
         guard let src = arguments["src"] as? String, let dst = arguments["dst"] as? String else {
             return "错误：请提供 src 和 dst 参数"
         }
+        guard let safeSrc = validatePath(src) else {
+            return "错误：拒绝访问敏感路径（src）"
+        }
+        guard let safeDst = validatePath(dst) else {
+            return "错误：拒绝访问敏感路径（dst）"
+        }
         do {
-            try fm.copyItem(atPath: src, toPath: dst)
+            try fm.copyItem(atPath: safeSrc, toPath: safeDst)
             return "已复制"
         } catch {
             return "错误：复制失败：\(error.localizedDescription)"
@@ -103,8 +148,14 @@ final class FileOperationTool: ToolProtocol {
         guard let src = arguments["src"] as? String, let dst = arguments["dst"] as? String else {
             return "错误：请提供 src 和 dst 参数"
         }
+        guard let safeSrc = validatePath(src) else {
+            return "错误：拒绝访问敏感路径（src）"
+        }
+        guard let safeDst = validatePath(dst) else {
+            return "错误：拒绝访问敏感路径（dst）"
+        }
         do {
-            try fm.moveItem(atPath: src, toPath: dst)
+            try fm.moveItem(atPath: safeSrc, toPath: safeDst)
             return "已移动"
         } catch {
             return "错误：移动失败：\(error.localizedDescription)"
@@ -116,7 +167,10 @@ final class FileOperationTool: ToolProtocol {
         guard let path = arguments["path"] as? String, let newName = arguments["name"] as? String else {
             return "错误：请提供 path 和 name 参数"
         }
-        let srcURL = URL(fileURLWithPath: path)
+        guard let safePath = validatePath(path) else {
+            return "错误：拒绝访问敏感路径"
+        }
+        let srcURL = URL(fileURLWithPath: safePath)
         // 在原路径所在目录下拼接新文件名
         let dstURL = srcURL.deletingLastPathComponent().appendingPathComponent(newName)
         do {
@@ -132,7 +186,10 @@ final class FileOperationTool: ToolProtocol {
         guard let path = arguments["path"] as? String else {
             return "错误：请提供 path 参数"
         }
-        let url = URL(fileURLWithPath: path)
+        guard let safePath = validatePath(path) else {
+            return "错误：拒绝访问敏感路径"
+        }
+        let url = URL(fileURLWithPath: safePath)
         do {
             // 移到废纸篓
             var resultURL: NSURL?
@@ -148,7 +205,10 @@ final class FileOperationTool: ToolProtocol {
         guard let path = arguments["path"] as? String else {
             return "错误：请提供 path 参数"
         }
-        guard let attrs = try? fm.attributesOfItem(atPath: path) else {
+        guard let safePath = validatePath(path) else {
+            return "错误：拒绝访问敏感路径"
+        }
+        guard let attrs = try? fm.attributesOfItem(atPath: safePath) else {
             return "错误：无法获取文件信息"
         }
         let size = (attrs[.size] as? NSNumber)?.int64Value ?? 0

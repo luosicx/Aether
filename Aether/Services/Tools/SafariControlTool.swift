@@ -34,9 +34,10 @@ final class SafariControlTool: ToolProtocol {
     /// run_js 允许执行的目标域白名单。空集合表示默认不允许任何域。
     private let allowedDomains: Set<String> = []
 
-    /// 将用户传入的字符串转义为 AppleScript 字符串字面量中的安全形式，
-    /// 防止通过 `"` 或 `\` 跳出字符串边界注入任意 AppleScript 代码。
-    /// 标记为 internal 以便单元测试直接验证转义行为。
+    /// 将字符串安全转义为 AppleScript 字符串字面量，防止注入。
+    /// 转义反斜杠、双引号以及换行/回车/制表符等控制字符，
+    /// 防止攻击者闭合字符串并注入任意 AppleScript 代码或多行脚本。
+    /// 标记为 internal static 以便单元测试直接验证转义行为。
     static func appleScriptEscaped(_ string: String) -> String {
         string
             .replacingOccurrences(of: "\\", with: "\\\\")
@@ -44,6 +45,14 @@ final class SafariControlTool: ToolProtocol {
             .replacingOccurrences(of: "\n", with: "\\n")
             .replacingOccurrences(of: "\r", with: "\\r")
             .replacingOccurrences(of: "\t", with: "\\t")
+    }
+
+    /// 校验 URL scheme 是否在允许的白名单内（仅 http/https），防止 file:// 等危险 scheme。
+    private func validateURLScheme(_ urlString: String) -> Bool {
+        guard let url = URL(string: urlString), let scheme = url.scheme?.lowercased() else {
+            return false
+        }
+        return scheme == "http" || scheme == "https"
     }
 
     /// 执行 Safari 控制操作
@@ -98,6 +107,9 @@ final class SafariControlTool: ToolProtocol {
         guard let url = arguments["url"] as? String else {
             return "错误：请提供 url 参数"
         }
+        guard validateURLScheme(url) else {
+            return "错误：仅允许 http/https URL"
+        }
         let escapedURL = Self.appleScriptEscaped(url)
         let script = """
         tell application "Safari"
@@ -144,6 +156,9 @@ final class SafariControlTool: ToolProtocol {
             end tell
             """
         } else {
+            guard validateURLScheme(url) else {
+                return "错误：仅允许 http/https URL"
+            }
             let escapedURL = Self.appleScriptEscaped(url)
             script = """
             tell application "Safari"

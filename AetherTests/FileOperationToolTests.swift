@@ -205,5 +205,113 @@ final class FileOperationToolTests: XCTestCase {
         let result = try await tool.execute(arguments: ["action": 123])
         XCTAssertEqual(result, "错误：请提供 action 参数")
     }
+
+    // MARK: - 敏感路径保护测试
+
+    /// list 敏感目录（~/.ssh）应被拒绝
+    func testListSensitivePathRejected() async throws {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let result = try await tool.execute(arguments: [
+            "action": "list",
+            "path": "\(home)/.ssh"
+        ])
+        XCTAssertEqual(result, "错误：拒绝访问敏感路径")
+    }
+
+    /// list 敏感目录（~/Library/Keychains）应被拒绝
+    func testListKeychainPathRejected() async throws {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let result = try await tool.execute(arguments: [
+            "action": "list",
+            "path": "\(home)/Library/Keychains"
+        ])
+        XCTAssertEqual(result, "错误：拒绝访问敏感路径")
+    }
+
+    /// info 敏感文件应被拒绝
+    func testInfoSensitivePathRejected() async throws {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let result = try await tool.execute(arguments: [
+            "action": "info",
+            "path": "\(home)/.ssh/id_rsa"
+        ])
+        XCTAssertEqual(result, "错误：拒绝访问敏感路径")
+    }
+
+    /// delete 敏感文件应被拒绝
+    func testDeleteSensitivePathRejected() async throws {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let result = try await tool.execute(arguments: [
+            "action": "delete",
+            "path": "\(home)/.ssh/id_rsa"
+        ])
+        XCTAssertEqual(result, "错误：拒绝访问敏感路径")
+    }
+
+    /// copy 从敏感路径应被拒绝
+    func testCopyFromSensitivePathRejected() async throws {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let result = try await tool.execute(arguments: [
+            "action": "copy",
+            "src": "\(home)/.ssh/id_rsa",
+            "dst": "/tmp/leaked"
+        ])
+        XCTAssertEqual(result, "错误：拒绝访问敏感路径（src）")
+    }
+
+    /// copy 到敏感路径应被拒绝
+    func testCopyToSensitivePathRejected() async throws {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let result = try await tool.execute(arguments: [
+            "action": "copy",
+            "src": "/tmp/test.txt",
+            "dst": "\(home)/.ssh/leaked"
+        ])
+        XCTAssertEqual(result, "错误：拒绝访问敏感路径（dst）")
+    }
+
+    /// move 从敏感路径应被拒绝
+    func testMoveFromSensitivePathRejected() async throws {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let result = try await tool.execute(arguments: [
+            "action": "move",
+            "src": "\(home)/.aws/credentials",
+            "dst": "/tmp/leaked"
+        ])
+        XCTAssertEqual(result, "错误：拒绝访问敏感路径（src）")
+    }
+
+    /// rename 敏感文件应被拒绝
+    func testRenameSensitivePathRejected() async throws {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let result = try await tool.execute(arguments: [
+            "action": "rename",
+            "path": "\(home)/.ssh/id_rsa",
+            "name": "leaked"
+        ])
+        XCTAssertEqual(result, "错误：拒绝访问敏感路径")
+    }
+
+    /// search 敏感目录应被拒绝
+    func testSearchSensitivePathRejected() async throws {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let result = try await tool.execute(arguments: [
+            "action": "search",
+            "path": "\(home)/.ssh",
+            "name": "*"
+        ])
+        XCTAssertEqual(result, "错误：拒绝访问敏感路径")
+    }
+
+    /// 路径遍历（..）标准化后命中敏感目录应被拒绝
+    func testPathTraversalToSensitivePathRejected() async throws {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        // 假设当前目录在 home 下，使用 ../../.ssh 尝试访问
+        let result = try await tool.execute(arguments: [
+            "action": "list",
+            "path": "\(home)/Documents/../../.ssh"
+        ])
+        XCTAssertEqual(result, "错误：拒绝访问敏感路径")
+    }
 }
 #endif

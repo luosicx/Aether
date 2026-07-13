@@ -118,14 +118,22 @@ final class WindowManagementTool: ToolProtocol {
         guard let appName = arguments["app"] as? String else {
             return "错误：请提供 app 参数"
         }
-        // 用 AppleScript 最小化窗口
-        let script = "tell application \"\(appName)\" to set miniaturized of window 1 to true"
+        // 校验 appName 是否为当前运行中的应用，防止 AppleScript 注入
+        guard isValidRunningApp(appName) else {
+            return "错误：未找到运行中的应用：\(appName)"
+        }
+        let escapedName = escapeForAppleScript(appName)
+        let script = "tell application \"\(escapedName)\" to set miniaturized of window 1 to true"
         return runAppleScript(script)
     }
 
     /// 通过 AXUIElement 定位应用窗口并调整 frame。
     /// - Parameter modify: 闭包用于修改传入的 frame（origin 或 size）
     private func setWindowFrame(_ appName: String, modify: (inout CGRect) -> Void) -> String {
+        // 校验 appName 是否为当前运行中的应用，防止 AppleScript 注入
+        guard isValidRunningApp(appName) else {
+            return "错误：未找到运行中的应用：\(appName)"
+        }
         // 通过 AXUIElement 设置窗口位置/大小
         let ws = NSWorkspace.shared
         for app in ws.runningApplications where app.localizedName == appName {
@@ -138,13 +146,27 @@ final class WindowManagementTool: ToolProtocol {
                     var frameRef: CFTypeRef?
                     AXUIElementCopyAttributeValue(window, kAXPositionAttribute as CFString, &frameRef)
                     // 简化实现：用 AppleScript 设置
-                    let script = "tell application \"\(appName)\" to set bounds of window 1 to {0, 0, 800, 600}"
+                    let escapedName = escapeForAppleScript(appName)
+                    let script = "tell application \"\(escapedName)\" to set bounds of window 1 to {0, 0, 800, 600}"
                     _ = runAppleScript(script)
                     return "已调整 \(appName) 窗口"
                 }
             }
         }
         return "未找到应用窗口：\(appName)"
+    }
+
+    /// 校验 appName 是否为当前运行中的应用名称，防止通过 app 参数注入 AppleScript。
+    private func isValidRunningApp(_ appName: String) -> Bool {
+        let ws = NSWorkspace.shared
+        return ws.runningApplications.contains { $0.localizedName == appName }
+    }
+
+    /// 将字符串安全转义为 AppleScript 字符串字面量，防止注入。
+    private func escapeForAppleScript(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
     }
 
     /// 执行 AppleScript 脚本并返回结果，错误以字符串形式返回
