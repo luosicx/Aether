@@ -115,6 +115,22 @@ final class TelemetryServiceTests: XCTestCase {
         XCTAssertEqual(records[4].payload["errorType"], "apiError")
     }
 
+    // errorOccurred 的 userMessage 应在入队前被脱敏，原始敏感字符串不得进入缓冲
+    func testErrorOccurredUserMessageIsRedacted() async {
+        let service = TelemetryService()
+        let sensitiveMessage = "登录失败：password=Secret123，用户邮箱 alice@example.com"
+        await service.track(.errorOccurred(errorType: "loginFailed", userMessage: sensitiveMessage))
+
+        let records = await service.drain()
+        XCTAssertEqual(records.count, 1)
+        let userMessage = records[0].payload["userMessage"]
+        XCTAssertNotNil(userMessage)
+        XCTAssertTrue(userMessage!.contains("[REDACTED_CREDENTIAL]"))
+        XCTAssertTrue(userMessage!.contains("[REDACTED_EMAIL]"))
+        XCTAssertFalse(userMessage!.contains("Secret123"))
+        XCTAssertFalse(userMessage!.contains("alice@example.com"))
+    }
+
     // 自定义阈值：threshold=5 时，5 条事件即触发上报（边界等于）
     func testShouldUploadWithCustomThreshold() async {
         let service = TelemetryService()

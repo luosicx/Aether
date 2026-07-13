@@ -645,4 +645,67 @@ final class SettingsViewModelTests: XCTestCase {
         vm.bffConfig.userToken = "mutated-token"
         XCTAssertEqual(vm.bffConfig.userToken, "mutated-token")
     }
+
+    // MARK: - 工具启用状态管理
+
+    /// loadSettings 应从 ToolRegistry 同步启用状态到 ViewModel
+    func testLoadSettingsSyncsEnabledTools() {
+        // 先设置一个已知状态
+        let toolName = "calculate"
+        let originalEnabled = ToolRegistry.shared.isEnabled(name: toolName)
+        ToolRegistry.shared.setEnabled(name: toolName, value: false)
+
+        vm.loadSettings()
+        XCTAssertFalse(vm.enabledTools.contains(toolName), "loadSettings 后未启用的工具不应在 enabledTools 中")
+
+        // 启用后重新加载
+        ToolRegistry.shared.setEnabled(name: toolName, value: true)
+        vm.loadSettings()
+        XCTAssertTrue(vm.enabledTools.contains(toolName), "loadSettings 后已启用的工具应在 enabledTools 中")
+
+        // 恢复原始状态
+        ToolRegistry.shared.setEnabled(name: toolName, value: originalEnabled)
+    }
+
+    /// toggleTool 应切换工具的启用状态并同步到 ToolRegistry
+    func testToggleToolChangesEnabledState() {
+        let toolName = "calculate"
+        let originalEnabled = ToolRegistry.shared.isEnabled(name: toolName)
+
+        // 确保起始状态为启用
+        ToolRegistry.shared.setEnabled(name: toolName, value: true)
+        vm.loadSettings()
+        XCTAssertTrue(vm.enabledTools.contains(toolName), "初始状态应为启用")
+
+        // 切换为禁用
+        vm.toggleTool(name: toolName)
+        XCTAssertFalse(ToolRegistry.shared.isEnabled(name: toolName), "toggleTool 后应为禁用")
+        XCTAssertFalse(vm.enabledTools.contains(toolName), "enabledTools 应反映禁用状态")
+
+        // 再次切换为启用
+        vm.toggleTool(name: toolName)
+        XCTAssertTrue(ToolRegistry.shared.isEnabled(name: toolName), "再次 toggleTool 后应为启用")
+        XCTAssertTrue(vm.enabledTools.contains(toolName), "enabledTools 应反映启用状态")
+
+        // 恢复原始状态
+        ToolRegistry.shared.setEnabled(name: toolName, value: originalEnabled)
+    }
+
+    /// toggleTool 对高危工具也应正常工作
+    func testToggleToolForHighRiskTool() {
+        let toolName = "run_terminal_command"
+        let originalEnabled = ToolRegistry.shared.isEnabled(name: toolName)
+
+        // 高危工具默认禁用
+        ToolRegistry.shared.setEnabled(name: toolName, value: false)
+        vm.loadSettings()
+        XCTAssertFalse(vm.enabledTools.contains(toolName))
+
+        // 启用高危工具
+        vm.toggleTool(name: toolName)
+        XCTAssertTrue(ToolRegistry.shared.isEnabled(name: toolName), "toggleTool 应能启用高危工具")
+
+        // 恢复
+        ToolRegistry.shared.setEnabled(name: toolName, value: originalEnabled)
+    }
 }

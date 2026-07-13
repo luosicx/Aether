@@ -86,6 +86,9 @@ struct SettingsView: View {
     @State private var showMailComposer: Bool = false
     // iPad/macOS 双栏:当前选中的设置分类
     @State private var selectedSection: SettingsSection? = .provider
+    // 危险工具授权 Alert 状态
+    @State private var showToolAuthorizationAlert = false
+    @State private var pendingToolName: String?
 
     var body: some View {
         Group {
@@ -113,6 +116,21 @@ struct SettingsView: View {
             }
         }
         #endif
+        // 危险工具启用风险提示
+        .alert(NSLocalizedString("启用高危工具", comment: "危险工具授权弹窗标题"), isPresented: $showToolAuthorizationAlert) {
+            Button(NSLocalizedString("取消", comment: "取消按钮"), role: .cancel) {
+                pendingToolName = nil
+            }
+            Button(NSLocalizedString("确认启用", comment: "确认启用危险工具按钮"), role: .destructive) {
+                if let name = pendingToolName {
+                    settingsVM.authorizedToolsOnce.insert(name)
+                    settingsVM.toggleTool(name: name)
+                }
+                pendingToolName = nil
+            }
+        } message: {
+            Text(NSLocalizedString("该工具可执行系统命令或控制其他应用，存在安全风险。确定要启用吗？", comment: "危险工具授权风险提示"))
+        }
     }
 
     // MARK: - Compact (iPhone)
@@ -133,6 +151,7 @@ struct SettingsView: View {
                 apiConfigSection
                 modelSection
                 featuresSection
+                dangerousToolsSection
                 systemPromptSection
                 if let msg = settingsVM.saveMessage {
                     saveMessageSection(msg)
@@ -237,6 +256,7 @@ struct SettingsView: View {
             voiceSection
         case .features:
             featuresSection
+            dangerousToolsSection
             systemPromptSection
             preferenceSection
             themeSection
@@ -684,6 +704,59 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: - Section: 危险工具（macOS 高危工具开关）
+
+    @ViewBuilder
+    private var dangerousToolsSection: some View {
+        let dangerousTools = ToolRegistry.shared.dangerousToolDefs
+        if !dangerousTools.isEmpty {
+            Section {
+                ForEach(dangerousTools, id: \.name) { tool in
+                    let name = tool.name
+                    Toggle(displayNameForDangerousTool(name), isOn: Binding(
+                        get: { settingsVM.enabledTools.contains(name) },
+                        set: { isOn in
+                            if isOn {
+                                if ToolRegistry.shared.requiresAuthorization(name: name),
+                                   !settingsVM.authorizedToolsOnce.contains(name) {
+                                    pendingToolName = name
+                                    showToolAuthorizationAlert = true
+                                } else {
+                                    settingsVM.toggleTool(name: name)
+                                }
+                            } else {
+                                settingsVM.toggleTool(name: name)
+                            }
+                        }
+                    ))
+                    .accessibilityLabel(displayNameForDangerousTool(name))
+                    .accessibilityHint("启用或禁用此高危工具")
+                    .accessibilityIdentifier("dangerousToolToggle_\(name)")
+                }
+            } header: {
+                Text(NSLocalizedString("危险工具", comment: "危险工具分组标题"))
+            } footer: {
+                Text(NSLocalizedString("以下工具可执行系统命令、控制其他应用或访问敏感信息，默认关闭。启用前请阅读风险提示。", comment: "危险工具分组底部说明"))
+                    .font(.captionAI)
+            }
+        }
+    }
+
+    /// 将危险工具注册名映射为本地化的可读显示名称
+    private func displayNameForDangerousTool(_ name: String) -> String {
+        switch name {
+        case "run_terminal_command":
+            return NSLocalizedString("终端命令", comment: "终端命令工具显示名称")
+        case "run_applescript":
+            return NSLocalizedString("AppleScript", comment: "AppleScript 工具显示名称")
+        case "control_safari":
+            return NSLocalizedString("Safari 控制", comment: "Safari 控制工具显示名称")
+        case "create_shortcut":
+            return NSLocalizedString("快捷指令", comment: "快捷指令工具显示名称")
+        default: return name
+        }
+    }
+
     // MARK: - Section: 系统提示词
 
     @ViewBuilder
@@ -1101,6 +1174,9 @@ struct SettingsView: View {
 
         // Day 17: 刷新 HealthKit 授权状态与洞察数量
         refreshHealthStatus()
+
+        // 同步工具启用状态
+        settingsVM.loadSettings()
 
         Task {
             await settingsVM.loadAPIKeysFromKeychain()

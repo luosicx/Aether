@@ -218,6 +218,24 @@ struct ChatView: View {
             .onOpenURL { url in
                 handleDeepLink(url)
             }
+            // Task 7: 提示注入检测弹窗
+            .alert(
+                NSLocalizedString("输入安全提醒", comment: ""),
+                isPresented: $viewModel.showInjectionWarning,
+                actions: {
+                    Button(NSLocalizedString("取消", comment: ""), role: .cancel) {
+                        viewModel.pendingInjectionDecision?(false)
+                        viewModel.pendingInjectionDecision = nil
+                    }
+                    Button(NSLocalizedString("继续发送", comment: ""), role: .destructive) {
+                        viewModel.pendingInjectionDecision?(true)
+                        viewModel.pendingInjectionDecision = nil
+                    }
+                },
+                message: {
+                    Text(viewModel.injectionWarningMessage)
+                }
+            )
             // Task 4: 监听 macOS 菜单栏命令通知 —— 新建对话 / 搜索会话 / 设置
             .onReceive(NotificationCenter.default.publisher(for: .newConversationRequested)) { _ in
                 createNewConversation()

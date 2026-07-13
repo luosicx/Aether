@@ -25,6 +25,7 @@ final class ContactsTool: ToolProtocol {
 
     /// 执行联系人搜索。流程：1) 必须提供 query 参数；2) 请求通讯录权限；
     /// 3) 按姓名匹配 + 按电话号码匹配；4) 合并去重；5) 返回格式化结果字符串。
+    @MainActor
     func execute(arguments: [String: Any]) async throws -> String {
         guard let query = arguments["query"] as? String, !query.isEmpty else {
             return "错误：请提供搜索关键词"

@@ -32,6 +32,7 @@ final class OCRTool: ToolProtocol {
     /// - Parameter arguments: 可含 `image_path` 键的参数字典
     /// - Returns: 识别到的文字字符串，多行用换行符分隔；无文字时返回提示
     /// - Throws: Vision 识别过程中的错误会抛出
+    @MainActor
     func execute(arguments: [String: Any]) async throws -> String {
         // 确定图片来源：优先用传入路径，否则调用 ScreenshotTool 截屏
         let imagePath: String

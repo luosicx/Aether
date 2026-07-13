@@ -12,6 +12,11 @@ struct APIConfig {
     static let defaultModel = "deepseek-chat"
     /// 默认嵌入模型名。
     static let embeddingModel = "deepseek-embedding"
+
+    /// 遥测日志上传端点占位符。
+    /// 安全要求：生产环境必须替换为带认证的端点（STS 临时凭证或预签名 URL），
+    /// 禁止直接向可公开写入的 OSS URL 上传。
+    static let telemetryUploadEndpoint = "https://aether-logs.oss-cn-hangzhou.aliyuncs.com/logs"
 }
 
 /// 单次 chat 请求的配置参数。

@@ -93,13 +93,14 @@ final class LogUploaderTests: XCTestCase {
     // MARK: - Fixture
 
     private let endpoint = URL(string: "https://test.example.com/logs")!
+    private let testToken = "Bearer test-sts-token"
     private var uploader: LogUploader!
 
     override func setUp() {
         super.setUp()
         MockURLProtocol.reset()
         URLProtocol.registerClass(MockURLProtocol.self)
-        uploader = LogUploader(endpointURL: endpoint)
+        uploader = LogUploader(endpointURL: endpoint, authorizationHeader: testToken)
     }
 
     override func tearDown() {
@@ -326,23 +327,66 @@ final class LogUploaderTests: XCTestCase {
         XCTAssertEqual(status, "success", "无数据上报应记为 success")
     }
 
-    /// LogUploader 默认初始化应使用阿里云 OSS endpoint
-    func testDefaultInitUsesAliyunEndpoint() {
+    /// LogUploader 默认初始化应使用配置端点；不带凭证时初始化本身不崩溃
+    func testDefaultInitUsesConfigEndpoint() {
         let defaultUploader = LogUploader()
-        // 仅验证初始化不崩溃，endpoint 为 private 无法直接验证
+        // 仅验证初始化不崩溃，endpoint / authorizationHeader 为 private 无法直接验证
         _ = defaultUploader
+    }
+
+    /// 缺少凭证时应立即拒绝上传，不发出网络请求
+    func testUploadRejectsMissingCredentials() async {
+        await drainShared()
+        await seedEvents(1)
+        let noAuthUploader = LogUploader(endpointURL: endpoint, authorizationHeader: nil)
+
+        await noAuthUploader.uploadIfNeeded()
+
+        XCTAssertEqual(MockURLProtocol.requestCount, 0, "无凭证时不应发出请求")
+        let status = await noAuthUploader.lastUploadStatus
+        XCTAssertEqual(status, "failed", "无凭证应记为 failed")
+        let lastUploadAt = await noAuthUploader.lastUploadAt
+        XCTAssertNil(lastUploadAt, "无凭证失败时不应更新 lastUploadAt")
+    }
+
+    /// 空字符串凭证同样视为无凭证，应拒绝上传
+    func testUploadRejectsEmptyCredentials() async {
+        await drainShared()
+        await seedEvents(1)
+        let emptyAuthUploader = LogUploader(endpointURL: endpoint, authorizationHeader: "")
+
+        await emptyAuthUploader.uploadIfNeeded()
+
+        XCTAssertEqual(MockURLProtocol.requestCount, 0, "空凭证时不应发出请求")
+        let status = await emptyAuthUploader.lastUploadStatus
+        XCTAssertEqual(status, "failed")
+    }
+
+    /// 上报请求应携带 Authorization header
+    func testUploadSetsAuthorizationHeader() async {
+        await drainShared()
+        await seedEvents(1)
+        MockURLProtocol.fallbackStatusCode = 200
+
+        await uploader.uploadIfNeeded()
+
+        XCTAssertEqual(
+            MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Authorization"),
+            testToken,
+            "应设置 Authorization header"
+        )
     }
 
     /// lastUploadStatus 初始值应为 "idle"
     func testInitialStatusIsIdle() async {
-        let freshUploader = LogUploader(endpointURL: endpoint)
+        let freshUploader = LogUploader(endpointURL: endpoint, authorizationHeader: testToken)
         let status = await freshUploader.lastUploadStatus
         XCTAssertEqual(status, "idle", "初始 lastUploadStatus 应为 'idle'")
     }
 
     /// lastUploadAt 初始值应为 nil
     func testInitialLastUploadAtIsNil() async {
-        let freshUploader = LogUploader(endpointURL: endpoint)
+        let freshUploader = LogUploader(endpointURL: endpoint, authorizationHeader: testToken)
         let value = await freshUploader.lastUploadAt
         XCTAssertNil(value, "初始 lastUploadAt 应为 nil")
     }
