@@ -7,15 +7,16 @@ on:
     branches: [main]
 
 jobs:
-  # Unit tests - 3 shards in parallel via matrix for faster execution
-  # Each shard runs ~1/3 of test classes, generates its own coverage.xml
+  # Unit tests - 2 shards in parallel via matrix for faster execution
+  # Each shard runs ~1/2 of test classes, generates its own coverage.xml
+  # Uses 2 shards (not 3) to stay within macOS runner concurrency limit (~4)
   unit-tests:
     strategy:
       fail-fast: false
       matrix:
-        shard-index: [0, 1, 2]
+        shard-index: [0, 1]
     runs-on: macos-15
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v5
 
@@ -39,7 +40,7 @@ jobs:
 
       - name: Get test classes for this shard
         run: |
-          python3 scripts/ci-shard-tests.py ${{ matrix.shard-index }} 3 > /tmp/shard_classes.txt
+          python3 scripts/ci-shard-tests.py ${{ matrix.shard-index }} 2 > /tmp/shard_classes.txt
           echo "=== Shard ${{ matrix.shard-index }} test classes ==="
           cat /tmp/shard_classes.txt
           echo "Total: $(wc -l < /tmp/shard_classes.txt) classes"
@@ -229,70 +230,13 @@ jobs:
           fi
           echo "xcodebuild exited non-zero but all UIT tests passed (simulator instability)"
 
-  security-tests:
-    runs-on: macos-15
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Select Xcode (latest)
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: 'latest'
-
-      - name: Setup iOS Simulator
-        run: bash scripts/ci-setup-simulator.sh
-
-      - name: Build for Testing
-        run: |
-          xcodebuild build-for-testing \
-            -project Aether.xcodeproj \
-            -scheme Aether \
-            -destination 'platform=iOS Simulator,name=iPhone 17,arch=arm64' \
-            -configuration Debug \
-            -derivedDataPath build \
-            CODE_SIGNING_ALLOWED=NO
-
-      - name: Run Security Tests
-        id: test
-        continue-on-error: true
-        run: |
-          xcodebuild test-without-building \
-            -project Aether.xcodeproj \
-            -scheme Aether \
-            -destination 'platform=iOS Simulator,name=iPhone 17,arch=arm64' \
-            -configuration Debug \
-            -derivedDataPath build \
-            -only-testing:AetherTests/ToolRegistryTests \
-            -only-testing:AetherTests/ToolAuthorizationTests \
-            -only-testing:AetherTests/KeychainManagerTests \
-            -only-testing:AetherTests/TelemetrySanitizerTests \
-            -only-testing:AetherTests/PromptInjectionDetectorTests \
-            -only-testing:AetherTests/ChatViewModelToolSecurityTests \
-            -only-testing:AetherTests/LogUploaderTests \
-            -only-testing:AetherTests/TelemetryServiceTests \
-            -test-timeouts-enabled YES \
-            -default-test-execution-time-allowance 30 \
-            -maximum-test-execution-time-allowance 60 \
-            -resultBundlePath SecurityTestResults.xcresult \
-            CODE_SIGNING_ALLOWED=NO
-
-      - name: Verify Security Test Results
-        if: steps.test.outcome != 'success'
-        run: |
-          echo "xcodebuild test exited non-zero, verifying security test results..."
-          if [ ! -d "SecurityTestResults.xcresult" ]; then
-            echo "ERROR: No test results generated (SecurityTestResults.xcresult missing)"
-            exit 1
-          fi
-          FAILED_TESTS=$(xcrun xcresulttool get test-results summary --path SecurityTestResults.xcresult 2>/dev/null | grep -c '"failed"' | tr -d '\n')
-          FAILED_TESTS=${FAILED_TESTS:-0}
-          if [ "$FAILED_TESTS" -gt 0 ]; then
-            echo "ERROR: $FAILED_TESTS security test(s) failed"
-            xcrun xcresulttool get test-results summary --path SecurityTestResults.xcresult
-            exit 1
-          fi
-          echo "xcodebuild exited non-zero but all security tests passed (simulator instability)"
+  # NOTE: security-tests job removed — all 8 security test classes
+  # (ToolRegistryTests, ToolAuthorizationTests, KeychainManagerTests,
+  # TelemetrySanitizerTests, PromptInjectionDetectorTests,
+  # ChatViewModelToolSecurityTests, LogUploaderTests, TelemetryServiceTests)
+  # are already included in the unit-tests shards above, making the separate
+  # security-tests job fully redundant. macOS-only test classes run in
+  # security-tests-macos below.
 
   security-tests-macos:
     runs-on: macos-15
