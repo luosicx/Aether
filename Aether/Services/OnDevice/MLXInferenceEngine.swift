@@ -1,13 +1,13 @@
 import Foundation
 import CryptoKit
-#if canImport(MLX)
+#if canImport(MLXLLM)
 import MLX
 import MLXLMCommon
 import MLXLLM
 #endif
 
 /// Day 16: MLX 端侧推理引擎（actor 隔离，保证并发安全）。
-/// 通过 `#if canImport(MLX)` 条件编译保护：
+/// 通过 `#if canImport(MLXLLM)` 条件编译保护：
 /// - mlx-swift 可用（真机集成 SPM 后）：调用真正的 MLX API 加载模型并流式生成
 /// - mlx-swift 不可用（模拟器或未集成时）：提供占位实现，抛 loadFailed 或返回提示流
 /// 这样代码在模拟器上能编译（走占位分支），在真机上有 mlx-swift 时才真正调用 MLX。
@@ -22,7 +22,7 @@ actor MLXInferenceEngine {
     /// 最近一次成功加载的模型路径（用于 tokenizer 预加载等后续操作）
     private var loadedModelPath: URL?
 
-    #if canImport(MLX)
+    #if canImport(MLXLLM)
     /// 已加载的 MLX 模型容器（mlx-swift 可用时持有真实模型）
     private var loadedModel: ModelContainer?
     #endif
@@ -67,7 +67,7 @@ actor MLXInferenceEngine {
             }
         }
 
-        #if canImport(MLX)
+        #if canImport(MLXLLM)
         // 真正加载 MLX 模型：通过 Task.detached 将阻塞式加载放到后台线程，避免阻塞 actor
         // 使用 ModelConfiguration 指定本地模型目录路径，MLXLMCommon 会读取
         // config.json / tokenizer.json / model.safetensors 等完整模型目录文件
@@ -95,7 +95,7 @@ actor MLXInferenceEngine {
     /// 通过 ModelContainer 执行一次 prepare 预热 tokenizer，同时并行预读配置文件 warm OS page cache，
     /// 减少首次推理的延迟。在 mlx-swift 不可用时为空操作。
     func preloadTokenizer() async {
-        #if canImport(MLX)
+        #if canImport(MLXLLM)
         guard let model = loadedModel else { return }
         // 通过 ModelContainer 执行一次 tokenizer prepare，初始化并预热 tokenizer
         _ = try? await model.perform { context in
@@ -116,7 +116,7 @@ actor MLXInferenceEngine {
     /// - Returns: 逐 token 的文本流
     func generate(prompt: String, maxTokens: Int, temperature: Double, modelPath: URL? = nil) -> AsyncStream<String> {
         AsyncStream { continuation in
-            #if canImport(MLX)
+            #if canImport(MLXLLM)
             Task {
                 // 自动加载：模型未加载且提供了路径时，先后台加载
                 if !isLoaded, let path = modelPath {
@@ -162,7 +162,7 @@ actor MLXInferenceEngine {
 
     /// 卸载模型，释放内存。
     func unloadModel() {
-        #if canImport(MLX)
+        #if canImport(MLXLLM)
         loadedModel = nil
         #endif
         isLoaded = false
