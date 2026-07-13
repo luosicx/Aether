@@ -25,16 +25,6 @@ final class AppleScriptTool: ToolProtocol {
         )
     }
 
-    /// 执行前请求用户确认。
-    ///
-    /// 展示完整脚本内容，并返回是否获得用户确认。
-    private func requestConfirmation(for script: String) async -> Bool {
-        let details = "脚本内容：\n\(script)"
-        let result = await ToolAuthorization.shared.presentConfirmation(toolName: "run_applescript", details: details)
-        if case .authorized = result { return true }
-        return false
-    }
-
     /// 执行 AppleScript 脚本
     ///
     /// - Parameter arguments: 含 `script` 键的参数字典
@@ -42,14 +32,8 @@ final class AppleScriptTool: ToolProtocol {
     /// - Throws: 工具未启用或用户未确认时抛出错误
     @MainActor
     func execute(arguments: [String: Any]) async throws -> String {
-        guard ToolRegistry.shared.isEnabled(name: "run_applescript") else {
-            throw NSError(domain: "AppleScriptTool", code: 1, userInfo: [NSLocalizedDescriptionKey: "AppleScript 工具未启用"])
-        }
         guard let script = arguments["script"] as? String, !script.isEmpty else {
             return "错误：请提供 AppleScript 脚本"
-        }
-        guard await requestConfirmation(for: script) else {
-            throw NSError(domain: "AppleScriptTool", code: 2, userInfo: [NSLocalizedDescriptionKey: "用户未确认执行 AppleScript"])
         }
         // 通过 NSAppleScript 编译并执行脚本，错误信息写入 errorInfo
         let appleScript = NSAppleScript(source: script)

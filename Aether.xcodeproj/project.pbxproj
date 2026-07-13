@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		A1B2C3D4E5F6071809AB1004 /* PromptInjectionDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB1001 /* PromptInjectionDetector.swift */; };
 		A1B2C3D4E5F6071809AB1005 /* ToolAuditLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB1002 /* ToolAuditLogger.swift */; };
+		A1B2C3D4E5F6071809AB1008 /* ToolAuthorization.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB1007 /* ToolAuthorization.swift */; };
 		A1B2C3D4E5F6071809AB1006 /* PromptInjectionDetectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB1003 /* PromptInjectionDetectorTests.swift */; };
 		A1B2C3D4E5F6071809AB2001 /* ToolAuthorizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB2002 /* ToolAuthorizationTests.swift */; };
 		A1B2C3D4E5F6071809AB2003 /* ChatViewModelToolSecurityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB2004 /* ChatViewModelToolSecurityTests.swift */; };
@@ -499,6 +500,7 @@
 		FE1A2B3C4D5E6F700000000A /* HeadingViewTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HeadingViewTests.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6071809AB1001 /* PromptInjectionDetector.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PromptInjectionDetector.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6071809AB1002 /* ToolAuditLogger.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ToolAuditLogger.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6071809AB1007 /* ToolAuthorization.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ToolAuthorization.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6071809AB1003 /* PromptInjectionDetectorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PromptInjectionDetectorTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -830,6 +832,7 @@
 				12A0EB0900AC70CC80392CA8 /* InputAutomationTool.swift */,
 				1BE3F6B0E3D6E76923AD2D3C /* ShortcutsTool.swift */,
 				A1B2C3D4E5F6071809AB1002 /* ToolAuditLogger.swift */,
+				A1B2C3D4E5F6071809AB1007 /* ToolAuthorization.swift */,
 			);
 			path = Tools;
 			sourceTree = "<group>";
@@ -1406,6 +1409,7 @@
 			files = (
 				A1B2C3D4E5F6071809AB1004 /* PromptInjectionDetector.swift in Sources */,
 				A1B2C3D4E5F6071809AB1005 /* ToolAuditLogger.swift in Sources */,
+				A1B2C3D4E5F6071809AB1008 /* ToolAuthorization.swift in Sources */,
 				217769921333520FCEEFB981 /* AetherApp.swift in Sources */,
 				B0B65CF075744E81D2D66286 /* APIConfig.swift in Sources */,
 				94012D11AE56BDE24C31B149 /* String+TokenCount.swift in Sources */,

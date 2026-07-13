@@ -34,9 +34,6 @@ final class OCRTool: ToolProtocol {
     /// - Throws: Vision 识别过程中的错误会抛出
     @MainActor
     func execute(arguments: [String: Any]) async throws -> String {
-        guard ToolRegistry.shared.isEnabled(name: "extract_text_from_image") else {
-            throw NSError(domain: "OCRTool", code: 1, userInfo: [NSLocalizedDescriptionKey: "extract_text_from_image 工具未启用"])
-        }
         // 确定图片来源：优先用传入路径，否则调用 ScreenshotTool 截屏
         let imagePath: String
         if let path = arguments["image_path"] as? String, !path.isEmpty {

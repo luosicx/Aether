@@ -32,9 +32,6 @@ final class ReadClipboardTool: ToolProtocol {
     /// - Throws: 不抛异常
     @MainActor
     func execute(arguments: [String: Any]) async throws -> String {
-        guard ToolRegistry.shared.isEnabled(name: "read_clipboard") else {
-            throw NSError(domain: "ReadClipboardTool", code: 1, userInfo: [NSLocalizedDescriptionKey: "read_clipboard 工具未启用"])
-        }
         #if os(iOS)
         let content = UIPasteboard.general.string ?? ""
         #else
@@ -73,9 +70,6 @@ final class WriteClipboardTool: ToolProtocol {
     /// - Throws: 不抛异常，错误以字符串形式返回
     @MainActor
     func execute(arguments: [String: Any]) async throws -> String {
-        guard ToolRegistry.shared.isEnabled(name: "write_clipboard") else {
-            throw NSError(domain: "WriteClipboardTool", code: 1, userInfo: [NSLocalizedDescriptionKey: "write_clipboard 工具未启用"])
-        }
         guard let text = arguments["text"] as? String, !text.isEmpty else {
             return "错误：请提供要写入的文本"
         }

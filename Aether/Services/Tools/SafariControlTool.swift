@@ -41,9 +41,6 @@ final class SafariControlTool: ToolProtocol {
     /// - Throws: 不抛异常，错误以字符串形式返回
     @MainActor
     func execute(arguments: [String: Any]) async throws -> String {
-        guard ToolRegistry.shared.isEnabled(name: "control_safari") else {
-            return "错误：Safari 控制工具未启用"
-        }
         guard let action = arguments["action"] as? String else {
             return "错误：请提供 action 参数"
         }

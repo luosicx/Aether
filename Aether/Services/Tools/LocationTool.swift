@@ -37,9 +37,6 @@ final class LocationTool: ToolProtocol {
     /// 4) 拼装格式化字符串返回。用户可见错误以字符串返回而非抛错。
     @MainActor
     func execute(arguments: [String: Any]) async throws -> String {
-        guard ToolRegistry.shared.isEnabled(name: "get_location") else {
-            throw NSError(domain: "LocationTool", code: 1, userInfo: [NSLocalizedDescriptionKey: "get_location 工具未启用"])
-        }
         let fetcher = LocationFetcher()
         let location: CLLocation
         do {
