@@ -11,7 +11,6 @@ final class MCPSettingsUITests: BaseUITestCase {
     }
 
     func testOpenMCPSettings() throws {
-        let app = self.app
 
         XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(timeout: 10), "应存在设置按钮")
         app.buttons["settingsButton"].tap()
@@ -41,7 +40,6 @@ final class MCPSettingsUITests: BaseUITestCase {
     }
 
     func testAddMCPServer() throws {
-        let app = self.app
 
         app.buttons["settingsButton"].tap()
         let mcpLink = app.descendants(matching: .any).matching(identifier: "mcpSettingsLink").firstMatch
@@ -62,7 +60,6 @@ final class MCPSettingsUITests: BaseUITestCase {
     }
 
     func testDeleteMCPServer() throws {
-        let app = self.app
 
         app.buttons["settingsButton"].tap()
         let mcpLink = app.descendants(matching: .any).matching(identifier: "mcpSettingsLink").firstMatch
