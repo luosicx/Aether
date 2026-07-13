@@ -34,6 +34,18 @@ final class SafariControlTool: ToolProtocol {
     /// run_js 允许执行的目标域白名单。空集合表示默认不允许任何域。
     private let allowedDomains: Set<String> = []
 
+    /// 将用户传入的字符串转义为 AppleScript 字符串字面量中的安全形式，
+    /// 防止通过 `"` 或 `\` 跳出字符串边界注入任意 AppleScript 代码。
+    /// 标记为 internal 以便单元测试直接验证转义行为。
+    static func appleScriptEscaped(_ string: String) -> String {
+        string
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+            .replacingOccurrences(of: "\n", with: "\\n")
+            .replacingOccurrences(of: "\r", with: "\\r")
+            .replacingOccurrences(of: "\t", with: "\\t")
+    }
+
     /// 执行 Safari 控制操作
     ///
     /// - Parameter arguments: 含 `action` 及其所需参数的字典
@@ -86,9 +98,10 @@ final class SafariControlTool: ToolProtocol {
         guard let url = arguments["url"] as? String else {
             return "错误：请提供 url 参数"
         }
+        let escapedURL = Self.appleScriptEscaped(url)
         let script = """
         tell application "Safari"
-            set URL of current tab of front window to "\(url)"
+            set URL of current tab of front window to "\(escapedURL)"
         end tell
         """
         return runAppleScript(script)
@@ -102,9 +115,10 @@ final class SafariControlTool: ToolProtocol {
         guard let host = currentPageHost(), allowedDomains.contains(host) else {
             return "错误：当前页面所在域不在 run_js 白名单中"
         }
+        let escapedJS = Self.appleScriptEscaped(jsCode)
         let script = """
         tell application "Safari"
-            do JavaScript "\(jsCode)" in current tab of front window
+            do JavaScript "\(escapedJS)" in current tab of front window
         end tell
         """
         return runAppleScript(script)
@@ -130,9 +144,10 @@ final class SafariControlTool: ToolProtocol {
             end tell
             """
         } else {
+            let escapedURL = Self.appleScriptEscaped(url)
             script = """
             tell application "Safari"
-                make new document with properties {URL:"\(url)"}
+                make new document with properties {URL:"\(escapedURL)"}
             end tell
             """
         }
