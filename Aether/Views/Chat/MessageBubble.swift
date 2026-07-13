@@ -67,6 +67,18 @@ struct MessageBubble: View {
     let onCopy: () -> Void
     /// 重新提问回调（仅用户消息）
     let onResend: () -> Void
+    /// Task 23.2: 重新生成回调（仅 AI 消息）——删除最后一条 AI 回复后重发上一条用户消息
+    let onRegenerate: () -> Void
+    /// Task 23.2: 从此处分叉回调——以当前消息为终点复制到新会话
+    let onBranch: () -> Void
+    /// Task 27: 气泡样式（默认液态玻璃）
+    let bubbleStyle: BubbleStyleType
+    /// Task 28: 字体大小（pt）
+    let fontSize: Double
+    /// Task 28: 行距倍数
+    let lineHeight: Double
+    /// Task 26: AI 自定义头像数据
+    let aiAvatarData: Data?
     /// Day 5 补充A：控制全屏图片预览
     @State private var showFullScreenImage = false
 
@@ -76,7 +88,13 @@ struct MessageBubble: View {
          feedbackState: Bool? = nil,
          onFeedback: @escaping (Bool) -> Void = { _ in },
          onCopy: @escaping () -> Void = {},
-         onResend: @escaping () -> Void = {}) {
+         onResend: @escaping () -> Void = {},
+         onRegenerate: @escaping () -> Void = {},
+         onBranch: @escaping () -> Void = {},
+         bubbleStyle: BubbleStyleType = .liquidGlass,
+         fontSize: Double = 16.0,
+         lineHeight: Double = 1.5,
+         aiAvatarData: Data? = nil) {
         self.message = message
         self.isSpeaking = isSpeaking
         self.onToggleSpeak = onToggleSpeak
@@ -84,6 +102,12 @@ struct MessageBubble: View {
         self.onFeedback = onFeedback
         self.onCopy = onCopy
         self.onResend = onResend
+        self.onRegenerate = onRegenerate
+        self.onBranch = onBranch
+        self.bubbleStyle = bubbleStyle
+        self.fontSize = fontSize
+        self.lineHeight = lineHeight
+        self.aiAvatarData = aiAvatarData
     }
 
     private var isUser: Bool { message.role == "user" }
@@ -95,7 +119,7 @@ struct MessageBubble: View {
         HStack(alignment: .top, spacing: Spacing.sm) {
             if isUser { Spacer(minLength: 48) }
             if !isUser {
-                AvatarView(role: .assistant, size: 28)
+                AvatarView(role: .assistant, size: 28, avatarData: aiAvatarData)
             }
             VStack(alignment: isUser ? .trailing : .leading, spacing: Spacing.sm) {
                 if isTool {
@@ -118,7 +142,7 @@ struct MessageBubble: View {
                             .font(.captionAI)
                             .foregroundStyle(isSpeaking ? .red : .secondary)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(PressableButtonStyle())
                     .accessibilityLabel(isSpeaking ? "停止朗读" : "朗读")
                     .padding(.horizontal, Spacing.lg)
                     .padding(.top, 2)
@@ -176,8 +200,13 @@ struct MessageBubble: View {
                         #endif
                 }
                 HStack(alignment: .bottom, spacing: 0) {
-                    if isAssistant {
-                        MarkdownText(content: message.content)
+                    // Task 22: 富媒体检测——优先渲染卡片/图表，否则回退到文本渲染
+                    if let card = parsedRichCard {
+                        RichMessageCard(title: card.title, content: card.content, type: card.type)
+                    } else if let chart = parsedInlineChart {
+                        InlineChartView(data: chart.data, type: chart.type)
+                    } else if isAssistant {
+                        MarkdownText(content: message.content, fontSize: fontSize, lineHeight: lineHeight)
                         if message.isStreaming {
                             Text("▍")
                                 .foregroundStyle(.tertiary)
@@ -192,24 +221,44 @@ struct MessageBubble: View {
                         }
                     }
                 }
+                // Task 22: 链接预览——检测非流式消息中的 URL 并展示预览卡片
+                if !message.isStreaming && !detectedURLs.isEmpty && parsedRichCard == nil && parsedInlineChart == nil {
+                    ForEach(detectedURLs, id: \.self) { url in
+                        LinkPreviewCard(url: url)
+                    }
+                }
             }
-            .font(.bodyAI)
+            .font(.system(size: fontSize))
+            .lineSpacing(CGFloat(fontSize) * CGFloat(lineHeight - 1))
             .padding(.horizontal, Spacing.lg)
             .padding(.vertical, Spacing.md)
-            .background(bubbleBackground)
             .foregroundStyle(isUser ? Color.white : Color.textPrimary)
-            .overlay { bubbleBorder }
+            .modifier(BubbleStyleModifier(style: bubbleStyle, isUser: isUser))
             .clipShape(bubbleShape)
-            .shadow(color: isUser ? .clear : Color.nebulaGlow.opacity(0.3), radius: 10)
             // Day 19: 无障碍——合并气泡内文本与光标为一个元素，用完整消息文本作为朗读值
             .accessibilityElement(children: .combine)
             .accessibilityValue(message.content)
             .contextMenu {
                 if !message.isStreaming {
+                    // 复制消息文本到剪贴板
                     Button {
                         onCopy()
                     } label: {
                         Label("复制", systemImage: "doc.on.doc")
+                    }
+                    .accessibilityLabel("复制消息")
+                    .accessibilityHint("复制消息文本到剪贴板")
+                    .accessibilityIdentifier("copyMessageContextMenuButton")
+                    // Task 23.2: 重新生成——仅 AI 消息，触发 onRegenerate 回调
+                    if isAssistant {
+                        Button {
+                            onRegenerate()
+                        } label: {
+                            Label("重新生成", systemImage: "arrow.clockwise")
+                        }
+                        .accessibilityLabel("重新生成")
+                        .accessibilityHint("删除此 AI 回复后重新生成")
+                        .accessibilityIdentifier("regenerateMessageContextMenuButton")
                     }
                     if isUser {
                         Button {
@@ -218,43 +267,103 @@ struct MessageBubble: View {
                             Label("重新提问", systemImage: "arrow.clockwise")
                         }
                     }
+                    // Task 23.2: 朗读——调用 ChatViewModel.toggleSpeak
+                    Button {
+                        onToggleSpeak()
+                    } label: {
+                        Label(isSpeaking ? "停止朗读" : "朗读", systemImage: "speaker.wave.2")
+                    }
+                    .accessibilityLabel(isSpeaking ? "停止朗读" : "朗读")
+                    .accessibilityHint(isSpeaking ? "停止当前消息朗读" : "朗读此消息")
+                    .accessibilityIdentifier("speakMessageContextMenuButton")
+                    // Task 23.2: 从此处分叉——以当前消息为终点创建对话分支
+                    Button {
+                        onBranch()
+                    } label: {
+                        Label("从此处分叉", systemImage: "arrow.triangle.branch")
+                    }
+                    .accessibilityLabel("从此处分叉")
+                    .accessibilityHint("以当前消息为终点复制到新会话")
+                    .accessibilityIdentifier("branchMessageContextMenuButton")
                 }
             }
         }
     }
 
-    /// 气泡背景：液态玻璃风格
-    /// - 用户：品牌紫半透明 + 毛玻璃
-    /// - AI：液态玻璃基底 + 毛玻璃 + 星云光晕（叠加 bubbleBorder 描边）
-    @ViewBuilder
-    private var bubbleBackground: some View {
-        if isUser {
-            Color.bubbleUser
-                .opacity(0.85)
-                .background(.ultraThinMaterial)
-        } else {
-            Color.bubbleAI
-                .opacity(0.75)
-                .background(.ultraThinMaterial)
+    // MARK: - Task 22: 富媒体检测
+
+    /// 解析结构化卡片标记。
+    /// 格式：`:::card:type\ntitle\ncontent\n:::`
+    /// 其中 type 为 info / warning / success / error / code
+    /// - Returns: 解析出的卡片数据，未检测到返回 nil
+    private var parsedRichCard: (title: String, content: String, type: RichMessageCard.CardType)? {
+        let content = message.content
+        guard content.hasPrefix(":::card:") else { return nil }
+        let lines = content.components(separatedBy: "\n")
+        guard lines.count >= 4 else { return nil }
+        // 第一行 :::card:type
+        let typeString = lines[0].replacingOccurrences(of: ":::card:", with: "")
+        let cardType: RichMessageCard.CardType
+        switch typeString {
+        case "info": cardType = .info
+        case "warning": cardType = .warning
+        case "success": cardType = .success
+        case "error": cardType = .error
+        case "code": cardType = .code
+        default: return nil
         }
+        // 第二行为标题，最后一行为 :::，中间所有行为正文
+        let title = lines[1]
+        let contentLines = lines.dropFirst(2).dropLast()
+        let body = contentLines.joined(separator: "\n")
+        return (title: title, content: body, type: cardType)
     }
 
-    /// AI 气泡紫-蓝渐变描边，强化 Aether 星云边框
-    @ViewBuilder
-    private var bubbleBorder: some View {
-        if !isUser {
-            bubbleShape
-                .stroke(
-                    LinearGradient(
-                        colors: [.aetherPurple, .electricBlue],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1.5
-                )
-                .opacity(0.6)
+    /// 解析内联图表标记。
+    /// 格式：`:::chart:type\nlabel:value\nlabel:value\n...:::`
+    /// 其中 type 为 bar / line / pie
+    /// - Returns: 解析出的图表数据，未检测到返回 nil
+    private var parsedInlineChart: (data: [(label: String, value: Double)], type: InlineChartView.ChartType)? {
+        let content = message.content
+        guard content.hasPrefix(":::chart:") else { return nil }
+        let lines = content.components(separatedBy: "\n")
+        guard lines.count >= 3 else { return nil }
+        // 第一行 :::chart:type
+        let typeString = lines[0].replacingOccurrences(of: ":::chart:", with: "")
+        let chartType: InlineChartView.ChartType
+        switch typeString {
+        case "bar": chartType = .bar
+        case "line": chartType = .line
+        case "pie": chartType = .pie
+        default: return nil
         }
+        // 解析 label:value 数据行（跳过首行和末行 :::）
+        var data: [(label: String, value: Double)] = []
+        for line in lines.dropFirst().dropLast() {
+            let parts = line.components(separatedBy: ":")
+            guard parts.count >= 2, let value = Double(parts.last!) else { continue }
+            let label = parts.dropLast().joined(separator: ":")
+            data.append((label: label, value: value))
+        }
+        guard !data.isEmpty else { return nil }
+        return (data: data, type: chartType)
     }
+
+    /// 使用 NSDataDetector 检测消息内容中的 URL。
+    /// 仅返回 http/https 链接，排除 markdown 链接语法中的纯文本部分。
+    /// - Returns: 检测到的 URL 数组
+    private var detectedURLs: [URL] {
+        let content = message.content
+        guard let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue) else {
+            return []
+        }
+        let range = NSRange(content.startIndex..., in: content)
+        let matches = detector.matches(in: content, options: [], range: range)
+        return matches.compactMap { $0.url }.filter { $0.scheme == "http" || $0.scheme == "https" }
+    }
+
+    // Task 27: 气泡背景/描边/阴影已迁移到 BubbleStyleModifier，此处不再需要
+    // bubbleBackground / bubbleBorder 已由 BubbleStyleModifier 统一管理
 
     private var bubbleShape: some Shape {
         #if os(iOS)

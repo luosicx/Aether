@@ -28,7 +28,7 @@ struct AetherApp: App {
         #if os(macOS)
         .defaultSize(width: 1000, height: 700)
         #endif
-        .modelContainer(for: [Conversation.self, ChatMessage.self, DocumentChunk.self, MessageFeedback.self, HealthInsight.self, UserPreference.self])
+        .modelContainer(for: [Conversation.self, ChatMessage.self, DocumentChunk.self, MessageFeedback.self, HealthInsight.self, UserPreference.self, AgentTask.self, Memory.self])
         // Task 4: macOS 菜单栏 —— 新建对话 / 搜索会话 / 设置
         .commands {
             // File → 新建对话 (Cmd+N)
@@ -37,6 +37,13 @@ struct AetherApp: App {
                     NotificationCenter.default.post(name: .newConversationRequested, object: nil)
                 }
                 .keyboardShortcut("n", modifiers: .command)
+                #if os(macOS)
+                // Task 20: macOS 新建窗口 (Cmd+Shift+N)——在独立窗口打开新对话
+                Button("新建窗口") {
+                    NotificationCenter.default.post(name: .newWindowRequested, object: nil)
+                }
+                .keyboardShortcut("n", modifiers: [.command, .shift])
+                #endif
             }
             // Edit → 搜索会话 (Cmd+K)
             CommandGroup(after: .textEditing) {
@@ -58,6 +65,22 @@ struct AetherApp: App {
                 .keyboardShortcut(",", modifiers: .command)
             }
         }
+        #if os(macOS)
+        // Task 20: macOS 多窗口——通过 UUID 参数打开指定对话的新窗口
+        WindowGroup("New Conversation", for: UUID.self) { $conversationID in
+            RootView()
+                .environment(\.conversationID, conversationID)
+                .frame(minWidth: 800, minHeight: 500)
+                .preferredColorScheme(.dark)
+        }
+        .defaultSize(width: 1000, height: 700)
+        // Task 24: macOS 菜单栏常驻模式——提供快捷输入与最近对话列表
+        MenuBarExtra("Aether", systemImage: "sparkles") {
+            MenuBarPanel()
+        }
+        .menuBarExtraStyle(.window)
+        .modelContainer(for: [Conversation.self, ChatMessage.self, DocumentChunk.self, MessageFeedback.self, HealthInsight.self, UserPreference.self, AgentTask.self, Memory.self])
+        #endif
     }
 
     /// 初始化 App。注册 BGTaskScheduler 每日刷新后台任务并调度首次执行。
@@ -120,7 +143,7 @@ struct AetherApp: App {
             let config = ModelConfiguration(isStoredInMemoryOnly: false)
             let container = try ModelContainer(
                 for: Conversation.self, ChatMessage.self, DocumentChunk.self,
-                    MessageFeedback.self, HealthInsight.self, UserPreference.self,
+                    MessageFeedback.self, HealthInsight.self, UserPreference.self, AgentTask.self,
                 configurations: config
             )
             let context = ModelContext(container)
@@ -224,7 +247,7 @@ struct AetherApp: App {
             do {
                 // 创建独立的 ModelContainer/Context（后台任务无法访问主 App 的 ModelContext）
                 let container = try ModelContainer(
-                    for: Conversation.self, ChatMessage.self, DocumentChunk.self, MessageFeedback.self, HealthInsight.self
+                    for: Conversation.self, ChatMessage.self, DocumentChunk.self, MessageFeedback.self, HealthInsight.self, AgentTask.self, Memory.self
                 )
                 let context = ModelContext(container)
                 let generator = HealthInsightGenerator.make(modelContext: context)
@@ -271,6 +294,11 @@ extension Notification.Name {
     static let focusSearchRequested = Notification.Name("focusSearchRequested")
     /// 菜单「设置」(Cmd+,) 触发
     static let settingsRequested = Notification.Name("settingsRequested")
+    /// Task 20: 菜单「新建窗口」(Cmd+Shift+N) 触发——仅 macOS
+    static let newWindowRequested = Notification.Name("newWindowRequested")
+    /// Task 24: 菜单栏面板点击最近对话时触发——在主窗口打开指定会话
+    /// userInfo["conversationId"] 为目标会话 UUID 字符串
+    static let openConversationFromMenuBar = Notification.Name("openConversationFromMenuBar")
 }
 
 // MARK: - RootView

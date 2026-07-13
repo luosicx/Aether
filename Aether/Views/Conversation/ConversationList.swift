@@ -5,6 +5,10 @@ struct ConversationList: View {
     @Bindable var conversationListVM: ConversationListVM
     let onSelect: (Conversation) -> Void
     let onCreate: () -> Void
+    #if os(macOS)
+    // Task 20: macOS 拖入对话时从 modelContext 查找会话
+    @Environment(\.modelContext) private var modelContext
+    #endif
 
     @State private var renamingConv: Conversation?
     @State private var newTitle = ""
@@ -12,6 +16,8 @@ struct ConversationList: View {
     @State private var searchText = ""
     @State private var showDeleteConfirm = false
     @State private var deleteIndexSet: IndexSet?
+    /// Task 23.1: 滑动删除时待确认的会话（与 deleteIndexSet 互斥使用，swipeActions 路径写入此值）
+    @State private var pendingDeleteConv: Conversation?
     /// 批量多选模式
     @State private var isEditMode = false
     @State private var selectedConversations: Set<UUID> = []
@@ -84,11 +90,20 @@ struct ConversationList: View {
                                     onSelect(conversation)
                                 }
                             } label: {
+                                #if os(macOS)
+                                // Task 20: macOS 使用可拖拽的会话行
+                                DraggableConversation(
+                                    conversation: conversation,
+                                    isSelected: selectedConversations.contains(conversation.id),
+                                    showsCheckbox: isEditMode
+                                )
+                                #else
                                 ConversationRow(
                                     conversation: conversation,
                                     isSelected: selectedConversations.contains(conversation.id),
                                     showsCheckbox: isEditMode
                                 )
+                                #endif
                             }
                             .contextMenu {
                                 Button {
@@ -121,10 +136,38 @@ struct ConversationList: View {
                                 .accessibilityHint("删除此会话")
                                 .accessibilityIdentifier("deleteContextMenuButton")
                             }
+                            // Task 23.1: 左滑显示删除（红）+ 重命名（黄）按钮
+                            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                Button(role: .destructive) {
+                                    withAnimation(AnimationTokens.transition) {
+                                        pendingDeleteConv = conversation
+                                    }
+                                    showDeleteConfirm = true
+                                } label: {
+                                    Label("删除", systemImage: "trash")
+                                }
+                                .accessibilityLabel("删除会话")
+                                .accessibilityHint("滑动删除此会话，需二次确认")
+                                .accessibilityIdentifier("swipeDeleteConversationButton")
+                                Button {
+                                    withAnimation(AnimationTokens.transition) {
+                                        renamingConv = conversation
+                                        newTitle = conversation.title
+                                    }
+                                } label: {
+                                    Label("重命名", systemImage: "pencil")
+                                }
+                                .tint(.yellow)
+                                .accessibilityLabel("重命名会话")
+                                .accessibilityHint("滑动重命名此会话")
+                                .accessibilityIdentifier("swipeRenameConversationButton")
+                            }
                         }
-                        .onDelete { indexSet in
-                            deleteIndexSet = indexSet
-                            showDeleteConfirm = true
+                        // Task 23.3: 拖拽排序——移动会话顺序并更新 order 字段持久化
+                        .onMove { source, destination in
+                            withAnimation(AnimationTokens.transition) {
+                                conversationListVM.reorder(from: source, to: destination)
+                            }
                         }
                     }
                     #if os(iOS)
@@ -174,8 +217,15 @@ struct ConversationList: View {
                             .background(.bar)
                         }
                     }
+                    #if os(macOS)
+                    // Task 20: macOS 支持拖入对话——接收来自其他窗口的会话拖拽
+                    .onDrop(of: [.text], isTargeted: nil) { providers in
+                        handleDrop(providers: providers)
+                    }
+                    #endif
                 }
             }
+            .responsiveLayout()
             .navigationTitle("以太")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -184,16 +234,16 @@ struct ConversationList: View {
                 ToolbarItem(placement: .topBarLeadingCompat) {
                     if !conversationListVM.conversations.isEmpty {
                         Button {
-                        isEditMode.toggle()
-                        if !isEditMode {
-                            selectedConversations.removeAll()
+                            isEditMode.toggle()
+                            if !isEditMode {
+                                selectedConversations.removeAll()
+                            }
+                        } label: {
+                            Text(isEditMode ? "完成" : "编辑")
                         }
-                    } label: {
-                        Text(isEditMode ? "完成" : "编辑")
-                    }
-                    .accessibilityLabel(isEditMode ? "完成" : "编辑")
-                    .accessibilityHint(isEditMode ? "退出批量编辑模式" : "进入批量编辑模式")
-                    .accessibilityIdentifier("editConversationsButton")
+                        .accessibilityLabel(isEditMode ? "完成" : "编辑")
+                        .accessibilityHint(isEditMode ? "退出批量编辑模式" : "进入批量编辑模式")
+                        .accessibilityIdentifier("editConversationsButton")
                     }
                 }
                 ToolbarItem(placement: .topBarTrailingCompat) {
@@ -226,8 +276,17 @@ struct ConversationList: View {
             .alert("删除对话", isPresented: $showDeleteConfirm) {
                 Button("取消", role: .cancel) {
                     deleteIndexSet = nil
+                    pendingDeleteConv = nil
                 }
                 Button("删除", role: .destructive) {
+                    // Task 23.1: swipeActions 路径——直接删除 pendingDeleteConv
+                    if let conv = pendingDeleteConv {
+                        withAnimation(AnimationTokens.transition) {
+                            conversationListVM.deleteConversation(conv)
+                        }
+                        pendingDeleteConv = nil
+                    }
+                    // 兼容路径——.onDelete 提供的 IndexSet（保留向后兼容）
                     if let indexSet = deleteIndexSet {
                         for index in indexSet {
                             guard index < filteredConversations.count else { continue }
@@ -253,4 +312,37 @@ struct ConversationList: View {
             }
         }
     }
+
+    #if os(macOS)
+    // MARK: - Task 20: macOS 拖入对话处理
+    /// 处理拖入的对话——解析对话 ID 并在当前窗口切换到该会话。
+    /// 拖拽载荷为会话 UUID 字符串（来自 `DraggableConversation.onDrag`）。
+    /// - Parameter providers: 拖入的 NSItemProvider 数组
+    /// - Returns: 是否接受拖入（始终返回 true，异步处理载荷）
+    private func handleDrop(providers: [NSItemProvider]) -> Bool {
+        guard let provider = providers.first else { return false }
+        provider.loadObject(ofClass: NSString.self) { object, _ in
+            guard let idString = object as? String,
+                  let conversationId = UUID(uuidString: idString) else { return }
+            Task { @MainActor in
+                // 先从已加载的列表中查找
+                if let conv = conversationListVM.conversations.first(where: { $0.id == conversationId }) {
+                    conversationListVM.autoTitleIfNeeded(for: conv)
+                    onSelect(conv)
+                    return
+                }
+                // 未在列表中找到时，从 modelContext 查找
+                var descriptor = FetchDescriptor<Conversation>(
+                    predicate: #Predicate { $0.id == conversationId }
+                )
+                descriptor.fetchLimit = 1
+                if let conv = try? modelContext.fetch(descriptor).first {
+                    conversationListVM.autoTitleIfNeeded(for: conv)
+                    onSelect(conv)
+                }
+            }
+        }
+        return true
+    }
+    #endif
 }

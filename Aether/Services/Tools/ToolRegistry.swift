@@ -89,9 +89,34 @@ final class ToolRegistry {
         tools[tool.definition.name] = tool
     }
 
+    /// 按名注销工具。工具不存在时不报错（no-op）。
+    /// - Parameter name: 工具名
+    func unregister(name: String) {
+        tools.removeValue(forKey: name)
+    }
+
+    /// 批量注册工具，逐个调用 register，同名覆盖。
+    /// - Parameter tools: 待注册的工具数组
+    func registerBatch(tools: [ToolProtocol]) {
+        for tool in tools {
+            register(tool: tool)
+        }
+    }
+
     /// 按名获取工具，未命中返回 nil
     func getTool(named name: String) -> ToolProtocol? {
         tools[name]
+    }
+
+    /// 获取所有已注册工具名（顺序不保证）
+    /// - Returns: 工具名数组
+    func getToolNames() -> [String] {
+        Array(tools.keys)
+    }
+
+    /// 当前已注册工具数量（只读）
+    var toolCount: Int {
+        tools.count
     }
 
     /// 执行工具。未注册或已禁用抛 NSError。返回工具执行结果字符串。

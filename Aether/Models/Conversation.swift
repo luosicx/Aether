@@ -16,6 +16,13 @@ final class Conversation {
     var isPinned: Bool = false
     /// 未读消息数。大于 0 时在会话行末尾显示胶囊徽标。
     var unreadCount: Int = 0
+    /// Day 23: 手动排序字段。默认 0，拖拽排序后按列表顺序赋值 0,1,2…
+    /// 排序优先级：isPinned > order > createdAt
+    var order: Int = 0
+    /// Task 21: 父对话 ID（分叉来源），nil 表示非分叉对话
+    var parentConversationID: UUID?
+    /// Task 21: 分叉点的消息 ID（在父对话中的哪条消息处分叉），nil 表示非分叉对话
+    var parentMessageID: UUID?
     /// 消息列表；cascade 删除规则，删除 Conversation 时级联删除所有 ChatMessage
     @Relationship(deleteRule: .cascade, inverse: \ChatMessage.conversation)
     var messages: [ChatMessage]
@@ -63,12 +70,54 @@ final class UserPreference {
     var preferredTools: [String] = []
     /// 用户自定义事实（如"我是素食者"）
     var customFact: String = ""
+    /// Task 6: AI 人设名称，如"小以太"
+    var aiPersona: String = ""
+    /// Task 6: AI 性格描述
+    var aiPersonaDescription: String = ""
+    /// Task 6: 自定义头像二进制数据（可选）
+    var avatarData: Data? = nil
+    /// Task 6: 主题名称：deepSpace / dawn / aurora
+    var themeName: String = "deepSpace"
+    /// Task 6: 气泡样式：liquidGlass / minimal / card
+    var bubbleStyle: String = "liquidGlass"
+    /// Task 6: 字体大小（pt）
+    var fontSize: Double = 16.0
+    /// Task 6: 行距倍数
+    var lineHeight: Double = 1.5
 
     /// 创建 UserPreference 实例，所有字段均初始化为默认值
-    /// （preferredTone = "默认"，preferredTools = []，customFact = ""）
-    init() {
-        self.preferredTone = "默认"
-        self.preferredTools = []
-        self.customFact = ""
+    /// - Parameters:
+    ///   - preferredTone: 偏好语气，默认 "默认"
+    ///   - preferredTools: 偏好工具名数组，默认 []
+    ///   - customFact: 自定义事实，默认 ""
+    ///   - aiPersona: AI 人设名称，默认 ""
+    ///   - aiPersonaDescription: AI 性格描述，默认 ""
+    ///   - avatarData: 自定义头像数据，默认 nil
+    ///   - themeName: 主题名称，默认 "deepSpace"
+    ///   - bubbleStyle: 气泡样式，默认 "liquidGlass"
+    ///   - fontSize: 字体大小，默认 16.0
+    ///   - lineHeight: 行距倍数，默认 1.5
+    init(
+        preferredTone: String = "默认",
+        preferredTools: [String] = [],
+        customFact: String = "",
+        aiPersona: String = "",
+        aiPersonaDescription: String = "",
+        avatarData: Data? = nil,
+        themeName: String = "deepSpace",
+        bubbleStyle: String = "liquidGlass",
+        fontSize: Double = 16.0,
+        lineHeight: Double = 1.5
+    ) {
+        self.preferredTone = preferredTone
+        self.preferredTools = preferredTools
+        self.customFact = customFact
+        self.aiPersona = aiPersona
+        self.aiPersonaDescription = aiPersonaDescription
+        self.avatarData = avatarData
+        self.themeName = themeName
+        self.bubbleStyle = bubbleStyle
+        self.fontSize = fontSize
+        self.lineHeight = lineHeight
     }
 }

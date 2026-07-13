@@ -86,6 +86,10 @@ final class ChatViewModel {
     var feedbackToast: String?
     /// TTS 朗读配置（音色/语速/音调/音量），由设置页同步更新，默认从 UserDefaults 加载
     var ttsConfig: TTSConfig = .load()
+    /// Task 7: 上下文窗口管理器（可选，nil 时不压缩历史消息）
+    var contextWindowManager: ContextWindowManager?
+    /// Task 8: 语义记忆存储（可选，nil 时不注入相关记忆到 systemPrompt）
+    var semanticMemoryStore: SemanticMemoryStore?
     // Task 7: 提示注入检测弹窗显示状态
     var showInjectionWarning: Bool = false
     // Task 7: 提示注入检测弹窗提示文案
@@ -417,6 +421,46 @@ final class ChatViewModel {
         sendMessage(in: conversation, modelContext: modelContext)
     }
 
+    /// Task 23.2: 重新生成最后一条 AI 回复。
+    /// 找到指定 AI 消息及其前序最近一条 user 消息，删除该 AI 消息后用同一 user 输入重新发送。
+    /// - Parameters:
+    ///   - assistantMessage: 要重新生成的 AI 消息
+    ///   - conversation: 所属会话
+    ///   - modelContext: SwiftData 上下文
+    func regenerateResponse(assistantMessage: ChatMessage, in conversation: Conversation, modelContext: ModelContext) {
+        // 仅处理 assistant 消息
+        guard assistantMessage.role == "assistant" else { return }
+        // 找到该 AI 消息在会话中的位置
+        guard let assistantIndex = conversation.messages.firstIndex(where: { $0.id == assistantMessage.id }) else { return }
+        // 找到它之前最近的一条 user 消息
+        let userMessagesBefore = conversation.messages[..<assistantIndex].filter { $0.role == "user" }
+        guard let lastUser = userMessagesBefore.last else { return }
+        let userInput = lastUser.content
+        // 删除该 AI 消息（同时从 conversation.messages 和 messages 移除）
+        conversation.messages.remove(at: assistantIndex)
+        messages.removeAll { $0.id == assistantMessage.id }
+        // 注意：不删除 modelContext 中的 ChatMessage 实体，避免破坏 index；
+        //      sendMessage 会重新 save 覆盖状态
+        try? modelContext.save()
+        // 重发用户消息触发新的 AI 回复
+        inputText = userInput
+        sendMessage(in: conversation, modelContext: modelContext)
+    }
+
+    /// Task 23.2: 从指定消息处分叉——创建新会话，复制到该消息为止的所有消息（含该消息）。
+    /// - Parameters:
+    ///   - fromMessage: 分叉起点的消息（含），新会话将包含原会话从开头到该消息的所有消息
+    ///   - conversation: 原会话
+    ///   - modelContext: SwiftData 上下文
+    /// - Returns: 新创建的会话；若 fromMessage 不在原会话中则返回 nil
+    @discardableResult
+    func branch(from fromMessage: ChatMessage, in conversation: Conversation, modelContext: ModelContext) -> Conversation? {
+        let storage = ChatStorage(modelContext: modelContext)
+        // Task 21: 使用 ChatStorage.forkConversation 创建分叉对话
+        // 设置 parentConversationID / parentMessageID 并复制所有消息字段
+        return try? storage.forkConversation(from: conversation, at: fromMessage.id)
+    }
+
     /// 消息处理主流程：UIT 测试短路 → 读 apiKey → 注入偏好 systemPrompt → 计算 embedding → 缓存命中则跳过 ReAct → ReAct 循环 → 缓存写入 → 调试信息 → 关灵动岛。
     func processMessage(_ text: String, conversation: Conversation, modelContext: ModelContext) async {
         // UIT 测试模式：短路真实 HTTP/RAG/Tool，注入固定桩回复
@@ -480,11 +524,29 @@ final class ChatViewModel {
         }
         #endif
 
+        // Task 8: 注入语义记忆检索（可选，semanticMemoryStore 为 nil 时跳过）
+        // 检索与当前查询相关的记忆并追加到 systemPrompt 末尾
+        if let memoryStore = semanticMemoryStore {
+            let memories = (try? await memoryStore.retrieveRelevantMemories(query: text)) ?? []
+            let memoryText = memoryStore.formatMemoriesForPrompt(memories)
+            if !memoryText.isEmpty {
+                effectiveSystemPrompt = (effectiveSystemPrompt.isEmpty ? "" : effectiveSystemPrompt + "\n") + memoryText
+            }
+        }
+
         var apiMessages: [APIMessage] = []
         if !effectiveSystemPrompt.isEmpty {
             apiMessages.append(APIMessage(role: "system", content: effectiveSystemPrompt, images: nil, toolCallId: nil, toolName: nil, toolCalls: nil))
         }
-        apiMessages.append(contentsOf: conversation.messages.map { $0.toAPIMessage() })
+        // Task 7: 上下文压缩（可选，contextWindowManager 为 nil 时跳过）
+        // 在 token 截断前压缩历史消息，保留重要消息与近期消息，旧消息摘要化
+        let conversationMessages: [ChatMessage]
+        if let contextManager = contextWindowManager {
+            conversationMessages = (try? await contextManager.compress(messages: conversation.messages, maxTokens: tokenLimit)) ?? conversation.messages
+        } else {
+            conversationMessages = conversation.messages
+        }
+        apiMessages.append(contentsOf: conversationMessages.map { $0.toAPIMessage() })
 
         // Day 6: 计算 query embedding（用于语义缓存查询/写入）
         // - RAG 开启时复用 RAG 的 query embedding，不重复调 embed API
@@ -929,6 +991,7 @@ final class ChatViewModel {
 
     /// 测试性调整：把 systemPrompt + 用户偏好拼接逻辑提取为 internal 方法便于单测
     /// 生产侧行为不变：与原 processMessage 中内联实现等价
+    /// Task 26: 追加 AI 人设名称与性格描述
     func buildEffectiveSystemPrompt(base: String, preference: UserPreference) -> String {
         var prefParts: [String] = []
         if !preference.preferredTone.isEmpty && preference.preferredTone != "默认" {
@@ -940,7 +1003,26 @@ final class ChatViewModel {
         if !preference.customFact.isEmpty {
             prefParts.append(String(format: NSLocalizedString("自定义事实：%@", comment: ""), preference.customFact))
         }
-        guard !prefParts.isEmpty else { return base }
-        return (base.isEmpty ? "" : base + "\n") + "【用户偏好】" + prefParts.joined(separator: "；")
+        let prefLine = prefParts.isEmpty ? "" : "【用户偏好】" + prefParts.joined(separator: "；")
+
+        // Task 26: 注入 AI 人设信息
+        var personaLines: [String] = []
+        if !preference.aiPersona.isEmpty {
+            personaLines.append(String(format: NSLocalizedString("名称：%@", comment: ""), preference.aiPersona))
+        }
+        if !preference.aiPersonaDescription.isEmpty {
+            personaLines.append(String(format: NSLocalizedString("性格描述：%@", comment: ""), preference.aiPersonaDescription))
+        }
+        let personaLine = personaLines.isEmpty ? "" : "【AI人设】" + personaLines.joined(separator: "；")
+
+        // 组合：base + 用户偏好 + AI人设
+        var result = base
+        if !prefLine.isEmpty {
+            result = (result.isEmpty ? "" : result + "\n") + prefLine
+        }
+        if !personaLine.isEmpty {
+            result = (result.isEmpty ? "" : result + "\n") + personaLine
+        }
+        return result
     }
 }

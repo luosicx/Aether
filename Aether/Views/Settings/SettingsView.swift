@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UniformTypeIdentifiers
 #if os(iOS)
 import MessageUI
 #endif
@@ -61,6 +62,18 @@ struct SettingsView: View {
     @State private var preferredTone: String = "默认"
     @State private var preferredTools: Set<String> = []
     @State private var customFact: String = ""
+    // Task 25: 主题选择
+    @State private var selectedTheme: AetherTheme = .deepSpace
+    // Task 26: AI 人设
+    @State private var aiPersona: String = ""
+    @State private var aiPersonaDescription: String = ""
+    @State private var aiAvatarData: Data? = nil
+    @State private var showAvatarImporter: Bool = false
+    // Task 27: 气泡样式
+    @State private var selectedBubbleStyle: BubbleStyleType = .liquidGlass
+    // Task 28: 字体大小与行距
+    @State private var fontSize: Double = 16.0
+    @State private var lineHeight: Double = 1.5
     // Day 9: 调试面板 sheet 开关
     @State private var showDebugPanel: Bool = false
     @State private var showDeleteAPIKeyConfirm = false
@@ -144,10 +157,16 @@ struct SettingsView: View {
                     saveMessageSection(msg)
                 }
                 preferenceSection
+                themeSection
+                aiPersonaSection
+                avatarSection
+                bubbleStyleSection
+                fontSizeSection
                 debugSection
                 aboutSection
             }
             .formStyle(.grouped)
+            .responsiveLayout()
             .tint(Color.aetherPurple)
             .foregroundStyle(Color.starlight)
             .scrollContentBackground(.hidden)
@@ -191,6 +210,7 @@ struct SettingsView: View {
                         sectionContent(for: section)
                     }
                     .formStyle(.grouped)
+                    .responsiveLayout()
                     .tint(Color.aetherPurple)
                     .foregroundStyle(Color.starlight)
                     .scrollContentBackground(.hidden)
@@ -239,6 +259,11 @@ struct SettingsView: View {
             dangerousToolsSection
             systemPromptSection
             preferenceSection
+            themeSection
+            aiPersonaSection
+            avatarSection
+            bubbleStyleSection
+            fontSizeSection
         case .health:
             #if os(iOS)
             healthSection
@@ -645,6 +670,32 @@ struct SettingsView: View {
                 .accessibilityLabel("启用工具调用")
                 .accessibilityHint("启用后进入 ReAct 循环调用工具")
                 .accessibilityIdentifier("toolsToggle")
+            // 插件管理入口
+            NavigationLink {
+                PluginSettingsView()
+            } label: {
+                HStack {
+                    Text("插件管理")
+                    Spacer()
+                    Image(systemName: "puzzlepiece.extension")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .accessibilityLabel("插件管理")
+            .accessibilityHint("管理已安装的插件，安装或卸载插件")
+            .accessibilityIdentifier("pluginManagementLink")
+            // MCP Server 配置入口
+            NavigationLink {
+                MCPSettingsView()
+            } label: {
+                HStack {
+                    Text("MCP 配置")
+                    Spacer()
+                }
+            }
+            .accessibilityLabel("MCP 配置")
+            .accessibilityHint("管理 MCP Server 配置")
+            .accessibilityIdentifier("mcpSettingsLink")
         } header: {
             Text("功能开关")
         } footer: {
@@ -806,6 +857,221 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: - Task 25: Section: 主题切换
+
+    @ViewBuilder
+    private var themeSection: some View {
+        Section {
+            Picker("主题", selection: Binding(
+                get: { selectedTheme },
+                set: { newValue in
+                    selectedTheme = newValue
+                    // 立即切换主题，获得实时预览效果
+                    ThemeManager.shared.switchTheme(newValue)
+                }
+            )) {
+                ForEach(AetherTheme.allCases) { theme in
+                    Label(theme.displayName, systemImage: theme.iconName)
+                        .tag(theme)
+                }
+            }
+            .pickerStyle(.menu)
+            .accessibilityLabel("主题")
+            .accessibilityHint("选择 App 主题配色方案")
+            .accessibilityIdentifier("themePicker")
+        } header: {
+            Text("主题")
+        } footer: {
+            Text("切换主题将改变背景、气泡、文字配色。深空为默认深色主题，黎明为暖色浅色主题，极光为青绿深色主题。")
+                .font(.captionAI)
+        }
+    }
+
+    // MARK: - Task 26: Section: AI 人设
+
+    @ViewBuilder
+    private var aiPersonaSection: some View {
+        Section {
+            TextField("AI 名称", text: $aiPersona)
+                .accessibilityLabel("AI 名称")
+                .accessibilityHint("设置 AI 助手的名称")
+                .accessibilityIdentifier("aiPersonaNameField")
+            TextEditor(text: $aiPersonaDescription)
+                .frame(minHeight: 80)
+                .accessibilityLabel("AI 性格描述")
+                .accessibilityHint("描述 AI 助手的性格特征")
+                .accessibilityIdentifier("aiPersonaDescriptionField")
+                .overlay(alignment: .topLeading) {
+                    if aiPersonaDescription.isEmpty {
+                        Text("如：温和耐心、善于鼓励、回答简洁…")
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 8)
+                            .allowsHitTesting(false)
+                    }
+                }
+        } header: {
+            Text("AI 人设")
+        } footer: {
+            Text("人设名称与性格描述会注入到系统提示词，影响 AI 的回复风格。")
+                .font(.captionAI)
+        }
+    }
+
+    // MARK: - Task 26: Section: 头像选择
+
+    @ViewBuilder
+    private var avatarSection: some View {
+        Section {
+            // 预览当前头像
+            HStack {
+                AvatarView(role: .assistant, size: 48, avatarData: aiAvatarData)
+                Spacer()
+                if aiAvatarData != nil {
+                    Button("清除头像", role: .destructive) {
+                        aiAvatarData = nil
+                    }
+                    .accessibilityLabel("清除头像")
+                    .accessibilityHint("移除当前自定义头像")
+                    .accessibilityIdentifier("clearAvatarButton")
+                }
+            }
+            // 预设头像选择
+            HStack {
+                ForEach(presetAvatarSymbols, id: \.self) { symbol in
+                    Button {
+                        aiAvatarData = renderSymbolToData(symbol)
+                    } label: {
+                        Image(systemName: symbol)
+                            .font(.system(size: 20))
+                            .foregroundStyle(Color.electricBlue)
+                            .frame(width: 44, height: 44)
+                            .background(Circle().fill(Color.electricBlue.opacity(0.15)))
+                    }
+                    .buttonStyle(PressableButtonStyle())
+                    .accessibilityLabel("预设头像 \(symbol)")
+                    .accessibilityIdentifier("presetAvatar_\(symbol)")
+                }
+            }
+            // 自定义头像上传
+            Button {
+                showAvatarImporter = true
+            } label: {
+                Label("从相册选择头像", systemImage: "photo.badge.plus")
+            }
+            .accessibilityLabel("从相册选择头像")
+            .accessibilityHint("上传自定义图片作为 AI 头像")
+            .accessibilityIdentifier("uploadAvatarButton")
+        } header: {
+            Text("AI 头像")
+        } footer: {
+            Text("选择预设头像或上传自定义图片。自定义头像将显示在对话气泡旁。")
+                .font(.captionAI)
+        }
+        .fileImporter(
+            isPresented: $showAvatarImporter,
+            allowedContentTypes: [.image]
+        ) { result in
+            switch result {
+            case .success(let url):
+                if url.startAccessingSecurityScopedResource() {
+                    defer { url.stopAccessingSecurityScopedResource() }
+                    if let data = try? Data(contentsOf: url) {
+                        aiAvatarData = data
+                    }
+                }
+            case .failure:
+                break
+            }
+        }
+    }
+
+    /// 预设头像 SF Symbol 列表
+    private var presetAvatarSymbols: [String] {
+        ["sparkles", "person.fill", "robot", "face.smiling.fill", "wand.and.stars", "brain.head.fill"]
+    }
+
+    /// 将 SF Symbol 渲染为 PNG/TIFF Data，便于存储到 UserPreference.avatarData
+    @MainActor
+    private func renderSymbolToData(_ systemName: String) -> Data? {
+        let view = ZStack {
+            Circle().fill(Color.electricBlue.opacity(0.2))
+            Image(systemName: systemName)
+                .font(.system(size: 24))
+                .foregroundStyle(Color.electricBlue)
+        }
+        .frame(width: 56, height: 56)
+        let renderer = ImageRenderer(content: view)
+        renderer.scale = 2
+        #if os(iOS)
+        return renderer.uiImage?.pngData()
+        #else
+        return renderer.nsImage?.tiffRepresentation
+        #endif
+    }
+
+    // MARK: - Task 27: Section: 气泡样式
+
+    @ViewBuilder
+    private var bubbleStyleSection: some View {
+        Section {
+            Picker("气泡样式", selection: $selectedBubbleStyle) {
+                ForEach(BubbleStyleType.allCases) { style in
+                    Label(style.displayName, systemImage: style.iconName)
+                        .tag(style)
+                }
+            }
+            .pickerStyle(.menu)
+            .accessibilityLabel("气泡样式")
+            .accessibilityHint("选择对话气泡的视觉风格")
+            .accessibilityIdentifier("bubbleStylePicker")
+        } header: {
+            Text("气泡样式")
+        } footer: {
+            Text("液态玻璃为默认毛玻璃效果，极简为无背景纯文本，卡片为带边框阴影样式。")
+                .font(.captionAI)
+        }
+    }
+
+    // MARK: - Task 28: Section: 字体大小与行距
+
+    @ViewBuilder
+    private var fontSizeSection: some View {
+        Section {
+            VStack(alignment: .leading) {
+                Text(String(format: "字体大小：%.0f pt", fontSize))
+                Slider(value: $fontSize, in: 12...24, step: 1.0)
+                    .accessibilityLabel("字体大小")
+                    .accessibilityHint("调整对话文字大小")
+                    .accessibilityIdentifier("fontSizeSlider")
+            }
+            VStack(alignment: .leading) {
+                Text(String(format: "行距：%.1f", lineHeight))
+                Slider(value: $lineHeight, in: 1.0...2.0, step: 0.1)
+                    .accessibilityLabel("行距")
+                    .accessibilityHint("调整对话文字行间距")
+                    .accessibilityIdentifier("lineHeightSlider")
+            }
+            // 实时预览
+            VStack(alignment: .leading, spacing: 4) {
+                Text("预览")
+                    .font(.captionAI)
+                    .foregroundStyle(.secondary)
+                Text("你好，我是以太。这是字体大小与行距的预览效果。")
+                    .font(.system(size: fontSize))
+                    .lineSpacing(CGFloat(fontSize) * CGFloat(lineHeight - 1))
+                    .padding(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
+                    .background(Color.bubbleAI.opacity(0.5))
+                    .clipShape(RoundedRectangle(cornerRadius: CornerRadius.medium))
+            }
+        } header: {
+            Text("字体与行距")
+        } footer: {
+            Text("调整对话正文的字体大小和行距，设置后立即生效。")
+                .font(.captionAI)
+        }
+    }
+
     // MARK: - Section: 调试面板
 
     @ViewBuilder
@@ -895,6 +1161,16 @@ struct SettingsView: View {
         preferredTone = pref.preferredTone
         preferredTools = Set(pref.preferredTools)
         customFact = pref.customFact
+        // Task 25-28: 加载主题/人设/头像/气泡样式/字体设置
+        selectedTheme = AetherTheme(rawValue: pref.themeName) ?? .deepSpace
+        // 同步 UserPreference 的主题到 ThemeManager
+        ThemeManager.shared.switchTheme(selectedTheme)
+        aiPersona = pref.aiPersona
+        aiPersonaDescription = pref.aiPersonaDescription
+        aiAvatarData = pref.avatarData
+        selectedBubbleStyle = BubbleStyleType(rawValue: pref.bubbleStyle) ?? .liquidGlass
+        fontSize = pref.fontSize
+        lineHeight = pref.lineHeight
 
         // Day 17: 刷新 HealthKit 授权状态与洞察数量
         refreshHealthStatus()
@@ -915,6 +1191,15 @@ struct SettingsView: View {
             tools: Array(preferredTools),
             fact: customFact
         )
+        // Task 25-28: 持久化主题/人设/头像/气泡样式/字体设置到 UserPreference
+        let pref = storage.fetchPreference()
+        pref.themeName = selectedTheme.rawValue
+        pref.aiPersona = aiPersona
+        pref.aiPersonaDescription = aiPersonaDescription
+        pref.avatarData = aiAvatarData
+        pref.bubbleStyle = selectedBubbleStyle.rawValue
+        pref.fontSize = fontSize
+        pref.lineHeight = lineHeight
         // Day 15: 离开页面时持久化 BFF 配置
         settingsVM.saveBFFConfig()
         // Day 16: 离开页面时持久化端侧推理配置
