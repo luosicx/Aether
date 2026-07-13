@@ -135,7 +135,19 @@ final class TerminalCommandToolTests: XCTestCase {
     }
 
     func testPathTraversalInArgumentsRejected() {
-        assertParseThrows("cat ../../etc/passwd", expected: .pathTraversal)
+        assertParseThrows("ls ../../etc/passwd", expected: .pathTraversal)
+    }
+
+    func testSensitivePathRejected() {
+        // 敏感路径黑名单：~/.ssh 应被拒绝
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let sshPath = "\(home)/.ssh/id_rsa"
+        assertParseThrows("ls \(sshPath)", expected: .pathTraversal)
+    }
+
+    func testCatRemovedFromWhitelist() {
+        // cat 已从白名单移除，防止读取任意敏感文件
+        assertParseThrows("cat /etc/passwd", expected: .notInWhitelist)
     }
 
     func testAbsolutePathExecutableRejected() {

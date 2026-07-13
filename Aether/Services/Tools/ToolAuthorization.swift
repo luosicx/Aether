@@ -23,6 +23,13 @@ final class ToolAuthorization: @unchecked Sendable {
     /// 用户选择「始终允许」的工具名集合
     private(set) var alwaysAuthorized: Set<String> = []
 
+    /// 禁止「始终允许」的工具集合：这些工具风险过高，每次调用都必须用户确认。
+    /// 包括任意 AppleScript 执行和终端命令执行。
+    private let neverAlwaysAllow: Set<String> = [
+        "run_applescript",
+        "run_terminal_command"
+    ]
+
     private let alwaysAuthorizedKeyPrefix = "aether.tool.auth.always."
 
     private init() {
@@ -141,12 +148,19 @@ private extension ToolAuthorization {
         for key in UserDefaults.standard.dictionaryRepresentation().keys where key.hasPrefix(alwaysAuthorizedKeyPrefix) {
             if UserDefaults.standard.bool(forKey: key) {
                 let toolName = String(key.dropFirst(alwaysAuthorizedKeyPrefix.count))
+                // 高危工具不允许持久化授权，清除残留的旧数据
+                guard !neverAlwaysAllow.contains(toolName) else {
+                    UserDefaults.standard.removeObject(forKey: key)
+                    continue
+                }
                 alwaysAuthorized.insert(toolName)
             }
         }
     }
 
     func grantAlways(_ toolName: String) {
+        // 高危工具禁止持久化授权，每次调用都必须用户确认
+        guard !neverAlwaysAllow.contains(toolName) else { return }
         alwaysAuthorized.insert(toolName)
         UserDefaults.standard.set(true, forKey: "\(alwaysAuthorizedKeyPrefix)\(toolName)")
     }

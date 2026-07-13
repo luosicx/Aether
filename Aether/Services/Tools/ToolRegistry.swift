@@ -27,7 +27,8 @@ final class ToolRegistry {
         "run_terminal_command",
         "run_applescript",
         "control_safari",
-        "create_shortcut"
+        "create_shortcut",
+        "simulate_input"
     ]
     /// 敏感工具集合，包含需要显式授权才能启用的工具或子操作标识。
     /// 同时包含任务中的 `ocr_screen` 与实际注册名 `extract_text_from_image`，保证两端都能匹配。
@@ -41,7 +42,10 @@ final class ToolRegistry {
         "run_terminal_command",
         "run_applescript",
         "control_safari.run_js",
-        "create_shortcut.run_script"
+        "create_shortcut.run_script",
+        "manage_file",
+        "manage_window",
+        "simulate_input"
     ]
     /// 当前已启用的工具名集合。初始化时从 UserDefaults 恢复默认值。
     private(set) var enabledTools: Set<String> = []
