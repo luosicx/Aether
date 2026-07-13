@@ -7,12 +7,11 @@ final class PluginSettingsUITests: BaseUITestCase {
     }
 
     override func tearDown() {
-        navigateBackToRoot(in: Self.app)
         super.tearDown()
     }
 
     func testNavigateToPluginSettings() {
-        let app = Self.app!
+        let app = self.app
 
         XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(timeout: 10))
         app.buttons["settingsButton"].tap()
@@ -27,7 +26,7 @@ final class PluginSettingsUITests: BaseUITestCase {
     }
 
     func testPluginSettingsShowsEmptyState() {
-        let app = Self.app!
+        let app = self.app
 
         app.buttons["settingsButton"].tap()
         let pluginLink = app.descendants(matching: .any).matching(identifier: "pluginManagementLink").firstMatch
@@ -40,7 +39,7 @@ final class PluginSettingsUITests: BaseUITestCase {
     }
 
     func testInstallSamplePlugin() {
-        let app = Self.app!
+        let app = self.app
 
         app.buttons["settingsButton"].tap()
         let pluginLink = app.descendants(matching: .any).matching(identifier: "pluginManagementLink").firstMatch
@@ -56,7 +55,7 @@ final class PluginSettingsUITests: BaseUITestCase {
     }
 
     func testUninstallPlugin() {
-        let app = Self.app!
+        let app = self.app
 
         app.buttons["settingsButton"].tap()
         let pluginLink = app.descendants(matching: .any).matching(identifier: "pluginManagementLink").firstMatch
@@ -71,7 +70,7 @@ final class PluginSettingsUITests: BaseUITestCase {
     }
 
     func testViewPluginPermissions() {
-        let app = Self.app!
+        let app = self.app
 
         app.buttons["settingsButton"].tap()
         let pluginLink = app.descendants(matching: .any).matching(identifier: "pluginManagementLink").firstMatch

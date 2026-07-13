@@ -7,12 +7,11 @@ final class AetherUITests: BaseUITestCase {
     }
 
     override func tearDown() {
-        navigateBackToRoot(in: Self.app)
         super.tearDown()
     }
 
     func testLaunchShowsEmptyState() {
-        let app = Self.app!
+        let app = self.app
 
         XCTAssertTrue(app.staticTexts["以太"].waitForExistence(timeout: 10),
                       "emptyState 应显示「以太」标题")
@@ -24,7 +23,7 @@ final class AetherUITests: BaseUITestCase {
     }
 
     func testOpenConversationListShowsEmptyState() {
-        let app = Self.app!
+        let app = self.app
 
         XCTAssertTrue(app.buttons["conversationListButton"].waitForExistence(timeout: 5), "应存在「会话列表」按钮")
         app.buttons["conversationListButton"].tap()
@@ -37,7 +36,7 @@ final class AetherUITests: BaseUITestCase {
     }
 
     func testCreateNewConversation() {
-        let app = Self.app!
+        let app = self.app
 
         app.buttons["conversationListButton"].tap()
         app.buttons["newConversationButton"].firstMatch.tap()
@@ -46,7 +45,7 @@ final class AetherUITests: BaseUITestCase {
     }
 
     func testSaveAPIKey() throws {
-        let app = Self.app!
+        let app = self.app
 
         app.buttons["settingsButton"].tap()
         let secureField = app.secureTextFields["deepseekAPIKeySecureField"]
@@ -67,7 +66,7 @@ final class AetherUITests: BaseUITestCase {
     }
 
     func testDeleteAPIKeyWithConfirmation() throws {
-        let app = Self.app!
+        let app = self.app
 
         app.buttons["settingsButton"].tap()
         let secureField = app.secureTextFields["deepseekAPIKeySecureField"]
@@ -107,7 +106,7 @@ final class AetherUITests: BaseUITestCase {
     }
 
     func testToggleRAGAndTools() {
-        let app = Self.app!
+        let app = self.app
 
         app.buttons["settingsButton"].tap()
 
@@ -162,7 +161,7 @@ final class AetherUITests: BaseUITestCase {
     }
 
     func testSwitchModel() throws {
-        let app = Self.app!
+        let app = self.app
 
         app.buttons["settingsButton"].tap()
 
@@ -219,7 +218,7 @@ final class AetherUITests: BaseUITestCase {
     }
 
     func testEditSystemPrompt() {
-        let app = Self.app!
+        let app = self.app
 
         let input = inputField(in: app)
         XCTAssertTrue(input.waitForExistence(timeout: 5))
@@ -292,7 +291,7 @@ final class AetherUITests: BaseUITestCase {
     }
 
     func testUserPreferencePersistence() throws {
-        let app = Self.app!
+        let app = self.app
 
         app.buttons["settingsButton"].tap()
 
@@ -404,7 +403,7 @@ final class AetherUITests: BaseUITestCase {
     }
 
     func testConversationContextMenuActions() throws {
-        let app = Self.app!
+        let app = self.app
 
         app.buttons["conversationListButton"].tap()
         app.buttons["newConversationButton"].firstMatch.tap()
@@ -425,7 +424,7 @@ final class AetherUITests: BaseUITestCase {
     }
 
     func testSearchFiltering() throws {
-        let app = Self.app!
+        let app = self.app
 
         app.buttons["conversationListButton"].tap()
         app.buttons["newConversationButton"].firstMatch.tap()

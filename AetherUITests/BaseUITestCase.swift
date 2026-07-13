@@ -1,23 +1,21 @@
 import XCTest
 
 class BaseUITestCase: XCTestCase {
-    static var app: XCUIApplication!
-    static var launchCount = 0
+    var app: XCUIApplication!
     
     override func setUp() {
         super.setUp()
         continueAfterFailure = false
         
-        if Self.launchCount == 0 {
-            Self.app = XCUIApplication()
-            Self.app.launchArguments += ["UITEST_DISABLE_NETWORK", "UITEST_RESET_DATA", "UITEST_DISABLE_SPLASH"]
-            Self.app.launch()
-            Self.launchCount += 1
-        }
+        app = XCUIApplication()
+        app.launchArguments += ["UITEST_DISABLE_NETWORK", "UITEST_RESET_DATA", "UITEST_DISABLE_SPLASH"]
+        app.launch()
     }
     
     override func tearDown() {
-        navigateBackToRoot(in: Self.app)
+        if app != nil && app.state == .runningForeground {
+            app.terminate()
+        }
         super.tearDown()
     }
     

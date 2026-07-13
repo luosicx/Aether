@@ -7,12 +7,11 @@ final class GestureUITests: BaseUITestCase {
     }
 
     override func tearDown() {
-        navigateBackToRoot(in: Self.app)
         super.tearDown()
     }
 
     func testSwipeDeleteConversation() throws {
-        let app = Self.app!
+        let app = self.app
 
         app.buttons["conversationListButton"].tap()
         app.buttons["newConversationButton"].firstMatch.tap()
@@ -46,7 +45,7 @@ final class GestureUITests: BaseUITestCase {
     }
 
     func testLongPressMessageContextMenu() throws {
-        let app = Self.app!
+        let app = self.app
 
         let input = inputField(in: app)
         XCTAssertTrue(input.waitForExistence(timeout: 5))
@@ -69,7 +68,7 @@ final class GestureUITests: BaseUITestCase {
     }
 
     func testDragReorderEditMode() throws {
-        let app = Self.app!
+        let app = self.app
 
         app.buttons["conversationListButton"].tap()
         for _ in 0..<3 {
