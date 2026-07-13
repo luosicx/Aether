@@ -24,6 +24,8 @@ struct AetherApp: App {
                 }
                 // Aether 主题在深色模式下效果最佳，默认启用深色模式
                 .preferredColorScheme(.dark)
+                // 注入 ThemeManager（@Observable），供 BubbleStyle 等 @Environment(ThemeManager.self) 读取
+                .environment(ThemeManager.shared)
         }
         #if os(macOS)
         .defaultSize(width: 1000, height: 700)
@@ -72,11 +74,13 @@ struct AetherApp: App {
                 .environment(\.conversationID, conversationID)
                 .frame(minWidth: 800, minHeight: 500)
                 .preferredColorScheme(.dark)
+                .environment(ThemeManager.shared)
         }
         .defaultSize(width: 1000, height: 700)
         // Task 24: macOS 菜单栏常驻模式——提供快捷输入与最近对话列表
         MenuBarExtra("Aether", systemImage: "sparkles") {
             MenuBarPanel()
+                .environment(ThemeManager.shared)
         }
         .menuBarExtraStyle(.window)
         .modelContainer(for: [Conversation.self, ChatMessage.self, DocumentChunk.self, MessageFeedback.self, HealthInsight.self, UserPreference.self, AgentTask.self, Memory.self])
