@@ -2,24 +2,23 @@ import XCTest
 
 class BaseUITestCase: XCTestCase {
     static var app: XCUIApplication!
+    static var launchCount = 0
     
-    override class func setUp() {
+    override func setUp() {
         super.setUp()
         continueAfterFailure = false
-    }
-    
-    override class func setUpAll() {
-        super.setUpAll()
-        app = XCUIApplication()
-        app.launchArguments += ["UITEST_DISABLE_NETWORK", "UITEST_RESET_DATA", "UITEST_DISABLE_SPLASH"]
-        app.launch()
-    }
-    
-    override class func tearDownAll() {
-        if app != nil && app.state == .runningForeground {
-            app.terminate()
+        
+        if Self.launchCount == 0 {
+            Self.app = XCUIApplication()
+            Self.app.launchArguments += ["UITEST_DISABLE_NETWORK", "UITEST_RESET_DATA", "UITEST_DISABLE_SPLASH"]
+            Self.app.launch()
+            Self.launchCount += 1
         }
-        super.tearDownAll()
+    }
+    
+    override func tearDown() {
+        navigateBackToRoot(in: Self.app)
+        super.tearDown()
     }
     
     func inputField(in app: XCUIApplication) -> XCUIElement {
