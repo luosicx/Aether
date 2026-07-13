@@ -1,4 +1,5 @@
 import XCTest
+import SwiftUI
 @testable import Aether
 
 /// Task 25: 主题管理器单元测试
@@ -128,5 +129,136 @@ final class ThemeManagerTests: XCTestCase {
         XCTAssertEqual(manager.currentTheme, .deepSpace, "无效存储值应回退到 deepSpace")
         // 清理测试数据
         UserDefaults.standard.removeObject(forKey: ThemeManager.storageKey)
+    }
+
+    // MARK: - 主题传播验证
+
+    /// 验证切换主题后 Color 语义 token 反映新主题的颜色
+    func testColorTokensReflectCurrentTheme() {
+        let manager = ThemeManager()
+        // 切换到 deepSpace，验证 Color token 与主题色一致
+        manager.switchTheme(.deepSpace)
+        XCTAssertEqual(
+            Color.bubbleUser,
+            AetherTheme.deepSpace.bubbleUserColor,
+            "Color.bubbleUser 应反映 deepSpace 主题色"
+        )
+        XCTAssertEqual(
+            Color.bubbleAI,
+            AetherTheme.deepSpace.bubbleAIColor,
+            "Color.bubbleAI 应反映 deepSpace 主题色"
+        )
+        XCTAssertEqual(
+            Color.textPrimary,
+            AetherTheme.deepSpace.textPrimaryColor,
+            "Color.textPrimary 应反映 deepSpace 主题色"
+        )
+        XCTAssertEqual(
+            Color.textSecondary,
+            AetherTheme.deepSpace.textSecondaryColor,
+            "Color.textSecondary 应反映 deepSpace 主题色"
+        )
+
+        // 切换到 dawn，验证 Color token 立即更新
+        manager.switchTheme(.dawn)
+        XCTAssertEqual(
+            Color.bubbleUser,
+            AetherTheme.dawn.bubbleUserColor,
+            "切换后 Color.bubbleUser 应反映 dawn 主题色"
+        )
+        XCTAssertEqual(
+            Color.bubbleAI,
+            AetherTheme.dawn.bubbleAIColor,
+            "切换后 Color.bubbleAI 应反映 dawn 主题色"
+        )
+        XCTAssertEqual(
+            Color.textPrimary,
+            AetherTheme.dawn.textPrimaryColor,
+            "切换后 Color.textPrimary 应反映 dawn 主题色"
+        )
+
+        // 切换到 aurora 验证全部更新
+        manager.switchTheme(.aurora)
+        XCTAssertEqual(
+            Color.bubbleUser,
+            AetherTheme.aurora.bubbleUserColor,
+            "切换后 Color.bubbleUser 应反映 aurora 主题色"
+        )
+        XCTAssertEqual(
+            Color.textPrimary,
+            AetherTheme.aurora.textPrimaryColor,
+            "切换后 Color.textPrimary 应反映 aurora 主题色"
+        )
+        XCTAssertEqual(
+            Color.textSecondary,
+            AetherTheme.aurora.textSecondaryColor,
+            "切换后 Color.textSecondary 应反映 aurora 主题色"
+        )
+    }
+
+    /// 验证 Color.backgroundPrimary 反映当前主题的背景渐变首色
+    func testColorBackgroundPrimaryReflectsTheme() {
+        let manager = ThemeManager()
+        manager.switchTheme(.deepSpace)
+        XCTAssertEqual(
+            Color.backgroundPrimary,
+            AetherTheme.deepSpace.backgroundGradient.first ?? Color.black,
+            "backgroundPrimary 应反映 deepSpace 背景色"
+        )
+
+        manager.switchTheme(.dawn)
+        XCTAssertEqual(
+            Color.backgroundPrimary,
+            AetherTheme.dawn.backgroundGradient.first ?? Color.black,
+            "backgroundPrimary 应反映 dawn 背景色"
+        )
+    }
+
+    /// 验证 Color.textTertiary 由当前主题的次要色派生
+    func testColorTextTertiaryReflectsTheme() {
+        let manager = ThemeManager()
+        manager.switchTheme(.deepSpace)
+        XCTAssertEqual(
+            Color.textTertiary,
+            AetherTheme.deepSpace.textSecondaryColor.opacity(0.6),
+            "textTertiary 应由 deepSpace 次要色派生"
+        )
+
+        manager.switchTheme(.aurora)
+        XCTAssertEqual(
+            Color.textTertiary,
+            AetherTheme.aurora.textSecondaryColor.opacity(0.6),
+            "textTertiary 应由 aurora 次要色派生"
+        )
+    }
+
+    /// 验证 switchTheme(byName:) 能从 UserPreference.themeName 同步主题
+    func testSwitchByNameSyncsFromUserPreferenceThemeName() {
+        let manager = ThemeManager()
+        // 模拟 UserPreference.themeName = "aurora" 的同步
+        manager.switchTheme(byName: "aurora")
+        XCTAssertEqual(manager.currentTheme, .aurora, "switchTheme(byName:) 应从 themeName 同步")
+
+        // 模拟 UserPreference.themeName = "dawn" 的同步
+        manager.switchTheme(byName: "dawn")
+        XCTAssertEqual(manager.currentTheme, .dawn, "switchTheme(byName:) 应从 themeName 同步")
+
+        // 验证 Color token 也随之更新
+        XCTAssertEqual(Color.bubbleUser, AetherTheme.dawn.bubbleUserColor, "同步后 Color token 应更新")
+    }
+
+    /// 验证不同主题的 Color token 值互不相同
+    func testColorTokensDifferBetweenThemes() {
+        let manager = ThemeManager()
+        manager.switchTheme(.deepSpace)
+        let deepSpaceTextPrimary = Color.textPrimary
+        let deepSpaceBubbleUser = Color.bubbleUser
+
+        manager.switchTheme(.dawn)
+        let dawnTextPrimary = Color.textPrimary
+        let dawnBubbleUser = Color.bubbleUser
+
+        XCTAssertNotEqual(deepSpaceTextPrimary, dawnTextPrimary, "不同主题的 textPrimary 应不同")
+        XCTAssertNotEqual(deepSpaceBubbleUser, dawnBubbleUser, "不同主题的 bubbleUser 应不同")
     }
 }

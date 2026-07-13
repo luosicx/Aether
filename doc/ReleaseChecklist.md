@@ -94,10 +94,12 @@
 
 ## 4.8 国际化与无障碍审计
 
-- [ ] `Localizable.xcstrings` 包含 385 keys，en / zh-Hans / zh-Hant 三者完整
-- [ ] 设置 → 语言切换后重启，英文/繁体界面无残留中文
+- [ ] `Localizable.xcstrings` 包含 387 keys，8 种语言（zh-Hans / zh-Hant / en / ja / ko / fr / de / es）翻译完整
+- [ ] 设置 → 语言切换（9 选项：跟随系统 + 8 种语言）后重启，各语言界面无残留中文
 - [ ] VoiceOver 可朗读设置页所有 Toggle / Picker / Button
-- [ ] 所有关键交互控件存在 `accessibilityIdentifier`（供 UITest 使用）
+- [ ] 所有关键交互控件存在 `accessibilityIdentifier`（供 UITest 使用，当前覆盖 13 个元素）
+- [ ] Dynamic Type XL 下设置页 Toggle / Picker 行不截断
+- [ ] Watch App 与 LaunchScreen 含无障碍标签（accessibilityLabel）
 
 ## 4.9 截图与元数据审计
 
@@ -193,7 +195,7 @@
 
 ### 国际化
 - [ ] `Localizable.xcstrings` 存在且已注册到 Resources build phase
-- [ ] `developmentRegion = zh-Hans`，`knownRegions` 含 `zh-Hans` / `en` / `Base`
+- [ ] `developmentRegion = zh-Hans`，`knownRegions` 含 `zh-Hans` / `zh-Hant` / `en` / `ja` / `ko` / `fr` / `de` / `es` / `Base`
 - [ ] SwiftUI `Text`/`Button`/`TextField` 字面量在构建后自动提取到 String Catalog
 - [ ] 验证命令：
   ```bash
@@ -217,6 +219,76 @@
 - [ ] 预期输出：0 serious / 0 violations（或所有 warning 已审查并标记 `// swiftlint:disable`）
 - [ ] Xcode Build Phase 中 SwiftLint Run Script 已配置（构建时自动触发）
 - [ ] 提交前确认无新增 SwiftLint violation
+
+## 4.16 Watch App 构建验证
+
+> ⚠️ Watch App target 需在 Xcode 中手动创建并关联 `AetherWatch/` 源文件。
+
+- [ ] Watch target 已创建，Bundle ID 为 `<主 App Bundle ID>.watchkitapp`
+- [ ] `AetherWatch/` 目录下 3 个源文件已添加到 Watch target
+- [ ] Watch target Signing & Capabilities 已添加 App Group `group.com.aether.shared`
+- [ ] Watch target Deployment Target 设为 watchOS 10+
+- [ ] Watch App 构建成功：
+  ```bash
+  xcodebuild build \
+    -project Aether.xcodeproj \
+    -scheme AetherWatch \
+    -destination 'platform=watchOS Simulator,name=Apple Watch Series 10 (46mm)' \
+    -configuration Debug
+  ```
+- [ ] 预期输出：`** BUILD SUCCEEDED **`
+- [ ] Watch App 在 Apple Watch 模拟器中启动，TabView 三标签正常显示
+- [ ] WatchConnectivity 与 iPhone 主 App 配对通信正常
+
+## 4.17 Widget Extension 构建验证
+
+> ⚠️ Widget Extension target 需在 Xcode 中手动创建并关联 `AetherWidgets/` 源文件。
+
+- [ ] Widget target 已创建，Bundle ID 为 `<主 App Bundle ID>.widgets`
+- [ ] `AetherWidgets/` 目录下 4 个源文件已添加到 Widget target
+- [ ] Widget target Signing & Capabilities 已添加 App Group `group.com.aether.shared`
+- [ ] Widget target Deployment Target 设为 iOS 17+
+- [ ] Widget Extension 构建成功：
+  ```bash
+  xcodebuild build \
+    -project Aether.xcodeproj \
+    -scheme AetherWidgets \
+    -destination 'platform=iOS Simulator,name=iPhone 17' \
+    -configuration Debug
+  ```
+- [ ] 预期输出：`** BUILD SUCCEEDED **`
+- [ ] 主屏幕添加 3 个 Widget（QuickChat / HealthInsight / RecentConversations）均正常显示
+- [ ] Widget 通过 App Group 共享 SwiftData 可读取主 App 数据
+- [ ] Widget deepLink 跳转（`aether://ask?query=` / `aether://conversation/<uuid>`）正常
+
+## 4.18 MLX 端侧推理 SPM 解析检查
+
+- [ ] `mlx-swift` SPM 依赖已添加到主 App target（`https://github.com/ml-explore/mlx-swift`）
+- [ ] Xcode → File → Packages → Package Dependencies 中 mlx-swift 解析成功（无红色错误）
+- [ ] mlx-swift 依赖版本与 mlx-swift-examples 兼容
+- [ ] 真机构建时 MLX 模块可正常 import（`import MLX` / `import MLXLLM` / `import MLXTokenizerUtils`）
+- [ ] 模拟器构建走占位实现（`OfflineLLMProvider` 不依赖 mlx-swift 编译），无链接错误
+- [ ] 端侧模型下载（Llama-3.2-1B-Instruct Q4_K_M）在真机上可正常加载与推理
+
+## 4.19 DeepLink 验证
+
+- [ ] Info.plist 含 `CFBundleURLTypes`，URL Scheme 为 `aether`
+- [ ] `aether://ask?query=你好` 在 Safari 中打开后跳转主 App 并自动发送消息
+- [ ] `aether://conversation/<uuid>` 跳转到指定会话（uuid 为有效会话 ID）
+- [ ] 无效 uuid 的 DeepLink 显示错误提示而非崩溃
+- [ ] macOS 端 DeepLink 同样可用（通过 `open aether://ask?query=test` 命令测试）
+
+## 4.20 App Group 共享 SwiftData 验证
+
+- [ ] 主 App target Signing & Capabilities 已添加 App Group `group.com.aether.shared`
+- [ ] Widget target Signing & Capabilities 已添加相同 App Group
+- [ ] Watch target Signing & Capabilities 已添加相同 App Group（如已创建 Watch target）
+- [ ] 主 App 创建会话后，Widget 可读取该会话数据
+- [ ] 主 App 生成健康洞察后，Widget 与 Watch App 可读取该洞察
+- [ ] App Group 容器路径正确：
+  ```swift
+  FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.aether.shared")
+  ```
 
 ## 5. 提交审核前最终检查
 

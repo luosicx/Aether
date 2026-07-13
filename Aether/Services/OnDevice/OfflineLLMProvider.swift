@@ -96,8 +96,12 @@ nonisolated final class OfflineLLMProvider: LLMProvider, @unchecked Sendable {
     }
 
     /// 批量文本嵌入：返回基于 hash 的 384 维占位向量。
-    /// 端侧不调用远程 embedding API，用确定性 hash 为每条文本生成固定向量，
-    /// 归一化后可作为语义缓存的键（精度有限，仅用于离线兜底）。
+    ///
+    /// **占位实现说明**：端侧 LLM 模型（Llama/Qwen/Phi）为生成模型，不直接提供 embedding 输出。
+    /// 真实 embedding 需加载专用嵌入模型（如 `mlx-community/all-MiniLM-L6-v2-4bit`），
+    /// 通过 MLXLMCommon ModelContainer 加载后取模型隐藏层输出。当前为离线兜底方案，
+    /// 用确定性 hash 为每条文本生成固定向量，归一化后可作为语义缓存的键（精度有限）。
+    /// 若需高精度语义搜索，建议启用云端 embedding API。
     func embed(texts: [String], apiKey: String) async throws -> [[Float]] {
         // 空入参短路返回空数组
         guard !texts.isEmpty else { return [] }

@@ -287,14 +287,14 @@ final class OnDeviceModelDownloaderTests: XCTestCase {
         XCTAssertNil(nonExisting, "不存在的 ID 应返回 nil")
     }
 
-    /// OnDeviceModelCatalog 模型 url(for:) 按 DownloadSource 返回对应 URL
-    func testModelCatalogURLForSource() {
+    /// OnDeviceModelCatalog 模型 repo(for:) 按 DownloadSource 返回对应仓库 ID
+    func testModelCatalogRepoForSource() {
         guard let model = OnDeviceModelCatalog.models.first else {
             XCTFail("OnDeviceModelCatalog.models 不应为空")
             return
         }
-        XCTAssertEqual(model.url(for: .domestic), model.modelScopeURL, "domestic 应返回 ModelScope URL")
-        XCTAssertEqual(model.url(for: .international), model.huggingFaceURL, "international 应返回 HuggingFace URL")
+        XCTAssertEqual(model.repo(for: .domestic), model.modelScopeRepo, "domestic 应返回 ModelScope 仓库 ID")
+        XCTAssertEqual(model.repo(for: .international), model.huggingFaceRepo, "international 应返回 HuggingFace 仓库 ID")
     }
 
     // MARK: - 11. DownloadSource 枚举
@@ -571,13 +571,13 @@ final class OnDeviceModelDownloaderTests: XCTestCase {
 
     // MARK: - 23. OnDeviceModelCatalog 完整性
 
-    /// OnDeviceModelCatalog 所有模型应有有效的 HuggingFace 和 ModelScope URL
-    func testModelCatalogAllModelsHaveValidURLs() {
+    /// OnDeviceModelCatalog 所有模型应有有效的 HuggingFace 和 ModelScope 仓库 ID
+    func testModelCatalogAllModelsHaveValidRepos() {
         for model in OnDeviceModelCatalog.models {
-            XCTAssertTrue(model.huggingFaceURL?.absoluteString.hasPrefix("https://") ?? false,
-                          "模型 \(model.id) 的 HuggingFace URL 应为 https")
-            XCTAssertTrue(model.modelScopeURL?.absoluteString.hasPrefix("https://") ?? false,
-                          "模型 \(model.id) 的 ModelScope URL 应为 https")
+            XCTAssertFalse(model.huggingFaceRepo.isEmpty,
+                          "模型 \(model.id) 的 HuggingFace 仓库 ID 不应为空")
+            XCTAssertNotNil(model.modelScopeRepo,
+                          "模型 \(model.id) 的 ModelScope 仓库 ID 不应为 nil")
         }
     }
 

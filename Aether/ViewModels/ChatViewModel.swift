@@ -97,6 +97,8 @@ final class ChatViewModel {
     // Task 7: 提示注入弹窗用户选择回调（true=继续发送）
     @ObservationIgnored
     var pendingInjectionDecision: (@MainActor (Bool) -> Void)?
+    /// Task 4: Watch 发来的快速对话消息（非 nil 时 ChatView 应将其写入当前会话并发送）
+    var pendingWatchMessage: String?
 
     // 测试性调整：把 client / cache 暴露为 internal 并支持注入，便于单元测试预置缓存命中或注入 Mock LLMProvider
     // 生产侧行为不变：默认参数 DeepSeekClient() / SemanticCache() 兜底
@@ -124,6 +126,8 @@ final class ChatViewModel {
     private let toolTimeout: TimeInterval = 15
     /// Day 10: 通知中心观察者，deinit 中移除
     nonisolated private let errorObserver = ErrorObserver()
+    /// Task 4: Watch 快速对话消息观察者，deinit 中移除
+    nonisolated private let quickChatObserver = ErrorObserver()
     /// 补充 D：灵动岛 Live Activity 引用
     #if os(iOS)
     private var liveActivity: Activity<TimerActivityAttributes>?
@@ -204,12 +208,29 @@ final class ChatViewModel {
         if onDeviceConfig.autoSwitchOnNetworkLoss {
             startNetworkMonitoring()
         }
+        // Task 4: 订阅 Watch 快速对话消息通知。WatchConnectivityService 收到 Watch 消息后广播此通知，
+        // ChatViewModel 设置 pendingWatchMessage，ChatView 观察后将其写入当前会话并发送。
+        quickChatObserver.token = NotificationCenter.default.addObserver(
+            forName: .wcQuickChatReceived,
+            object: nil,
+            queue: OperationQueue.main
+        ) { [weak self] notification in
+            guard let self = self else { return }
+            if let msg = notification.object as? String {
+                Task { @MainActor [weak self] in
+                    self?.pendingWatchMessage = msg
+                }
+            }
+        }
     }
 
     /// Day 10: 释放 errorObserver 避免泄漏
     deinit {
         // streamingTask 已使用 [weak self]，无需在 deinit 中显式取消
         if let observer = errorObserver.token {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        if let observer = quickChatObserver.token {
             NotificationCenter.default.removeObserver(observer)
         }
     }

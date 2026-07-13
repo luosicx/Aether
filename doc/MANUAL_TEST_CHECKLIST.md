@@ -2155,6 +2155,147 @@
   - **预期结果**：每个控件朗读出有意义的中文标签
   - **失败排查**：检查对应 View 是否添加 `accessibilityLabel`
 
+## 30. 设置 UI 修复验证
+
+> 验证 6 项设置 UI Bug 修复：macOS 设置显示、API Key 保存、主题切换、头像选择器、气泡样式、字体/行间距。
+
+- [ ] macOS 设置页可正常滚动
+  - **前置条件**：macOS 进入设置页
+  - **操作步骤**：
+    1. 打开设置页
+    2. 上下滚动浏览所有 Section
+  - **预期结果**：macOS 设置页可正常上下滚动，所有 Section 完整可见，无内容截断
+  - **失败排查**：检查 SettingsView ScrollView / Form 布局；查看 `#if os(macOS)` 守卫下的布局分支
+
+- [ ] API Key 保存后重启仍保留
+  - **前置条件**：进入设置 → API 配置
+  - **操作步骤**：
+    1. 输入 DeepSeek API Key 并点击「保存 API Key」
+    2. 退出设置页
+    3. 重启 App
+    4. 重新进入设置 → API 配置
+  - **预期结果**：API Key 保存后重启 App 仍保留（Keychain 持久化），输入框非空
+  - **失败排查**：检查 KeychainManager.shared.saveAPIKey；查看 `kSecAttrService` / `kSecAttrAccount` 一致性
+
+- [ ] 主题切换即时生效并持久化
+  - **前置条件**：进入设置 → 外观
+  - **操作步骤**：
+    1. 切换主题（如深空 / 黎明 / 极光）
+    2. 观察界面颜色变化
+    3. 重启 App
+  - **预期结果**：主题切换即时生效（界面颜色立即变化），重启 App 后主题保持一致（从 SwiftData UserPreference 同步）
+  - **失败排查**：检查 Theme 从 SwiftData UserPreference @Model 同步逻辑；查看 UserDefaults / SwiftData 持久化
+
+- [ ] 头像选择器可正常选择图片
+  - **前置条件**：进入设置 → AI 人设
+  - **操作步骤**：
+    1. 点击头像区域
+    2. 从 PhotosPicker 选择一张图片
+    3. 确认头像已更新
+  - **预期结果**：PhotosPicker 头像选择器在 iOS 与 macOS 均可正常选择图片，选择后头像立即更新
+  - **失败排查**：检查 PhotosPicker 跨平台兼容性；查看 PhotosPicker selection binding
+
+- [ ] 气泡样式切换正常
+  - **前置条件**：进入设置 → 外观
+  - **操作步骤**：
+    1. 切换气泡样式（液态玻璃 / 极简 / 卡片）
+    2. 返回主对话界面发送消息
+  - **预期结果**：气泡样式切换后，消息气泡按所选样式渲染（液态玻璃含毛玻璃效果 / 极简纯色 / 卡片带边框）
+  - **失败排查**：检查 MessageBubble 样式分支；查看 bubbleStyle binding
+
+- [ ] 字体大小与行距可调
+  - **前置条件**：进入设置 → 外观
+  - **操作步骤**：
+    1. 调节字体大小 Slider
+    2. 调节行距 Slider
+    3. 返回主对话界面查看消息
+  - **预期结果**：字体大小与行距调节后，消息气泡中的文字按新设置渲染
+  - **失败排查**：检查 FontSize / LineSpacing 持久化；查看 MessageBubble font / lineSpacing 修饰符
+
+## 31. 设备调试与性能修复验证
+
+> 验证 3 项修复：entitlements 设备调试、启动性能优化、键盘关闭手势。
+
+- [ ] iOS 真机调试可正常安装运行
+  - **前置条件**：iPhone 真机已连接，开发者证书已配置
+  - **操作步骤**：
+    1. Xcode 选择 iPhone 真机目标
+    2. 按 Cmd + R 构建并安装
+  - **预期结果**：App 在 iPhone 真机上可正常安装运行，无 entitlements 签名错误
+  - **失败排查**：检查 entitlements 文件中 keychain-access-groups / app-groups 配置；查看 Provisioning Profile
+
+- [ ] 冷启动到可交互 < 1.5s
+  - **前置条件**：iPhone 17 模拟器
+  - **操作步骤**：
+    1. 冷启动 App（先 kill 再启动）
+    2. 用秒表或 Instruments 计时启动到主界面可交互的时间
+  - **预期结果**：冷启动到可交互 < 1.5s（远程配置拉取已从 init() 移到首屏 .task，BGTask 懒注册）
+  - **失败排查**：检查 RemoteConfigService.fetch 调用时机；查看 BGTaskScheduler 注册时机；查看 PerformanceMonitor 启动耗时指标
+
+- [ ] 键盘下拉手势关闭
+  - **前置条件**：iOS 端进入主对话界面，键盘已弹出
+  - **操作步骤**：
+    1. 在键盘弹出状态下，从输入框上方下拉
+    2. 或点击输入框外空白区域
+  - **预期结果**：下拉手势或点击空白区域可关闭键盘
+  - **失败排查**：检查 keyboard dismiss gesture；查看 `.onTapGesture` / `FocusState` 重置
+
+## 32. 多语言与无障碍强化验证
+
+> 验证 8 种语言切换与 VoiceOver 完整朗读。
+
+- [ ] 8 种语言切换全部生效
+  - **前置条件**：App 安装后至少完成一次启动
+  - **操作步骤**：
+    1. 依次切换语言为：简体中文 → 繁体中文 → English → 日本語 → 한국어 → Français → Deutsch → Español
+    2. 每次切换后重启 App，检查界面文案
+  - **预期结果**：8 种语言切换后，设置页、主界面、工具描述、错误提示全部显示对应语言，无残留中文
+  - **失败排查**：检查 `Localizable.xcstrings` 是否包含 8 种语言翻译；检查 `AppleLanguages` UserDefaults 写入；查看是否有硬编码字符串
+
+- [ ] VoiceOver 完整朗读所有页面
+  - **前置条件**：系统设置开启 VoiceOver
+  - **操作步骤**：
+    1. 打开 App 主界面，单指滑动遍历各元素
+    2. 进入设置页，遍历所有 Section 与控件
+    3. 触发工具调用，遍历 StepCard
+    4. 进入知识库页面，遍历文档列表
+  - **预期结果**：VoiceOver 可正确朗读所有页面元素，包括消息气泡、发送按钮、设置 Toggle、StepCard、CitationCard 等，标签有意义且无「按钮」等无意义朗读
+  - **失败排查**：检查各视图 accessibilityLabel；查看 accessibilityElement(children: .combine) 使用
+
+## 33. 平台扩展功能验证
+
+> 验证 Watch App 快速聊天、Widget 显示交互、端侧模型下载推理。
+
+- [ ] Watch App 快速聊天
+  - **前置条件**：Watch App target 已创建，iPhone 与 Apple Watch 配对，WatchConnectivity 已连接
+  - **操作步骤**：
+    1. 在 Apple Watch 上打开 Aether App
+    2. 在「快速对话」标签输入或选择预设问题
+    3. 发送消息
+  - **预期结果**：Watch App 通过 WatchConnectivity 将消息转发到 iPhone，iPhone 处理后将回复返回 Watch 显示
+  - **失败排查**：检查 WCSession.sendMessage；查看 session reachable 状态；检查 iPhone 端 quickChat handler
+
+- [ ] Widget 显示与交互
+  - **前置条件**：Widget Extension target 已创建，主 App 至少有 1 个会话
+  - **操作步骤**：
+    1. 在 iOS 主屏幕长按 → 添加 Widget
+    2. 分别添加 QuickChat / HealthInsight / RecentConversations 三个 Widget
+    3. 点击 QuickChat Widget 输入问题并发送
+    4. 点击 RecentConversations Widget 中的会话
+  - **预期结果**：三个 Widget 均正常显示数据，QuickChat 点击后通过 deepLink 跳转主 App 并发送消息，RecentConversations 点击后跳转对应会话
+  - **失败排查**：检查 App Group 共享 SwiftData 配置；查看 WidgetCenter.reloadAllTimelines 调用；检查 deepLink URL Scheme
+
+- [ ] 端侧模型下载与推理
+  - **前置条件**：Apple Silicon 真机（A17 Pro+），mlx-swift SPM 已集成
+  - **操作步骤**：
+    1. 进入设置 → 端侧推理
+    2. 选择模型（如 Llama-3.2-1B-Instruct Q4_K_M）开始下载
+    3. 等待下载完成与 SHA256 校验
+    4. 切换供应商为「端侧推理」
+    5. 发送消息验证流式推理
+  - **预期结果**：模型下载进度正常更新，校验通过后可加载推理；端侧模式下发送消息收到 token 级流式响应（非假流式）
+  - **失败排查**：检查 mlx-swift SPM 解析；查看 ModelContainer.load；检查 MLXEngine.generate AsyncStream；查看内存检测 os_proc_available_memory
+
 ## 手测环境要求
 
 | 功能模块 | 设备要求 | 备注 |

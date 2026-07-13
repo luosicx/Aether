@@ -3,6 +3,7 @@ import CryptoKit
 #if canImport(MLX)
 import MLX
 import MLXLMCommon
+import MLXLLM
 #endif
 
 /// Day 16: MLX 端侧推理引擎（actor 隔离，保证并发安全）。
@@ -49,8 +50,17 @@ actor MLXInferenceEngine {
         }
 
         // 3. SHA256 完整性校验（expectedSHA256 非空时执行）
+        //    若 path 为目录（完整 MLX 模型目录），校验其中的 model.safetensors；
+        //    若 path 为单文件（兼容旧测试），校验文件本身
         if !expectedSHA256.isEmpty {
-            let actualSHA = sha256(of: path)
+            var isDir: ObjCBool = false
+            let shaPath: URL
+            if FileManager.default.fileExists(atPath: path.path, isDirectory: &isDir), isDir.boolValue {
+                shaPath = path.appendingPathComponent("model.safetensors")
+            } else {
+                shaPath = path
+            }
+            let actualSHA = sha256(of: shaPath)
             guard actualSHA == expectedSHA256 else {
                 lastLoadError = .sha256Mismatch(expected: expectedSHA256, actual: actualSHA)
                 throw OnDeviceError.sha256Mismatch(expected: expectedSHA256, actual: actualSHA)
@@ -59,10 +69,12 @@ actor MLXInferenceEngine {
 
         #if canImport(MLX)
         // 真正加载 MLX 模型：通过 Task.detached 将阻塞式加载放到后台线程，避免阻塞 actor
+        // 使用 ModelConfiguration 指定本地模型目录路径，MLXLMCommon 会读取
+        // config.json / tokenizer.json / model.safetensors 等完整模型目录文件
         do {
             let model = try await Task.detached(priority: .userInitiated) {
-                // MLXLMCommon 的 ModelContainer.load 会读取 model.mlpackage 目录并初始化权重
-                try ModelContainer.load(path: path)
+                let configuration = ModelConfiguration(id: path.path)
+                return try await ModelContainer.load(configuration: configuration)
             }.value
             loadedModel = model
             loadedModelPath = path
@@ -79,24 +91,15 @@ actor MLXInferenceEngine {
         #endif
     }
 
-    /// 预加载 tokenizer 相关资源（后台并行执行，不阻塞调用线程）。
-    /// 使用 TaskGroup 并行预读 tokenizer 配置文件与模型配置，提前 warm OS page cache，
-    /// 减少首次推理的磁盘 I/O 延迟。在 mlx-swift 不可用时为空操作。
+    /// 预加载 tokenizer 相关资源（后台异步执行，不阻塞调用线程）。
+    /// 通过 ModelContainer 执行一次 prepare 预热 tokenizer，同时并行预读配置文件 warm OS page cache，
+    /// 减少首次推理的延迟。在 mlx-swift 不可用时为空操作。
     func preloadTokenizer() async {
         #if canImport(MLX)
-        guard let path = loadedModelPath else { return }
-        // 使用 TaskGroup 并行预读 tokenizer 相关文件，warm OS page cache
-        await withTaskGroup(of: Void.self) { group in
-            // 并行任务 1：预读 tokenizer.json（HF 标准 tokenizer 配置文件）
-            group.addTask {
-                let tokenizerURL = path.appendingPathComponent("tokenizer.json")
-                _ = FileManager.default.contents(atPath: tokenizerURL.path)
-            }
-            // 并行任务 2：预读 config.json（模型配置，含 tokenizer 合并策略等）
-            group.addTask {
-                let configURL = path.appendingPathComponent("config.json")
-                _ = FileManager.default.contents(atPath: configURL.path)
-            }
+        guard let model = loadedModel else { return }
+        // 通过 ModelContainer 执行一次 tokenizer prepare，初始化并预热 tokenizer
+        _ = try? await model.perform { context in
+            _ = try await context.processor.prepare(input: UserInput(prompt: " "))
         }
         #else
         // 占位：mlx-swift 不可用时无 tokenizer 可预加载
@@ -125,19 +128,23 @@ actor MLXInferenceEngine {
                         return
                     }
                 }
-                guard isLoaded else {
+                guard isLoaded, let model = loadedModel else {
                     continuation.yield(NSLocalizedString("[端侧模型未加载，请先下载并加载模型]", comment: ""))
                     continuation.finish()
                     return
                 }
                 do {
-                    // MLX 生成结果按 token 流式返回
-                    let result = try await loadedModel?.generate(prompt: prompt, maxTokens: maxTokens, temperature: temperature)
-                    // MLX generate 返回完整字符串，此处按字符切分模拟流式输出
-                    if let text = result {
-                        for chunk in text.split(separator: " ") {
+                    // 使用 MLX 原生流式生成：通过 perform 获取 ModelContext，
+                    // 调用 MLXLMCommon.generate 获取 AsyncStream<Generation>，逐 token yield
+                    try await model.perform { context in
+                        let input = try await context.processor.prepare(input: UserInput(prompt: prompt))
+                        let params = GenerateParameters(temperature: Float(temperature), maxTokens: maxTokens)
+                        let tokenStream = try generate(input: input, parameters: params, context: context)
+                        for await part in tokenStream {
                             if Task.isCancelled { break }
-                            continuation.yield(String(chunk) + " ")
+                            if let chunk = part.chunk, !chunk.isEmpty {
+                                continuation.yield(chunk)
+                            }
                         }
                     }
                 } catch {

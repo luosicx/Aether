@@ -1,6 +1,6 @@
 # Aether（以太）
 
-> 一个原生 SwiftUI AI 对话助手，支持 iOS / iPad / macOS 三端，采用**液态玻璃 + 深空主题**视觉语言。基于多 LLM Provider（DeepSeek / Qwen / BFF 代理 / 端侧 MLX），覆盖流式对话、RAG 知识库、ReAct 工具调用、语义缓存、端侧离线推理、语音合成与识别、健康洞察、灵动岛 Live Activity 等能力。
+> 一个原生 SwiftUI AI 对话助手，支持 iOS / iPad / macOS 三端，采用**液态玻璃 + 深空主题**视觉语言。基于多 LLM Provider（DeepSeek / Qwen / BFF 代理 / 端侧 MLX），覆盖流式对话、RAG 知识库、ReAct 工具调用、语义缓存、端侧离线推理、语音合成与识别、健康洞察、灵动岛 Live Activity、Watch App、桌面 Widget、DeepLink 等能力。支持 8 种语言（简中 / 繁中 / 英 / 日 / 韩 / 法 / 德 / 西）。
 
 ## 截图
 
@@ -23,6 +23,11 @@
 - **健康洞察**（iOS）：HealthKit 读取步数 / 心率 / 睡眠，生成中文洞察文本并持久化。
 - **灵动岛 Live Activity**（iOS）：ActivityKit 状态机「思考中 → 回复中 → 完成」。
 - **SmartRouter 智能模型路由**：基于规则与历史成功率在多 Provider 间动态路由，失败自动 Fallback。
+- **Watch App**（iOS 配对）：watchOS 独立 App，TabView 三标签（快速对话 / 健康洞察 / 设置），通过 WatchConnectivity 与主 App 双向同步。⚠️ 需在 Xcode 中手动创建 Watch target。
+- **桌面 Widget**：三个 Widget（QuickChat 快捷提问 / HealthInsight 健康洞察 / RecentConversations 最近会话），通过 App Group 共享 SwiftData。⚠️ 需在 Xcode 中手动创建 Widget target。
+- **DeepLink 支持**：`aether://ask?query=` 快捷提问、`aether://conversation/<uuid>` 跳转指定会话。
+- **多语言支持**：8 种语言（zh-Hans / zh-Hant / en / ja / ko / fr / de / es），App 内切换并提示重启。
+- **无障碍**：VoiceOver 标签与提示、Dynamic Type 适配、accessibilityIdentifier 覆盖关键交互控件。
 - **深色模式默认 + 液态玻璃 UI**：深空黑基底 + 神秘紫强调 + 电光蓝交互 + 液态玻璃卡片，深色模式开箱即用。
 
 ## 技术栈
@@ -49,16 +54,21 @@
 项目采用 MVVM + Service 分层架构，详见 [架构文档](doc/ARCHITECTURE.md)。简要结构：
 
 ```
-Aether/
-├── App/                    # App 入口（AetherApp.swift）
+Aether/                     # 主 App（iOS / iPad / macOS）
+├── App/                    # App 入口（AetherApp.swift，含 DeepLink 处理）
 ├── AppIntents/             # App Intents（AskAether / NewConversation / SwitchConversation）
 ├── Core/                   # 核心协议与常量（LLMProvider / ToolProtocol / APIConfig）
 ├── DesignSystem/           # 设计系统 Token（颜色 / 字体 / 间距 / 圆角 / 动画）
 ├── Models/                 # SwiftData @Model（Conversation / ChatMessage / DocumentChunk 等 7 实体）
-├── Resources/              # 资源（Assets.xcassets / Info.plist / Localizable.xcstrings / PrivacyInfo）
+├── Resources/              # 资源（Assets / Info.plist / Localizable.xcstrings 8 语言 / PrivacyInfo）
 ├── Services/               # 服务层（19 子模块：LLM / RAG / Tools / Cache / Voice / OnDevice / Health 等）
 ├── ViewModels/             # MVVM ViewModel（ChatViewModel / ConversationListVM / KnowledgeBaseVM / SettingsViewModel）
 └── Views/                  # SwiftUI 视图（Chat / Components / Conversation / OnDevice / RAG / Settings）
+AetherWatch/                # watchOS App（TabView：快速对话 / 健康洞察 / 设置）
+AetherWidgets/              # Widget Extension（QuickChat / HealthInsight / RecentConversations）
+CloudflareWorkers/          # BFF 代理层（worker.js + wrangler.toml）
+AetherTests/                # 单元测试（73 文件 / 248 用例）
+AetherUITests/              # UI 测试（2 文件 / 13 用例）
 ```
 
 ## 文档导航
@@ -72,19 +82,24 @@ Aether/
 | [变更日志](doc/CHANGELOG.md) | Day 1–20 全部里程碑记录 |
 | [路线图](doc/ROADMAP.md) | 后续任务方向 |
 | [优化方案](doc/OPTIMIZATION.md) | 性能与体验优化 |
-| [设计更新](doc/DESIGN_UPDATE.md) | UI/UX 演进计划 |
 | [样式指南](doc/Style%20Guide.md) | 液态玻璃 + 深空主题设计规范 |
 | [手测清单](doc/MANUAL_TEST_CHECKLIST.md) | 多平台适配、工具能力等手测模块 |
 | [发布清单](doc/ReleaseChecklist.md) | 多平台构建验证、工具数量审计 |
 | [BFF 部署](doc/BFF_DEPLOYMENT.md) | Cloudflare Workers 代理层部署指南 |
+| [DMG 打包](doc/DMG_PACKAGING.md) | macOS .dmg 打包与公证流程 |
+| [架构图](doc/diagrams/README.md) | PlantUML 架构图渲染说明 |
 
 ## 环境要求
 
 - Xcode 16+
 - iOS Deployment Target 17.0+
 - macOS Deployment Target 14+
+- watchOS Deployment Target 10+（Watch App 可选）
 - DeepSeek API Key（云端模式）
 - mlx-swift SPM 依赖（端侧推理可选）
+- App Group `group.com.aether.shared`（Widget 共享 SwiftData 可选）
+
+> **Watch App 与 Widget 注意事项**：源代码已就绪（`AetherWatch/` 与 `AetherWidgets/`），但需在 Xcode 中手动创建对应的 target 并关联源文件、配置 App Group 与 Capabilities。详见 [贡献指南](doc/CONTRIBUTING.md) 中的 Watch / Widget 开发指南。
 
 ## License
 

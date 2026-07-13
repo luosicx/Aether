@@ -187,4 +187,78 @@ final class SettingsViewTests: XCTestCase {
         XCTAssertEqual(call.arguments, "{\"expr\":\"1+1\"}")
         XCTAssertEqual(call.result, "2")
     }
+
+    // MARK: - 设置变更通知验证
+
+    /// 验证 .settingsDidUpdate 通知名存在且可被 NotificationCenter 接收
+    func testSettingsDidUpdateNotificationIsReceived() {
+        let expectation = XCTestExpectation(description: "应收到 settingsDidUpdate 通知")
+        let observer = NotificationCenter.default.addObserver(
+            forName: .settingsDidUpdate,
+            object: nil,
+            queue: .main
+        ) { _ in
+            expectation.fulfill()
+        }
+        defer { NotificationCenter.default.removeObserver(observer) }
+
+        NotificationCenter.default.post(name: .settingsDidUpdate, object: nil)
+        wait(for: [expectation], timeout: 1.0)
+    }
+
+    // MARK: - KeychainManager.saveAPIKey kSecAttrAccessible 验证
+
+    /// 验证 saveAPIKey(_,for:) 能正确往返保存与读取（含 kSecAttrAccessible 修复后）
+    func testKeychainSaveAPIKeyRoundTripAfterAccessibleFix() throws {
+        KeychainManager.shared.backend = InMemoryKeychainBackend()
+        defer {
+            KeychainManager.shared.deleteAPIKey(for: .deepseek)
+            KeychainManager.shared.deleteAPIKey(for: .qwen)
+            KeychainManager.shared.backend = SystemKeychainBackend()
+        }
+
+        try KeychainManager.shared.saveAPIKey("accessible-test-key", for: .deepseek)
+        XCTAssertEqual(
+            KeychainManager.shared.getAPIKey(for: .deepseek),
+            "accessible-test-key",
+            "saveAPIKey 修复 kSecAttrAccessible 后应能正常往返"
+        )
+
+        try KeychainManager.shared.saveAPIKey("qwen-accessible-key", for: .qwen)
+        XCTAssertEqual(
+            KeychainManager.shared.getAPIKey(for: .qwen),
+            "qwen-accessible-key",
+            "qwen key 也应能正常往返"
+        )
+    }
+
+    /// 验证 SettingsViewModel.saveAPIKey(for:) 对两个 provider 均能保存
+    @MainActor
+    func testSettingsVMSaveAPIKeyForBothProviders() throws {
+        KeychainManager.shared.backend = InMemoryKeychainBackend()
+        defer {
+            KeychainManager.shared.deleteAPIKey(for: .deepseek)
+            KeychainManager.shared.deleteAPIKey(for: .qwen)
+            KeychainManager.shared.backend = SystemKeychainBackend()
+        }
+
+        let vm = SettingsViewModel()
+        vm.deepseekAPIKey = "ds-auto-save"
+        vm.qwenAPIKey = "qwen-auto-save"
+
+        // 模拟 handleDisappear / doneButton 中的自动保存调用
+        vm.saveAPIKey(for: .deepseek)
+        vm.saveAPIKey(for: .qwen)
+
+        XCTAssertEqual(
+            KeychainManager.shared.getAPIKey(for: .deepseek),
+            "ds-auto-save",
+            "saveAPIKey(for: .deepseek) 应保存 deepseek key"
+        )
+        XCTAssertEqual(
+            KeychainManager.shared.getAPIKey(for: .qwen),
+            "qwen-auto-save",
+            "saveAPIKey(for: .qwen) 应保存 qwen key"
+        )
+    }
 }

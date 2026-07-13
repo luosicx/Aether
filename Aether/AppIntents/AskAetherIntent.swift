@@ -4,11 +4,14 @@ import Foundation
 /// Day 16/18: 「向 Aether 提问」AppIntent，支持 Siri 与快捷指令发起对话。
 /// Day 18: 通过 IntentChatService 走真实 LLM 流程（不再返回占位文本），
 /// AppIntent 不直接持有 ChatViewModel（ViewModel 生命周期绑定 SwiftUI 视图）。
+/// Task 5: openAppWhenRun = true，允许 Widget 点击后打开主 App。
 struct AskAetherIntent: AppIntent {
     /// Siri / 快捷指令中显示的标题
     static var title: LocalizedStringResource = "向以太提问"
     /// 描述（用于快捷指令详情页）
     static var description = IntentDescription("向以太发送问题并获取回复")
+    /// Task 5: Widget 点击后打开主 App，deeplink 携带 query 参数供 ChatView 接收并自动发送
+    static var openAppWhenRun: Bool = true
 
     /// 用户输入的问题文本
     @Parameter(title: "问题")

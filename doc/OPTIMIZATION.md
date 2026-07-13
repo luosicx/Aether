@@ -24,6 +24,30 @@
 - **优化**：模型加载放到后台 `Task`；使用 `TaskGroup` 预加载 tokenizer。
 - **验收**：切换端侧推理时 UI 不卡死。
 
+### 1.4 TTS 音色目录主线程阻塞
+
+- **现状**：`AVSpeechSynthesisVoice.speechVoices()` 在主线程调用时可能阻塞 50-100ms（首次访问触发 `speechsynthesisd` 进程启动）。
+- **优化**：`TTSVoiceCatalog` 使用 `static cachedVoices` / `static cachedGrouped` 静态缓存，首次访问在后台线程预热，后续直接返回缓存；`VoiceService` 使用实例级 `cachedVoice` / `cachedVoiceIdentifier` 避免每次朗读时重复解析音色。
+- **验收**：设置页 TTS 音色选择器打开时无卡顿；连续朗读多条消息无延迟累积。
+
+### 1.5 远程配置延迟拉取
+
+- **现状**：`RemoteConfigService` 在 `init()` 中立即拉取远程配置。
+- **优化**：将 `fetch()` 调用从 `init()` 移到首屏 `.task` modifier 出现后执行，避免冷启动时网络请求阻塞。
+- **验收**：冷启动时无网络请求发出（首屏渲染后才开始拉取）。
+
+### 1.6 主题持久化同步
+
+- **现状**：主题切换后仅在内存生效，重启后丢失。
+- **优化**：Theme 从 SwiftData `UserPreference` @Model 同步，切换主题后立即持久化到 SwiftData 并在下次启动时恢复。
+- **验收**：切换主题后 kill 进程重启，主题保持一致。
+
+### 1.7 跨平台文件选择器
+
+- **现状**：`DocumentPickerView` 使用 UIKit `UIDocumentPickerViewController`，macOS 不可用。
+- **优化**：替换为 SwiftUI `.fileImporter`，跨平台兼容 iOS / iPad / macOS。
+- **验收**：iOS 与 macOS 均可导入 PDF / 文本文件到知识库。
+
 ## 2. 体验优化
 
 ### 2.1 错误提示

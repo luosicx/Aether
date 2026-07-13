@@ -1125,9 +1125,43 @@ stateDiagram-v2
 
 ### 5.7 国际化与无障碍
 
-- **String Catalog 统一源语言**：`Localizable.xcstrings` 以 `zh-Hans` 为源语言，`zh-Hant` / `en` 完整翻译，共 385 keys；SwiftUI 字面量自动提取，动态文本使用 `NSLocalizedString`。
-- **accessibility 工程化**：13+ 视图补充 `accessibilityLabel` / `accessibilityHint` / `accessibilityIdentifier`，关键交互控件全部可访问，同时为 UITest 提供稳定定位符。
+- **String Catalog 统一源语言**：`Localizable.xcstrings` 以 `zh-Hans` 为源语言，支持 **8 种语言**完整翻译（`zh-Hans` 简体中文 / `zh-Hant` 繁体中文 / `en` 英文 / `ja` 日文 / `ko` 韩文 / `fr` 法文 / `de` 德文 / `es` 西班牙文），共 387 keys；SwiftUI 字面量自动提取，动态文本使用 `NSLocalizedString`；App 内「设置 → 语言」支持跟随系统或手动切换 9 种选项（含 8 种语言 + 跟随系统），切换后写入 `AppleLanguages` UserDefaults 并提示重启。
+- **accessibility 工程化**：13+ 视图补充 `accessibilityLabel` / `accessibilityHint` / `accessibilityIdentifier`，关键交互控件全部可访问，同时为 UITest 提供稳定定位符；Watch App 与 LaunchScreen 同样补充无障碍标签。
 - **截图资产规范化**：`screenshots/` 目录按 iOS / macOS 分类，8 张核心页面截图用于 README 与 App Store 元数据。
+
+### 5.8 平台扩展（Watch App / Widget Extension / DeepLink）
+
+#### Watch App（`AetherWatch/`）
+
+- **架构**：watchOS 独立 App，`WatchApp.swift` 使用 `TabView` 三标签页（快速对话 / 健康洞察 / 设置）。
+- **数据同步**：通过 `WatchConnectivityService`（`WCSession`）与 iOS 主 App 双向通信：`transferUserInfo` 推送健康洞察到 Watch；`sendQuickChat` 从 Watch 发送快捷对话消息到 iPhone。
+- **依赖**：需 iOS 主 App 配对（`WatchConnectivity` 仅 iOS 端激活），macOS 不支持。
+- **⚠️ Target 配置**：源代码已就绪，需在 Xcode 中手动创建 watchOS App target 并关联 `AetherWatch/` 目录下的源文件。
+
+#### Widget Extension（`AetherWidgets/`）
+
+- **架构**：三个 Widget 共用一个 Widget Extension target：
+  - `QuickChatWidget`：桌面快捷提问，点击通过 DeepLink `aether://ask?query=` 跳转到主 App 并自动发送。
+  - `HealthInsightWidget`：展示最新健康洞察摘要，通过 App Group 共享 SwiftData 读取 `HealthInsight` @Model。
+  - `RecentConversationsWidget`：最近会话列表，点击通过 DeepLink `aether://conversation/<uuid>` 跳转。
+- **数据共享**：通过 App Group（`group.com.aether.shared`）配置共享 `ModelContainer`，Widget 与主 App 读取同一 SwiftData 数据库。
+- **技术栈**：`TimelineProvider` + `AppIntentConfiguration`（iOS 17+ / macOS 14+）。
+- **⚠️ Target 配置**：源代码已就绪，需在 Xcode 中手动创建 Widget Extension target 并关联 `AetherWidgets/` 目录下的源文件，配置 App Group capability。
+
+#### DeepLink 支持
+
+- **URL Scheme**：`aether://`
+- **支持的 DeepLink**：
+  - `aether://ask?query=<URL编码文本>`：打开主界面并自动发送指定文本作为消息。
+  - `aether://conversation/<uuid>`：跳转到指定 UUID 的会话。
+- **实现**：在 `AetherApp.swift` 中通过 `.onOpenURL` 处理，解析 URL 后调用 `IntentChatService` 或 `ConversationListVM` 路由到对应会话。
+- **入口**：Widget 点击、Siri / Shortcuts、Spotlight 搜索结果、外部 App 跳转。
+
+#### App Group 共享 SwiftData
+
+- **配置**：App Group identifier `group.com.aether.shared`。
+- **共享方案**：主 App 与 Widget Extension 的 `ModelContainer` 均指向 App Group 容器目录下的同一 SQLite 数据库文件，Widget 可直接读取主 App 写入的 `Conversation` / `HealthInsight` 数据。
+- **影响范围**：`AetherApp.swift`（ModelContainer 初始化）+ Widget Extension（TimelineProvider 读取数据）。
 
 ---
 
@@ -1456,11 +1490,17 @@ Aether/
         ├── SettingsView.swift
         └── TTSVoicePickerView.swift
 
-AetherWatch/                  # watchOS App
+AetherWatch/                  # watchOS App（TabView：快速对话 / 健康洞察 / 设置）
 ├── Views/
 │   ├── WatchHealthInsightView.swift
 │   └── WatchQuickChatView.swift
 └── WatchApp.swift
+
+AetherWidgets/                # Widget Extension（QuickChat / HealthInsight / RecentConversations）
+├── AetherWidgetsBundle.swift
+├── QuickChatWidget.swift
+├── HealthInsightWidget.swift
+└── RecentConversationsWidget.swift
 
 CloudflareWorkers/               # BFF 代理网关
 ├── worker.js
@@ -1528,13 +1568,23 @@ Aether.xcodeproj/             # Xcode 工程文件
 doc/
 ├── ARCHITECTURE.md              # 本文件
 ├── USAGE.md
+├── API.md
+├── CHANGELOG.md
+├── CONTRIBUTING.md
+├── ROADMAP.md
+├── OPTIMIZATION.md
+├── Style Guide.md
 ├── MANUAL_TEST_CHECKLIST.md
 ├── ReleaseChecklist.md
 ├── BFF_DEPLOYMENT.md
-├── plans/
-│   ├── 2026-07-06-day1-streaming-chat.md
-│   └── 2026-07-06-day2-conversation-memory.md
-└── Aether 实战计划.md
+├── DMG_PACKAGING.md
+├── Aether 实战计划.md
+└── diagrams/
+    ├── README.md
+    ├── architecture-overview.puml
+    ├── react-loop.puml
+    ├── rag-dataflow.puml
+    └── provider-fallback.puml
 .github/workflows/ci.yml
 .trae/specs/                     # 43 个 spec 目录（Day 1–20 + 修复 + 补充 + 文档更新）
 README.md

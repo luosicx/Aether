@@ -105,3 +105,39 @@
 3.  **先深色，后浅色**：Liquid Glass在深色模式下效果最惊艳，可以此为起点。
 4.  **构建组件库**：在Figma中构建一套包含颜色、字体、毛玻璃效果和核心组件的设计系统。
 5.  **迭代与测试**：在不同光线条件和设备上测试毛玻璃效果的可读性与视觉效果。
+
+---
+
+### ⌚ Watch App 设计规范
+
+Watch App 遵循 watchOS HIG，在 Aether 液态玻璃视觉语言基础上做适配简化。
+
+#### 布局原则
+- **TabView 三标签**：快速对话 / 健康洞察 / 设置，底部 TabBar 使用 SF Symbols
+- **容器相对尺寸**：使用 `.containerRelativeFrame(.horizontal)` 适配各表盘尺寸，不硬编码宽度
+- **紧凑信息密度**：表盘空间有限，每屏仅展示核心信息（最近 1 条洞察 / 最近 3 条会话标题）
+
+#### 视觉适配
+- **背景**：使用 `.containerBackground` 适配 watchOS 深色模式
+- **字体**：使用 watchOS 系统语义字体（`.font(.headline)` / `.font(.caption)`），不使用 Aether 自定义 Token
+- **色彩**：仅保留 `aetherPurple` 作为强调色，其余使用 watchOS 系统色
+
+---
+
+### 📐 Widget 设计规范
+
+Widget 遵循 WidgetKit 设计规范，保持 Aether 视觉一致性。
+
+#### 三个 Widget 视觉说明
+
+| Widget | 尺寸 | 视觉要素 |
+|--------|------|----------|
+| QuickChatWidget | medium | 紫蓝渐变标题 + 输入框占位 + 发送按钮图标 |
+| HealthInsightWidget | medium | 健康图标 + 最新洞察摘要（最多 2 行） + 时间戳 |
+| RecentConversationsWidget | medium | 会话图标 + 最近 3 条会话标题 + 时间戳 |
+
+#### 视觉适配
+- **背景**：使用 `Color.deepSpace` + `.containerBackground` 适配深色模式
+- **圆角**：使用系统 Widget 圆角（不使用 Aether CornerRadius Token）
+- **字体**：使用系统语义字体（`.font(.headline)` / `.font(.caption2)`）
+- **强调色**：QuickChatWidget 发送按钮使用 `aetherGradient`

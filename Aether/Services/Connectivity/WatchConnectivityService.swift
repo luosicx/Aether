@@ -1,5 +1,6 @@
-#if os(iOS)
 import Foundation
+
+#if os(iOS)
 import WatchConnectivity
 
 /// Day 17: watchOS 与 iOS 通信服务，管理活跃会话同步与快速对话消息。
@@ -52,8 +53,19 @@ final class WatchConnectivityService: NSObject, WCSessionDelegate {
         }
     }
 
-    /// 接收到 watchOS 发来的消息，按 action 分发到 NotificationCenter
+    /// 接收到 watchOS 发来的实时消息，按 action 分发到 NotificationCenter
     func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
+        handleIncomingMessage(message)
+    }
+
+    /// Day 17: 接收到 watchOS 发来的后台 userInfo（transferUserInfo 投递），按 action 分发到 NotificationCenter。
+    /// 即使 iOS App 不在前台，系统也会在下次启动/唤醒时回调此方法。
+    func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any] = [:]) {
+        handleIncomingMessage(userInfo)
+    }
+
+    /// 统一处理收到的消息（实时 + 后台 userInfo 共用），按 action 分发到 NotificationCenter
+    private func handleIncomingMessage(_ message: [String: Any]) {
         guard let action = message["action"] as? String else { return }
         switch action {
         case "activeConversation":
@@ -88,8 +100,9 @@ final class WatchConnectivityService: NSObject, WCSessionDelegate {
         WCSession.default.activate()
     }
 }
+#endif
 
-// MARK: - 通知名扩展
+// MARK: - 通知名扩展（跨平台：WatchConnectivityService 仅 iOS 编译，但通知名需在 macOS 端可读以便 ChatViewModel 编译）
 extension Notification.Name {
     /// 活跃会话变更通知（object 为新的会话 UUID）
     static let wcActiveConversationChanged = Notification.Name("wcActiveConversationChanged")
@@ -98,4 +111,3 @@ extension Notification.Name {
     /// watchOS 可达性变更通知（object 为 Bool 是否可达）
     static let wcReachabilityChanged = Notification.Name("wcReachabilityChanged")
 }
-#endif

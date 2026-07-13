@@ -23,36 +23,28 @@ final class OnDeviceModelCatalogTests: XCTestCase {
         }
     }
 
-    // MARK: - 2. URL 有效性
+    // MARK: - 2. 仓库 ID 有效性
 
-    /// 验证每个模型的双源 URL 格式正确。
-    func testModelURLsValid() {
+    /// 验证每个模型的双源仓库 ID 格式正确。
+    func testModelReposValid() {
         for model in OnDeviceModelCatalog.models {
-            // HuggingFace URL
-            XCTAssertEqual(model.huggingFaceURL?.scheme, "https", "HuggingFace URL 应为 https：\(model.id)")
-            XCTAssertEqual(model.huggingFaceURL?.host, "huggingface.co", "HuggingFace URL host 应为 huggingface.co：\(model.id)")
-            XCTAssertTrue(
-                model.huggingFaceURL?.path.contains("model.safetensors") ?? false,
-                "HuggingFace URL 路径应包含 model.safetensors：\(model.id)"
-            )
+            // HuggingFace 仓库 ID
+            XCTAssertFalse(model.huggingFaceRepo.isEmpty, "HuggingFace 仓库 ID 不应为空：\(model.id)")
+            XCTAssertTrue(model.huggingFaceRepo.contains("/"), "HuggingFace 仓库 ID 应包含 '/'（org/model 格式）：\(model.id)")
 
-            // ModelScope URL
-            XCTAssertEqual(model.modelScopeURL?.scheme, "https", "ModelScope URL 应为 https：\(model.id)")
-            XCTAssertEqual(model.modelScopeURL?.host, "www.modelscope.cn", "ModelScope URL host 应为 www.modelscope.cn：\(model.id)")
-            XCTAssertTrue(
-                model.modelScopeURL?.absoluteString.contains("model.safetensors") ?? false,
-                "ModelScope URL 应包含 model.safetensors：\(model.id)"
-            )
+            // ModelScope 仓库 ID
+            XCTAssertNotNil(model.modelScopeRepo, "ModelScope 仓库 ID 不应为 nil：\(model.id)")
+            XCTAssertTrue(model.modelScopeRepo?.contains("/") ?? false, "ModelScope 仓库 ID 应包含 '/'（org/model 格式）：\(model.id)")
         }
     }
 
-    // MARK: - 3. URL 选择器
+    // MARK: - 3. 仓库选择器
 
-    /// 验证 url(for:) 方法根据下载源返回对应 URL。
-    func testURLForDownloadSource() {
+    /// 验证 repo(for:) 方法根据下载源返回对应仓库 ID。
+    func testRepoForDownloadSource() {
         let model = OnDeviceModelCatalog.models[0]
-        XCTAssertEqual(model.url(for: .domestic), model.modelScopeURL, "国内源应返回 ModelScope URL")
-        XCTAssertEqual(model.url(for: .international), model.huggingFaceURL, "国外源应返回 HuggingFace URL")
+        XCTAssertEqual(model.repo(for: .domestic), model.modelScopeRepo, "国内源应返回 ModelScope 仓库 ID")
+        XCTAssertEqual(model.repo(for: .international), model.huggingFaceRepo, "国外源应返回 HuggingFace 仓库 ID")
     }
 
     // MARK: - 4. 模型查找
@@ -89,14 +81,14 @@ final class OnDeviceModelCatalogTests: XCTestCase {
                        "international displayName 应为 '国外（HuggingFace）'")
     }
 
-    /// 遍历 OnDeviceModelCatalog.models，对每个模型验证 url(for:) 的两个分支。
-    /// 覆盖 OnDeviceModelEntry.url(for:) 的 domestic 与 international 两个 case 分支。
-    func testURLForDownloadSourceForAllModels() {
+    /// 遍历 OnDeviceModelCatalog.models，对每个模型验证 repo(for:) 的两个分支。
+    /// 覆盖 OnDeviceModelEntry.repo(for:) 的 domestic 与 international 两个 case 分支。
+    func testRepoForDownloadSourceForAllModels() {
         for model in OnDeviceModelCatalog.models {
-            XCTAssertEqual(model.url(for: .domestic), model.modelScopeURL,
-                           "\(model.id): 国内源应返回 ModelScope URL")
-            XCTAssertEqual(model.url(for: .international), model.huggingFaceURL,
-                           "\(model.id): 国外源应返回 HuggingFace URL")
+            XCTAssertEqual(model.repo(for: .domestic), model.modelScopeRepo,
+                           "\(model.id): 国内源应返回 ModelScope 仓库 ID")
+            XCTAssertEqual(model.repo(for: .international), model.huggingFaceRepo,
+                           "\(model.id): 国外源应返回 HuggingFace 仓库 ID")
         }
     }
 

@@ -83,15 +83,16 @@ struct MenuBarPanel: View {
             Image(systemName: "bubble.left.and.bubble.right")
                 .font(.title)
                 .foregroundStyle(.secondary)
-            Text("暂无最近对话")
+            Text("暂无最近对话", comment: "")
                 .font(.captionAI)
                 .foregroundStyle(.secondary)
-            Text("在上方输入问题开始")
+            Text("在上方输入问题开始", comment: "")
                 .font(.captionAI)
                 .foregroundStyle(Color.duskGray)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .accessibilityLabel("暂无最近对话")
+        .accessibilityHint("在上方输入框输入问题开始新对话")
         .accessibilityIdentifier("menuBarEmptyState")
     }
 

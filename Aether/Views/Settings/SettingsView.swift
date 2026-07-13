@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
+import PhotosUI
 #if os(iOS)
 import MessageUI
 #endif
@@ -20,12 +21,12 @@ enum SettingsSection: String, CaseIterable, Identifiable, Hashable {
 
     var title: String {
         switch self {
-        case .provider: return "API 与模型"
-        case .inference: return "推理配置"
-        case .voice: return "语音朗读"
-        case .features: return "功能与偏好"
-        case .health: return "健康"
-        case .about: return "关于"
+        case .provider: return String(localized: "API 与模型")
+        case .inference: return String(localized: "推理配置")
+        case .voice: return String(localized: "语音朗读")
+        case .features: return String(localized: "功能与偏好")
+        case .health: return String(localized: "健康")
+        case .about: return String(localized: "关于")
         }
     }
 
@@ -69,6 +70,8 @@ struct SettingsView: View {
     @State private var aiPersonaDescription: String = ""
     @State private var aiAvatarData: Data? = nil
     @State private var showAvatarImporter: Bool = false
+    // Task: 修复头像选择器——iOS 上使用 PhotosPicker 替代 fileImporter
+    @State private var avatarPhotoItem: PhotosPickerItem?
     // Task 27: 气泡样式
     @State private var selectedBubbleStyle: BubbleStyleType = .liquidGlass
     // Task 28: 字体大小与行距
@@ -79,7 +82,7 @@ struct SettingsView: View {
     @State private var showDeleteAPIKeyConfirm = false
     // Day 17: 健康管理状态(iOS only —— macOS 下不渲染健康入口)
     #if os(iOS)
-    @State private var healthAuthorizationStatus: String = "未授权"
+    @State private var healthAuthorizationStatus: String = String(localized: "未授权")
     @State private var healthInsightCount: Int = 0
     #endif
     // Day 20: 邮件 composer sheet 开关
@@ -103,7 +106,7 @@ struct SettingsView: View {
         .alert("语言", isPresented: $showRestartAlert) {
             Button("完成") {}
         } message: {
-            Text("重启 App 以应用语言更改")
+            Text("重启 App 以应用语言更改", comment: "")
         }
         .sheet(isPresented: $showDebugPanel) {
             DebugPanelView(chatViewModel: chatViewModel)
@@ -210,7 +213,7 @@ struct SettingsView: View {
                         sectionContent(for: section)
                     }
                     .formStyle(.grouped)
-                    .responsiveLayout()
+                    .frame(maxWidth: 600)
                     .tint(Color.aetherPurple)
                     .foregroundStyle(Color.starlight)
                     .scrollContentBackground(.hidden)
@@ -284,6 +287,9 @@ struct SettingsView: View {
     private var doneButton: some View {
         Button("完成") {
             settingsVM.updateSystemPrompt(in: conversation, modelContext: modelContext)
+            // Task: 修复 API Key 未自动保存——点击「完成」时也保存两个 provider 的 Key
+            settingsVM.saveAPIKey(for: .deepseek)
+            settingsVM.saveAPIKey(for: .qwen)
             isPresented = false
         }
         .fontWeight(.medium)
@@ -315,9 +321,9 @@ struct SettingsView: View {
             .accessibilityHint("选择 App 界面语言，切换后需重启 App 生效")
             .accessibilityIdentifier("languagePicker")
         } header: {
-            Text("语言")
+            Text("语言", comment: "")
         } footer: {
-            Text("切换语言后需重启 App 生效。选择「跟随系统」将使用设备系统语言。")
+            Text("切换语言后需重启 App 生效。选择「跟随系统」将使用设备系统语言。", comment: "")
                 .font(.captionAI)
         }
     }
@@ -338,9 +344,9 @@ struct SettingsView: View {
             .accessibilityHint("选择 LLM 供应商")
             .accessibilityIdentifier("providerPicker")
         } header: {
-            Text("供应商")
+            Text("供应商", comment: "")
         } footer: {
-            Text("选择 LLM 供应商。不同供应商的 API Key 独立存储。")
+            Text("选择 LLM 供应商。不同供应商的 API Key 独立存储。", comment: "")
                 .font(.captionAI)
         }
     }
@@ -356,9 +362,9 @@ struct SettingsView: View {
                 .accessibilityHint("主供应商失败时自动切换备用供应商")
                 .accessibilityIdentifier("fallbackToggle")
         } header: {
-            Text("自动降级")
+            Text("自动降级", comment: "")
         } footer: {
-            Text("主供应商失败时自动切换到备用供应商重试一次。")
+            Text("主供应商失败时自动切换到备用供应商重试一次。", comment: "")
                 .font(.captionAI)
         }
     }
@@ -408,9 +414,9 @@ struct SettingsView: View {
                 .accessibilityHint("设置 embed 接口每分钟最大请求数")
                 .accessibilityIdentifier("bffEmbedRateLimitStepper")
         } header: {
-            Text("BFF 代理")
+            Text("BFF 代理", comment: "")
         } footer: {
-            Text("启用后 API Key 由服务端保护，设备只持有 BFF Token。")
+            Text("启用后 API Key 由服务端保护，设备只持有 BFF Token。", comment: "")
                 .font(.captionAI)
         }
     }
@@ -449,9 +455,9 @@ struct SettingsView: View {
                     .accessibilityIdentifier("onDeviceTemperatureSlider")
             }
         } header: {
-            Text("端侧推理")
+            Text("端侧推理", comment: "")
         } footer: {
-            Text("端侧推理在断网时自动启用，模型文件约 700MB。")
+            Text("端侧推理在断网时自动启用，模型文件约 700MB。", comment: "")
                 .font(.captionAI)
         }
     }
@@ -467,10 +473,10 @@ struct SettingsView: View {
                 HealthSettingsView(chatViewModel: chatViewModel)
             } label: {
                 HStack {
-                    Text("健康管理")
+                    Text("健康管理", comment: "")
                     Spacer()
                     Text(healthAuthorizationStatus)
-                        .foregroundStyle(healthAuthorizationStatus == "已授权" ? .green : .secondary)
+                        .foregroundStyle(healthAuthorizationStatus == String(localized: "已授权") ? .green : .secondary)
                         .font(.captionAI)
                 }
             }
@@ -478,15 +484,15 @@ struct SettingsView: View {
             .accessibilityHint("管理 HealthKit 授权与健康洞察")
             .accessibilityIdentifier("healthManagementLink")
             HStack {
-                Text("已生成洞察")
+                Text("已生成洞察", comment: "")
                 Spacer()
                 Text("\(healthInsightCount)")
                     .foregroundStyle(.secondary)
             }
         } header: {
-            Text("健康")
+            Text("健康", comment: "")
         } footer: {
-            Text("接入 HealthKit 后 AI 可基于健康数据给出针对性建议。")
+            Text("接入 HealthKit 后 AI 可基于健康数据给出针对性建议。", comment: "")
                 .font(.captionAI)
         }
     }
@@ -502,7 +508,7 @@ struct SettingsView: View {
                 TTSVoicePickerView(settingsVM: settingsVM, chatViewModel: chatViewModel)
             } label: {
                 HStack {
-                    Text("音色")
+                    Text("音色", comment: "")
                     Spacer()
                     Text(currentVoiceDisplayName)
                         .foregroundStyle(.secondary)
@@ -565,9 +571,9 @@ struct SettingsView: View {
             .accessibilityHint(chatViewModel.voiceService.isPreviewing ? "停止试听" : "用当前音色朗读示例句")
             .accessibilityIdentifier("previewVoiceButton")
         } header: {
-            Text("语音朗读")
+            Text("语音朗读", comment: "")
         } footer: {
-            Text("选择朗读音色、语速、音调与音量。增强/优质音色首次使用时系统会自动下载。")
+            Text("选择朗读音色、语速、音调与音量。增强/优质音色首次使用时系统会自动下载。", comment: "")
                 .font(.captionAI)
         }
     }
@@ -614,7 +620,7 @@ struct SettingsView: View {
                     .accessibilityIdentifier("deleteAPIKeyButton")
                 case .onDevice:
                     // 端侧推理无需 API Key，提示用户
-                    Text("端侧推理无需 API Key，模型在本地运行。")
+                    Text("端侧推理无需 API Key，模型在本地运行。", comment: "")
                         .foregroundStyle(.secondary)
                         .font(.footnote)
                 }
@@ -628,9 +634,9 @@ struct SettingsView: View {
                 Text(String(format: NSLocalizedString("确定删除 %@ 的 API Key？删除后无法恢复。", comment: ""), settingsVM.selectedProvider.displayName))
             }
         } header: {
-            Text("API 配置")
+            Text("API 配置", comment: "")
         } footer: {
-            Text("API Key 存储在系统 Keychain,不会离开本设备。")
+            Text("API Key 存储在系统 Keychain,不会离开本设备。", comment: "")
                 .font(.captionAI)
         }
     }
@@ -641,7 +647,7 @@ struct SettingsView: View {
     private var modelSection: some View {
         Section {
             Picker("模型", selection: $settingsVM.modelSelectionMode) {
-                Text("自动").tag("auto")
+                Text("自动", comment: "").tag("auto")
                 Text("Chat").tag("deepseek-chat")
                 Text("Reasoner").tag("deepseek-reasoner")
             }
@@ -650,9 +656,9 @@ struct SettingsView: View {
             .accessibilityHint("选自动时智能路由，选具体模型则固定使用")
             .accessibilityIdentifier("modelPicker")
         } header: {
-            Text("模型")
+            Text("模型", comment: "")
         } footer: {
-            Text("选「自动」时由智能路由根据消息特征决定；选具体模型时禁用智能路由。")
+            Text("选「自动」时由智能路由根据消息特征决定；选具体模型时禁用智能路由。", comment: "")
                 .font(.captionAI)
         }
     }
@@ -675,7 +681,7 @@ struct SettingsView: View {
                 PluginSettingsView()
             } label: {
                 HStack {
-                    Text("插件管理")
+                    Text("插件管理", comment: "")
                     Spacer()
                     Image(systemName: "puzzlepiece.extension")
                         .foregroundStyle(.secondary)
@@ -689,7 +695,7 @@ struct SettingsView: View {
                 MCPSettingsView()
             } label: {
                 HStack {
-                    Text("MCP 配置")
+                    Text("MCP 配置", comment: "")
                     Spacer()
                 }
             }
@@ -697,9 +703,9 @@ struct SettingsView: View {
             .accessibilityHint("管理 MCP Server 配置")
             .accessibilityIdentifier("mcpSettingsLink")
         } header: {
-            Text("功能开关")
+            Text("功能开关", comment: "")
         } footer: {
-            Text("RAG 启用后会在发送消息前检索本地知识库；工具调用启用后会进入 ReAct 循环。")
+            Text("RAG 启用后会在发送消息前检索本地知识库；工具调用启用后会进入 ReAct 循环。", comment: "")
                 .font(.captionAI)
         }
     }
@@ -763,7 +769,7 @@ struct SettingsView: View {
     private var systemPromptSection: some View {
         Section {
             HStack {
-                Text("预设角色")
+                Text("预设角色", comment: "")
                     .font(.subheadline)
                 Spacer()
                 Menu("选择角色") {
@@ -783,9 +789,9 @@ struct SettingsView: View {
                 .accessibilityHint("输入系统提示词以定义 AI 行为")
                 .accessibilityIdentifier("systemPromptTextEditor")
         } header: {
-            Text("系统提示词")
+            Text("系统提示词", comment: "")
         } footer: {
-            Text("当前会话生效。新建对话沿用此值。")
+            Text("当前会话生效。新建对话沿用此值。", comment: "")
                 .font(.captionAI)
         }
     }
@@ -808,9 +814,9 @@ struct SettingsView: View {
         // MARK: Day 9 - 用户偏好
         Section {
             Picker("语气", selection: $preferredTone) {
-                Text("默认").tag("默认")
-                Text("正式").tag("正式")
-                Text("轻松").tag("轻松")
+                Text("默认", comment: "").tag("默认")
+                Text("正式", comment: "").tag("正式")
+                Text("轻松", comment: "").tag("轻松")
             }
             .accessibilityLabel("语气")
             .accessibilityHint("选择 AI 回复的语气风格")
@@ -842,7 +848,7 @@ struct SettingsView: View {
                 .accessibilityIdentifier("customFactTextEditor")
                 .overlay(alignment: .topLeading) {
                     if customFact.isEmpty {
-                        Text("如：我是素食者…")
+                        Text("如：我是素食者…", comment: "")
                             .foregroundStyle(.secondary)
                             .padding(.horizontal, 4)
                             .padding(.vertical, 8)
@@ -850,9 +856,9 @@ struct SettingsView: View {
                     }
                 }
         } header: {
-            Text("用户偏好")
+            Text("用户偏好", comment: "")
         } footer: {
-            Text("这些偏好会被注入到系统提示词，影响 AI 回复风格与工具选择。")
+            Text("这些偏好会被注入到系统提示词，影响 AI 回复风格与工具选择。", comment: "")
                 .font(.captionAI)
         }
     }
@@ -880,9 +886,9 @@ struct SettingsView: View {
             .accessibilityHint("选择 App 主题配色方案")
             .accessibilityIdentifier("themePicker")
         } header: {
-            Text("主题")
+            Text("主题", comment: "")
         } footer: {
-            Text("切换主题将改变背景、气泡、文字配色。深空为默认深色主题，黎明为暖色浅色主题，极光为青绿深色主题。")
+            Text("切换主题将改变背景、气泡、文字配色。深空为默认深色主题，黎明为暖色浅色主题，极光为青绿深色主题。", comment: "")
                 .font(.captionAI)
         }
     }
@@ -903,7 +909,7 @@ struct SettingsView: View {
                 .accessibilityIdentifier("aiPersonaDescriptionField")
                 .overlay(alignment: .topLeading) {
                     if aiPersonaDescription.isEmpty {
-                        Text("如：温和耐心、善于鼓励、回答简洁…")
+                        Text("如：温和耐心、善于鼓励、回答简洁…", comment: "")
                             .foregroundStyle(.secondary)
                             .padding(.horizontal, 4)
                             .padding(.vertical, 8)
@@ -911,9 +917,9 @@ struct SettingsView: View {
                     }
                 }
         } header: {
-            Text("AI 人设")
+            Text("AI 人设", comment: "")
         } footer: {
-            Text("人设名称与性格描述会注入到系统提示词，影响 AI 的回复风格。")
+            Text("人设名称与性格描述会注入到系统提示词，影响 AI 的回复风格。", comment: "")
                 .font(.captionAI)
         }
     }
@@ -954,6 +960,15 @@ struct SettingsView: View {
                 }
             }
             // 自定义头像上传
+            // Task: 修复头像选择器——iOS 用 PhotosPicker 打开相册，macOS 保留 fileImporter
+            #if os(iOS)
+            PhotosPicker(selection: $avatarPhotoItem, matching: .images) {
+                Label("从相册选择头像", systemImage: "photo.badge.plus")
+            }
+            .accessibilityLabel("从相册选择头像")
+            .accessibilityHint("上传自定义图片作为 AI 头像")
+            .accessibilityIdentifier("uploadAvatarButton")
+            #else
             Button {
                 showAvatarImporter = true
             } label: {
@@ -962,12 +977,22 @@ struct SettingsView: View {
             .accessibilityLabel("从相册选择头像")
             .accessibilityHint("上传自定义图片作为 AI 头像")
             .accessibilityIdentifier("uploadAvatarButton")
+            #endif
         } header: {
-            Text("AI 头像")
+            Text("AI 头像", comment: "")
         } footer: {
-            Text("选择预设头像或上传自定义图片。自定义头像将显示在对话气泡旁。")
+            Text("选择预设头像或上传自定义图片。自定义头像将显示在对话气泡旁。", comment: "")
                 .font(.captionAI)
         }
+        #if os(iOS)
+        .onChange(of: avatarPhotoItem) { _, newItem in
+            Task {
+                if let data = try? await newItem?.loadTransferable(type: Data.self) {
+                    aiAvatarData = data
+                }
+            }
+        }
+        #else
         .fileImporter(
             isPresented: $showAvatarImporter,
             allowedContentTypes: [.image]
@@ -984,6 +1009,7 @@ struct SettingsView: View {
                 break
             }
         }
+        #endif
     }
 
     /// 预设头像 SF Symbol 列表
@@ -1026,9 +1052,9 @@ struct SettingsView: View {
             .accessibilityHint("选择对话气泡的视觉风格")
             .accessibilityIdentifier("bubbleStylePicker")
         } header: {
-            Text("气泡样式")
+            Text("气泡样式", comment: "")
         } footer: {
-            Text("液态玻璃为默认毛玻璃效果，极简为无背景纯文本，卡片为带边框阴影样式。")
+            Text("液态玻璃为默认毛玻璃效果，极简为无背景纯文本，卡片为带边框阴影样式。", comment: "")
                 .font(.captionAI)
         }
     }
@@ -1046,7 +1072,7 @@ struct SettingsView: View {
                     .accessibilityIdentifier("fontSizeSlider")
             }
             VStack(alignment: .leading) {
-                Text(String(format: "行距：%.1f", lineHeight))
+                Text(String(format: NSLocalizedString("行距：%.1f", comment: "行距滑杆当前值"), lineHeight))
                 Slider(value: $lineHeight, in: 1.0...2.0, step: 0.1)
                     .accessibilityLabel("行距")
                     .accessibilityHint("调整对话文字行间距")
@@ -1054,10 +1080,10 @@ struct SettingsView: View {
             }
             // 实时预览
             VStack(alignment: .leading, spacing: 4) {
-                Text("预览")
+                Text("预览", comment: "")
                     .font(.captionAI)
                     .foregroundStyle(.secondary)
-                Text("你好，我是以太。这是字体大小与行距的预览效果。")
+                Text("你好，我是以太。这是字体大小与行距的预览效果。", comment: "")
                     .font(.system(size: fontSize))
                     .lineSpacing(CGFloat(fontSize) * CGFloat(lineHeight - 1))
                     .padding(EdgeInsets(top: 8, leading: 12, bottom: 8, trailing: 12))
@@ -1065,9 +1091,9 @@ struct SettingsView: View {
                     .clipShape(RoundedRectangle(cornerRadius: CornerRadius.medium))
             }
         } header: {
-            Text("字体与行距")
+            Text("字体与行距", comment: "")
         } footer: {
-            Text("调整对话正文的字体大小和行距，设置后立即生效。")
+            Text("调整对话正文的字体大小和行距，设置后立即生效。", comment: "")
                 .font(.captionAI)
         }
     }
@@ -1085,9 +1111,9 @@ struct SettingsView: View {
             .accessibilityHint("打开调试信息面板")
             .accessibilityIdentifier("openDebugPanelButton")
         } header: {
-            Text("调试面板")
+            Text("调试面板", comment: "")
         } footer: {
-            Text("展示最近一次发送的 prompt、API 响应、embedding 维度与工具调用。")
+            Text("展示最近一次发送的 prompt、API 响应、embedding 维度与工具调用。", comment: "")
                 .font(.captionAI)
         }
     }
@@ -1103,7 +1129,7 @@ struct SettingsView: View {
                 PrivacyPolicyView()
             } label: {
                 HStack {
-                    Text("隐私政策")
+                    Text("隐私政策", comment: "")
                     Spacer()
                 }
             }
@@ -1126,7 +1152,7 @@ struct SettingsView: View {
                 #endif
             } label: {
                 HStack {
-                    Text("投诉反馈")
+                    Text("投诉反馈", comment: "")
                     Spacer()
                     Image(systemName: "envelope")
                         .foregroundStyle(.secondary)
@@ -1138,16 +1164,16 @@ struct SettingsView: View {
 
             // App 版本号
             HStack {
-                Text("版本")
+                Text("版本", comment: "")
                 Spacer()
                 Text(appVersionString)
                     .foregroundStyle(.secondary)
                     .font(.system(.body, design: .monospaced))
             }
         } header: {
-            Text("关于")
+            Text("关于", comment: "")
         } footer: {
-            Text("以太致力于保护您的隐私")
+            Text("以太致力于保护您的隐私", comment: "")
                 .font(.captionAI)
         }
     }
@@ -1200,10 +1226,17 @@ struct SettingsView: View {
         pref.bubbleStyle = selectedBubbleStyle.rawValue
         pref.fontSize = fontSize
         pref.lineHeight = lineHeight
+        // Task: 修复 API Key 未自动保存——离开页面时自动保存两个 provider 的 Key
+        settingsVM.saveAPIKey(for: .deepseek)
+        settingsVM.saveAPIKey(for: .qwen)
         // Day 15: 离开页面时持久化 BFF 配置
         settingsVM.saveBFFConfig()
         // Day 16: 离开页面时持久化端侧推理配置
         settingsVM.saveOnDeviceConfig()
+        // Task: 修复字体与行距不持久化——显式保存所有 UserPreference 修改
+        try? modelContext.save()
+        // Task: 修复气泡样式不生效——通知聊天界面重新加载用户偏好
+        NotificationCenter.default.post(name: .settingsDidUpdate, object: nil)
     }
 
     // MARK: - Day 20: 关于 Section 辅助
@@ -1222,9 +1255,9 @@ struct SettingsView: View {
         #if os(iOS)
         // 授权状态：从 ChatViewModel 的 HealthKitService 读取（未注入则视为未授权）
         if let service = chatViewModel.healthKitService {
-            healthAuthorizationStatus = service.isAuthorized ? "已授权" : "未授权"
+            healthAuthorizationStatus = service.isAuthorized ? String(localized: "已授权") : String(localized: "未授权")
         } else {
-            healthAuthorizationStatus = "未授权"
+            healthAuthorizationStatus = String(localized: "未授权")
         }
         // 洞察数量：用 FetchDescriptor 查询 HealthInsight 总数
         let descriptor = FetchDescriptor<HealthInsight>()
@@ -1270,7 +1303,7 @@ struct DebugPanelView: View {
                 // Day 19: 性能指标
                 Section("性能指标") {
                     if performanceMetrics.isEmpty {
-                        Text("暂无性能数据")
+                        Text("暂无性能数据", comment: "")
                             .foregroundStyle(.secondary)
                             .font(.callout)
                     } else {
@@ -1298,38 +1331,38 @@ struct DebugPanelView: View {
                 // Day 14: 远程配置 / 遥测
                 Section("远程配置 / 遥测") {
                     HStack {
-                        Text("配置版本")
+                        Text("配置版本", comment: "")
                         Spacer()
                         Text("\(configVersion)").foregroundStyle(.secondary)
                     }
                     HStack {
-                        Text("拉取时间")
+                        Text("拉取时间", comment: "")
                         Spacer()
-                        Text(fetchedAt?.formatted(.dateTime) ?? "未拉取").foregroundStyle(.secondary)
+                        Text(fetchedAt?.formatted(.dateTime) ?? String(localized: "未拉取")).foregroundStyle(.secondary)
                     }
                     HStack {
-                        Text("默认供应商")
+                        Text("默认供应商", comment: "")
                         Spacer()
                         Text(remoteDefaultProvider).foregroundStyle(.secondary)
                     }
                     HStack {
-                        Text("维护模式")
+                        Text("维护模式", comment: "")
                         Spacer()
                         Text(maintenanceMode ? "是" : "否")
                             .foregroundStyle(maintenanceMode ? .red : .secondary)
                     }
                     HStack {
-                        Text("缓冲事件数")
+                        Text("缓冲事件数", comment: "")
                         Spacer()
                         Text("\(telemetryBufferCount)").foregroundStyle(.secondary)
                     }
                     HStack {
-                        Text("上次上报时间")
+                        Text("上次上报时间", comment: "")
                         Spacer()
                         Text(lastUploadAt?.formatted(.dateTime) ?? "从未").foregroundStyle(.secondary)
                     }
                     HStack {
-                        Text("上次上报状态")
+                        Text("上次上报状态", comment: "")
                         Spacer()
                         Text(lastUploadStatus).foregroundStyle(.secondary)
                     }
@@ -1356,21 +1389,21 @@ struct DebugPanelView: View {
                 // Day 13: 供应商 / 模型 / 降级信息
                 Section("供应商与降级") {
                     HStack {
-                        Text("当前供应商")
+                        Text("当前供应商", comment: "")
                         Spacer()
-                        Text(chatViewModel.lastUsedProvider?.displayName ?? "未发送")
+                        Text(chatViewModel.lastUsedProvider?.displayName ?? String(localized: "未发送"))
                             .foregroundStyle(.secondary)
                     }
                     HStack {
-                        Text("选中模型")
+                        Text("选中模型", comment: "")
                         Spacer()
                         Text(chatViewModel.selectedProvider.defaultChatModel)
                             .foregroundStyle(.secondary)
                     }
                     HStack {
-                        Text("触发降级")
+                        Text("触发降级", comment: "")
                         Spacer()
-                        Text(chatViewModel.didFallbackLastRequest ? "是" : "否")
+                        Text(chatViewModel.didFallbackLastRequest ? String(localized: "是") : String(localized: "否"))
                             .foregroundStyle(chatViewModel.didFallbackLastRequest ? .orange : .secondary)
                     }
                 }
@@ -1389,7 +1422,7 @@ struct DebugPanelView: View {
                 // 最近一次 DeepSeek API 原始响应
                 Section("API 原始响应") {
                     ScrollView {
-                        Text(chatViewModel.lastDebugInfo?.apiResponse ?? "无")
+                        Text(chatViewModel.lastDebugInfo?.apiResponse ?? String(localized: "无"))
                             .font(.system(.caption, design: .monospaced))
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .textSelection(.enabled)
@@ -1402,7 +1435,7 @@ struct DebugPanelView: View {
                     if let dim = chatViewModel.lastDebugInfo?.embeddingDimension {
                         Text(String(format: NSLocalizedString("%d 维", comment: ""), dim))
                     } else {
-                        Text("无")
+                        Text("无", comment: "")
                     }
                 }
 
@@ -1422,7 +1455,7 @@ struct DebugPanelView: View {
                             }
                         }
                     } else {
-                        Text("无工具调用")
+                        Text("无工具调用", comment: "")
                             .foregroundStyle(.secondary)
                     }
                 }

@@ -2,7 +2,7 @@
 import json
 from pathlib import Path
 
-xcstrings_path = Path('AIBuilder/Resources/Localizable.xcstrings')
+xcstrings_path = Path('Aether/Resources/Localizable.xcstrings')
 new_path = Path('scripts/new_strings.json')
 data = json.loads(xcstrings_path.read_text(encoding='utf-8'))
 strings = data.setdefault('strings', {})

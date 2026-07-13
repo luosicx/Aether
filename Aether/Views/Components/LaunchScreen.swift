@@ -45,7 +45,7 @@ struct LaunchScreen: View {
                     .opacity(fadeIn ? 1.0 : 0)
 
                 VStack(spacing: Spacing.sm) {
-                    Text("以太")
+                    Text("以太", comment: "")
                         .font(.aetherTitle)
                         .foregroundStyle(Color.starlight)
 
@@ -58,7 +58,7 @@ struct LaunchScreen: View {
 
                 Spacer()
 
-                Text("无形，无处不在，智能")
+                Text("无形，无处不在，智能", comment: "")
                     .font(.aetherBody)
                     .foregroundStyle(Color.nebulaGlow.opacity(0.6))
                     .padding(.bottom, Spacing.xxl)
@@ -73,6 +73,8 @@ struct LaunchScreen: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("以太，AI 对话助手")
+        .accessibilityHint("无形，无处不在，智能")
+        .accessibilityIdentifier("launchScreen")
     }
 }
 

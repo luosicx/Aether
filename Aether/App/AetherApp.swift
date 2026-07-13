@@ -18,8 +18,13 @@ struct AetherApp: App {
                 .task {
                     // 预热语音引擎：触发 speechsynthesisd daemon 启动和音色库加载，
                     // 避免首次朗读时冷启动阻塞主线程 1-3 秒。仅加载不发声。
-                    _ = AVSpeechSynthesisVoice.speechVoices()
+                    // 性能优化：speechVoices() 是同步阻塞调用，移至后台线程避免卡首屏
+                    Task.detached(priority: .background) {
+                        _ = AVSpeechSynthesisVoice.speechVoices()
+                    }
                     // 性能优化：远程配置拉取从 init() 移到首屏出现后，避免影响冷启动
+                    // 延迟 1 秒让首屏先完成渲染，再发起网络请求
+                    try? await Task.sleep(for: .seconds(1))
                     await RemoteConfigService.shared.fetch()
                 }
                 // Aether 主题在深色模式下效果最佳，默认启用深色模式
@@ -30,7 +35,7 @@ struct AetherApp: App {
         #if os(macOS)
         .defaultSize(width: 1000, height: 700)
         #endif
-        .modelContainer(for: [Conversation.self, ChatMessage.self, DocumentChunk.self, MessageFeedback.self, HealthInsight.self, UserPreference.self, AgentTask.self, Memory.self])
+        .modelContainer(AetherApp.sharedModelContainer)
         // Task 4: macOS 菜单栏 —— 新建对话 / 搜索会话 / 设置
         .commands {
             // File → 新建对话 (Cmd+N)
@@ -83,9 +88,41 @@ struct AetherApp: App {
                 .environment(ThemeManager.shared)
         }
         .menuBarExtraStyle(.window)
-        .modelContainer(for: [Conversation.self, ChatMessage.self, DocumentChunk.self, MessageFeedback.self, HealthInsight.self, UserPreference.self, AgentTask.self, Memory.self])
+        .modelContainer(AetherApp.sharedModelContainer)
         #endif
     }
+
+    /// Task 4/5: 创建使用 App Group 共享存储的 ModelConfiguration。
+    /// 使 iOS / watchOS / Widget 三端读写同一 SQLite store。
+    /// App Group 未配置时回退到默认存储（开发/测试兜底）。
+    static let sharedModelConfiguration: ModelConfiguration = {
+        let groupIdentifier = "group.com.aether.app"
+        if let groupURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: groupIdentifier) {
+            let storeURL = groupURL.appendingPathComponent("Aether.sqlite")
+            return ModelConfiguration(url: storeURL)
+        }
+        return ModelConfiguration(isStoredInMemoryOnly: false)
+    }()
+
+    /// 预构建的 ModelContainer，使用 sharedModelConfiguration。
+    /// SwiftUI 的 `.modelContainer(for:configurations:)` View modifier 不支持数组类型 + configurations 重载，
+    /// 因此显式构建 Container 后通过 `.modelContainer(_:)` 注入。
+    static let sharedModelContainer: ModelContainer = {
+        do {
+            return try ModelContainer(
+                for: Conversation.self, ChatMessage.self, DocumentChunk.self,
+                    MessageFeedback.self, HealthInsight.self, UserPreference.self, AgentTask.self, Memory.self,
+                configurations: AetherApp.sharedModelConfiguration
+            )
+        } catch {
+            // 回退到内存存储，避免启动崩溃（开发/测试兜底）
+            return try! ModelContainer(
+                for: Conversation.self, ChatMessage.self, DocumentChunk.self,
+                    MessageFeedback.self, HealthInsight.self, UserPreference.self, AgentTask.self, Memory.self,
+                configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+            )
+        }
+    }()
 
     /// 初始化 App。注册 BGTaskScheduler 每日刷新后台任务并调度首次执行。
     ///
@@ -144,11 +181,10 @@ struct AetherApp: App {
     /// 静默失败，不影响 App 启动。
     private func wipeAllDataForUITest() {
         do {
-            let config = ModelConfiguration(isStoredInMemoryOnly: false)
             let container = try ModelContainer(
                 for: Conversation.self, ChatMessage.self, DocumentChunk.self,
                     MessageFeedback.self, HealthInsight.self, UserPreference.self, AgentTask.self, Memory.self,
-                configurations: config
+                configurations: AetherApp.sharedModelConfiguration
             )
             let context = ModelContext(container)
             ChatStorage(modelContext: context).wipeAllData()
@@ -251,7 +287,8 @@ struct AetherApp: App {
             do {
                 // 创建独立的 ModelContainer/Context（后台任务无法访问主 App 的 ModelContext）
                 let container = try ModelContainer(
-                    for: Conversation.self, ChatMessage.self, DocumentChunk.self, MessageFeedback.self, HealthInsight.self, UserPreference.self, AgentTask.self, Memory.self
+                    for: Conversation.self, ChatMessage.self, DocumentChunk.self, MessageFeedback.self, HealthInsight.self, UserPreference.self, AgentTask.self, Memory.self,
+                    configurations: AetherApp.sharedModelConfiguration
                 )
                 let context = ModelContext(container)
                 let generator = HealthInsightGenerator.make(modelContext: context)
@@ -303,6 +340,8 @@ extension Notification.Name {
     /// Task 24: 菜单栏面板点击最近对话时触发——在主窗口打开指定会话
     /// userInfo["conversationId"] 为目标会话 UUID 字符串
     static let openConversationFromMenuBar = Notification.Name("openConversationFromMenuBar")
+    /// 设置页关闭后触发——通知聊天界面重新加载用户偏好（气泡样式、字体大小、行距等）
+    static let settingsDidUpdate = Notification.Name("settingsDidUpdate")
 }
 
 // MARK: - RootView
@@ -311,6 +350,7 @@ extension Notification.Name {
 struct RootView: View {
     @State private var showSplash = !ProcessInfo.processInfo.arguments.contains("UITEST_DISABLE_SPLASH")
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.modelContext) private var modelContext
     #if os(iOS)
     @State private var hasScheduledBGTasks = false
     #endif
@@ -321,6 +361,11 @@ struct RootView: View {
                 if showSplash {
                     BrandSplash(isVisible: $showSplash)
                 }
+            }
+            .task {
+                // Task: 修复主题双数据源——App 启动时从 UserPreference（SwiftData）同步到 ThemeManager（UserDefaults）
+                let pref = ChatStorage(modelContext: modelContext).fetchPreference()
+                ThemeManager.shared.switchTheme(byName: pref.themeName)
             }
             .onChange(of: scenePhase) { _, newPhase in
                 #if os(iOS)

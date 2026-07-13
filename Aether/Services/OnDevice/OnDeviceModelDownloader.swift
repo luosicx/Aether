@@ -56,6 +56,66 @@ actor OnDeviceModelDownloader {
         }
     }
 
+    /// 下载完整 MLX 模型目录（含 config.json、tokenizer.json、model.safetensors 等必需文件）。
+    /// MLXLMCommon 的 ModelContainer.load 需要完整模型目录，而非单个 safetensors 文件。
+    /// 先下载小体积配置文件（无进度追踪），再下载大体积 model.safetensors（有进度追踪与 SHA256 校验）。
+    /// - Parameters:
+    ///   - repo: HuggingFace 仓库 ID（如 "mlx-community/Llama-3.2-1B-Instruct-4bit"）
+    ///   - destinationDirectory: 本地模型目录路径
+    ///   - mirrorRepo: ModelScope 镜像仓库 ID（主地址失败时回退，nil 表示不回退）
+    ///   - expectedSHA256: model.safetensors 的期望 SHA256（仅校验权重文件，空字符串跳过校验）
+    func startModelDownload(repo: String, to destinationDirectory: URL, mirrorRepo: String? = nil, expectedSHA256: String = "") async {
+        guard !isDownloading else { return }
+        isDownloading = true
+        progress = 0.0
+        lastError = nil
+
+        // 创建本地模型目录
+        try? FileManager.default.createDirectory(at: destinationDirectory, withIntermediateDirectories: true)
+
+        // 小体积配置文件列表（快速下载，不追踪进度）
+        let configFiles = ["config.json", "tokenizer_config.json", "special_tokens_map.json", "tokenizer.json"]
+
+        for file in configFiles {
+            let hfURL = URL(string: "https://huggingface.co/\(repo)/resolve/main/\(file)")!
+            let destURL = destinationDirectory.appendingPathComponent(file)
+            var failed = await downloadFile(url: hfURL, to: destURL)
+
+            // 镜像回退
+            if failed, let mirror = mirrorRepo {
+                lastError = nil
+                let msURL = URL(string: "https://www.modelscope.cn/api/v1/models/\(mirror)/repo?Revision=master&FilePath=\(file)")!
+                failed = await downloadFile(url: msURL, to: destURL)
+            }
+
+            if failed {
+                isDownloading = false
+                return
+            }
+        }
+
+        // 大体积权重文件：model.safetensors（使用 performDownload 以获取进度回调与 SHA256 校验）
+        let modelFileURL = URL(string: "https://huggingface.co/\(repo)/resolve/main/model.safetensors")!
+        let modelDestURL = destinationDirectory.appendingPathComponent("model.safetensors")
+
+        let modelFailed = await performDownload(url: modelFileURL, to: modelDestURL, expectedSHA256: expectedSHA256)
+
+        // 镜像回退
+        if modelFailed, let mirror = mirrorRepo {
+            let currentResumeExists = resumeData != nil
+            if !currentResumeExists {
+                isDownloading = true
+                progress = 0.0
+                lastError = nil
+                let msURL = URL(string: "https://www.modelscope.cn/api/v1/models/\(mirror)/repo?Revision=master&FilePath=model.safetensors")!
+                await performDownload(url: msURL, to: modelDestURL, expectedSHA256: expectedSHA256)
+            }
+        }
+
+        progress = 1.0
+        isDownloading = false
+    }
+
     /// 执行单次下载尝试，返回是否失败（lastError 非空即视为失败）。
     /// - Parameters:
     ///   - url: 模型文件远端下载地址
@@ -71,6 +131,32 @@ actor OnDeviceModelDownloader {
                 },
                 onDone: { [weak self] result in
                     await self?.handleDownloadDone(result: result, destination: destinationURL, expectedSHA256: expectedSHA256)
+                    continuation.resume()
+                }
+            )
+            self.delegate = delegate
+            let session = URLSession(configuration: makeDownloadSessionConfig(), delegate: delegate, delegateQueue: nil)
+            self.session = session
+            let task = session.downloadTask(with: url)
+            self.task = task
+            task.resume()
+        }
+        return lastError != nil
+    }
+
+    /// 静默下载单个文件（不更新 isDownloading / progress，不校验 SHA256）。
+    /// 用于下载 config.json / tokenizer.json 等小体积配置文件。
+    /// - Parameters:
+    ///   - url: 文件远端下载地址
+    ///   - destinationURL: 本地保存路径
+    /// - Returns: 下载失败返回 true，成功返回 false
+    private func downloadFile(url: URL, to destinationURL: URL) async -> Bool {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            let delegate = DownloadDelegate(
+                destinationURL: destinationURL,
+                onProgress: { _ in },
+                onDone: { [weak self] result in
+                    Task { await self?.handleFileDownloadDone(result: result) }
                     continuation.resume()
                 }
             )
@@ -194,6 +280,16 @@ actor OnDeviceModelDownloader {
                     return
                 }
             }
+            lastError = .loadFailed(String(format: NSLocalizedString("下载失败：%@", comment: ""), error.localizedDescription))
+        }
+    }
+
+    /// 处理配置文件下载完成回调（不更新 isDownloading / progress，不校验 SHA256）
+    private func handleFileDownloadDone(result: Result<URL, Error>) {
+        switch result {
+        case .success:
+            lastError = nil
+        case .failure(let error):
             lastError = .loadFailed(String(format: NSLocalizedString("下载失败：%@", comment: ""), error.localizedDescription))
         }
     }

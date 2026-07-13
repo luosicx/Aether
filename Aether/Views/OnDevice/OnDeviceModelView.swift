@@ -44,13 +44,13 @@ struct OnDeviceModelView: View {
                         Text(source.displayName).tag(source)
                     }
                 } label: {
-                    Text("下载源")
+                    Text("下载源", comment: "")
                 }
                 .accessibilityLabel("下载源")
                 .accessibilityHint("选择国内 ModelScope 或国外 HuggingFace 下载源")
                 .accessibilityIdentifier("downloadSourcePicker")
             } header: {
-                Text("下载源")
+                Text("下载源", comment: "")
             }
 
             // 可用模型列表
@@ -68,7 +68,7 @@ struct OnDeviceModelView: View {
                     modelCard(for: model)
                 }
             } header: {
-                Text("可用模型")
+                Text("可用模型", comment: "")
             }
 
             // 错误信息
@@ -86,7 +86,7 @@ struct OnDeviceModelView: View {
                     HStack {
                         ProgressView()
                             .controlSize(.small)
-                        Text("正在加载模型…")
+                        Text("正在加载模型…", comment: "")
                             .font(.captionAI)
                             .foregroundStyle(.secondary)
                     }
@@ -159,11 +159,11 @@ struct OnDeviceModelView: View {
                 Text(model.name).bold()
                 Spacer()
                 if isDownloaded {
-                    Text("已下载✓")
+                    Text("已下载✓", comment: "")
                         .font(.captionAI)
                         .foregroundStyle(.green)
                 } else {
-                    Text("未下载")
+                    Text("未下载", comment: "")
                         .font(.captionAI)
                         .foregroundStyle(.secondary)
                 }
@@ -177,11 +177,11 @@ struct OnDeviceModelView: View {
                     .foregroundStyle(.secondary)
                 Spacer()
                 if isDownloaded {
-                    Text("已校验")
+                    Text("已校验", comment: "")
                         .font(.captionAI)
                         .foregroundStyle(.green)
                 } else if model.sha256.isEmpty {
-                    Text("未配置")
+                    Text("未配置", comment: "")
                         .font(.captionAI)
                         .foregroundStyle(.secondary)
                 } else {
@@ -233,26 +233,26 @@ struct OnDeviceModelView: View {
         .padding(.vertical, 4)
     }
 
-    /// 启动下载：创建目录 → 调用 downloader → 设置 isDownloading 触发轮询
+    /// 启动下载：创建目录 → 调用 downloader 下载完整模型目录 → 设置 isDownloading 触发轮询
     private func startDownload(model: OnDeviceModelEntry) async {
         errorMessage = nil
         try? FileManager.default.createDirectory(at: modelDirectory, withIntermediateDirectories: true)
         isDownloading = true
         downloadingModelId = model.id
         downloadTaskId += 1 // 触发 .task(id: downloadTaskId) 轮询
-        guard let url = model.url(for: settingsVM.onDeviceConfig.downloadSource) else {
-            errorMessage = "模型下载地址无效"
+        guard let repo = model.repo(for: settingsVM.onDeviceConfig.downloadSource) else {
+            errorMessage = String(localized: "模型下载仓库地址无效")
             isDownloading = false
             downloadingModelId = nil
             return
         }
         // 国内源：主地址为 ModelScope，无需镜像；国外源：主地址为 HuggingFace，镜像回退到 ModelScope
-        let mirrorURL: URL? = settingsVM.onDeviceConfig.downloadSource == .international ? model.modelScopeURL : nil
-        await OnDeviceModelDownloader.shared.startDownload(
-            url: url,
+        let mirrorRepo: String? = settingsVM.onDeviceConfig.downloadSource == .international ? model.modelScopeRepo : nil
+        await OnDeviceModelDownloader.shared.startModelDownload(
+            repo: repo,
             to: modelPath(for: model),
-            expectedSHA256: model.sha256,
-            mirrorURL: mirrorURL
+            mirrorRepo: mirrorRepo,
+            expectedSHA256: model.sha256
         )
         // 下载完成后回写 modelPath / modelName 到 config
         settingsVM.onDeviceConfig.modelPath = modelPath(for: model)
@@ -323,10 +323,11 @@ struct OnDeviceModelView: View {
         modelDirectory.appendingPathComponent(model.id)
     }
 
-    /// 刷新已下载模型集合（遍历目录检查文件存在性）
+    /// 刷新已下载模型集合（检查 model.safetensors 是否存在，确认完整下载）
     private func refreshDownloadedStatus() {
         downloadedModelIds = Set(OnDeviceModelCatalog.models.filter { model in
-            FileManager.default.fileExists(atPath: modelPath(for: model).path)
+            let safetensorsURL = modelPath(for: model).appendingPathComponent("model.safetensors")
+            return FileManager.default.fileExists(atPath: safetensorsURL.path)
         }.map { $0.id })
     }
 }

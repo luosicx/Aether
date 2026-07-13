@@ -81,6 +81,9 @@ struct MessageBubble: View {
     let aiAvatarData: Data?
     /// Day 5 补充A：控制全屏图片预览
     @State private var showFullScreenImage = false
+    // Task: 修复 iOS 主题不生效——通过 @Environment 观察 ThemeManager，
+    // 使 SwiftUI 在 currentTheme 变化时重新渲染视图，确保 Color.textPrimary 等动态颜色生效
+    @Environment(ThemeManager.self) private var themeManager
 
     init(message: MessageSnapshot,
          isSpeaking: Bool = false,
@@ -123,7 +126,7 @@ struct MessageBubble: View {
             }
             VStack(alignment: isUser ? .trailing : .leading, spacing: Spacing.sm) {
                 if isTool {
-                    Text("工具调用")
+                    Text("工具调用", comment: "")
                         .font(.toolLabel)
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 4)
@@ -266,6 +269,9 @@ struct MessageBubble: View {
                         } label: {
                             Label("重新提问", systemImage: "arrow.clockwise")
                         }
+                        .accessibilityLabel("重新提问")
+                        .accessibilityHint("重新发送此用户消息")
+                        .accessibilityIdentifier("resendMessageContextMenuButton")
                     }
                     // Task 23.2: 朗读——调用 ChatViewModel.toggleSpeak
                     Button {

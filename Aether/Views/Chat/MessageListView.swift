@@ -134,7 +134,7 @@ struct MessageListView: View {
                                 Image(systemName: "text.quote")
                                     .font(.captionAI)
                                     .foregroundStyle(.tertiary)
-                                Text("引用来源")
+                                Text("引用来源", comment: "")
                                     .font(.toolLabel)
                                     .foregroundStyle(.tertiary)
                                 Spacer()
@@ -152,7 +152,7 @@ struct MessageListView: View {
                             Image(systemName: "wrench.and.screwdriver")
                                 .font(.captionAI)
                                 .foregroundStyle(.tertiary)
-                            Text("工具调用流程")
+                            Text("工具调用流程", comment: "")
                                 .font(.toolLabel)
                                 .foregroundStyle(.tertiary)
                             Spacer()
@@ -181,6 +181,10 @@ struct MessageListView: View {
                 .animation(reduceMotion ? nil : AnimationTokens.messageAppear, value: viewModel.messages.count)
             }
             .frame(maxHeight: .infinity)
+            #if os(iOS)
+            // Task 3: 向下滑动消息列表时交互式收起键盘
+            .scrollDismissesKeyboard(.interactively)
+            #endif
             .onChange(of: viewModel.messages.count) {
                 if reduceMotion {
                     if let lastId = viewModel.messages.last?.id {
@@ -218,6 +222,10 @@ struct MessageListView: View {
         }
         .onAppear {
             // 在 onAppear 中加载用户偏好，只创建一次 ChatStorage 实例
+            userPreference = ChatStorage(modelContext: modelContext).fetchPreference()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .settingsDidUpdate)) { _ in
+            // 设置页关闭后重新加载用户偏好，确保气泡样式、字体大小、行距等立即生效
             userPreference = ChatStorage(modelContext: modelContext).fetchPreference()
         }
     }

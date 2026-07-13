@@ -25,42 +25,62 @@ struct WatchQuickChatView: View {
                             .padding(6)
                             .background(Color.gray.opacity(0.2))
                             .cornerRadius(6)
+                            .accessibilityLabel("已发送消息")
+                            .accessibilityValue(messages[index])
                     }
 
                     if !statusMessage.isEmpty {
                         Text(statusMessage)
                             .font(.caption2)
                             .foregroundStyle(.secondary)
+                            .accessibilityLabel("发送状态")
+                            .accessibilityValue(statusMessage)
                     }
 
                     // 快速回复按钮
                     HStack {
-                        Button("你好") { sendQuickChat("你好") }
-                        Button("今天天气") { sendQuickChat("今天天气怎么样？") }
+                        Button(NSLocalizedString("你好", comment: "Watch 快速回复：你好")) { sendQuickChat(NSLocalizedString("你好", comment: "Watch 快速回复：你好")) }
+                            .accessibilityLabel("快速回复：你好")
+                            .accessibilityHint("发送「你好」到 iPhone")
+                        Button(NSLocalizedString("今天天气", comment: "Watch 快速回复按钮")) { sendQuickChat(NSLocalizedString("今天天气怎么样？", comment: "Watch 快速回复：今天天气怎么样")) }
+                            .accessibilityLabel("快速回复：今天天气")
+                            .accessibilityHint("发送「今天天气怎么样？」到 iPhone")
                     }
                     .font(.caption)
 
-                    Button("发送") {
+                    Button(NSLocalizedString("发送", comment: "Watch 发送按钮")) {
                         sendQuickChat(inputText)
                         inputText = ""
                     }
                     .disabled(inputText.isEmpty)
+                    .accessibilityLabel("发送")
+                    .accessibilityHint("发送输入的文本到 iPhone")
+                    .accessibilityIdentifier("watchSendButton")
                 }
                 .padding(.horizontal, 4)
             }
-            .navigationTitle("快速对话")
+            .navigationTitle(NSLocalizedString("快速对话", comment: "Watch 导航标题：快速对话"))
+            .accessibilityIdentifier("watchQuickChatView")
         }
     }
 
-    /// 通过 WCSession 发送快速对话消息到 iOS 端
+    /// 通过 WCSession 发送快速对话消息到 iOS 端。
+    /// 优先用 sendMessage（实时），不可达时回退到 transferUserInfo（后台可靠投递）。
     private func sendQuickChat(_ message: String) {
         guard WCSession.default.activationState == .activated else {
-            statusMessage = "未连接 iPhone"
+            statusMessage = NSLocalizedString("未连接 iPhone", comment: "Watch 未连接 iPhone 提示")
             return
         }
-        WCSession.default.sendMessage(["action": "quickChat", "message": message], replyHandler: nil)
-        messages.append("我：\(message)")
-        statusMessage = "已发送"
+        let payload: [String: Any] = ["action": "quickChat", "message": message]
+        if WCSession.default.isReachable {
+            // iOS 端可达时实时发送
+            WCSession.default.sendMessage(payload, replyHandler: nil)
+        } else {
+            // 不可达时通过 transferUserInfo 后台投递，iOS 端会在下次启动/唤醒时收到
+            WCSession.default.transferUserInfo(payload)
+        }
+        messages.append(String(format: NSLocalizedString("我：%@", comment: "Watch 已发送消息前缀"), message))
+        statusMessage = NSLocalizedString("已发送", comment: "Watch 已发送状态")
     }
 }
 #endif

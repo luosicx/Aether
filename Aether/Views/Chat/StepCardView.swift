@@ -60,7 +60,7 @@ struct StepCardView: View {
                         .foregroundColor(statusColor)
                         .shadow(color: statusColor.opacity(0.4), radius: 3)
                     if step.status == .running {
-                        Text("执行中…")
+                        Text("执行中…", comment: "")
                             .font(.caption2)
                             .foregroundColor(Color.duskGray)
                     }
