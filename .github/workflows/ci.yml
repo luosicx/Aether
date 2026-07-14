@@ -759,6 +759,6 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: windows-exe
-          path: windows/Aether.Windows/bin/*/Debug/
+          path: windows/Aether.Windows/bin/Debug/
           if-no-files-found: error
           retention-days: 7
