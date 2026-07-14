@@ -1,6 +1,5 @@
-// 从 tokens.json 生成（Phase 3），适配 WinUI 3
-using Microsoft.UI;
-using Microsoft.UI.Xaml.Media;
+// 从 tokens.json 生成（Phase 3），适配 WPF
+using System.Windows.Media;
 
 namespace Aether.Windows.Design;
 

@@ -85,9 +85,9 @@ fun ChatScreen(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .padding(horizontal = AetherSpacing.md.dp),
-                verticalArrangement = Arrangement.spacedBy(AetherSpacing.md.dp),
-                contentPadding = PaddingValues(vertical = AetherSpacing.md.dp)
+                    .padding(horizontal = AetherSpacing.md),
+                verticalArrangement = Arrangement.spacedBy(AetherSpacing.md),
+                contentPadding = PaddingValues(vertical = AetherSpacing.md)
             ) {
                 items(messages, key = { it.id }) { message ->
                     MessageBubble(message)
@@ -126,12 +126,12 @@ private fun MessageBubble(message: ChatMessage) {
     ) {
         Surface(
             color = if (isUser) AetherColors.aetherPurple else AetherColors.liquidGlass,
-            shape = RoundedCornerShape(AetherCornerRadius.medium.dp),
+            shape = RoundedCornerShape(AetherCornerRadius.medium),
             modifier = Modifier.widthIn(max = 320.dp)
         ) {
             Text(
                 text = message.content,
-                modifier = Modifier.padding(horizontal = AetherSpacing.lg.dp, vertical = AetherSpacing.md.dp),
+                modifier = Modifier.padding(horizontal = AetherSpacing.lg, vertical = AetherSpacing.md),
                 color = if (isUser) AetherColors.starlight else AetherColors.starlight,
                 style = MaterialTheme.typography.bodyLarge
             )
@@ -147,12 +147,12 @@ private fun StreamingBubble(text: String) {
     ) {
         Surface(
             color = AetherColors.liquidGlass,
-            shape = RoundedCornerShape(AetherCornerRadius.medium.dp),
+            shape = RoundedCornerShape(AetherCornerRadius.medium),
             modifier = Modifier.widthIn(max = 320.dp)
         ) {
             Text(
                 text = buildString { append(text); append("▌") },
-                modifier = Modifier.padding(horizontal = AetherSpacing.lg.dp, vertical = AetherSpacing.md.dp),
+                modifier = Modifier.padding(horizontal = AetherSpacing.lg, vertical = AetherSpacing.md),
                 color = AetherColors.starlight,
                 style = MaterialTheme.typography.bodyLarge
             )
@@ -168,11 +168,11 @@ private fun TypingIndicator() {
     ) {
         Surface(
             color = AetherColors.liquidGlass,
-            shape = RoundedCornerShape(AetherCornerRadius.medium.dp)
+            shape = RoundedCornerShape(AetherCornerRadius.medium)
         ) {
             Text(
                 text = "思考中…",
-                modifier = Modifier.padding(horizontal = AetherSpacing.lg.dp, vertical = AetherSpacing.md.dp),
+                modifier = Modifier.padding(horizontal = AetherSpacing.lg, vertical = AetherSpacing.md),
                 color = AetherColors.starlight,
                 fontWeight = FontWeight.Light
             )
@@ -184,13 +184,13 @@ private fun TypingIndicator() {
 private fun ErrorBanner(message: String, onClose: () -> Unit) {
     Surface(
         color = MaterialTheme.colorScheme.errorContainer,
-        shape = RoundedCornerShape(AetherCornerRadius.small.dp),
+        shape = RoundedCornerShape(AetherCornerRadius.small),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = AetherSpacing.md.dp, vertical = AetherSpacing.sm.dp)
+            .padding(horizontal = AetherSpacing.md, vertical = AetherSpacing.sm)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = AetherSpacing.lg.dp, vertical = AetherSpacing.sm.dp),
+            modifier = Modifier.padding(horizontal = AetherSpacing.lg, vertical = AetherSpacing.sm),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
@@ -217,7 +217,7 @@ private fun ChatInputBar(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(AetherSpacing.md.dp),
+                .padding(AetherSpacing.md),
             verticalAlignment = Alignment.CenterVertically
         ) {
             OutlinedTextField(
@@ -226,13 +226,13 @@ private fun ChatInputBar(
                 modifier = Modifier.weight(1f),
                 placeholder = { Text("输入消息…") },
                 maxLines = 5,
-                shape = RoundedCornerShape(AetherCornerRadius.large.dp)
+                shape = RoundedCornerShape(AetherCornerRadius.large)
             )
-            Spacer(modifier = Modifier.width(AetherSpacing.sm.dp))
+            Spacer(modifier = Modifier.width(AetherSpacing.sm))
             FilledIconButton(
                 onClick = onSend,
                 enabled = enabled && text.isNotBlank(),
-                modifier = Modifier.clip(RoundedCornerShape(AetherCornerRadius.large.dp))
+                modifier = Modifier.clip(RoundedCornerShape(AetherCornerRadius.large))
             ) {
                 Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "发送")
             }

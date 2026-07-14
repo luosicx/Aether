@@ -66,8 +66,8 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(AetherSpacing.lg.dp),
-            verticalArrangement = Arrangement.spacedBy(AetherSpacing.lg.dp)
+                .padding(AetherSpacing.lg),
+            verticalArrangement = Arrangement.spacedBy(AetherSpacing.lg)
         ) {
             // BFF 端点
             SectionTitle("BFF 网关")
@@ -78,7 +78,7 @@ fun SettingsScreen(
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(AetherCornerRadius.medium.dp)
+                shape = RoundedCornerShape(AetherCornerRadius.medium)
             )
             OutlinedTextField(
                 value = userToken,
@@ -94,7 +94,7 @@ fun SettingsScreen(
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(AetherCornerRadius.medium.dp)
+                shape = RoundedCornerShape(AetherCornerRadius.medium)
             )
 
             HorizontalDivider()
@@ -135,7 +135,7 @@ fun SettingsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
-                shape = RoundedCornerShape(AetherCornerRadius.large.dp)
+                shape = RoundedCornerShape(AetherCornerRadius.large)
             ) {
                 Text("保存")
             }
@@ -173,7 +173,7 @@ private fun ModelSelector(
             modifier = Modifier
                 .fillMaxWidth()
                 .menuAnchor(),
-            shape = RoundedCornerShape(AetherCornerRadius.medium.dp)
+            shape = RoundedCornerShape(AetherCornerRadius.medium)
         )
         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             options.forEach { option ->

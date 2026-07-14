@@ -20,7 +20,7 @@ public final class ThemeManager {
     }
 
     /// 初始化：从 UserDefaults 读取已保存的主题名，未保存时默认 .deepSpace
-    init() {
+    public init() {
         let name = UserDefaults.standard.string(forKey: Self.storageKey) ?? AetherTheme.deepSpace.rawValue
         currentTheme = AetherTheme(rawValue: name) ?? .deepSpace
     }

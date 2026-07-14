@@ -84,8 +84,8 @@ fun ConversationListScreen(
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(AetherSpacing.md.dp),
-                    verticalArrangement = Arrangement.spacedBy(AetherSpacing.sm.dp)
+                    contentPadding = PaddingValues(AetherSpacing.md),
+                    verticalArrangement = Arrangement.spacedBy(AetherSpacing.sm)
                 ) {
                     items(conversations, key = { it.id }) { conv ->
                         ConversationRow(
@@ -114,12 +114,12 @@ private fun ConversationRow(
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(AetherCornerRadius.medium.dp),
+        shape = RoundedCornerShape(AetherCornerRadius.medium),
         colors = CardDefaults.cardColors(containerColor = AetherColors.liquidGlass)
     ) {
         Row(
             modifier = Modifier
-                .padding(horizontal = AetherSpacing.lg.dp, vertical = AetherSpacing.md.dp),
+                .padding(horizontal = AetherSpacing.lg, vertical = AetherSpacing.md),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
@@ -131,7 +131,7 @@ private fun ConversationRow(
                             tint = AetherColors.nebulaGlow,
                             modifier = Modifier
                                 .size(16.dp)
-                                .padding(end = AetherSpacing.xs.dp)
+                                .padding(end = AetherSpacing.xs)
                         )
                     }
                     Text(
@@ -142,7 +142,7 @@ private fun ConversationRow(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-                Spacer(modifier = Modifier.height(AetherSpacing.xs.dp))
+                Spacer(modifier = Modifier.height(AetherSpacing.xs))
                 Text(
                     text = conversation.lastMessagePreview.ifEmpty { "点击开始对话" },
                     style = MaterialTheme.typography.bodyMedium,
@@ -150,7 +150,7 @@ private fun ConversationRow(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Spacer(modifier = Modifier.height(AetherSpacing.xs.dp))
+                Spacer(modifier = Modifier.height(AetherSpacing.xs))
                 Text(
                     text = timeText,
                     style = MaterialTheme.typography.labelSmall,
@@ -174,13 +174,13 @@ private fun ConversationRow(
 private fun ErrorBanner(message: String, onClose: () -> Unit) {
     Surface(
         color = MaterialTheme.colorScheme.errorContainer,
-        shape = RoundedCornerShape(AetherCornerRadius.small.dp),
+        shape = RoundedCornerShape(AetherCornerRadius.small),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = AetherSpacing.md.dp, vertical = AetherSpacing.sm.dp)
+            .padding(horizontal = AetherSpacing.md, vertical = AetherSpacing.sm)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = AetherSpacing.lg.dp, vertical = AetherSpacing.sm.dp),
+            modifier = Modifier.padding(horizontal = AetherSpacing.lg, vertical = AetherSpacing.sm),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
