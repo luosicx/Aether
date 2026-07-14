@@ -23,11 +23,11 @@ public extension Color {
 
 public extension Font {
     /// Aether 标题
-    static let genAetherTitle = .system(size: 28, weight: .semibold)
+    static let genAetherTitle = Font.system(size: 28, weight: .semibold)
     /// Aether 展示字体（开屏 Logo / 大标题）
-    static let genAetherDisplay = .system(size: 48, weight: .bold)
+    static let genAetherDisplay = Font.system(size: 48, weight: .bold)
     /// Aether 正文
-    static let genAetherBody = .system(size: 16, weight: .regular)
+    static let genAetherBody = Font.system(size: 16, weight: .regular)
 }
 
 public enum GeneratedSpacing {

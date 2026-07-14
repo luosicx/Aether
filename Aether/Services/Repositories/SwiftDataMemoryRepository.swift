@@ -50,7 +50,7 @@ final class SwiftDataMemoryRepository: MemoryRepository {
 
     func searchRelevant(query: String, limit: Int) async throws -> [MemoryDTO] {
         let lowercaseQuery = query.lowercased()
-        let descriptor = FetchDescriptor<Memory>(
+        var descriptor = FetchDescriptor<Memory>(
             predicate: #Predicate { $0.content.localizedStandardContains(lowercaseQuery) },
             sortBy: [SortDescriptor(\.importance, order: .reverse)]
         )

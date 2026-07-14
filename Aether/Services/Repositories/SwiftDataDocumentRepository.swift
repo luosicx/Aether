@@ -33,7 +33,7 @@ final class SwiftDataDocumentRepository: DocumentRepository {
 
     func search(query: String, limit: Int) async throws -> [DocumentChunkDTO] {
         let lowercaseQuery = query.lowercased()
-        let descriptor = FetchDescriptor<DocumentChunk>(
+        var descriptor = FetchDescriptor<DocumentChunk>(
             predicate: #Predicate { $0.content.localizedStandardContains(lowercaseQuery) },
             sortBy: [SortDescriptor(\.weight, order: .reverse)]
         )

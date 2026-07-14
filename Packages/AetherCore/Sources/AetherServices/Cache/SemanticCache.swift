@@ -12,6 +12,9 @@ public final class SemanticCache {
     /// 相似度阈值 0.92，严格大于才命中（=不命中）
     private let similarityThreshold: Float = 0.92
 
+    /// 公开初始化器，允许 App target 创建实例
+    public init() {}
+
     /// 查询缓存。入参 query 仅用于调试，实际匹配用 embedding。返回命中的 response 或 nil。
     public func get(query: String, embedding: [Float]) -> String? {
         for entry in cache where cosineSimilarity(embedding, entry.embedding) > similarityThreshold {

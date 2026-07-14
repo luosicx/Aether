@@ -116,7 +116,7 @@ def gen_typography(typo_tokens):
         if desc:
             lines.append(f"    /// {desc}")
         lines.append(
-            f"    static let {name} = .system(size: {int(size)}, weight: {weight_swift})"
+            f"    static let {name} = Font.system(size: {int(size)}, weight: {weight_swift})"
         )
     lines.append("}")
     return "\n".join(lines)
