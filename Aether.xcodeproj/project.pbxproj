@@ -94,7 +94,7 @@
 		1F43FE8F4B5C6D9AEA2F5981 /* SwitchConversationIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A53D759B12CCF9A30101BEB /* SwitchConversationIntent.swift */; };
 		1FCCAFBFC7004BA54382D4A3 /* BrandSplash.swift in Sources */ = {isa = PBXBuildFile; fileRef = 236916723758663383A30C03 /* BrandSplash.swift */; };
 		1FD179F4C112A3D4970DB81D /* RateLimiterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31CD6FD5F21DEE9B2C4112DB /* RateLimiterTests.swift */; };
-		217769921333520FCEEFB981 /* AetherApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C9F13300462551F1AD5FCB2 /* AetherApp.swift */; };
+		217769921333520FCEEFB981 /* BuildFile in Sources */ = {isa = PBXBuildFile; };
 		21EFCE26DEE53DBFCAC10099 /* ChatViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EBEC69CD9EDDA741203BD8D /* ChatViewModel.swift */; };
 		22222222222222222222B001 /* ResponsiveLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 22222222222222222222B002 /* ResponsiveLayout.swift */; };
 		22959E5CB4A89628324DE8E2 /* ClipboardToolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEE8478D4A45010E8D3FBCCC /* ClipboardToolTests.swift */; };
@@ -279,6 +279,7 @@
 		75BD689A6FFE654A6A0BFBC0 /* TTSConfigTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1927DD6F92247F6C2494D3C6 /* TTSConfigTests.swift */; };
 		7608FEC5865386A75148287C /* CitationCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD000000000000000000D001 /* CitationCard.swift */; };
 		767094F7F08F3BAA34DF1DAA /* HealthKitService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286D0E0E7454F821CC4B205A /* HealthKitService.swift */; };
+		76D84841CE7F2EF02F92FF15 /* ToolRegistry+macOS.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32B243600898D3CA4E4F334A /* ToolRegistry+macOS.swift */; };
 		76F664477EA39935332FEE49 /* MCPSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000014 /* MCPSettingsView.swift */; };
 		773EF1F610E3F884E30A7D2F /* HealthInsight.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B15E68F979F01D85C4B9EB9 /* HealthInsight.swift */; };
 		778C33ADF20BE3DF362D5231 /* APIConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B0A1ECFB82B1D23FC44A565 /* APIConfig.swift */; };
@@ -730,6 +731,7 @@
 		2F1C63B538D08AA782CFD591 /* FeedbackServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FeedbackServiceTests.swift; sourceTree = "<group>"; };
 		30E623C6BCBBD8112F16FE09 /* StepCardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StepCardView.swift; sourceTree = "<group>"; };
 		31CD6FD5F21DEE9B2C4112DB /* RateLimiterTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RateLimiterTests.swift; sourceTree = "<group>"; };
+		32B243600898D3CA4E4F334A /* ToolRegistry+macOS.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "ToolRegistry+macOS.swift"; path = "Aether/Services/Tools/ToolRegistry+macOS.swift"; sourceTree = "<group>"; };
 		32CF7DEBCDA67603FA06F82A /* OnDeviceModelDownloader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OnDeviceModelDownloader.swift; sourceTree = "<group>"; };
 		33CA17C53B9626062C3D8FF7 /* EmbeddingService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EmbeddingService.swift; sourceTree = "<group>"; };
 		34F68ADC3B02EB2833170347 /* TelemetryServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TelemetryServiceTests.swift; sourceTree = "<group>"; };
@@ -1464,6 +1466,7 @@
 				1BE3F6B0E3D6E76923AD2D3C /* ShortcutsTool.swift */,
 				A1B2C3D4E5F6071809AB1002 /* ToolAuditLogger.swift */,
 				A1B2C3D4E5F6071809AB1007 /* ToolAuthorization.swift */,
+				32B243600898D3CA4E4F334A /* ToolRegistry+macOS.swift */,
 			);
 			path = Tools;
 			sourceTree = "<group>";
@@ -2399,6 +2402,7 @@
 				A69F6A2878AB94FA08575CA4 /* InlineChartView.swift in Sources */,
 				E8BD3F44843678C8B7AE40F7 /* AetherApp+Shared.swift in Sources */,
 				6585403F37A55E3B032CC8A5 /* AetherApp-macOS.swift in Sources */,
+				76D84841CE7F2EF02F92FF15 /* ToolRegistry+macOS.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2698,7 +2702,7 @@
 				A1B2C3D4E5F6071809AB1004 /* PromptInjectionDetector.swift in Sources */,
 				A1B2C3D4E5F6071809AB1005 /* ToolAuditLogger.swift in Sources */,
 				A1B2C3D4E5F6071809AB1008 /* ToolAuthorization.swift in Sources */,
-				217769921333520FCEEFB981 /* AetherApp.swift in Sources */,
+				217769921333520FCEEFB981 /* BuildFile in Sources */,
 				B0B65CF075744E81D2D66286 /* APIConfig.swift in Sources */,
 				94012D11AE56BDE24C31B149 /* String+TokenCount.swift in Sources */,
 				0CDB439A715648C34B53C82E /* LLMProvider.swift in Sources */,

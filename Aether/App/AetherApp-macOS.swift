@@ -80,9 +80,11 @@ struct AetherApp: App {
         .modelContainer(AetherApp.sharedModelContainer)
     }
 
-    /// macOS 初始化：仅共享初始化逻辑（无 BGTaskScheduler）
+    /// macOS 初始化：共享初始化逻辑 + 注册 macOS 独有工具
     init() {
         sharedInit()
+        // Task 2.6: 注册 macOS 独有工具（11 个）
+        ToolRegistry.shared.registerMacOSTools()
     }
 }
 #endif
