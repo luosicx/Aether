@@ -154,7 +154,7 @@ Core 层除协议/常量/扩展/Actor 外，新增 `Core/Models` 子目录承载
 
 | 文件 | 职责 |
 |------|------|
-| `Core/Actors/ChatActor.swift` | 自定义 `@globalActor`，目前仅占位未实际应用到具体方法上。 |
+| `Core/Actors/ChatActor.swift` | ~~自定义 `@globalActor`，目前仅占位未实际应用到具体方法上。~~ **已移除**（ChatActor.swift 已删除）。 |
 | `Core/Constants/APIConfig.swift` | 定义 `APIConfig`（DeepSeek 端点 URL + 模型名常量）与 `ChatConfig`（model / systemPrompt / maxTokens / temperature）。 |
 | `Core/Constants/ModelProvider.swift` | Day 13 LLM 供应商抽象 enum：`deepseek` / `qwen` / `onDevice` 三 case，承载 displayName / baseURL / chatEndpoint / embeddingEndpoint / defaultChatModel / defaultReasonerModel / defaultEmbeddingModel / keychainAccount / fallback（deepseek ↔ qwen 互备，onDevice 备用 deepseek）。 |
 | `Core/Extensions/String+TokenCount.swift` | `estimatedTokens` 扩展，按空格分词后乘 1.3 系数粗略估算 token 数，用于 tokenLimit 截断。 |
@@ -564,6 +564,8 @@ ViewModels 文件数无新增（仍为 4 个），但内部字段与编排逻辑
 | `ViewModels/ConversationListVM.swift` | 会话列表 ViewModel，管理会话 CRUD 与置顶排序；新增编辑模式（多选 / 全选 / 删除选中）与 `cleanupEmptyConversations` 批量清理。 |
 | `ViewModels/KnowledgeBaseVM.swift` | 知识库 ViewModel，管理文档索引与删除。 |
 | `ViewModels/SettingsViewModel.swift` | 设置 ViewModel，管理 API Key 保存/删除（按 provider 隔离）、用户偏好读写、TTS 配置 / BFF 配置 / OnDevice 配置 / Health 授权状态读写。 |
+
+> **Agent 模块说明**：Agent 模块（AgentOrchestrator / GoalDecomposer / AgentRole）为完整实现但尚未接入生产 ChatViewModel，保留以备未来接入。
 
 ### 3.5 Views 层（6 个子模块）
 
@@ -1125,7 +1127,7 @@ stateDiagram-v2
 
 ### 5.7 国际化与无障碍
 
-- **String Catalog 统一源语言**：`Localizable.xcstrings` 以 `zh-Hans` 为源语言，支持 **8 种语言**完整翻译（`zh-Hans` 简体中文 / `zh-Hant` 繁体中文 / `en` 英文 / `ja` 日文 / `ko` 韩文 / `fr` 法文 / `de` 德文 / `es` 西班牙文），共 387 keys；SwiftUI 字面量自动提取，动态文本使用 `NSLocalizedString`；App 内「设置 → 语言」支持跟随系统或手动切换 9 种选项（含 8 种语言 + 跟随系统），切换后写入 `AppleLanguages` UserDefaults 并提示重启。
+- **String Catalog 统一源语言**：`Localizable.xcstrings` 以 `zh-Hans` 为源语言，支持 **8 种语言**完整翻译（`zh-Hans` 简体中文 / `zh-Hant` 繁体中文 / `en` 英文 / `ja` 日文 / `ko` 韩文 / `fr` 法文 / `de` 德文 / `es` 西班牙文），共 887 keys；SwiftUI 字面量自动提取，动态文本使用 `NSLocalizedString`；App 内「设置 → 语言」支持跟随系统或手动切换 9 种选项（含 8 种语言 + 跟随系统），切换后写入 `AppleLanguages` UserDefaults 并提示重启。
 - **accessibility 工程化**：13+ 视图补充 `accessibilityLabel` / `accessibilityHint` / `accessibilityIdentifier`，关键交互控件全部可访问，同时为 UITest 提供稳定定位符；Watch App 与 LaunchScreen 同样补充无障碍标签。
 - **截图资产规范化**：`screenshots/` 目录按 iOS / macOS 分类，8 张核心页面截图用于 README 与 App Store 元数据。
 
@@ -1144,7 +1146,7 @@ stateDiagram-v2
   - `QuickChatWidget`：桌面快捷提问，点击通过 DeepLink `aether://ask?query=` 跳转到主 App 并自动发送。
   - `HealthInsightWidget`：展示最新健康洞察摘要，通过 App Group 共享 SwiftData 读取 `HealthInsight` @Model。
   - `RecentConversationsWidget`：最近会话列表，点击通过 DeepLink `aether://conversation/<uuid>` 跳转。
-- **数据共享**：通过 App Group（`group.com.aether.shared`）配置共享 `ModelContainer`，Widget 与主 App 读取同一 SwiftData 数据库。
+- **数据共享**：通过 App Group（`group.com.aether.app`）配置共享 `ModelContainer`，Widget 与主 App 读取同一 SwiftData 数据库。
 - **技术栈**：`TimelineProvider` + `AppIntentConfiguration`（iOS 17+ / macOS 14+）。
 - **⚠️ Target 配置**：源代码已就绪，需在 Xcode 中手动创建 Widget Extension target 并关联 `AetherWidgets/` 目录下的源文件，配置 App Group capability。
 
@@ -1159,7 +1161,7 @@ stateDiagram-v2
 
 #### App Group 共享 SwiftData
 
-- **配置**：App Group identifier `group.com.aether.shared`。
+- **配置**：App Group identifier `group.com.aether.app`。
 - **共享方案**：主 App 与 Widget Extension 的 `ModelContainer` 均指向 App Group 容器目录下的同一 SQLite 数据库文件，Widget 可直接读取主 App 写入的 `Conversation` / `HealthInsight` 数据。
 - **影响范围**：`AetherApp.swift`（ModelContainer 初始化）+ Widget Extension（TimelineProvider 读取数据）。
 
@@ -1201,8 +1203,8 @@ stateDiagram-v2
 | PerformanceMonitor | `Services/Performance/PerformanceMonitor.swift` | iOS 17.0+ / macOS 14.0+ |
 | PrivacyInfo.xcprivacy | `Resources/PrivacyInfo.xcprivacy` | iOS 17.0+ / macOS 14.0+ / Xcode 16+（App Store 审核要求） |
 | AttributedString（Markdown） | `Views/Chat/Markdown*.swift` / `CodeSyntaxHighlighter.swift` | iOS 17.0+ / macOS 14.0+ / Foundation |
-| XCTest | `AetherTests/` 73 文件（248 用例） | Xcode 16+ / Swift 5.9+ |
-| XCUITest | `AetherUITests/` 2 文件（13 用例） | Xcode 16+ / Swift 5.9+ |
+| XCTest | `AetherTests/` 115 文件（2092 用例） | Xcode 16+ / Swift 5.9+ |
+| XCUITest | `AetherUITests/` 7 文件（30 用例） | Xcode 16+ / Swift 5.9+ |
 | GitHub Actions | `.github/workflows/ci.yml` | macos-14 runner / Xcode 16+ |
 | CoreLocation | CLLocationManager + CLGeocoder | LocationTool 定位与反地理编码 | iOS 17.0+ / macOS 14.0+ / CoreLocation.framework |
 | Contacts | CNContactStore | ContactsTool 通讯录搜索 | iOS 17.0+ / macOS 14.0+ / Contacts.framework |
@@ -1220,7 +1222,7 @@ stateDiagram-v2
 ### 7.1 单元测试（UT）
 
 - **Target**：`AetherTests`
-- **规模**：73 个测试文件，248 用例（248 pass / 0 skip / 0 failures）
+- **规模**：115 个测试文件，2092 用例（2092 pass / 0 skip / 0 failures）
 - **分层覆盖**：
 
 | 层级 | 测试文件 | 文件数 | 核心断言数（约） | skip 原因 |
@@ -1276,7 +1278,7 @@ stateDiagram-v2
 | ViewModel 层 | `KnowledgeBaseVMTests` | 1 | 3 | — |
 | ViewModel 层 | `SettingsViewModelTests` | 1 | 4 | — |
 | 跨层 / 行为 | `ConversationActivityTests`（NSUserActivity / Handoff） | 1 | 4 | — |
-| 合计 | — | 73 | — | — |
+| 合计 | — | 115 | — | — |
 
 > **注**：核心断言数为约数（基于测试方法数与典型 XCTest 断言密度估算），实际值以代码为准。skip 用例总数为 3，分布于 Keychain / NLTokenizer / 语音识别器不可用等场景。
 
@@ -1299,13 +1301,18 @@ stateDiagram-v2
 ### 7.2 UI 测试（UIT）
 
 - **Target**：`AetherUITests`
-- **规模**：2 个测试文件，13 用例（13 pass / 0 skip / 0 failures）
+- **规模**：7 个测试文件，30 用例（30 pass / 0 skip / 0 failures）
 - **文件拆分**：
 
 | 文件 | 用例数 | 核心断言数（约） | skip 原因 | 覆盖端到端流 |
 |------|--------|----------------|-----------|-------------|
 | `AetherUITests.swift` | 12 | 24 | contextMenu 在模拟器上不稳定 / Picker 滚动时机差异 / alert 未在超时内消失 | 启动 / 会话列表 / 创建会话 / API Key 保存/删除 / RAG+Tools Toggle / 模型切换 / 系统提示词 / 用户偏好 / contextMenu / 搜索 / 错误条 / 预设角色（修复 switch 标签定位与 flaky tap） |
 | `AetherUITestsLaunchUITests.swift` | 1 | 1 | — | launch 用例 |
+| `GestureUITests.swift` | 3 | — | — | 手势交互（下拉关闭键盘等） |
+| `MCPSettingsUITests.swift` | 3 | — | — | MCP 服务配置 |
+| `MenuBarUITests.swift` | 3 | — | — | macOS 菜单栏 |
+| `MultiWindowUITests.swift` | 3 | — | — | 多窗口 |
+| `PluginSettingsUITests.swift` | 5 | — | — | 插件配置 |
 
 - **启动参数**：
   - `UITEST_DISABLE_NETWORK`：短路真实 HTTP，注入桩回复「（UIT 测试模式）已收到：{input}」
@@ -1344,7 +1351,7 @@ Aether/
 │   └── SwitchConversationIntent.swift
 ├── Core/
 │   ├── Actors/
-│   │   └── ChatActor.swift
+│   │   └── ChatActor.swift          # 已移除（文件已删除）
 │   ├── Constants/
 │   │   ├── APIConfig.swift
 │   │   └── ModelProvider.swift
@@ -1506,7 +1513,7 @@ CloudflareWorkers/               # BFF 代理网关
 ├── worker.js
 └── wrangler.toml
 
-AetherTests/                  # 73 个 UT 文件 / 248 用例
+AetherTests/                  # 115 个 UT 文件 / 2092 用例
 ├── APIConfigTests.swift
 ├── AlarmToolTests.swift
 ├── BFFProxyClientTests.swift
@@ -1559,7 +1566,7 @@ AetherTests/                  # 73 个 UT 文件 / 248 用例
 ├── VoiceServiceTests.swift
 └── WatchConnectivityServiceTests.swift
 
-AetherUITests/                # 2 个 UIT 文件 / 13 用例
+AetherUITests/                # 7 个 UIT 文件 / 30 用例
 ├── AetherUITests.swift
 ├── AetherUITestsLaunchUITests.swift
 └── Info.plist

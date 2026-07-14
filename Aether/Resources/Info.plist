@@ -8,8 +8,6 @@
 		<string>com.aether.telemetry-upload</string>
 		<string>com.aether.health-insight</string>
 	</array>
-	<key>BuglyAppKey</key>
-	<string>your-bugly-app-key</string>
 	<key>BuglyAppChannel</key>
 	<string>AppStore</string>
 	<key>CFBundleDevelopmentRegion</key>

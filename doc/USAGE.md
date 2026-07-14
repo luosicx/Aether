@@ -62,7 +62,7 @@
 ```bash
 # 1. clone 仓库
 git clone <repo-url>
-cd AIBuiler
+cd Aether
 
 # 2. 用 Xcode 打开
 open Aether.xcodeproj
@@ -541,7 +541,7 @@ Aether Watch App 提供 watchOS 独立体验：
 
 ### 4.25 桌面 Widget
 
-> ⚠️ **前置条件**：Widget target 需在 Xcode 中手动创建并关联 `AetherWidgets/` 目录下的源文件，并配置 App Group capability（`group.com.aether.shared`）。
+> ⚠️ **前置条件**：Widget target 需在 Xcode 中手动创建并关联 `AetherWidgets/` 目录下的源文件，并配置 App Group capability（`group.com.aether.app`）。
 
 Aether 提供三个桌面 Widget：
 
@@ -549,7 +549,7 @@ Aether 提供三个桌面 Widget：
 2. **HealthInsightWidget**：展示最新健康洞察摘要，通过 App Group 共享 SwiftData 读取 `HealthInsight` @Model 数据。
 3. **RecentConversationsWidget**：展示最近 3-5 个会话标题，点击通过 DeepLink `aether://conversation/<uuid>` 跳转到指定会话。
 
-**数据共享**：Widget 与主 App 通过 App Group（`group.com.aether.shared`）共享同一 SwiftData 数据库，Widget 可直接读取主 App 写入的会话与健康洞察数据。
+**数据共享**：Widget 与主 App 通过 App Group（`group.com.aether.app`）共享同一 SwiftData 数据库，Widget 可直接读取主 App 写入的会话与健康洞察数据。
 
 对应代码：`AetherWidgets/QuickChatWidget.swift`、`AetherWidgets/HealthInsightWidget.swift`、`AetherWidgets/RecentConversationsWidget.swift`。
 
@@ -695,7 +695,7 @@ xcodebuild build \
   -configuration Debug \
   CODE_SIGNING_ALLOWED=NO
 
-# 2. 运行 UT（248 用例，0 skip）
+# 2. 运行 UT（2092 用例，0 skip）
 xcodebuild test \
   -project Aether.xcodeproj \
   -scheme Aether \
@@ -703,7 +703,7 @@ xcodebuild test \
   -only-testing:AetherTests \
   CODE_SIGNING_ALLOWED=NO
 
-# 3. 运行 UIT（13 用例，0 skip）
+# 3. 运行 UIT（30 用例，0 skip）
 xcodebuild test \
   -project Aether.xcodeproj \
   -scheme Aether \
@@ -723,8 +723,8 @@ xcodebuild test \
 
 | 测试套件 | 用例总数 | skipped | failures |
 |---|---|---|---|
-| UT（`AetherTests`） | 248 | 0 | 0 |
-| UIT（`AetherUITests`） | 13 | 0 | 0 |
+| UT（`AetherTests`） | 2092 | 0 | 0 |
+| UIT（`AetherUITests`） | 30 | 0 | 0 |
 
 ### skipped 原因
 
@@ -834,7 +834,7 @@ GitHub Actions 配置文件：`.github/workflows/ci.yml`
 
 ### Q10: UIT 测试不稳定？
 
-**A**：`contextMenu` 长按触发、Picker 导航式选项、邮件 composer 在模拟器上行为有差异，已用 `throw XCTSkip` 兜底跳过不稳定用例。**底层逻辑已由 UT 覆盖**（`ChatStorageTests` / `ConversationListVMTests` / `TTSConfigTests` / `TTSVoiceCatalogTests` 等）。当前 UIT 规模 13 用例（0 skip，0 failures），UT 规模 248 用例（0 skip，0 failures）。
+**A**：`contextMenu` 长按触发、Picker 导航式选项、邮件 composer 在模拟器上行为有差异，已用 `throw XCTSkip` 兜底跳过不稳定用例。**底层逻辑已由 UT 覆盖**（`ChatStorageTests` / `ConversationListVMTests` / `TTSConfigTests` / `TTSVoiceCatalogTests` 等）。当前 UIT 规模 30 用例（0 skip，0 failures），UT 规模 2092 用例（0 skip，0 failures）。
 
 ### Q11: App Intents / Siri 调用无响应？
 
