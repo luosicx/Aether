@@ -391,6 +391,23 @@
 		T22A000000000000000004A /* RichMessageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T22A000000000000000004B /* RichMessageTests.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		19570A7C106F8A3D402C4A64 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7C5EF9114C3CBE2937F8D8FA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 3E5AA27405E11EA8C5B0C6DB;
+			remoteInfo = "Aether-macOS";
+		};
+		E675934DC0576EBA520F2587 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7C5EF9114C3CBE2937F8D8FA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E23E24C20D3BDA0C23D4DB83;
+			remoteInfo = "Aether-iOS";
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		026C84A7B07AFEEBDBF03513 /* HealthInsightWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HealthInsightWidget.swift; sourceTree = "<group>"; };
 		03385CCF11D1C2F7897A459A /* FallbackLLMProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FallbackLLMProvider.swift; sourceTree = "<group>"; };
@@ -519,7 +536,7 @@
 		7E6BB4D19F445BAB14B9CAD5 /* SkeletonView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SkeletonView.swift; sourceTree = "<group>"; };
 		80555A529238E0F789A6EFB6 /* AppleScriptToolTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppleScriptToolTests.swift; sourceTree = "<group>"; };
 		809A61237168F207C54CD1BF /* ChatChunk.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatChunk.swift; sourceTree = "<group>"; };
-		809C24D39480CF26F66C08AA /* Aether.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Aether.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		809C24D39480CF26F66C08AA /* Aether.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Aether.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		80BF275875E655A3EBA6D931 /* AetherWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AetherWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		824AA18ED31DBE017FEFF015 /* QuickChatWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QuickChatWidget.swift; sourceTree = "<group>"; };
 		83DE3F8404C4A45F1F8D97F7 /* AetherUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AetherUITests.swift; sourceTree = "<group>"; };
@@ -620,7 +637,7 @@
 		C26F009FBEDBC323154172D8 /* SwiftDataDocumentRepository.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SwiftDataDocumentRepository.swift; sourceTree = "<group>"; };
 		C27D799C0807BF424343247D /* MarkdownTableView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MarkdownTableView.swift; sourceTree = "<group>"; };
 		C2A5FBBDA8F167C8FCBDAC1D /* DateTimeToolTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DateTimeToolTests.swift; sourceTree = "<group>"; };
-		C3C24B468E2A8E39B636FF92 /* Aether.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Aether.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		C3C24B468E2A8E39B636FF92 /* Aether.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Aether.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C3D4E5F6A7B8C9D0E1F2A3B4 /* OnDeviceModelCatalogTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OnDeviceModelCatalogTests.swift; sourceTree = "<group>"; };
 		C41ED6555734365803CF2CE4 /* ToolRegistryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ToolRegistryTests.swift; sourceTree = "<group>"; };
 		C42CB93D5F359C823B79BD26 /* SmartRouterTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SmartRouterTests.swift; sourceTree = "<group>"; };
@@ -1526,8 +1543,8 @@
 				78E85B486993CBA8E8CF5DC1 /* AetherWidgets.appex */,
 				1ADE2BA4118A4A0EB1E1FC81 /* AetherWatch.app */,
 				E23D426313B3F4302BFC7094 /* AetherWidgets.appex */,
-				809C24D39480CF26F66C08AA /* Aether-iOS.app */,
-				C3C24B468E2A8E39B636FF92 /* Aether-macOS.app */,
+				809C24D39480CF26F66C08AA /* Aether.app */,
+				C3C24B468E2A8E39B636FF92 /* Aether.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -1704,7 +1721,7 @@
 				8E5669BB90D7AB3818F7BB35 /* AetherUI */,
 			);
 			productName = "Aether-macOS";
-			productReference = C3C24B468E2A8E39B636FF92 /* Aether-macOS.app */;
+			productReference = C3C24B468E2A8E39B636FF92 /* Aether.app */;
 			productType = "com.apple.product-type.application";
 		};
 		8DE141236A8DDF7895D8AB48 /* AetherTests */ = {
@@ -1718,6 +1735,8 @@
 			buildRules = (
 			);
 			dependencies = (
+				CFC8B2DED07D909326F68594 /* PBXTargetDependency */,
+				80145CE557A8E962C328363A /* PBXTargetDependency */,
 			);
 			name = AetherTests;
 			packageProductDependencies = (
@@ -1801,7 +1820,7 @@
 				D9449C6001615A4D026BAE9A /* AetherUI */,
 			);
 			productName = "Aether-iOS";
-			productReference = 809C24D39480CF26F66C08AA /* Aether-iOS.app */;
+			productReference = 809C24D39480CF26F66C08AA /* Aether.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -2289,6 +2308,21 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		80145CE557A8E962C328363A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = "Aether-macOS";
+			target = 3E5AA27405E11EA8C5B0C6DB /* Aether-macOS */;
+			targetProxy = 19570A7C106F8A3D402C4A64 /* PBXContainerItemProxy */;
+		};
+		CFC8B2DED07D909326F68594 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = "Aether-iOS";
+			target = E23E24C20D3BDA0C23D4DB83 /* Aether-iOS */;
+			targetProxy = E675934DC0576EBA520F2587 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		04724E78A577FAF761F3A2B4 /* Release */ = {

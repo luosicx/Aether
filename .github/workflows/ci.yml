@@ -749,11 +749,11 @@ jobs:
 
       - name: Restore dependencies
         working-directory: windows/Aether.Windows
-        run: dotnet restore
+        run: dotnet restore -r win-x64
 
       - name: Build (Debug)
         working-directory: windows/Aether.Windows
-        run: dotnet build --configuration Debug --no-restore
+        run: dotnet build --configuration Debug --no-restore -p:Platform=x64
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v7
