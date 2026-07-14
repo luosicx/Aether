@@ -74,7 +74,12 @@ struct MenuBarPanel: View {
         }
         .frame(width: 320, height: 400)
         .background(Color.deepSpace.opacity(0.95))
-        .onAppear { loadRecentConversations() }
+        .onAppear {
+            // Task 3.1 Step 4: 注入 SwiftData 仓储实现，供 ChatViewModel 未来 DTO 化查询
+            viewModel.conversationRepo = SwiftDataConversationRepository(context: modelContext)
+            viewModel.messageRepo = SwiftDataMessageRepository(context: modelContext)
+            loadRecentConversations()
+        }
     }
 
     /// 空状态视图——无最近对话时展示
