@@ -109,8 +109,13 @@ jobs:
           # - AetherDesign/: AetherCore design tokens & theme (pure UI)
           # - AetherUI/: AetherCore SwiftUI components (pure UI)
           # - AppIntents/: App Intents require app context, hard to unit test
+          # - OnDevice/: MLX inference engine, model downloader (require ML runtime)
+          # - Health/: HealthKit service (requires device HealthKit, not on simulator)
+          # - Connectivity/: WatchConnectivity (requires paired Apple Watch)
+          # - Crash/: Crash reporting (requires crash integration SDK)
+          # - Search/: Spotlight indexer (requires Spotlight integration)
           # Note: AetherTests/ is NOT excluded - test code coverage contributes to overall coverage
-          EXCLUDE_PATTERNS = ["/Views/", "/DesignSystem/", "/App/AetherApp", "/Protocols/", "/Actors/", "/AetherUITests/", "/AetherWatch/", "/AetherDesign/", "/AetherUI/", "/AppIntents/"]
+          EXCLUDE_PATTERNS = ["/Views/", "/DesignSystem/", "/App/AetherApp", "/Protocols/", "/Actors/", "/AetherUITests/", "/AetherWatch/", "/AetherDesign/", "/AetherUI/", "/AppIntents/", "/OnDevice/", "/Health/", "/Connectivity/", "/Crash/", "/Search/"]
           for m in pattern.finditer(text):
               path = m.group(1)
               cov = int(m.group(3))
@@ -173,6 +178,8 @@ jobs:
               "/Protocols/", "/Actors/", "/AetherUITests/",
               "/AetherWatch/", "/AetherTests/",
               "/AetherDesign/", "/AetherUI/", "/AppIntents/",
+              "/OnDevice/", "/Health/", "/Connectivity/",
+              "/Crash/", "/Search/",
           ]
           files = []
           total_covered = 0
@@ -501,6 +508,8 @@ jobs:
               "/Protocols/", "/Actors/", "/AetherUITests/",
               "/AetherWatch/", "/AetherTests/",
               "/AetherDesign/", "/AetherUI/", "/AppIntents/",
+              "/OnDevice/", "/Health/", "/Connectivity/",
+              "/Crash/", "/Search/",
           ]
           files = []
           total_covered = 0
