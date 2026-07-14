@@ -4,7 +4,6 @@
 /// 在当前标签页执行 JavaScript、新建标签页、关闭指定标签页等操作。
 /// 调用方式：execute(arguments: ["action": "...", ...])，action 为必填参数。
 /// 主要 action：list_tabs/get_url/navigate/run_js/new_tab/close_tab。
-#if os(macOS)
 import Foundation
 import AetherFoundation
 
@@ -195,4 +194,3 @@ final class SafariControlTool: ToolProtocol, @unchecked Sendable {
         return output?.stringValue ?? "已执行"
     }
 }
-#endif

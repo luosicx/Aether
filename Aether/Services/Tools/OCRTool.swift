@@ -3,7 +3,6 @@
 /// 使用 Vision 框架的 VNRecognizeTextRequest 对截图或图片文件做 OCR，提取其中的文字。
 /// 调用方式：execute(arguments: ["image_path": "..."])，image_path 可选，不传则先截屏再识别。
 /// 支持简体中文和英文识别，识别精度设为 accurate。
-#if os(macOS)
 import Foundation
 import AppKit
 import Vision
@@ -80,4 +79,3 @@ final class OCRTool: ToolProtocol, @unchecked Sendable {
         }
     }
 }
-#endif

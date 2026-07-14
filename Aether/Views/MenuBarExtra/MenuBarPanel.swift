@@ -2,7 +2,6 @@ import SwiftUI
 import SwiftData
 import AetherDesign
 
-#if os(macOS)
 
 /// Task 24: macOS 菜单栏常驻模式面板。
 ///
@@ -139,4 +138,3 @@ struct MenuBarPanel: View {
     }
 }
 
-#endif

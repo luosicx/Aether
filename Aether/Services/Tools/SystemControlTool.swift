@@ -4,7 +4,6 @@
 /// 调用方式：execute(arguments: ["action": "...", "value": 50])，action 为必填参数。
 /// 主要 action：get_brightness/set_brightness/get_volume/set_volume。
 /// 注意：亮度设置无直接公开 API，实现为简化方案，可能需要辅助功能权限。
-#if os(macOS)
 import Foundation
 import AetherFoundation
 
@@ -117,4 +116,3 @@ final class SystemControlTool: ToolProtocol, @unchecked Sendable {
         return output?.stringValue ?? "已执行"
     }
 }
-#endif

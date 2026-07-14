@@ -3,7 +3,6 @@
 /// 通过 NSWorkspace 管理 macOS 应用，支持启动、退出、激活应用，以及获取前台应用和列出运行中的应用。
 /// 调用方式：execute(arguments: ["action": "...", "app": "..."])，action 为必填参数。
 /// 主要 action：launch/quit/activate/frontmost/list_running，app 参数在 launch/quit/activate 时需要。
-#if os(macOS)
 import Foundation
 import AppKit
 import AetherFoundation
@@ -116,4 +115,3 @@ final class AppManagementTool: ToolProtocol, @unchecked Sendable {
         return names.isEmpty ? "没有运行中的应用" : names.joined(separator: "\n")
     }
 }
-#endif
