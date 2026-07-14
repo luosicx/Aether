@@ -14,9 +14,9 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "B06AF15605D68E7EA565058C"
-               BuildableName = "Aether.app"
-               BlueprintName = "Aether"
+               BlueprintIdentifier = "3E5AA27405E11EA8C5B0C6DB"
+               BuildableName = "Aether-macOS.app"
+               BlueprintName = "Aether-macOS"
                ReferencedContainer = "container:Aether.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -31,20 +31,6 @@
                BlueprintIdentifier = "8DE141236A8DDF7895D8AB48"
                BuildableName = "AetherTests.xctest"
                BlueprintName = "AetherTests"
-               ReferencedContainer = "container:Aether.xcodeproj">
-            </BuildableReference>
-         </BuildActionEntry>
-         <BuildActionEntry
-            buildForTesting = "YES"
-            buildForRunning = "NO"
-            buildForProfiling = "NO"
-            buildForArchiving = "NO"
-            buildForAnalyzing = "NO">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "D98AD396A6D4DD6ACC7428FA"
-               BuildableName = "AetherUITests.xctest"
-               BlueprintName = "AetherUITests"
                ReferencedContainer = "container:Aether.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -67,16 +53,6 @@
                ReferencedContainer = "container:Aether.xcodeproj">
             </BuildableReference>
          </TestableReference>
-         <TestableReference
-            skipped = "NO">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "D98AD396A6D4DD6ACC7428FA"
-               BuildableName = "AetherUITests.xctest"
-               BlueprintName = "AetherUITests"
-               ReferencedContainer = "container:Aether.xcodeproj">
-            </BuildableReference>
-         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction
@@ -93,9 +69,9 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "B06AF15605D68E7EA565058C"
-            BuildableName = "Aether.app"
-            BlueprintName = "Aether"
+            BlueprintIdentifier = "3E5AA27405E11EA8C5B0C6DB"
+            BuildableName = "Aether-macOS.app"
+            BlueprintName = "Aether-macOS"
             ReferencedContainer = "container:Aether.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
