@@ -75,7 +75,7 @@ final class HealthInsightGeneratorTests: XCTestCase {
         let stub = StubLLMProvider()
         stub.chatContents = ["test insight"]
         let healthService = HealthKitService()
-        let generator = HealthInsightGenerator(llmProvider: stub, healthKitService: healthService, modelContext: context)
+        let generator = HealthInsightGenerator(llmProvider: stub, dataSource: healthService, modelContext: context)
 
         let insight = try await generator.generateInsight(days: 7)
 
@@ -87,7 +87,7 @@ final class HealthInsightGeneratorTests: XCTestCase {
     func testGenerateInsightCallsLLMProvider() async throws {
         let stub = StubLLMProvider()
         let healthService = HealthKitService()
-        let generator = HealthInsightGenerator(llmProvider: stub, healthKitService: healthService, modelContext: context)
+        let generator = HealthInsightGenerator(llmProvider: stub, dataSource: healthService, modelContext: context)
 
         _ = try await generator.generateInsight(days: 7)
 
@@ -98,7 +98,7 @@ final class HealthInsightGeneratorTests: XCTestCase {
     func testGenerateInsightStoresToSwiftData() async throws {
         let stub = StubLLMProvider()
         let healthService = HealthKitService()
-        let generator = HealthInsightGenerator(llmProvider: stub, healthKitService: healthService, modelContext: context)
+        let generator = HealthInsightGenerator(llmProvider: stub, dataSource: healthService, modelContext: context)
 
         let insight = try await generator.generateInsight(days: 7)
 
@@ -117,7 +117,7 @@ final class HealthInsightGeneratorTests: XCTestCase {
         // 未授权的 HealthKitService 会返回空字典
         let healthService = HealthKitService()
         XCTAssertFalse(healthService.isAuthorized, "测试前置：HealthKitService 未授权")
-        let generator = HealthInsightGenerator(llmProvider: stub, healthKitService: healthService, modelContext: context)
+        let generator = HealthInsightGenerator(llmProvider: stub, dataSource: healthService, modelContext: context)
 
         let insight = try await generator.generateInsight(days: 7)
 
@@ -135,7 +135,7 @@ final class HealthInsightGeneratorTests: XCTestCase {
         let stub = StubLLMProvider()
         stub.chatContents = ["健康建议内容"]
         let healthService = HealthKitService()
-        let generator = HealthInsightGenerator(llmProvider: stub, healthKitService: healthService, modelContext: context)
+        let generator = HealthInsightGenerator(llmProvider: stub, dataSource: healthService, modelContext: context)
         let insight = try await generator.generateInsight(days: 7)
 
         // nonisolated 方法，可直接调用，验证不崩溃
@@ -151,7 +151,7 @@ final class HealthInsightGeneratorTests: XCTestCase {
         // 模拟长文本 LLM 响应
         stub.chatContents = [String(repeating: "这是一段很长的健康建议。", count: 30)]
         let healthService = HealthKitService()
-        let generator = HealthInsightGenerator(llmProvider: stub, healthKitService: healthService, modelContext: context)
+        let generator = HealthInsightGenerator(llmProvider: stub, dataSource: healthService, modelContext: context)
         let insight = try await generator.generateInsight(days: 7)
 
         // 长内容也应正常发送通知，不崩溃
@@ -176,7 +176,7 @@ final class HealthInsightGeneratorTests: XCTestCase {
         let stub = StubLLMProvider()
         stub.chatContents = ["第一条建议", "第二条建议", "第三条建议"]
         let healthService = HealthKitService()
-        let generator = HealthInsightGenerator(llmProvider: stub, healthKitService: healthService, modelContext: context)
+        let generator = HealthInsightGenerator(llmProvider: stub, dataSource: healthService, modelContext: context)
 
         let insight = try await generator.generateInsight(days: 7)
 
@@ -191,7 +191,7 @@ final class HealthInsightGeneratorTests: XCTestCase {
     func testGenerateInsightRelatedMetricsContainsAllKeys() async throws {
         let stub = StubLLMProvider()
         let healthService = HealthKitService()
-        let generator = HealthInsightGenerator(llmProvider: stub, healthKitService: healthService, modelContext: context)
+        let generator = HealthInsightGenerator(llmProvider: stub, dataSource: healthService, modelContext: context)
 
         let insight = try await generator.generateInsight(days: 7)
 
@@ -209,7 +209,7 @@ final class HealthInsightGeneratorTests: XCTestCase {
     func testGenerateInsightTimestampIsRecent() async throws {
         let stub = StubLLMProvider()
         let healthService = HealthKitService()
-        let generator = HealthInsightGenerator(llmProvider: stub, healthKitService: healthService, modelContext: context)
+        let generator = HealthInsightGenerator(llmProvider: stub, dataSource: healthService, modelContext: context)
 
         let before = Date()
         let insight = try await generator.generateInsight(days: 7)
@@ -225,7 +225,7 @@ final class HealthInsightGeneratorTests: XCTestCase {
     func testGenerateInsightInsightTypeIsOverall() async throws {
         let stub = StubLLMProvider()
         let healthService = HealthKitService()
-        let generator = HealthInsightGenerator(llmProvider: stub, healthKitService: healthService, modelContext: context)
+        let generator = HealthInsightGenerator(llmProvider: stub, dataSource: healthService, modelContext: context)
 
         let insight = try await generator.generateInsight(days: 7)
 
@@ -238,7 +238,7 @@ final class HealthInsightGeneratorTests: XCTestCase {
     func testGenerateInsightWithDays1() async throws {
         let stub = StubLLMProvider()
         let healthService = HealthKitService()
-        let generator = HealthInsightGenerator(llmProvider: stub, healthKitService: healthService, modelContext: context)
+        let generator = HealthInsightGenerator(llmProvider: stub, dataSource: healthService, modelContext: context)
 
         let insight = try await generator.generateInsight(days: 1)
 
@@ -250,7 +250,7 @@ final class HealthInsightGeneratorTests: XCTestCase {
     func testGenerateInsightWithDays30() async throws {
         let stub = StubLLMProvider()
         let healthService = HealthKitService()
-        let generator = HealthInsightGenerator(llmProvider: stub, healthKitService: healthService, modelContext: context)
+        let generator = HealthInsightGenerator(llmProvider: stub, dataSource: healthService, modelContext: context)
 
         let insight = try await generator.generateInsight(days: 30)
 
@@ -264,7 +264,7 @@ final class HealthInsightGeneratorTests: XCTestCase {
         let stub = StubLLMProvider()
         stub.chatContents = []
         let healthService = HealthKitService()
-        let generator = HealthInsightGenerator(llmProvider: stub, healthKitService: healthService, modelContext: context)
+        let generator = HealthInsightGenerator(llmProvider: stub, dataSource: healthService, modelContext: context)
 
         let insight = try await generator.generateInsight(days: 7)
 
@@ -280,7 +280,7 @@ final class HealthInsightGeneratorTests: XCTestCase {
     func testGenerateInsightStoresMultipleInsights() async throws {
         let stub = StubLLMProvider()
         let healthService = HealthKitService()
-        let generator = HealthInsightGenerator(llmProvider: stub, healthKitService: healthService, modelContext: context)
+        let generator = HealthInsightGenerator(llmProvider: stub, dataSource: healthService, modelContext: context)
 
         _ = try await generator.generateInsight(days: 7)
         _ = try await generator.generateInsight(days: 7)
@@ -295,7 +295,7 @@ final class HealthInsightGeneratorTests: XCTestCase {
     func testGenerateInsightHasUniqueNonEmptyId() async throws {
         let stub = StubLLMProvider()
         let healthService = HealthKitService()
-        let generator = HealthInsightGenerator(llmProvider: stub, healthKitService: healthService, modelContext: context)
+        let generator = HealthInsightGenerator(llmProvider: stub, dataSource: healthService, modelContext: context)
 
         let insight1 = try await generator.generateInsight(days: 7)
         let insight2 = try await generator.generateInsight(days: 7)
