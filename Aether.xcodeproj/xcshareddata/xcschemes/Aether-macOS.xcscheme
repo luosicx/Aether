@@ -15,7 +15,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "3E5AA27405E11EA8C5B0C6DB"
-               BuildableName = "Aether-macOS.app"
+               BuildableName = "Aether.app"
                BlueprintName = "Aether-macOS"
                ReferencedContainer = "container:Aether.xcodeproj">
             </BuildableReference>
@@ -70,7 +70,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "3E5AA27405E11EA8C5B0C6DB"
-            BuildableName = "Aether-macOS.app"
+            BuildableName = "Aether.app"
             BlueprintName = "Aether-macOS"
             ReferencedContainer = "container:Aether.xcodeproj">
          </BuildableReference>

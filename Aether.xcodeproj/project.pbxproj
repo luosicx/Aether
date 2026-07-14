@@ -519,7 +519,7 @@
 		7E6BB4D19F445BAB14B9CAD5 /* SkeletonView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SkeletonView.swift; sourceTree = "<group>"; };
 		80555A529238E0F789A6EFB6 /* AppleScriptToolTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppleScriptToolTests.swift; sourceTree = "<group>"; };
 		809A61237168F207C54CD1BF /* ChatChunk.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatChunk.swift; sourceTree = "<group>"; };
-		809C24D39480CF26F66C08AA /* Aether-iOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Aether-iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		809C24D39480CF26F66C08AA /* Aether.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Aether.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		80BF275875E655A3EBA6D931 /* AetherWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AetherWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		824AA18ED31DBE017FEFF015 /* QuickChatWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QuickChatWidget.swift; sourceTree = "<group>"; };
 		83DE3F8404C4A45F1F8D97F7 /* AetherUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AetherUITests.swift; sourceTree = "<group>"; };
@@ -620,7 +620,7 @@
 		C26F009FBEDBC323154172D8 /* SwiftDataDocumentRepository.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SwiftDataDocumentRepository.swift; sourceTree = "<group>"; };
 		C27D799C0807BF424343247D /* MarkdownTableView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MarkdownTableView.swift; sourceTree = "<group>"; };
 		C2A5FBBDA8F167C8FCBDAC1D /* DateTimeToolTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DateTimeToolTests.swift; sourceTree = "<group>"; };
-		C3C24B468E2A8E39B636FF92 /* Aether-macOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Aether-macOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		C3C24B468E2A8E39B636FF92 /* Aether.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Aether.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		C3D4E5F6A7B8C9D0E1F2A3B4 /* OnDeviceModelCatalogTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OnDeviceModelCatalogTests.swift; sourceTree = "<group>"; };
 		C41ED6555734365803CF2CE4 /* ToolRegistryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ToolRegistryTests.swift; sourceTree = "<group>"; };
 		C42CB93D5F359C823B79BD26 /* SmartRouterTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SmartRouterTests.swift; sourceTree = "<group>"; };
@@ -2319,8 +2319,7 @@
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -Xfrontend -disable-sandbox";
 				PRODUCT_BUNDLE_IDENTIFIER = com.aether.app.ios;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				PRODUCT_MODULE_NAME = Aether;
+				PRODUCT_NAME = Aether;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -2434,8 +2433,7 @@
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -Xfrontend -disable-sandbox";
 				PRODUCT_BUNDLE_IDENTIFIER = com.aether.app.macos;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				PRODUCT_MODULE_NAME = Aether;
+				PRODUCT_NAME = Aether;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = macosx;
 				SUPPORTED_PLATFORMS = macosx;
@@ -2556,8 +2554,7 @@
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -Xfrontend -disable-sandbox";
 				PRODUCT_BUNDLE_IDENTIFIER = com.aether.app.ios;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				PRODUCT_MODULE_NAME = Aether;
+				PRODUCT_NAME = Aether;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -2643,8 +2640,8 @@
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SWIFT_VERSION = 5.0;
-				"TEST_HOST[sdk=iphone*]" = "$(BUILT_PRODUCTS_DIR)/Aether-iOS.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Aether-iOS";
-				"TEST_HOST[sdk=macosx*]" = "$(BUILT_PRODUCTS_DIR)/Aether-macOS.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Aether-macOS";
+				"TEST_HOST[sdk=iphone*]" = "$(BUILT_PRODUCTS_DIR)/Aether.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Aether";
+				"TEST_HOST[sdk=macosx*]" = "$(BUILT_PRODUCTS_DIR)/Aether.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Aether";
 			};
 			name = Debug;
 		};
@@ -2697,8 +2694,7 @@
 				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -Xfrontend -disable-sandbox";
 				PRODUCT_BUNDLE_IDENTIFIER = com.aether.app.macos;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				PRODUCT_MODULE_NAME = Aether;
+				PRODUCT_NAME = Aether;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = macosx;
 				SUPPORTED_PLATFORMS = macosx;
@@ -2723,8 +2719,8 @@
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SWIFT_VERSION = 5.0;
-				"TEST_HOST[sdk=iphone*]" = "$(BUILT_PRODUCTS_DIR)/Aether-iOS.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Aether-iOS";
-				"TEST_HOST[sdk=macosx*]" = "$(BUILT_PRODUCTS_DIR)/Aether-macOS.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Aether-macOS";
+				"TEST_HOST[sdk=iphone*]" = "$(BUILT_PRODUCTS_DIR)/Aether.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Aether";
+				"TEST_HOST[sdk=macosx*]" = "$(BUILT_PRODUCTS_DIR)/Aether.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Aether";
 				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
