@@ -1,4 +1,5 @@
 import SwiftUI
+import AetherDesign
 
 struct ConversationRow: View {
     let conversation: Conversation

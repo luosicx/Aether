@@ -1,5 +1,6 @@
 import Foundation
 import Security
+import AetherFoundation
 
 /// 应用错误类型，LocalizedError 协议提供用户友好描述
 enum AppError: LocalizedError {

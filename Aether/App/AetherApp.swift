@@ -1,6 +1,9 @@
 import SwiftUI
 import SwiftData
 import AVFoundation
+import AetherServices
+import AetherDesign
+import AetherUI
 #if os(iOS)
 import BackgroundTasks
 import ActivityKit

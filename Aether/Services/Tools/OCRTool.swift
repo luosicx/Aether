@@ -7,6 +7,7 @@
 import Foundation
 import AppKit
 import Vision
+import AetherFoundation
 
 /// macOS 文字识别工具，使用 Vision 框架对截图或图片文件做 OCR
 final class OCRTool: ToolProtocol, @unchecked Sendable {

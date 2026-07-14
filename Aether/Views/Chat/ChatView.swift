@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import AetherDesign
 
 struct ChatView: View {
     @Environment(\.modelContext) private var modelContext

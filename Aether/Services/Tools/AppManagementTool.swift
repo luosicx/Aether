@@ -6,6 +6,7 @@
 #if os(macOS)
 import Foundation
 import AppKit
+import AetherFoundation
 
 /// macOS 应用管理工具
 final class AppManagementTool: ToolProtocol, @unchecked Sendable {

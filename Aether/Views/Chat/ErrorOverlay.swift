@@ -1,4 +1,5 @@
 import SwiftUI
+import AetherUI
 
 struct ErrorOverlay: View {
     let errorMessage: String?

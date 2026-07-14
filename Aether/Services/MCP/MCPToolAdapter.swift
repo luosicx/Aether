@@ -1,4 +1,5 @@
 import Foundation
+import AetherFoundation
 
 /// MCP 工具适配器：将 MCP Server 暴露的工具适配为本地 ToolProtocol。
 ///

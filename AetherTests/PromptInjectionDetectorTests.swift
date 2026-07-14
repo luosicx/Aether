@@ -1,4 +1,8 @@
 import XCTest
+import AetherFoundation
+import AetherServices
+import AetherDesign
+import AetherUI
 @testable import Aether
 
 /// PromptInjectionDetector 单元测试

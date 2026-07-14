@@ -7,6 +7,7 @@
 import Foundation
 import AppKit
 import CoreGraphics
+import AetherFoundation
 
 /// macOS 截屏工具
 final class ScreenshotTool: ToolProtocol, @unchecked Sendable {

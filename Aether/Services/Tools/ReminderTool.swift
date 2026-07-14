@@ -1,5 +1,6 @@
 import Foundation
 import EventKit
+import AetherFoundation
 
 /// 提醒工具，通过 EventKit 创建带 dueDate 的提醒事项
 final class ReminderTool: ToolProtocol, @unchecked Sendable {

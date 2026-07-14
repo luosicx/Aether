@@ -1,4 +1,8 @@
 import XCTest
+import AetherFoundation
+import AetherServices
+import AetherDesign
+import AetherUI
 @testable import Aether
 
 /// APIConfig 常量与 ChatConfig.default 单元测试

@@ -1,4 +1,5 @@
 import Foundation
+import AetherFoundation
 
 /// MCP 客户端管理器，管理多个 MCP Server 连接。
 ///

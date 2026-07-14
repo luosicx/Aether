@@ -6,6 +6,7 @@
 /// 主要 action：list_tabs/get_url/navigate/run_js/new_tab/close_tab。
 #if os(macOS)
 import Foundation
+import AetherFoundation
 
 /// macOS Safari 浏览器自动化工具，通过 AppleScript 控制 Safari
 final class SafariControlTool: ToolProtocol, @unchecked Sendable {

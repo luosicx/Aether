@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import AetherDesign
 
 /// Day 17: 健康管理设置页。展示授权状态、注入开关与已生成洞察列表。
 ///

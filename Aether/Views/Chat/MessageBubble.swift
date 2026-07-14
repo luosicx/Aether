@@ -1,4 +1,6 @@
 import SwiftUI
+import AetherDesign
+import AetherUI
 
 /// 消息值类型快照：用于切断 SwiftUI 对 SwiftData @Model 的观察链
 struct MessageSnapshot: Identifiable, Equatable {

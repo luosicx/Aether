@@ -1,4 +1,8 @@
 import XCTest
+import AetherFoundation
+import AetherServices
+import AetherDesign
+import AetherUI
 @testable import Aether
 
 /// Day 13: FallbackLLMProvider 装饰器单元测试

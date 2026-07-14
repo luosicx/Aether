@@ -1,4 +1,5 @@
 import SwiftUI
+import AetherDesign
 
 /// Task 22: 内联图表视图——使用自定义 Path 绘制简单图表。
 /// 支持 bar（竖条形图）/ line（折线图）/ pie（饼图）三种类型。

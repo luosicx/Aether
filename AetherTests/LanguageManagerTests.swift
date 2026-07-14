@@ -1,4 +1,8 @@
 import XCTest
+import AetherFoundation
+import AetherServices
+import AetherDesign
+import AetherUI
 @testable import Aether
 
 /// LanguageManager 与 AppLanguage 单元测试

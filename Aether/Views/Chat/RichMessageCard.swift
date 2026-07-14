@@ -1,4 +1,5 @@
 import SwiftUI
+import AetherDesign
 
 /// Task 22: 富媒体结构化卡片——不同类型使用不同颜色和图标展示。
 /// 支持 info / warning / success / error / code 五种类型。

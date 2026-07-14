@@ -1,4 +1,8 @@
 import XCTest
+import AetherFoundation
+import AetherServices
+import AetherDesign
+import AetherUI
 @testable import Aether
 
 /// Task 14.3 测试：插件沙箱隔离与权限管理。

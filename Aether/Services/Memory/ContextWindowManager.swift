@@ -1,4 +1,5 @@
 import Foundation
+import AetherFoundation
 
 /// 上下文窗口管理器，负责压缩历史消息以适配 LLM 的 token 上限。
 ///

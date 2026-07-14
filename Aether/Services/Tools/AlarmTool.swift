@@ -1,5 +1,6 @@
 import Foundation
 import EventKit
+import AetherFoundation
 
 /// 闹钟工具，通过 EventKit 创建提醒事项
 final class AlarmTool: ToolProtocol, @unchecked Sendable {

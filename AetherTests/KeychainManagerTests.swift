@@ -1,4 +1,8 @@
 import XCTest
+import AetherFoundation
+import AetherServices
+import AetherDesign
+import AetherUI
 @testable import Aether
 
 /// KeychainManager 单元测试：使用真实 Keychain，setUp/tearDown 清理测试 key

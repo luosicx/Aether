@@ -1,4 +1,8 @@
 import XCTest
+import AetherFoundation
+import AetherServices
+import AetherDesign
+import AetherUI
 @testable import Aether
 
 /// Conversation / UserPreference / DocumentChunk / ChatChunk 模型默认值与解码测试

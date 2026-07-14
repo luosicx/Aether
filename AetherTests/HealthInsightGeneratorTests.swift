@@ -1,6 +1,10 @@
 #if os(iOS)
 import XCTest
 import SwiftData
+import AetherFoundation
+import AetherServices
+import AetherDesign
+import AetherUI
 @testable import Aether
 
 /// Day 17: HealthInsightGenerator 单元测试

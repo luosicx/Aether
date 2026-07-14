@@ -1,15 +1,20 @@
+import AetherServices
 import Foundation
 import SwiftData
 
 /// 会话与消息持久化服务，封装 SwiftData ModelContext 操作。@MainActor 隔离。
+/// Task 1.7: 通过注入 ConversationIndexer 协议解耦对 SpotlightIndexer 的直接依赖。
 @MainActor
 final class ChatStorage {
     /// SwiftData 上下文
     let modelContext: ModelContext
+    /// 会话索引器（平台无关协议）。nil 时不索引；默认 SpotlightIndexer.shared（向后兼容）。
+    private let indexer: ConversationIndexer?
 
-    /// 注入 ModelContext
-    init(modelContext: ModelContext) {
+    /// 注入 ModelContext 与可选 indexer
+    init(modelContext: ModelContext, indexer: ConversationIndexer? = SpotlightIndexer.shared) {
         self.modelContext = modelContext
+        self.indexer = indexer
     }
 
     // MARK: - 私有 helper
@@ -26,6 +31,19 @@ final class ChatStorage {
         }
     }
 
+    /// 将 Conversation 转换为 ConversationIndexDTO 并通过 indexer 协议异步索引。
+    /// indexer 为 nil 时直接返回（不索引）。Task 解耦避免阻塞 @MainActor。
+    private func indexConversation(_ conversation: Conversation) {
+        guard let indexer else { return }
+        let dto = ConversationIndexDTO(
+            id: conversation.id,
+            title: conversation.title,
+            lastMessageContent: conversation.messages.last?.content,
+            createdAt: conversation.createdAt
+        )
+        Task { await indexer.index(conversation: dto) }
+    }
+
     /// 创建会话并插入 modelContext。不立即 save（首次 save 触发 schema migration check 阻塞 200-500ms），
     /// save 延迟到首次发消息时。默认 title="新对话"，systemPrompt="你是一个有帮助的AI助手。"
     func createConversation(title: String = "新对话", systemPrompt: String = "你是一个有帮助的AI助手。") -> Conversation {
@@ -34,7 +52,7 @@ final class ChatStorage {
         // 不立即 save（首次 save 触发 schema migration check，阻塞 200-500ms）
         // save 延迟到首次发消息时（ChatViewModel.sendMessage 中会 save）
         // Day 18: 同步 Spotlight 索引（新会话虽为空，仍索引标题便于检索）
-        SpotlightIndexer.index(conversation)
+        indexConversation(conversation)
         return conversation
     }
 
@@ -44,7 +62,7 @@ final class ChatStorage {
         modelContext.delete(conversation)
         save("deleteConversation")
         // Day 18: 从 Spotlight 索引中移除该会话
-        SpotlightIndexer.removeIndex(conversationId: conversationId)
+        Task { await indexer?.remove(conversationId: conversationId) }
     }
 
     /// 重命名并 save
@@ -52,7 +70,7 @@ final class ChatStorage {
         conversation.title = newTitle
         save("renameConversation")
         // Day 18: 标题变更后重新索引 Spotlight
-        SpotlightIndexer.index(conversation)
+        indexConversation(conversation)
     }
 
     /// 翻转 isPinned 并 save
@@ -110,7 +128,7 @@ final class ChatStorage {
 
         save("forkConversation")
         // Day 18: 同步 Spotlight 索引
-        SpotlightIndexer.index(forkedConversation)
+        indexConversation(forkedConversation)
         return forkedConversation
     }
 
@@ -132,7 +150,7 @@ final class ChatStorage {
         conversation.messages.append(message)
         save("addMessage")
         // Day 18: 消息更新后重新索引 Spotlight（contentDescription 取最后一条消息）
-        SpotlightIndexer.index(conversation)
+        indexConversation(conversation)
         return message
     }
 
@@ -167,7 +185,7 @@ final class ChatStorage {
             let convId = conv.id
             modelContext.delete(conv)
             // 同步清理 Spotlight 索引
-            SpotlightIndexer.removeIndex(conversationId: convId)
+            Task { await indexer?.remove(conversationId: convId) }
         }
         save("cleanupEmptyConversations")
     }

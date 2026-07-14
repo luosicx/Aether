@@ -1,4 +1,5 @@
 import Foundation
+import AetherFoundation
 
 // MARK: - MCP 错误类型
 

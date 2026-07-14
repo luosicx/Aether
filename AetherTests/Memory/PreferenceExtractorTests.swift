@@ -1,5 +1,9 @@
 import XCTest
 import SwiftData
+import AetherFoundation
+import AetherServices
+import AetherDesign
+import AetherUI
 @testable import Aether
 
 /// Task 6: PreferenceExtractor 与 UserPreference 新字段单元测试。

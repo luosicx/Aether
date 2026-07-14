@@ -1,5 +1,9 @@
 import XCTest
 import SwiftData
+import AetherFoundation
+import AetherServices
+import AetherDesign
+import AetherUI
 @testable import Aether
 
 /// Task 10/11/12: AgentOrchestrator 单元测试

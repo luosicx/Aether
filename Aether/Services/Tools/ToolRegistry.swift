@@ -8,6 +8,7 @@
 import Foundation
 import EventKit
 import UserNotifications
+import AetherFoundation
 
 /// 工具注册中心，单例。默认注册 4 个工具：AlarmTool / ReminderTool / DateTimeTool / CalculatorTool。@MainActor 隔离。
 @MainActor

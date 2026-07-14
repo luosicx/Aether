@@ -8,6 +8,7 @@
 import Foundation
 import AppKit
 import ApplicationServices
+import AetherFoundation
 
 /// macOS 窗口管理工具
 final class WindowManagementTool: ToolProtocol, @unchecked Sendable {

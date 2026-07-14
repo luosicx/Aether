@@ -7,6 +7,7 @@
 #if os(macOS)
 import Foundation
 import AppKit
+import AetherFoundation
 
 /// macOS Finder 操作工具
 final class FinderTool: ToolProtocol, @unchecked Sendable {

@@ -1,5 +1,7 @@
 import Foundation
 import SwiftData
+import AetherFoundation
+import AetherServices
 
 /// 设置 ViewModel，管理 API Key、模型选择、系统提示词。使用 @Observable + @MainActor 隔离。
 @Observable

@@ -1,4 +1,5 @@
 import SwiftUI
+import AetherDesign
 
 /// Task 22: 链接预览卡片——从 URL 异步加载 OpenGraph 元数据并卡片式展示。
 /// 加载标题、摘要、缩略图，使用 AsyncImage 加载缩略图。

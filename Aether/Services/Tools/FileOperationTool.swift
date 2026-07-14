@@ -7,6 +7,7 @@
 #if os(macOS)
 import Foundation
 import AppKit
+import AetherFoundation
 
 /// macOS 文件操作工具
 final class FileOperationTool: ToolProtocol, @unchecked Sendable {

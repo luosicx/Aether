@@ -1,4 +1,8 @@
 import XCTest
+import AetherFoundation
+import AetherServices
+import AetherDesign
+import AetherUI
 @testable import Aether
 
 /// SemanticCache 边界用例补充（不重复 SemanticCacheTests 已覆盖的命中/未命中/容量 101 驱逐）

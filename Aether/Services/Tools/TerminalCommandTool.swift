@@ -5,6 +5,7 @@
 /// 调用方式：execute(arguments: ["command": "..."])，command 为必填参数。
 #if os(macOS)
 import Foundation
+import AetherFoundation
 
 /// macOS 命令行执行工具，仅执行白名单内的命令并返回输出
 final class TerminalCommandTool: ToolProtocol, @unchecked Sendable {

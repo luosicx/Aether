@@ -6,6 +6,7 @@
 /// 注意：亮度设置无直接公开 API，实现为简化方案，可能需要辅助功能权限。
 #if os(macOS)
 import Foundation
+import AetherFoundation
 
 /// macOS 系统控制工具：调节屏幕亮度 / 系统音量
 final class SystemControlTool: ToolProtocol, @unchecked Sendable {

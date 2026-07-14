@@ -1,4 +1,5 @@
 import SwiftUI
+import AetherDesign
 
 /// 工具步骤值类型快照：用于切断对 @Observable ViewModel 的观察链
 struct ToolStepSnapshot: Identifiable, Equatable {

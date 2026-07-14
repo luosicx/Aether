@@ -1,6 +1,8 @@
 import Foundation
 import SwiftData
 import UserNotifications
+import AetherFoundation
+import AetherServices
 
 /// Day 17: 健康洞察生成器。读取 HealthKit 数据后调用 LLM 生成健康建议，并持久化到 SwiftData。
 ///

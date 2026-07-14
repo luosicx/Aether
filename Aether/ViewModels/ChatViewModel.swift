@@ -1,6 +1,9 @@
 import Foundation
 import SwiftData
 import Observation
+import AetherFoundation
+import AetherServices
+import AetherUI
 #if os(iOS)
 import ActivityKit
 #endif

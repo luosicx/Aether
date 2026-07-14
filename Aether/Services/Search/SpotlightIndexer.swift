@@ -1,16 +1,22 @@
+import AetherServices
 import CoreSpotlight
 import Foundation
 import UniformTypeIdentifiers
 
 /// Day 18: Spotlight 索引管理。将会话索引到 Spotlight，支持系统搜索直接打开对应会话。
 /// 索引内容：标题、最后一条消息内容、最近更新时间（用 createdAt 兜底，因 Conversation 无 updatedAt 字段）。
-enum SpotlightIndexer {
-    /// 索引单个会话到 Spotlight。
-    /// - Parameter conversation: 待索引的会话
-    static func index(_ conversation: Conversation) {
+/// Task 1.7: 重构为 ConversationIndexer 协议实现，解耦 ChatStorage 对 CoreSpotlight 的直接依赖。
+final class SpotlightIndexer: ConversationIndexer {
+    static let shared = SpotlightIndexer()
+
+    private init() {}
+
+    /// 索引或更新单个会话
+    /// - Parameter conversation: 平台无关的会话数据传输对象
+    func index(conversation: ConversationIndexDTO) async {
         let attributes = CSSearchableItemAttributeSet(contentType: .text)
         attributes.title = conversation.title
-        attributes.contentDescription = conversation.messages.last?.content
+        attributes.contentDescription = conversation.lastMessageContent
         // Conversation 仅有 createdAt（无 updatedAt），用 createdAt 作为最近使用时间
         attributes.lastUsedDate = conversation.createdAt
 
@@ -24,16 +30,16 @@ enum SpotlightIndexer {
         }
     }
 
-    /// 从 Spotlight 移除指定会话的索引。
+    /// 从索引中移除指定会话
     /// - Parameter conversationId: 会话唯一标识
-    static func removeIndex(conversationId: UUID) {
+    func remove(conversationId: UUID) async {
         CSSearchableIndex.default().deleteSearchableItems(
             withIdentifiers: [conversationId.uuidString]
         ) { _ in }
     }
 
-    /// 清空所有以太会话索引。
-    static func clearAll() {
+    /// 清空所有以太会话索引
+    func removeAll() async {
         CSSearchableIndex.default().deleteAllSearchableItems { _ in }
     }
 }

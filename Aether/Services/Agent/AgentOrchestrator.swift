@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import AetherFoundation
 
 /// Task 10/11/12: Agent 任务编排引擎。
 ///

@@ -1,5 +1,6 @@
 import Foundation
 import CryptoKit
+import AetherFoundation
 #if canImport(MLXLLM)
 import MLX
 import MLXLMCommon

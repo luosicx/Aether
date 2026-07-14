@@ -1,5 +1,6 @@
 import AppIntents
 import Foundation
+import AetherServices
 
 /// Day 16/18: 「向 Aether 提问」AppIntent，支持 Siri 与快捷指令发起对话。
 /// Day 18: 通过 IntentChatService 走真实 LLM 流程（不再返回占位文本），

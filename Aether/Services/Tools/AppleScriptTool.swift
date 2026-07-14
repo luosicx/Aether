@@ -5,6 +5,7 @@
 /// 调用方式：execute(arguments: ["script": "..."])，script 为必填参数。
 #if os(macOS)
 import Foundation
+import AetherFoundation
 
 /// macOS AppleScript 执行工具
 final class AppleScriptTool: ToolProtocol, @unchecked Sendable {
