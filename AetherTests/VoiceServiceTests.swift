@@ -973,8 +973,12 @@ final class VoiceServiceTests: XCTestCase {
     /// startRecording 在模拟器音频可用时应成功激活 AVAudioSession、创建识别请求与任务，
     /// 并将 isRecording 置为 true。在 iOS Simulator 中跳过真实音频会话操作，避免音频子系统死锁。
     func testStartRecordingSuccessPath() throws {
+        #if os(macOS)
+        try XCTSkipIf(true, "macOS CI 环境无可靠音频输入，跳过录音测试")
+        #else
         try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil,
                       "iOS Simulator 真实音频会话不稳定，跳过录音启动测试")
+        #endif
 
         let service = VoiceService()
         service.recognizerAvailabilityCheck = { true }
@@ -995,8 +999,12 @@ final class VoiceServiceTests: XCTestCase {
     /// stopRecording 在已开始录音时应停止音频引擎、移除 tap、结束识别请求并释放 audio session，
     /// 且不抛出异常。在 iOS Simulator 中跳过真实音频会话操作，避免音频子系统死锁。
     func testStopRecordingWhenStarted() throws {
+        #if os(macOS)
+        try XCTSkipIf(true, "macOS CI 环境无可靠音频输入，跳过录音测试")
+        #else
         try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil,
                       "iOS Simulator 真实音频会话不稳定，跳过录音停止测试")
+        #endif
 
         let service = VoiceService()
         service.recognizerAvailabilityCheck = { true }
@@ -1014,8 +1022,12 @@ final class VoiceServiceTests: XCTestCase {
     /// 连续 startRecording → stopRecording 不应崩溃（验证资源释放与重复启用稳定性）。
     /// 在 iOS Simulator 中跳过真实音频会话操作，避免音频子系统死锁。
     func testStartStopRecordingMultipleTimes() throws {
+        #if os(macOS)
+        try XCTSkipIf(true, "macOS CI 环境无可靠音频输入，跳过录音测试")
+        #else
         try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil,
                       "iOS Simulator 真实音频会话不稳定，跳过重复录音测试")
+        #endif
 
         let service = VoiceService()
         service.recognizerAvailabilityCheck = { true }
@@ -1035,8 +1047,12 @@ final class VoiceServiceTests: XCTestCase {
     /// 手动调用 onRecognized 应能更新外部状态（验证回调闭包可用）。
     /// 在 iOS Simulator 中跳过真实音频会话操作，避免音频子系统死锁。
     func testOnRecognizedManualInvocationUpdatesExternalState() throws {
+        #if os(macOS)
+        try XCTSkipIf(true, "macOS CI 环境无可靠音频输入，跳过录音测试")
+        #else
         try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil,
                       "iOS Simulator 真实音频会话不稳定，跳过 onRecognized 录音流程测试")
+        #endif
 
         let service = VoiceService()
         service.recognizerAvailabilityCheck = { true }

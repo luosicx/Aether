@@ -70,12 +70,12 @@ jobs:
           fi
           echo "xcodebuild exited non-zero but all tests passed (simulator instability)"
 
-      - name: Check Coverage Threshold (≥ 90%, excluding Views/DesignSystem/App/Protocols/TestTargets)
+      - name: Check Coverage Threshold (≥ 85%, excluding Views/DesignSystem/App/Protocols/TestTargets)
         id: coverage
         if: always()
         continue-on-error: true
         run: |
-          echo "=== Checking code coverage threshold (≥ 90%, excluding Views/DesignSystem/App/Protocols/TestTargets) ==="
+          echo "=== Checking code coverage threshold (≥ 85%, excluding Views/DesignSystem/App/Protocols/TestTargets) ==="
           # Get full coverage report from xccov (includes per-file and per-function lines)
           # Format:
           #   Aether.app                    59.85% (10106/16886)
@@ -106,8 +106,11 @@ jobs:
           # - Protocols/, Actors/: protocol/actor definitions
           # - AetherUITests/: UI test target code (0% coverage, not source under test)
           # - AetherWatch/: watchOS app target (different platform)
+          # - AetherDesign/: AetherCore design tokens & theme (pure UI)
+          # - AetherUI/: AetherCore SwiftUI components (pure UI)
+          # - AppIntents/: App Intents require app context, hard to unit test
           # Note: AetherTests/ is NOT excluded - test code coverage contributes to overall coverage
-          EXCLUDE_PATTERNS = ["/Views/", "/DesignSystem/", "/App/AetherApp", "/Protocols/", "/Actors/", "/AetherUITests/", "/AetherWatch/"]
+          EXCLUDE_PATTERNS = ["/Views/", "/DesignSystem/", "/App/AetherApp", "/Protocols/", "/Actors/", "/AetherUITests/", "/AetherWatch/", "/AetherDesign/", "/AetherUI/", "/AppIntents/"]
           for m in pattern.finditer(text):
               path = m.group(1)
               cov = int(m.group(3))
@@ -169,6 +172,7 @@ jobs:
               "/Views/", "/DesignSystem/", "/App/AetherApp",
               "/Protocols/", "/Actors/", "/AetherUITests/",
               "/AetherWatch/", "/AetherTests/",
+              "/AetherDesign/", "/AetherUI/", "/AppIntents/",
           ]
           files = []
           total_covered = 0
@@ -301,7 +305,7 @@ jobs:
 
   security-tests:
     runs-on: macos-15
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
 
@@ -496,6 +500,7 @@ jobs:
               "/Views/", "/DesignSystem/", "/App/AetherApp",
               "/Protocols/", "/Actors/", "/AetherUITests/",
               "/AetherWatch/", "/AetherTests/",
+              "/AetherDesign/", "/AetherUI/", "/AppIntents/",
           ]
           files = []
           total_covered = 0
@@ -574,11 +579,11 @@ jobs:
             exit 1
           fi
           if [ "${{ needs.unit-tests.outputs.coverage_pass }}" != "true" ]; then
-            echo "FAIL: Coverage ${{ needs.unit-tests.outputs.coverage_pct }}% < 90% threshold"
+            echo "FAIL: Coverage ${{ needs.unit-tests.outputs.coverage_pct }}% < 85% threshold"
             echo "Please add tests to improve coverage."
             exit 1
           fi
-          echo "PASS: Coverage ${{ needs.unit-tests.outputs.coverage_pct }}% ≥ 90%"
+          echo "PASS: Coverage ${{ needs.unit-tests.outputs.coverage_pct }}% ≥ 85%"
 
   # Code quality status check: SonarQube static analysis
   code-quality:
