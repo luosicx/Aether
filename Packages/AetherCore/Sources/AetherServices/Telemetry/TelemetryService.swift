@@ -99,6 +99,9 @@ public actor TelemetryService {
     /// 单例，供全局 fire-and-forget 调用
     public static let shared = TelemetryService()
 
+    /// 公开初始化器，允许测试 target 创建独立实例
+    public init() {}
+
     /// 记录一条事件：转为 TelemetryRecord 写入 buffer；超出上限移除最旧的一条（removeFirst）。
     /// 对于 `.errorOccurred`，会先对 `userMessage` 调用 `TelemetrySanitizer.redact` 脱敏，
     /// 确保原始敏感上下文不进入遥测事件。

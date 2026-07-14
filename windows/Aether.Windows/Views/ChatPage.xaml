@@ -18,7 +18,7 @@
 
         <!-- 消息列表 -->
         <ListView Grid.Row="1" ItemsSource="{Binding ViewModel.Messages}"
-                  Padding="16">
+                  Margin="16">
             <ListView.ItemTemplate>
                 <DataTemplate>
                     <Border CornerRadius="16" Padding="12" Margin="0,4"
@@ -33,16 +33,16 @@
 
         <!-- 流式响应 -->
         <TextBlock Grid.Row="1" Text="{Binding ViewModel.StreamingText}"
-                   Padding="16" TextWrapping="Wrap"
+                   Margin="16" TextWrapping="Wrap"
                    Foreground="{x:Static design:AetherColors.NebulaGlow}"/>
 
         <!-- 错误信息 -->
         <TextBlock Grid.Row="1" Text="{Binding ViewModel.ErrorMessage}"
-                   Padding="16" VerticalAlignment="Bottom"
+                   Margin="16" VerticalAlignment="Bottom"
                    Foreground="#FFEF4444"/>
 
         <!-- 输入栏 -->
-        <Grid Grid.Row="2" Padding="16" Background="{x:Static design:AetherColors.LiquidGlass}">
+        <Grid Grid.Row="2" Margin="16" Background="{x:Static design:AetherColors.LiquidGlass}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
