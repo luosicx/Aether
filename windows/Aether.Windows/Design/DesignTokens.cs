@@ -1,81 +1,38 @@
-using Windows.UI;
-using Windows.UI.Text;
-using Windows.UI.Xaml.Media;
+// 从 tokens.json 生成（Phase 3），适配 WinUI 3
+using Microsoft.UI;
+using Microsoft.UI.Xaml.Media;
 
-namespace Aether.Windows.Design
+namespace Aether.Windows.Design;
+
+/// <summary>设计令牌：品牌色</summary>
+public static class AetherColors
 {
-    /// <summary>
-    /// Auto-generated from tokens.json. Do not edit manually.
-    /// 单一真相源：DesignTokens/tokens.json
-    /// 生成脚本：scripts/gen_csharp_tokens.py
-    /// </summary>
-    public static class DesignTokens
-    {
-        #region Color
-        /// <summary>深空黑/浅空白基底</summary>
-        public static Color DeepSpaceColor => Color.FromArgb(255, 10, 14, 26);
-        /// <summary>神秘紫强调色</summary>
-        public static Color AetherPurpleColor => Color.FromArgb(255, 124, 58, 237);
-        /// <summary>电光蓝交互色</summary>
-        public static Color ElectricBlueColor => Color.FromArgb(255, 0, 212, 255);
-        /// <summary>液态玻璃卡片基底（带 alpha）</summary>
-        public static Color LiquidGlassColor => Color.FromArgb(128, 28, 28, 46);
-        /// <summary>星云光晕高光</summary>
-        public static Color NebulaGlowColor => Color.FromArgb(255, 255, 229, 180);
-        /// <summary>星光白/夜色文字</summary>
-        public static Color StarlightColor => Color.FromArgb(255, 229, 231, 235);
-        /// <summary>暮色灰（系统色 fallback）</summary>
-        public static Color DuskGrayColor => Color.FromArgb(255, 75, 85, 99);
-        #endregion
+    public static SolidColorBrush DeepSpace => new(Color.FromArgb(0xFF, 0x0A, 0x0E, 0x1A));
+    public static SolidColorBrush AetherPurple => new(Color.FromArgb(0xFF, 0x7C, 0x3A, 0xED));
+    public static SolidColorBrush ElectricBlue => new(Color.FromArgb(0xFF, 0x00, 0xD4, 0xFF));
+    public static SolidColorBrush LiquidGlass => new(Color.FromArgb(0x80, 0x1C, 0x1C, 0x2E));
+    public static SolidColorBrush NebulaGlow => new(Color.FromArgb(0xFF, 0xFF, 0xE5, 0xB4));
+    public static SolidColorBrush Starlight => new(Color.FromArgb(0xFF, 0xE5, 0xE7, 0xEB));
+    public static SolidColorBrush DuskGray => new(Color.FromArgb(0xFF, 0x4B, 0x55, 0x63));
+}
 
-        #region Typography
-        /// <summary>Aether 标题</summary>
-        public static double AetherTitleFontSize => 28;
-        public static FontWeight AetherTitleFontWeight => FontWeights.SemiBold;
-        /// <summary>Aether 展示字体（开屏 Logo / 大标题）</summary>
-        public static double AetherDisplayFontSize => 48;
-        public static FontWeight AetherDisplayFontWeight => FontWeights.Bold;
-        /// <summary>Aether 正文</summary>
-        public static double AetherBodyFontSize => 16;
-        public static FontWeight AetherBodyFontWeight => FontWeights.Normal;
-        #endregion
+/// <summary>设计令牌：圆角</summary>
+public static class AetherCornerRadius
+{
+    public static int Small => 12;
+    public static int Medium => 16;
+    public static int Large => 24;
+    public static int Pill => 999;
+}
 
-        #region Spacing
-        /// <summary>2pt</summary>
-        public static double SpacingXs => 2;
-        /// <summary>4pt</summary>
-        public static double SpacingSm => 4;
-        /// <summary>8pt</summary>
-        public static double SpacingMd => 8;
-        /// <summary>12pt</summary>
-        public static double SpacingLg => 12;
-        /// <summary>16pt</summary>
-        public static double SpacingXl => 16;
-        /// <summary>24pt</summary>
-        public static double SpacingXxl => 24;
-        /// <summary>32pt</summary>
-        public static double SpacingXxxl => 32;
-        #endregion
-
-        #region CornerRadius
-        /// <summary>小圆角</summary>
-        public static double CornerSmall => 12;
-        /// <summary>中圆角</summary>
-        public static double CornerMedium => 16;
-        /// <summary>大圆角</summary>
-        public static double CornerLarge => 24;
-        /// <summary>胶囊圆角</summary>
-        public static double CornerPill => 999;
-        #endregion
-
-        #region Animation (duration in ms)
-        /// <summary>页面转场 0.25s</summary>
-        public static int AnimTransitionMs => 250;
-        /// <summary>消息进入 0.2s</summary>
-        public static int AnimMessageAppearMs => 200;
-        /// <summary>按钮按下 0.1s</summary>
-        public static int AnimButtonPressMs => 100;
-        #endregion
-
-    }
+/// <summary>设计令牌：间距</summary>
+public static class AetherSpacing
+{
+    public static int Xs => 2;
+    public static int Sm => 4;
+    public static int Md => 8;
+    public static int Lg => 12;
+    public static int Xl => 16;
+    public static int Xxl => 24;
+    public static int Xxxl => 32;
 }
