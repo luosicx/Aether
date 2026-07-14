@@ -1,0 +1,686 @@
+openapi: 3.0.3
+info:
+  title: Aether BFF API
+  version: 1.0.0
+  description: |
+    Aether 跨平台业务网关 BFF API 契约。
+
+    所有受保护端点需在请求头携带 `X-BFF-Token`，由 Cloudflare Worker 校验 KV `bff_tokens` 合法性。
+
+    ## 鉴权
+    - Header: `X-BFF-Token: <token>`
+    - 缺失/无效返回 401
+
+    ## 限流
+    - chat 端点每 userId 每分钟 60 次，超额返回 429 + `Retry-After` 头
+
+    ## SSE 流式格式
+    - `data: {"type":"delta","content":"xxx"}\n\n`
+    - `data: {"type":"done","conversationId":"...","messageId":"..."}\n\n`
+    - `data: [DONE]\n\n`
+
+    ## 向后兼容
+    - POST 到任意未匹配路径（如 `/v1/chat/completions`、`/v1/embeddings`）走原 LLM 透传代理
+      逻辑，按 `X-Provider` 路由到 DeepSeek / Qwen，注入上游 Authorization。
+
+servers:
+  - url: https://aether-bff.<your-subdomain>.workers.dev
+    description: Cloudflare Workers 部署地址
+
+components:
+  securitySchemes:
+    BFFToken:
+      type: apiKey
+      in: header
+      name: X-BFF-Token
+      description: BFF Token，由 Cloudflare KV `bff_tokens` 校验
+
+  security:
+    - BFFToken: []
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    Conversation:
+      type: object
+      properties:
+        id:
+          type: string
+        user_id:
+          type: string
+        title:
+          type: string
+        parent_id:
+          type: string
+          nullable: true
+        created_at:
+          type: integer
+          description: 毫秒时间戳
+        updated_at:
+          type: integer
+          description: 毫秒时间戳
+        last_message_preview:
+          type: string
+          nullable: true
+        is_pinned:
+          type: integer
+          description: 0 / 1
+        system_prompt:
+          type: string
+        unread_count:
+          type: integer
+        order_field:
+          type: integer
+
+    Message:
+      type: object
+      properties:
+        id:
+          type: string
+        conversation_id:
+          type: string
+        role:
+          type: string
+          enum: [user, assistant, system, tool]
+        content:
+          type: string
+        tool_calls:
+          type: string
+          nullable: true
+          description: JSON 字符串
+        tool_call_id:
+          type: string
+          nullable: true
+        tool_name:
+          type: string
+          nullable: true
+        feedback:
+          type: integer
+          nullable: true
+          description: 1=点赞, -1=点踩, null=未反馈
+        created_at:
+          type: integer
+          description: 毫秒时间戳
+
+    Memory:
+      type: object
+      properties:
+        id:
+          type: string
+        user_id:
+          type: string
+        content:
+          type: string
+        category:
+          type: string
+          nullable: true
+        importance:
+          type: number
+          default: 0.5
+        embedding:
+          type: string
+          nullable: true
+          description: JSON 数组，向量检索用
+        source_conversation_id:
+          type: string
+          nullable: true
+        created_at:
+          type: integer
+          description: 毫秒时间戳
+
+    DocumentChunk:
+      type: object
+      properties:
+        id:
+          type: string
+        document_id:
+          type: string
+        content:
+          type: string
+        metadata:
+          type: string
+          nullable: true
+        chunk_index:
+          type: integer
+        weight:
+          type: number
+          default: 1.0
+        created_at:
+          type: integer
+        document_title:
+          type: string
+          nullable: true
+
+    HealthSummary:
+      type: object
+      properties:
+        user_id:
+          type: string
+        date:
+          type: string
+          description: YYYY-MM-DD
+        steps:
+          type: integer
+          nullable: true
+        sleep_hours:
+          type: number
+          nullable: true
+        resting_heart_rate:
+          type: integer
+          nullable: true
+
+    ChatRequest:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+        conversationId:
+          type: string
+          nullable: true
+          description: 为空时自动创建新会话
+        model:
+          type: string
+          default: deepseek-chat
+        provider:
+          type: string
+          enum: [deepseek, qwen]
+          default: deepseek
+        memoryEnabled:
+          type: boolean
+          default: true
+        temperature:
+          type: number
+        maxTokens:
+          type: integer
+        systemPrompt:
+          type: string
+
+    ChatSSEEvent:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [delta, done, error]
+        content:
+          type: string
+          description: delta 事件的增量文本
+        conversationId:
+          type: string
+          description: done 事件携带
+        messageId:
+          type: string
+          description: done 事件携带，助手消息 id
+        userMessageId:
+          type: string
+          description: done 事件携带，用户消息 id
+        message:
+          type: string
+          description: error 事件携带
+
+paths:
+  /chat/stream:
+    post:
+      summary: 流式聊天
+      description: 加载会话上下文 + 历史 + 记忆 + RAG，调用 LLM 流式返回 SSE。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+      responses:
+        '200':
+          description: SSE 流式响应
+          content:
+            text/event-stream:
+              schema:
+                $ref: '#/components/schemas/ChatSSEEvent'
+        '400':
+          description: 请求体不合法
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 未鉴权
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: 限流
+          headers:
+            Retry-After:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /conversations:
+    get:
+      summary: 列出会话
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: pinned
+          in: query
+          schema:
+            type: string
+            enum: ['1']
+      responses:
+        '200':
+          description: 会话列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  conversations:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Conversation'
+    post:
+      summary: 创建会话
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                systemPrompt:
+                  type: string
+                parentId:
+                  type: string
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+
+  /conversations/{id}:
+    get:
+      summary: 获取单个会话
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 会话详情
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  conversation:
+                    $ref: '#/components/schemas/Conversation'
+        '404':
+          description: 会话不存在
+    patch:
+      summary: 更新会话
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                isPinned:
+                  type: integer
+                systemPrompt:
+                  type: string
+                orderField:
+                  type: integer
+      responses:
+        '200':
+          description: 更新后的会话
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  conversation:
+                    $ref: '#/components/schemas/Conversation'
+    delete:
+      summary: 删除会话（级联删除其下消息）
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 删除成功
+
+  /conversations/{conversationId}/messages:
+    get:
+      summary: 列出某会话下的消息
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: asc
+      responses:
+        '200':
+          description: 消息列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messages:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Message'
+
+  /messages/{messageId}:
+    delete:
+      summary: 删除单条消息
+      parameters:
+        - name: messageId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 删除成功
+
+  /messages/{messageId}/feedback:
+    post:
+      summary: 对消息反馈
+      parameters:
+        - name: messageId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [feedback]
+              properties:
+                feedback:
+                  type: integer
+                  enum: [1, -1, 0]
+                  description: 1=点赞, -1=点踩, 0=取消
+      responses:
+        '200':
+          description: 反馈成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  feedback:
+                    type: integer
+                    nullable: true
+
+  /memory:
+    get:
+      summary: 列出记忆
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: category
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 记忆列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  memories:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Memory'
+    post:
+      summary: 创建记忆
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content:
+                  type: string
+                category:
+                  type: string
+                importance:
+                  type: number
+                sourceConversationId:
+                  type: string
+      responses:
+        '201':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  memory:
+                    $ref: '#/components/schemas/Memory'
+
+  /memory/search:
+    post:
+      summary: 搜索记忆（文本匹配）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query:
+                  type: string
+                limit:
+                  type: integer
+                  default: 5
+      responses:
+        '200':
+          description: 搜索结果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  memories:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Memory'
+                  query:
+                    type: string
+
+  /memory/{id}:
+    delete:
+      summary: 删除记忆
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 删除成功
+
+  /rag/search:
+    post:
+      summary: 检索文档分块
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query:
+                  type: string
+                limit:
+                  type: integer
+                  default: 3
+      responses:
+        '200':
+          description: 检索结果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  chunks:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DocumentChunk'
+                  query:
+                    type: string
+
+  /rag/documents:
+    post:
+      summary: 上传文档（含分块）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                title:
+                  type: string
+                content:
+                  type: string
+                source:
+                  type: string
+      responses:
+        '201':
+          description: 上传成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  documentId:
+                    type: string
+                  chunkCount:
+                    type: integer
+
+  /health/summary:
+    post:
+      summary: 上报健康摘要（按 user_id + date upsert）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [date]
+              properties:
+                date:
+                  type: string
+                  description: YYYY-MM-DD
+                steps:
+                  type: integer
+                sleepHours:
+                  type: number
+                restingHeartRate:
+                  type: integer
+      responses:
+        '200':
+          description: 上报成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthSummary'
+
+  /health/summary/{date}:
+    get:
+      summary: 获取某日健康摘要
+      parameters:
+        - name: date
+          in: path
+          required: true
+          schema:
+            type: string
+            description: YYYY-MM-DD
+      responses:
+        '200':
+          description: 健康摘要
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  summary:
+                    $ref: '#/components/schemas/HealthSummary'
+        '404':
+          description: 该日期无数据

@@ -3,10 +3,18 @@ main = "worker.js"
 compatibility_date = "2026-07-01"
 
 # BFF Token KV namespace：键为 token 字符串，值为用户元数据（存在即合法）
-# 部署后用 `wrangler kv:namespace create bff_tokens` 创建并替换下方 id
+# 部署后用 `wrangler kv namespace create bff_tokens` 创建并替换下方 id
 [[kv_namespaces]]
 binding = "bff_tokens"
 id = "your-kv-namespace-id"
+
+# D1 数据库：承载会话、消息、记忆、RAG、健康摘要
+# 部署后用 `wrangler d1 create aether-bff-db` 创建并替换下方 database_id
+# 初始化：`wrangler d1 execute aether-bff-db --file=schema.sql`
+[[d1_databases]]
+binding = "DB"
+database_name = "aether-bff-db"
+database_id = "your-d1-database-id"
 
 # 上游 endpoint（非敏感，明文配置）
 # Secrets（DEEPSEEK_API_KEY / QWEN_API_KEY）通过 `wrangler secret put` 配置，不在此明文存储
