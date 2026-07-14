@@ -1,0 +1,181 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://aether.app/design-tokens.schema.json",
+  "title": "Aether Design Tokens",
+  "description": "Aether 设计令牌单一真相源（平台无关）",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["color", "gradient", "typography", "cornerRadius", "spacing", "animation", "material"],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "color": {
+      "type": "object",
+      "description": "颜色令牌（十六进制色值）",
+      "additionalProperties": {
+        "$ref": "#/definitions/colorToken"
+      }
+    },
+    "gradient": {
+      "type": "object",
+      "description": "渐变令牌",
+      "additionalProperties": {
+        "$ref": "#/definitions/gradientToken"
+      }
+    },
+    "typography": {
+      "type": "object",
+      "description": "字体令牌（size + weight）",
+      "additionalProperties": {
+        "$ref": "#/definitions/typographyToken"
+      }
+    },
+    "cornerRadius": {
+      "type": "object",
+      "description": "圆角令牌（数字 pt）",
+      "additionalProperties": {
+        "$ref": "#/definitions/numberToken"
+      }
+    },
+    "spacing": {
+      "type": "object",
+      "description": "间距令牌（数字 pt，基于 4pt grid）",
+      "additionalProperties": {
+        "$ref": "#/definitions/numberToken"
+      }
+    },
+    "animation": {
+      "type": "object",
+      "description": "动画时长令牌（秒）",
+      "additionalProperties": {
+        "$ref": "#/definitions/numberToken"
+      }
+    },
+    "material": {
+      "type": "object",
+      "description": "材质令牌（平台特性）",
+      "additionalProperties": {
+        "$ref": "#/definitions/materialToken"
+      }
+    }
+  },
+  "definitions": {
+    "baseToken": {
+      "type": "object",
+      "required": ["value", "type"],
+      "properties": {
+        "value": {
+          "description": "令牌值，类型由具体 token 决定"
+        },
+        "type": {
+          "type": "string",
+          "description": "令牌类型标识"
+        },
+        "description": {
+          "type": "string",
+          "description": "令牌描述（人类可读）"
+        }
+      }
+    },
+    "colorToken": {
+      "allOf": [
+        { "$ref": "#/definitions/baseToken" },
+        {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "string",
+              "pattern": "^#([0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$",
+              "description": "十六进制色值，支持 #RRGGBB 或 #RRGGBBAA"
+            },
+            "type": {
+              "const": "color"
+            }
+          }
+        }
+      ]
+    },
+    "gradientToken": {
+      "allOf": [
+        { "$ref": "#/definitions/baseToken" },
+        {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "object",
+              "required": ["from", "to", "direction"],
+              "properties": {
+                "from": { "type": "string" },
+                "to": { "type": "string" },
+                "direction": { "type": "string" }
+              }
+            },
+            "type": {
+              "const": "gradient"
+            }
+          }
+        }
+      ]
+    },
+    "typographyToken": {
+      "allOf": [
+        { "$ref": "#/definitions/baseToken" },
+        {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "object",
+              "required": ["size", "weight"],
+              "properties": {
+                "size": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "weight": {
+                  "type": "string",
+                  "enum": ["regular", "medium", "semibold", "bold", "heavy", "black", "light", "ultraLight"]
+                }
+              }
+            },
+            "type": {
+              "const": "typography"
+            }
+          }
+        }
+      ]
+    },
+    "numberToken": {
+      "allOf": [
+        { "$ref": "#/definitions/baseToken" },
+        {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        }
+      ]
+    },
+    "materialToken": {
+      "allOf": [
+        { "$ref": "#/definitions/baseToken" },
+        {
+          "type": "object",
+          "required": ["platform"],
+          "properties": {
+            "value": {
+              "type": "string"
+            },
+            "platform": {
+              "type": "string",
+              "enum": ["apple", "android", "windows", "web"]
+            }
+          }
+        }
+      ]
+    }
+  }
+}
