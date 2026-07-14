@@ -1,3 +1,4 @@
+using System.IO;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -67,6 +68,7 @@ public class AetherApiClient
             if (data == "[DONE]") yield break;
             if (string.IsNullOrEmpty(data)) continue;
 
+            string? textToYield = null;
             try
             {
                 using var doc = JsonDocument.Parse(data);
@@ -75,13 +77,13 @@ public class AetherApiClient
                     var type = typeEl.GetString();
                     if (type == "delta" && doc.RootElement.TryGetProperty("content", out var contentEl))
                     {
-                        var text = contentEl.GetString();
-                        if (!string.IsNullOrEmpty(text)) yield return text;
+                        textToYield = contentEl.GetString();
                     }
                     else if (type == "done") yield break;
                 }
             }
             catch (JsonException) { /* 忽略解析错误 */ }
+            if (!string.IsNullOrEmpty(textToYield)) yield return textToYield;
         }
     }
 
