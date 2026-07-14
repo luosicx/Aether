@@ -3,6 +3,9 @@ import AetherFoundation
 
 /// DeepSeek SSE 流解析器，@unchecked Sendable 允许跨 actor 使用
 public final class SSEParser: @unchecked Sendable {
+    /// 公开初始化器，允许 App target 和测试创建实例
+    public init() {}
+
     /// 解析原始 Data 为字符串（当前实现仅转码，未实际使用）
     public func parse(data: Data) -> String? {
         guard let text = String(data: data, encoding: .utf8) else { return nil }
