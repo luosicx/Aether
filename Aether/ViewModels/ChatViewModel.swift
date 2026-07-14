@@ -519,14 +519,17 @@ final class ChatViewModel {
         }
 
         // Day 13: 用工厂构造 LLMProvider（生产侧 FallbackLLMProvider 装饰，测试侧注入优先）
+        // Day 16: 端侧在启用工具且在线时降级到 fallback provider
+        let requestProvider = effectiveProviderForRequest()
         let llmClient = makeLLMProvider()
         // Day 13: 初值为主 provider（若未触发降级，最终值即此）。缓存命中路径不走 LLMProvider 也要保证已设置。
         // Day 16: 端侧降级到云端时记录实际使用的 provider
-        self.lastUsedProvider = effectiveProviderForRequest()
+        self.lastUsedProvider = requestProvider
         self.didFallbackLastRequest = false
 
         // 后台线程读取 apiKey，避免主线程阻塞
-        let provider = self.selectedProvider
+        // 必须使用 requestProvider（effective provider），否则端侧降级到云端时会读到 onDevice 的空 key
+        let provider = requestProvider
         let apiKey = await Task.detached(priority: .userInitiated) {
             KeychainManager.shared.getAPIKey(for: provider) ?? ""
         }.value
@@ -664,7 +667,6 @@ final class ChatViewModel {
 
         // Day 12+13: SmartRouter 决定模型名（按实际使用的 provider 映射到对应 provider 的模型名）
         // Day 16: 端侧降级到云端时，模型名映射到云端 provider 的模型
-        let requestProvider = effectiveProviderForRequest()
         let effectiveModel: String
         if modelSelectionMode == "auto" {
             let routed = SmartRouter.route(input: text, toolsEnabled: toolsEnabled, hasImage: pendingImage != nil)

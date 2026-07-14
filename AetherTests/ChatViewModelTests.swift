@@ -1741,6 +1741,29 @@ final class ChatViewModelTests: XCTestCase {
         XCTAssertNil(vm.errorMessage, "降级到云端 provider 不应设置错误")
     }
 
+    /// onDevice + toolsEnabled + 在线降级到 fallback provider 时，必须读取 fallback provider 的 API Key。
+    /// 若未保存 fallback provider 的 key，应在发起请求前报 API Key 缺失，而不是用 onDevice 的空 key 发起网络请求。
+    func testOnDeviceWithToolsOnlineReadsFallbackAPIKey() async throws {
+        // 隔离 Keychain 且不保存任何 key，模拟仅启用端侧但未配置云端 fallback key
+        KeychainManager.shared.backend = InMemoryKeychainBackend()
+        let vm = ChatViewModel()
+        vm.selectedProvider = .onDevice
+        vm.toolsEnabled = true
+
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+        let userMsg = ChatMessage(role: "user", content: "你好")
+        userMsg.conversation = conv
+        conv.messages.append(userMsg)
+
+        await vm.processMessage("你好", conversation: conv, modelContext: context)
+
+        XCTAssertEqual(vm.errorMessage, LLMError.apiKeyMissing.userMessage,
+                       "降级到 fallback provider 后未配置其 API Key 时应提示")
+        XCTAssertEqual(vm.lastUsedProvider, .deepseek,
+                       "lastUsedProvider 应记录 effective provider")
+    }
+
     /// toggleSpeak 后切换会话：speakingMessageId 应被 switchTo 清空
     func testSwitchToClearsSpeakingMessageId() throws {
         let vm = ChatViewModel()
