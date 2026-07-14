@@ -67,8 +67,8 @@
 - [ ] ToolRegistry.swift 注册数验证：14 个跨平台工具无条件注册，11 个 macOS 独有工具用 `#if os(macOS)` 条件注册
 
 ### 4.3 测试规模
-- [ ] UT 用例数：266
-- [ ] UIT 用例数：13（之前 12 + 新增 1）
+- [ ] UT 用例数：2092
+- [ ] UIT 用例数：30
 - [ ] iOS UT 运行：`xcodebuild test -destination 'platform=iOS Simulator,name=iPhone 17'` 全部通过（0 skipped，0 failures）
 - [ ] UIT 运行全部通过（0 failures）
 
@@ -94,7 +94,7 @@
 
 ## 4.8 国际化与无障碍审计
 
-- [ ] `Localizable.xcstrings` 包含 387 keys，8 种语言（zh-Hans / zh-Hant / en / ja / ko / fr / de / es）翻译完整
+- [ ] `Localizable.xcstrings` 包含 887 keys，8 种语言（zh-Hans / zh-Hant / en / ja / ko / fr / de / es）翻译完整
 - [ ] 设置 → 语言切换（9 选项：跟随系统 + 8 种语言）后重启，各语言界面无残留中文
 - [ ] VoiceOver 可朗读设置页所有 Toggle / Picker / Button
 - [ ] 所有关键交互控件存在 `accessibilityIdentifier`（供 UITest 使用，当前覆盖 13 个元素）
@@ -151,8 +151,8 @@
 ## 4.12 测试规模审计
 
 ### 单元测试（UT）
-- [ ] UT 用例数 = 266（266 pass / 0 skip / 0 failures）
-- [ ] UT 文件数 = 69
+- [ ] UT 用例数 = 2092（2092 pass / 0 skip / 0 failures）
+- [ ] UT 文件数 = 115
 - [ ] 验证命令：
   ```bash
   xcodebuild test \
@@ -162,11 +162,11 @@
     -only-testing:AetherTests \
     CODE_SIGNING_ALLOWED=NO 2>&1 | tail -5
   ```
-- [ ] 预期输出包含：`Executed 266 tests, with 0 failures, 0 skipped`
+- [ ] 预期输出包含：`Executed 2092 tests, with 0 failures, 0 skipped`
 
 ### UI 测试（UIT）
-- [ ] UIT 用例数 = 13（13 pass / 0 skip / 0 failures）
-- [ ] UIT 文件数 = 2
+- [ ] UIT 用例数 = 30（30 pass / 0 skip / 0 failures）
+- [ ] UIT 文件数 = 7
 - [ ] 验证命令：
   ```bash
   xcodebuild test \
@@ -176,7 +176,7 @@
     -only-testing:AetherUITests \
     CODE_SIGNING_ALLOWED=NO 2>&1 | tail -5
   ```
-- [ ] 预期输出包含：`Executed 13 tests, with 0 failures, 0 skipped`
+- [ ] 预期输出包含：`Executed 30 tests, with 0 failures, 0 skipped`
 
 ## 4.13 文档完整性审计
 
@@ -226,7 +226,7 @@
 
 - [ ] Watch target 已创建，Bundle ID 为 `<主 App Bundle ID>.watchkitapp`
 - [ ] `AetherWatch/` 目录下 3 个源文件已添加到 Watch target
-- [ ] Watch target Signing & Capabilities 已添加 App Group `group.com.aether.shared`
+- [ ] Watch target Signing & Capabilities 已添加 App Group `group.com.aether.app`
 - [ ] Watch target Deployment Target 设为 watchOS 10+
 - [ ] Watch App 构建成功：
   ```bash
@@ -246,7 +246,7 @@
 
 - [ ] Widget target 已创建，Bundle ID 为 `<主 App Bundle ID>.widgets`
 - [ ] `AetherWidgets/` 目录下 4 个源文件已添加到 Widget target
-- [ ] Widget target Signing & Capabilities 已添加 App Group `group.com.aether.shared`
+- [ ] Widget target Signing & Capabilities 已添加 App Group `group.com.aether.app`
 - [ ] Widget target Deployment Target 设为 iOS 17+
 - [ ] Widget Extension 构建成功：
   ```bash
@@ -280,14 +280,14 @@
 
 ## 4.20 App Group 共享 SwiftData 验证
 
-- [ ] 主 App target Signing & Capabilities 已添加 App Group `group.com.aether.shared`
+- [ ] 主 App target Signing & Capabilities 已添加 App Group `group.com.aether.app`
 - [ ] Widget target Signing & Capabilities 已添加相同 App Group
 - [ ] Watch target Signing & Capabilities 已添加相同 App Group（如已创建 Watch target）
 - [ ] 主 App 创建会话后，Widget 可读取该会话数据
 - [ ] 主 App 生成健康洞察后，Widget 与 Watch App 可读取该洞察
 - [ ] App Group 容器路径正确：
   ```swift
-  FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.aether.shared")
+  FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.aether.app")
   ```
 
 ## 5. 提交审核前最终检查

@@ -485,7 +485,6 @@ jobs:
           # 配置已迁移至 sonar-project.properties
           # 注意：若 SonarCloud 开启了 Automatic Analysis，CI 扫描会报错
           # 解决：登录 SonarCloud → Project Settings → Analysis Method → 选择 GitHub Actions CI
-          # 详见 doc/plans/sonarcloud-setup-guide.md
           args: >
             -Dsonar.qualitygate.wait=true
             ${{ github.event_name == 'pull_request' && format('-Dsonar.pullrequest.key={0} -Dsonar.pullrequest.branch={1} -Dsonar.pullrequest.base={2} -Dsonar.pullrequest.provider=github -Dsonar.pullrequest.github.repository=luosicx/Aether', github.event.pull_request.number, github.head_ref, github.base_ref) || '' }}

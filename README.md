@@ -97,7 +97,7 @@ AetherUITests/              # UI 测试（2 文件 / 13 用例）
 - watchOS Deployment Target 10+（Watch App 可选）
 - DeepSeek API Key（云端模式）
 - mlx-swift SPM 依赖（端侧推理可选）
-- App Group `group.com.aether.shared`（Widget 共享 SwiftData 可选）
+- App Group `group.com.aether.app`（Widget 共享 SwiftData 可选）
 
 > **Watch App 与 Widget 注意事项**：源代码已就绪（`AetherWatch/` 与 `AetherWidgets/`），但需在 Xcode 中手动创建对应的 target 并关联源文件、配置 App Group 与 Capabilities。详见 [贡献指南](doc/CONTRIBUTING.md) 中的 Watch / Widget 开发指南。
 

@@ -19,7 +19,7 @@
 
 ```bash
 git clone <your-fork-url>
-cd AIBuiler
+cd Aether
 open Aether.xcodeproj
 ```
 
@@ -90,12 +90,12 @@ class MyService {
 
 - 单元测试（UT）放 `AetherTests/`，命名 `<ClassName>Tests.swift`
 - UI 测试（UIT）放 `AetherUITests/`，避免依赖真实网络（用 `UITEST_DISABLE_NETWORK` 启动参数桩回复）
-- 测试用例数：UT 266 / UIT 13（每新增功能需补对应测试）
+- 测试用例数：UT 2092 / UIT 30（每新增功能需补对应测试）
 - 当前目标：0 skip；若必须跳过，需写明原因并在 Issue 跟踪
 
 ### 2.6 国际化规范
 
-- 用户可见文本必须进入 `Aether/Resources/Localizable.xcstrings`（当前 387 keys，支持 8 种语言：zh-Hans / zh-Hant / en / ja / ko / fr / de / es）。
+- 用户可见文本必须进入 `Aether/Resources/Localizable.xcstrings`（当前 887 keys，支持 8 种语言：zh-Hans / zh-Hant / en / ja / ko / fr / de / es）。
 - SwiftUI 控件直接传字符串字面量即可自动提取；动态拼接文本使用 `String(format: NSLocalizedString(...), ...)`。
 - 新增字符串后运行 `python3 scripts/extract_strings.py` 检查遗漏，并补充全部 8 种语言翻译（zh-Hans 为源语言，其余 7 种为翻译目标）。
 - App 内语言切换支持 9 个选项（跟随系统 + 8 种语言），切换后提示用户重启 App 生效。
@@ -121,12 +121,7 @@ class MyService {
 
 项目根目录已配置 `.swiftlint.yml`，定义了检查目录、启用规则、禁用规则与参数阈值。
 
-**本地检查**：
-
-```bash
-# 运行 SwiftLint 检查（未安装时脚本会提示安装方法并跳过，不报错）
-scripts/run_swiftlint.sh
-```
+**本地检查**：CI 通过 SonarQube 进行代码质量检查（见 `.github/workflows/ci.yml` 的 `code-quality` job）。
 
 **配置要点**：
 - 检查目录：`Aether` / `AetherTests` / `AetherUITests`
@@ -208,16 +203,15 @@ Closes #123
    ```
 4. 编写代码 + 补充测试，确保本地通过：
    ```bash
-   # 4.1 运行 SwiftLint 检查（必须 0 error，warning 建议修复）
-   scripts/run_swiftlint.sh
+   # 4.1 代码质量由 CI SonarQube job 检查（无需本地运行）
 
-   # 4.2 运行 UT（266 用例，0 skip）
+   # 4.2 运行 UT（2092 用例，0 skip）
    xcodebuild test -project Aether.xcodeproj -scheme Aether \
      -destination 'platform=iOS Simulator,name=iPhone 17' \
      -only-testing:AetherTests \
      -configuration Debug CODE_SIGNING_ALLOWED=NO
 
-   # 4.3 运行 UIT（13 用例，0 skip）
+   # 4.3 运行 UIT（30 用例，0 skip）
    xcodebuild test -project Aether.xcodeproj -scheme Aether \
      -destination 'platform=iOS Simulator,name=iPhone 17' \
      -only-testing:AetherUITests \
@@ -247,9 +241,9 @@ Closes #123
   - **Why**：变更动机（解决什么问题 / 满足什么需求）
   - **How to test**：测试步骤
   - **Checklist**：
-    - [ ] 已通过 SwiftLint 检查（`scripts/run_swiftlint.sh`，0 error）
-    - [ ] 已通过本地 UT (266 用例)
-    - [ ] 已通过本地 UIT (13 用例)
+    - [ ] 已通过 CI SonarQube 代码质量检查
+    - [ ] 已通过本地 UT (2092 用例)
+    - [ ] 已通过本地 UIT (30 用例)
     - [ ] 已更新相关文档（如有用户可见变更）
     - [ ] 已补充测试用例（如有新功能）
 
@@ -257,7 +251,7 @@ Closes #123
 
 - PR 自动触发 GitHub Actions CI（`.github/workflows/ci.yml`）
 - 必须 **Build 成功** + **Test 0 failures**
-- CI 集成 SwiftLint 检查脚本（`scripts/run_swiftlint.sh`），存在 error 会阻断合并
+- CI 通过 SonarQube 进行代码质量检查（`code-quality` job），存在 error 会阻断合并
 - Reviewer 审核通过后合并
 
 ## 5. spec 驱动开发说明
@@ -315,7 +309,7 @@ Watch App 源代码已就绪，但**需在 Xcode 中手动创建 target**：
 2. Product Name 填 `AetherWatch`，Interface 选 SwiftUI，Language 选 Swift
 3. Bundle Identifier 设为 `<主 App Bundle ID>.watchkitapp`
 4. 删除 Xcode 自动生成的文件，将 `AetherWatch/` 目录下的源文件添加到 target
-5. 在 Watch target 的 Signing & Capabilities 中添加 **App Group**：`group.com.aether.shared`
+5. 在 Watch target 的 Signing & Capabilities 中添加 **App Group**：`group.com.aether.app`
 6. 在主 App target 的 Signing & Capabilities 中也添加相同 App Group（如未添加）
 
 ### 6.3 数据同步机制
@@ -352,16 +346,16 @@ Widget Extension 源代码已就绪，但**需在 Xcode 中手动创建 target**
 2. Product Name 填 `AetherWidgets`，Interface 选 SwiftUI，取消勾选 "Include Configuration App Intent"（手动添加）
 3. Bundle Identifier 设为 `<主 App Bundle ID>.widgets`
 4. 删除 Xcode 自动生成的文件，将 `AetherWidgets/` 目录下的源文件添加到 target
-5. 在 Widget target 的 Signing & Capabilities 中添加 **App Group**：`group.com.aether.shared`
+5. 在 Widget target 的 Signing & Capabilities 中添加 **App Group**：`group.com.aether.app`
 6. 在主 App target 中也添加相同 App Group
 
 ### 7.3 数据共享机制
 
-- **App Group 共享 SwiftData**：Widget 通过 `group.com.aether.shared` 容器读取主 App 的 SwiftData 数据（Conversation / ChatMessage / HealthInsight）
+- **App Group 共享 SwiftData**：Widget 通过 `group.com.aether.app` 容器读取主 App 的 SwiftData 数据（Conversation / ChatMessage / HealthInsight）
 - **ModelContainer 配置**：Widget 端创建 `ModelContainer` 时需指定 App Group 容器 URL：
   ```swift
   let containerURL = FileManager.default
-      .containerURL(forSecurityApplicationGroupIdentifier: "group.com.aether.shared")!
+      .containerURL(forSecurityApplicationGroupIdentifier: "group.com.aether.app")!
   let config = ModelConfiguration(url: containerURL.appending(path: "Aether.store"))
   ```
 

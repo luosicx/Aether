@@ -72,7 +72,7 @@
 
 ### 3.1 测试覆盖率
 
-- **现状**：UT 248 / UIT 13，0 skip。
+- **现状**：UT 2092 / UIT 30，0 skip。
 - **优化**：将 Service 层覆盖率提升到 80%；为 macOS-only 工具补充单元测试。
 - **验收**：Codecov / Xcode Coverage 显示覆盖率 ≥ 80%。
 

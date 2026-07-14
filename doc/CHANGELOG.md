@@ -10,9 +10,9 @@
 - **多语言扩展至 8 种语言**：`Localizable.xcstrings` 从 3 种语言（zh-Hans / zh-Hant / en）扩展至 8 种（新增 ja 日语 / ko 韩语 / fr 法语 / de 德语 / es 西班牙语），i18n keys 覆盖全部核心 UI 文案
 - **Watch App 源代码**：新增 `AetherWatch/` 目录，包含 `WatchApp.swift`（TabView 三标签：快速对话 / 健康洞察 / 设置）、`WatchQuickChatView.swift`（快捷对话发送）、`WatchHealthInsightView.swift`（健康洞察浏览）；通过 `WatchConnectivityService` 与 iOS 主 App 双向同步（transferUserInfo 推送健康洞察）。⚠️ Watch target 需在 Xcode 中手动创建并关联源文件
 - **Widget Extension 源代码**：新增 `AetherWidgets/` 目录，包含三个 Widget：`QuickChatWidget`（桌面快捷提问，点击直达对话）、`HealthInsightWidget`（健康洞察摘要展示）、`RecentConversationsWidget`（最近会话列表快捷入口）；使用 `TimelineProvider` + `AppIntentConfiguration`。⚠️ Widget target 需在 Xcode 中手动创建并关联源文件
-- **App Group 共享 SwiftData**：新增 App Group 配置（`group.com.aether.shared`），主 App 与 Widget Extension 通过共享 `ModelContainer` 读取同一 SwiftData 数据库，Widget 可直接展示最近会话与健康洞察
+- **App Group 共享 SwiftData**：新增 App Group 配置（`group.com.aether.app`），主 App 与 Widget Extension 通过共享 `ModelContainer` 读取同一 SwiftData 数据库，Widget 可直接展示最近会话与健康洞察
 - **DeepLink 支持**：新增 `aether://` URL Scheme，支持两种 DeepLink：`aether://ask?query=<编码文本>`（快捷提问，打开主界面并自动发送）与 `aether://conversation/<uuid>`（跳转到指定会话）；在 `AetherApp.swift` 中通过 `.onOpenURL` 处理
-- **端侧 MLX 真实推理**：集成 `mlx-swift` SPM 依赖，`MLXInferenceEngine` 使用真实 `ModelContainer.load` 加载 GGUF 模型，支持 token 级流式输出（非假流式）；`OnDeviceModelDownloader` 从 HuggingFace CDN 下载 Llama-3.2-1B-Instruct Q4_K_M 量化模型并 SHA256 校验
+- **端侧 MLX 推理（条件编译）**：`mlx-swift` 需手动通过 Xcode → File → Add Package Dependencies 添加（`project.pbxproj` 未内置 SPM 包引用），未集成时 `MLXInferenceEngine` 走 `#if canImport(MLXLLM)` 占位实现（抛 `loadFailed` / 返回提示流）；集成后调用真实 `ModelContainer.load` 加载模型并 token 级流式输出；`OnDeviceModelDownloader` 从 HuggingFace CDN 下载 Llama-3.2-1B-Instruct Q4_K_M 量化模型并 SHA256 校验
 - **无障碍增强**：Watch App 与 LaunchScreen 补充 `accessibilityLabel`；新增 `accessibilityIdentifier` 覆盖全部关键交互控件（sendButton / messageInputField / voiceInputButton 等 12+ 标识符），VoiceOver 与 UITest 可靠性提升
 - **国际化基础设施**：新增 `Localizable.xcstrings` String Catalog（zh-Hans 源语言 + zh-Hant 繁体中文 + en 英文翻译，55 个核心 key）；`developmentRegion` 更新为 `zh-Hans`，`knownRegions` 新增 `zh-Hans`/`zh-Hant`/`en`；SwiftUI `Text`/`Button`/`TextField`/`accessibilityLabel` 字面量由 Xcode 自动提取
 - **App 内语言切换**：新增 `LanguageManager`（ObservableObject）与设置页「语言」Section，支持跟随系统 / 简体中文 / 繁体中文 / 英文 / 日语 / 韩语 / 法语 / 德语 / 西班牙语 九选项，切换后写入 `AppleLanguages` UserDefaults 并提示重启 App 生效
@@ -23,7 +23,7 @@
 - USAGE.md 新增 macOS 系统集成与性能监控章节
 - MANUAL_TEST_CHECKLIST.md 手测项四字段结构化（前置条件 / 操作步骤 / 预期结果 / 失败排查）
 - ReleaseChecklist.md 新增 4.4-4.7 审计项（多平台构建 / 工具数 / 测试规模 / 文档完整性）
-- **完整国际化补全**：`Localizable.xcstrings` 从 55 核心 key 扩展至 387 keys，覆盖 Views / ViewModels / Services / AppIntents / Core；新增 `scripts/` 提取/翻译/合并工具链
+- **完整国际化补全**：`Localizable.xcstrings` 从 55 核心 key 扩展至 887 keys，覆盖 Views / ViewModels / Services / AppIntents / Core；新增 `scripts/` 提取/翻译/合并工具链
 - **无障碍全面增强**：7 个核心视图新增约 75 个 `accessibilityLabel` / `accessibilityHint` / `accessibilityIdentifier`
 - **项目截图**：`screenshots/` 新增 8 张 iOS / macOS 核心页面截图
 - **后续规划文档**：新增 `doc/ROADMAP.md`、`doc/OPTIMIZATION.md`

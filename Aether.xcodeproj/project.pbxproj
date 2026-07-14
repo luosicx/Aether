@@ -8,7 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		01816DD644C823C301E3482E /* SmartRouterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C42CB93D5F359C823B79BD26 /* SmartRouterTests.swift */; };
-		02B8CC1E8A5ACE3D6F9222FD /* ChatActor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56D4D47C336265C381D1679A /* ChatActor.swift */; };
 		0358BFC334004D7E9D9624F8 /* BFFProxyClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9973368500D82552A2CF8091 /* BFFProxyClient.swift */; };
 		03D60552812509B4BF1EB48B /* ConversationListVM.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42A16870D042FAF3B85C9984 /* ConversationListVM.swift */; };
 		068F583501CA74EB91048D08 /* WatchQuickChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2F7349A21CF97B72D3EC019 /* WatchQuickChatView.swift */; };
@@ -466,7 +465,6 @@
 		545109D39F576CFDBD8F47C0 /* MessageFeedback.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MessageFeedback.swift; sourceTree = "<group>"; };
 		54AFC25E55FD8734EFE65310 /* RecentConversationsWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecentConversationsWidget.swift; sourceTree = "<group>"; };
 		55D5990C2944B7FAE202CC1C /* DocumentChunk.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DocumentChunk.swift; sourceTree = "<group>"; };
-		56D4D47C336265C381D1679A /* ChatActor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatActor.swift; sourceTree = "<group>"; };
 		571F195FF14DB4506B897253 /* QwenClientTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QwenClientTests.swift; sourceTree = "<group>"; };
 		5823864AC432A5FDC0BAA6C1 /* SpotlightIndexer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SpotlightIndexer.swift; sourceTree = "<group>"; };
 		58EB2D73891C6AAF6E10B744 /* WatchApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WatchApp.swift; sourceTree = "<group>"; };
@@ -1042,7 +1040,6 @@
 		58DF6D5979D5F1867117F56B /* Actors */ = {
 			isa = PBXGroup;
 			children = (
-				56D4D47C336265C381D1679A /* ChatActor.swift */,
 			);
 			path = Actors;
 			sourceTree = "<group>";
@@ -1964,7 +1961,6 @@
 				217769921333520FCEEFB981 /* AetherApp.swift in Sources */,
 				B0B65CF075744E81D2D66286 /* APIConfig.swift in Sources */,
 				94012D11AE56BDE24C31B149 /* String+TokenCount.swift in Sources */,
-				02B8CC1E8A5ACE3D6F9222FD /* ChatActor.swift in Sources */,
 				0CDB439A715648C34B53C82E /* LLMProvider.swift in Sources */,
 				F2714354198A19F1E7742BD7 /* ToolProtocol.swift in Sources */,
 				40431499260BD109E2BE4ACD /* ChatChunk.swift in Sources */,
