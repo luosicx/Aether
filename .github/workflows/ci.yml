@@ -697,3 +697,72 @@ jobs:
           args: >
             -Dsonar.qualitygate.wait=true
             ${{ github.event_name == 'pull_request' && format('-Dsonar.pullrequest.key={0} -Dsonar.pullrequest.branch={1} -Dsonar.pullrequest.base={2} -Dsonar.pullrequest.provider=github -Dsonar.pullrequest.github.repository=luosicx/Aether', github.event.pull_request.number, github.head_ref, github.base_ref) || '' }}
+
+  # Android 客户端构建验证
+  android-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Generate Gradle Wrapper
+        working-directory: android
+        run: gradle wrapper --gradle-version 8.7
+
+      - name: Build Debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
+
+  # Windows 客户端构建验证
+  windows-build:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Install Windows App SDK workload
+        run: |
+          dotnet workload install winappsdk
+
+      - name: Restore dependencies
+        working-directory: windows/Aether.Windows
+        run: dotnet restore
+
+      - name: Build (Debug)
+        working-directory: windows/Aether.Windows
+        run: dotnet build --configuration Debug --no-restore
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-exe
+          path: windows/Aether.Windows/bin/*/Debug/
+          if-no-files-found: error
+          retention-days: 7
