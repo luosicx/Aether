@@ -2320,6 +2320,7 @@
 				OTHER_SWIFT_FLAGS = "$(inherited) -Xfrontend -disable-sandbox";
 				PRODUCT_BUNDLE_IDENTIFIER = com.aether.app.ios;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_MODULE_NAME = Aether;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -2434,6 +2435,7 @@
 				OTHER_SWIFT_FLAGS = "$(inherited) -Xfrontend -disable-sandbox";
 				PRODUCT_BUNDLE_IDENTIFIER = com.aether.app.macos;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_MODULE_NAME = Aether;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = macosx;
 				SUPPORTED_PLATFORMS = macosx;
@@ -2555,6 +2557,7 @@
 				OTHER_SWIFT_FLAGS = "$(inherited) -Xfrontend -disable-sandbox";
 				PRODUCT_BUNDLE_IDENTIFIER = com.aether.app.ios;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_MODULE_NAME = Aether;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -2695,6 +2698,7 @@
 				OTHER_SWIFT_FLAGS = "$(inherited) -Xfrontend -disable-sandbox";
 				PRODUCT_BUNDLE_IDENTIFIER = com.aether.app.macos;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_MODULE_NAME = Aether;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = macosx;
 				SUPPORTED_PLATFORMS = macosx;

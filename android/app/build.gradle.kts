@@ -1,7 +1,6 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")  // 为 @Serializable 模型生成序列化器
     id("com.google.devtools.ksp")  // Room 用 KSP 代替 kapt
 }
@@ -23,6 +22,9 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.5.14"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

@@ -747,10 +747,6 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Install Windows App SDK workload
-        run: |
-          dotnet workload install winappsdk
-
       - name: Restore dependencies
         working-directory: windows/Aether.Windows
         run: dotnet restore
