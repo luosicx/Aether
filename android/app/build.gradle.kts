@@ -13,8 +13,8 @@ android {
         applicationId = "com.aether.app"
         minSdk = 29
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 100
+        versionName = "1.0.0"
         // BFF 端点配置（可在 build.gradle 中覆盖）
         buildConfigField("String", "BFF_BASE_URL", "\"https://aether-bff.example.com\"")
     }

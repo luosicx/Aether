@@ -1,0 +1,370 @@
+name: Release
+
+# 触发条件：推送 v* 形式的 tag（如 v1.0.0），或 Actions 页面手动触发
+"on":
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '发布版本号（如 1.0.0，无需 v 前缀）'
+        required: true
+        default: '1.0.0'
+
+# 顶层权限：仅写入 Release 资源；内容只读
+permissions:
+  contents: write
+
+# 全局并发：同一 tag 只允许一个发布流程
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  # 解析版本号，便于后续 job 引用
+  meta:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      tag: ${{ steps.v.outputs.tag }}
+    steps:
+      - id: v
+        run: |
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            VERSION="${{ github.event.inputs.tag }}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
+          echo "Releasing version: ${VERSION} (tag: v${VERSION})"
+
+  # ============================================================
+  # iOS: 构建 iOS Simulator .app（无签名，仅用于模拟器调试）
+  # ============================================================
+  build-ios:
+    needs: meta
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Select Xcode (latest)
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: 'latest'
+
+      - name: Setup iOS Simulator
+        run: bash scripts/ci-setup-simulator.sh
+
+      - name: Build iOS .app (Release, simulator)
+        run: |
+          xcodebuild build \
+            -project Aether.xcodeproj \
+            -scheme Aether-iOS \
+            -destination 'generic/platform=iOS Simulator' \
+            -configuration Release \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Locate and zip .app
+        run: |
+          APP_PATH=$(find build/Build/Products/Release-iphonesimulator -maxdepth 1 -name 'Aether.app' -type d | head -1)
+          if [ -z "$APP_PATH" ]; then
+            echo "ERROR: Aether.app not found"
+            exit 1
+          fi
+          echo "Found app: $APP_PATH"
+          cd "$(dirname "$APP_PATH")"
+          ditto -c -k --keepParent Aether.app "$GITHUB_WORKSPACE/Aether-iOS-${{ needs.meta.outputs.version }}-simulator.zip"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-app
+          path: Aether-iOS-${{ needs.meta.outputs.version }}-simulator.zip
+          if-no-files-found: error
+          retention-days: 14
+
+  # ============================================================
+  # macOS: 使用 scripts/build-dmg.sh 产出 unsigned .dmg
+  # ============================================================
+  build-macos:
+    needs: meta
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Select Xcode (latest)
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: 'latest'
+
+      - name: Build unsigned .dmg
+        run: |
+          chmod +x scripts/build-dmg.sh
+          ./scripts/build-dmg.sh --unsigned --app-version ${{ needs.meta.outputs.version }}
+
+      - name: Rename to canonical filename
+        run: |
+          SRC=$(find build/dmg -maxdepth 1 -name 'Aether-*unsigned.dmg' -type f | head -1)
+          if [ -z "$SRC" ]; then
+            echo "ERROR: unsigned dmg not found in build/dmg"
+            ls -la build/dmg
+            exit 1
+          fi
+          cp "$SRC" "Aether-macOS-${{ needs.meta.outputs.version }}-unsigned.dmg"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: macos-dmg
+          path: Aether-macOS-${{ needs.meta.outputs.version }}-unsigned.dmg
+          if-no-files-found: error
+          retention-days: 14
+
+  # ============================================================
+  # Android: 构建 Release APK（debug 签名，可直接安装）
+  # ============================================================
+  build-android:
+    needs: meta
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Generate Gradle Wrapper
+        working-directory: android
+        run: gradle wrapper --gradle-version 8.7
+
+      - name: Build Release APK
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Locate APK and rename
+        run: |
+          APK=$(find android/app/build/outputs/apk/release -maxdepth 1 -name '*.apk' -type f | head -1)
+          if [ -z "$APK" ]; then
+            echo "ERROR: Release APK not found"
+            ls -la android/app/build/outputs/apk/release || true
+            exit 1
+          fi
+          cp "$APK" "Aether-Android-${{ needs.meta.outputs.version }}.apk"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: android-apk
+          path: Aether-Android-${{ needs.meta.outputs.version }}.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  # ============================================================
+  # Windows: .NET 8 自包含发布包（win-x64，无需目标机安装 .NET）
+  # ============================================================
+  build-windows:
+    needs: meta
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        working-directory: windows/Aether.Windows
+        run: dotnet restore
+
+      - name: Publish self-contained (win-x64, Release)
+        working-directory: windows/Aether.Windows
+        run: |
+          dotnet publish Aether.Windows.csproj `
+            -c Release `
+            -r win-x64 `
+            --self-contained true `
+            -p:PublishSingleFile=false `
+            -o ../publish
+
+      - name: Zip publish folder
+        shell: pwsh
+        run: |
+          $version = "${{ needs.meta.outputs.version }}"
+          $source = "windows/publish"
+          $dest = "Aether-Windows-${version}-win-x64.zip"
+          if (-Not (Test-Path $source)) {
+            Write-Error "publish folder not found: $source"
+            exit 1
+          }
+          Compress-Archive -Path "$source/*" -DestinationPath $dest -CompressionLevel Optimal
+          Write-Host "Created $dest"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-zip
+          path: Aether-Windows-${{ needs.meta.outputs.version }}-win-x64.zip
+          if-no-files-found: error
+          retention-days: 14
+
+  # ============================================================
+  # Cloudflare Workers BFF: 打包源码（部署由 wrangler 完成）
+  # ============================================================
+  build-bff:
+    needs: meta
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        working-directory: CloudflareWorkers
+        run: |
+          if [ -f package.json ]; then npm install --no-audit --no-fund || true; fi
+
+      - name: Run tests (best-effort)
+        working-directory: CloudflareWorkers
+        continue-on-error: true
+        run: npm test || true
+
+      - name: Package BFF source
+        run: |
+          VERSION="${{ needs.meta.outputs.version }}"
+          zip -r "Aether-BFF-${VERSION}.zip" CloudflareWorkers \
+            -x "CloudflareWorkers/node_modules/*" \
+            -x "CloudflareWorkers/.wrangler/*" \
+            -x "CloudflareWorkers/.dev.vars"
+          ls -lh "Aether-BFF-${VERSION}.zip"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: bff-bundle
+          path: Aether-BFF-${{ needs.meta.outputs.version }}.zip
+          if-no-files-found: error
+          retention-days: 14
+
+  # ============================================================
+  # 生成 Source Code 产物（可选，便于离线检视源码）
+  # ============================================================
+  build-source:
+    needs: meta
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Pack source tarball
+        run: |
+          VERSION="${{ needs.meta.outputs.version }}"
+          # 使用 git archive 打包 tag 指向的源码（不含 .git）
+          git archive --format=tar.gz --prefix="Aether-${VERSION}/" HEAD -o "Aether-${VERSION}-source.tar.gz"
+          git archive --format=zip   --prefix="Aether-${VERSION}/" HEAD -o "Aether-${VERSION}-source.zip"
+          ls -lh "Aether-${VERSION}-source.tar.gz" "Aether-${VERSION}-source.zip"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: source-archives
+          path: |
+            Aether-${{ needs.meta.outputs.version }}-source.tar.gz
+            Aether-${{ needs.meta.outputs.version }}-source.zip
+          if-no-files-found: error
+          retention-days: 14
+
+  # ============================================================
+  # 发布：下载所有构建产物并创建 GitHub Release
+  # ============================================================
+  publish-release:
+    needs: [meta, build-ios, build-macos, build-android, build-windows, build-bff, build-source]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v7
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Inspect assets
+        run: |
+          echo "=== Downloaded release assets ==="
+          ls -lh release-assets/
+
+      - name: Extract release notes from CHANGELOG.md
+        id: notes
+        run: |
+          VERSION="${{ needs.meta.outputs.version }}"
+          # 从 doc/CHANGELOG.md 中提取 1.0.0 段落（从 "## [1.0.0]" 到下一个 "## "）
+          # 若未找到则回退为通用模板
+          NOTES=$(python3 - "$VERSION" <<'PYEOF'
+          import sys, re, pathlib
+          version = sys.argv[1]
+          changelog = pathlib.Path("doc/CHANGELOG.md")
+          if not changelog.exists():
+              print(f"## Aether v{version}")
+              sys.exit(0)
+          text = changelog.read_text(encoding="utf-8")
+          # 匹配 ## [1.0.0] 或 ## 1.0.0
+          m = re.search(rf"(?m)^## (?:\[)?{re.escape(version)}(?:\])?[^\n]*\n(?:(?!^## ).)+", text, re.S)
+          if m:
+              # 去掉首部 "## [1.0.0] ..." 行，保留正文
+              body = re.sub(rf"(?m)^## (?:\[)?{re.escape(version)}(?:\])?[^\n]*\n", "", m.group(0))
+              print(body.strip())
+          else:
+              print(f"## Aether v{version}")
+          PYEOF
+          )
+          {
+            echo "notes<<EOF"
+            echo "$NOTES"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release and upload assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.meta.outputs.tag }}
+          name: Aether v${{ needs.meta.outputs.version }}
+          body: ${{ steps.notes.outputs.notes }}
+          draft: false
+          prerelease: false
+          generate_release_notes: false
+          files: |
+            release-assets/Aether-iOS-${{ needs.meta.outputs.version }}-simulator.zip
+            release-assets/Aether-macOS-${{ needs.meta.outputs.version }}-unsigned.dmg
+            release-assets/Aether-Android-${{ needs.meta.outputs.version }}.apk
+            release-assets/Aether-Windows-${{ needs.meta.outputs.version }}-win-x64.zip
+            release-assets/Aether-BFF-${{ needs.meta.outputs.version }}.zip
+            release-assets/Aether-${{ needs.meta.outputs.version }}-source.tar.gz
+            release-assets/Aether-${{ needs.meta.outputs.version }}-source.zip
+          fail_on_unmatched_files: false

@@ -18,7 +18,7 @@ cd "$(dirname "$0")/.."
 
 # 项目固定配置
 PROJECT="Aether.xcodeproj"
-SCHEME="Aether"
+SCHEME="Aether-macOS"
 INFO_PLIST="Aether/Resources/Info.plist"
 APP_NAME="Aether"
 
