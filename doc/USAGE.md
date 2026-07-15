@@ -1,6 +1,6 @@
 # Aether 使用文档
 
-> AI Native 多平台 App（iOS / iPad / macOS 原生），基于 SwiftUI + 多 LLM Provider（DeepSeek / Qwen / 端侧 MLX）构建。本文件描述环境要求、安装运行、API Key 配置、Day 1-20 全部用户可见功能（21 项核心能力）、多平台支持、工具能力清单、开发与测试工作流、CI、权限与常见问题。
+> AI Native 多平台 App（iOS / iPad / macOS 原生），基于 SwiftUI + 多 LLM Provider（DeepSeek / Qwen / 端侧 MLX）构建。底层引入 Rust FFI 层（aether-core-ffi，xcframework 分发）提供跨平台统一的高性能核心算法。本文件描述环境要求、安装运行、API Key 配置、Day 1-20 全部用户可见功能（21 项核心能力 + Rust 核心能力）、多平台支持、工具能力清单、开发与测试工作流、CI、权限与常见问题。
 
 ## 目录
 
@@ -617,6 +617,23 @@ Aether 已从 iOS-only 适配为 **iOS / iPad / macOS 三端原生**应用，基
 ### 5.6 跨平台设备信息
 
 - `FeedbackService` 用 `ProcessInfo` 替代 `UIDevice` 获取设备型号 / OS 版本，三端统一；电量与可用存储在 iOS 用 `UIDevice`、macOS 用 `ProcessInfo` 分流
+
+### 5.7 Rust 核心能力（跨平台，10 个模块）
+
+Rust `aether-core-ffi` 通过 `AetherRustBin` xcframework 提供跨平台统一的高性能核心算法，涵盖以下 10 个模块：
+
+| 模块 | 平台 | 功能 |
+|------|------|------|
+| **Sha256** | iOS / macOS / Workers / Android | 流式 SHA-256 文件哈希（4MB chunk），替代 CryptoKit |
+| **Token** | iOS / macOS / Workers / Android | 精确 Token 计数估算，统一 Apple/Workers 两端 |
+| **Chunker** | iOS / macOS / Workers / Android | 文档分块，基于 UAX #29 句子边界算法 |
+| **Vector** | iOS / macOS / Workers / Android | 余弦相似度（f32/f64）+ Top-K 检索 |
+| **SSE** | iOS / macOS / Workers / Android | SSE 流解析器（含 tool_calls 跨 chunk 累积） |
+| **Inference** | macOS | Candle 推理引擎，加载 safetensors 模型 |
+| **Sandbox** | macOS | WASM 插件沙箱（wasmtime，Pulley 解释器，无 JIT） |
+| **RateLimiter** | iOS / macOS / Workers / Android | 令牌桶限流器（连续 refill 算法） |
+| **Redactor** | iOS / macOS / Workers / Android | 敏感信息脱敏（UUID/邮箱/URL/Token/密码/路径） |
+| **FFIError** | iOS / macOS / Workers / Android | Rust FFI 调用统一错误枚举 |
 
 ---
 

@@ -20,7 +20,7 @@
 
 ## 1. 项目概述
 
-**项目定位**：Aether 是一款 AI Native 多平台 App（iOS / iPad / macOS 原生），基于 SwiftUI + 多 LLM Provider（DeepSeek / Qwen / 端侧 MLX）构建，覆盖流式对话、多轮记忆、RAG 检索增强、ReAct 工具调用、语音输入输出、视觉多模态、Markdown 富文本渲染、TTS 音色可调节、BFF 代理、端侧 MLX 推理、HealthKit 健康洞察、App Intents 系统集成、智能路由与 Fallback、远程配置与遥测、崩溃监控、性能监控、隐私清单等 Day 1–20 全部能力。
+**项目定位**：Aether 是一款 AI Native 多平台 App（iOS / iPad / macOS 原生），基于 SwiftUI + 多 LLM Provider（DeepSeek / Qwen / 端侧 MLX）构建，覆盖流式对话、多轮记忆、RAG 检索增强、ReAct 工具调用、语音输入输出、视觉多模态、Markdown 富文本渲染、TTS 音色可调节、BFF 代理、端侧 MLX 推理、HealthKit 健康洞察、App Intents 系统集成、智能路由与 Fallback、远程配置与遥测、崩溃监控、性能监控、隐私清单等 Day 1–20 全部能力。底层引入 Rust FFI 层（aether-core-ffi）提供跨平台统一的高性能核心算法。
 
 **核心能力清单**（20+ 项）：
 
@@ -65,7 +65,7 @@
 
 ## 2. 分层架构图
 
-Aether 采用 4 层分层架构（表现层 / 领域层 / 服务层 / 数据层），依赖方向自上而下单向流动。下图使用 Mermaid `flowchart TB` 描述，每个 subgraph 代表一个分层。
+Aether 采用 5 层分层架构（表现层 / 领域层 / 服务层 / Rust FFI 层 / 数据层），依赖方向自上而下单向流动。下图使用 Mermaid `flowchart TB` 描述，每个 subgraph 代表一个分层。
 
 ```mermaid
 flowchart TB
@@ -90,6 +90,9 @@ flowchart TB
         RemoteConfig["RemoteConfigService"]
         Telemetry["TelemetryService"]
     end
+    subgraph RUST["Rust FFI 层 (AetherRust)"]
+        AetherRustBin["AetherRustBin<br/>xcframework<br/>（10 个 C FFI 模块）"]
+    end
     subgraph Data["数据层 (Models/Storage)"]
         SwiftData[("SwiftData<br/>Conversation/ChatMessage<br/>DocumentChunk/MessageFeedback<br/>HealthInsight/UserPreference")]
         Keychain["KeychainManager<br/>(API Keys)"]
@@ -103,7 +106,8 @@ flowchart TB
 |---------|---------|
 | 表现层 (Views) | 领域层 (ViewModels) |
 | 领域层 (ViewModels) | 服务层 (Services) + 数据层 (Models) |
-| 服务层 (Services) | 数据层 (SwiftData / Keychain / UserDefaults) |
+| 服务层 (Services) | Rust FFI 层 (AetherRust) + 数据层 (SwiftData / Keychain / UserDefaults) |
+| Rust FFI 层 (AetherRust) | aether-core-ffi Rust 库 / xcframework |
 | Tests | 所有层 |
 
 **各层职责概览**：
@@ -113,6 +117,7 @@ flowchart TB
 | 表现层 (Views) | SwiftUI 视图，6 个子模块（Chat / Components / Conversation / OnDevice / RAG / Settings），含液态玻璃 + 深空主题 DesignSystem | 37 |
 | 领域层 (ViewModels) | `@Observable` 状态管理 + 业务编排（ChatViewModel / ConversationListVM / KnowledgeBaseVM / SettingsViewModel） | 4 |
 | 服务层 (Services) | 20 个子模块业务实现（Auth / Cache / Connectivity / Crash / Feedback / Health / Intents / LLM / Language / Network / OnDevice / Performance / RAG / RemoteConfig / Routing / Search / Storage / Telemetry / Tools / Voice） | 54 |
+| Rust FFI 层 (AetherRust) | 10 个 Swift 包装器，通过 `AetherRustBin` xcframework 调用 Rust aether-core-ffi C ABI，提供高性能核心算法（Sha256 / Token / Chunker / Vector / SSE / Sandbox / Inference / RateLimiter / Redactor / FFIError） | 10 |
 | 数据层 (Models/Storage) | SwiftData `@Model`（7 实体）+ KeychainManager（API Keys）+ UserDefaults（Settings/Cache） | 7 |
 
 ### 2.1 模块依赖图
@@ -586,6 +591,30 @@ ViewModels 文件数无新增（仍为 4 个），但内部字段与编排逻辑
 | Settings | `TTSVoicePickerView.swift` | Day 19 TTS 音色选择：音色 Picker / 语速 / 音调 / 音量 / 试听按钮。 |
 | Settings | `HealthSettingsView.swift` | Day 18 Health 授权管理 + 健康洞察列表展示。 |
 | Settings | `PrivacyPolicyView.swift` | Day 14 隐私政策展示（Markdown 渲染）+ 投诉反馈入口。 |
+
+### 3.5b Rust FFI 层（AetherRust 模块）
+
+项目通过 `Packages/AetherCore` SPM 包引入 Rust FFI 层。Rust 侧 `aether-core-ffi` crate（`rust/aether-core-ffi/`）编译为 C 静态库，通过 `cbindgen` 生成 C 头文件（`aether_core_ffi.h`），打包为 `aether_core.xcframework`（含 ios-arm64 / ios-arm64-simulator / macos-arm64 三架构），作为 `AetherRustBin` binaryTarget 被 Swift 侧引用。Swift 侧 `AetherRust` target 提供 10 个 Swift 友好的包装器，通过 `AetherRustC` modulemap 导入 C 符号，服务层 `AetherServices` 依赖 `AetherRust`。
+
+| 文件 | 职责 |
+|------|------|
+| `AetherRust/Sha256.swift` | 流式 SHA-256 哈希，替代 CryptoKit。`AetherRustSha256` 类支持分块 `update` + `finalize`，`aetherSha256(of:)` 便捷函数按 4MB 分块读取文件，返回小写十六进制摘要。 |
+| `AetherRust/Token.swift` | Token 计数估算，替代 `String.estimatedTokens` 粗估公式。`AetherRustToken.estimateTokens(_:)` 调用 Rust 侧算法，统一 Apple/Workers 两端。 |
+| `AetherRust/Chunker.swift` | 文档分块，基于 Rust `unicode-segmentation` crate（UAX #29 句子边界），替代 Apple `NLTokenizer`。`AetherRustChunker.chunkDocument(_:maxChars:overlapChars:)` 返回块文本数组。 |
+| `AetherRust/Vector.swift` | 向量数学：`AetherRustVector.cosine`（f32/f64 余弦相似度）+ `topK`（top-K 检索，JSON 序列化进出）。统一 SemanticCache / RAGService / MemoryService 三处重复实现。 |
+| `AetherRust/SSE.swift` | SSE 流解析器：`AetherRustSSEParser` 类持有 `AetherSseState` 跨 chunk 累积 tool_calls。提供 `extractContent` / `parseChunk` / `parseWithTools` 三个方法，等价于 Workers 与 Swift 实现。 |
+| `AetherRust/Sandbox.swift` | WASM 插件沙箱（`#if !os(iOS)`），基于 Rust `wasmtime` crate（Pulley 解释器，无 JIT）。三层句柄：`AetherRustSandbox`（引擎）→ `AetherRustSandboxModule`（编译产物）→ `AetherRustSandboxInstance`（运行时实例）。强制 CPU fuel 与内存限额，插件 ABI 约定 `execute(args_len: i32) -> i32`。 |
+| `AetherRust/Inference.swift` | Candle 推理引擎，替代 Apple-only MLX。`AetherRustInferenceEngine` 加载 safetensors 模型目录，支持 `generate`（流式 token 数组）与 `generateText`（一次性完整文本），配置 `AetherRustInferenceConfig`（temperature / maxTokens / repeatPenalty / topP / seed）。 |
+| `AetherRust/RateLimiter.swift` | 令牌桶限流器：`AetherRustTokenBucket` 基于 Rust 连续 refill 算法（每秒按比例补充），调用方传入 `nowMs` 时间戳避免 Rust 侧依赖 `std::time::Instant`（WASM32 不可用）。提供 `acquire` / `availableTokens` / `reset`。 |
+| `AetherRust/Redactor.swift` | 敏感信息脱敏：`AetherRustRedactor.redact(_:)` 基于 Rust `regex` crate（RE2 语法，线性时间 NFA + SIMD），脱敏 UUID/邮箱/URL/Token/密码字段/路径，统一 Apple/Workers/Android 三端。 |
+| `AetherRust/FFIError.swift` | Rust FFI 调用错误枚举：`AetherRustError`（nullResult / invalidUTF8 / decodeFailed）。 |
+
+**Rust 侧架构**：
+
+- **`aether-core`**（workspace member）：纯 Rust 逻辑 crate，无 unsafe，提供所有算法实现（sha256_hex / estimate_tokens / chunk_document / cosine_similarity / top_k_f32 / parse_chunk / ratelimit / redact 等）。
+- **`aether-core-ffi`**（`rust/aether-core-ffi/`）：C ABI 绑定层，所有 `unsafe` 集中于此。返回值均为 C 字符串（JSON），调用方通过 `aether_free_string` 释放。`Cargo.toml` 输出 `staticlib` / `cdylib` / `rlib` 三种 crate-type。条件编译：candle 推理排除 wasm32/android，wasmtime 沙箱排除 wasm32/iOS/android，wasm32 目标引入 `wasm-bindgen`，android 目标引入 `jni`。
+- **`cbindgen.toml`**：配置 cbindgen 生成 C 头文件，`AETHER_EXPORT` 宏在静态库中定义为空、动态库中定义为 `__attribute__((visibility("default")))`，`include_guard = "AETHER_CORE_FFI_H"`。
+- **`xcframework`**：`aether_core.xcframework` 包含 ios-arm64 / ios-arm64-simulator / macos-arm64 三个 slice，每个含 `Headers/`（`aether_core_ffi.h` + `module.modulemap`）与 `libaether_core_ffi.a`。
 
 ### 3.6 工具调用关系图
 
@@ -1214,6 +1243,10 @@ stateDiagram-v2
 | NSWorkspace | NSWorkspace | AppManagementTool / OpenURLTool / FileOperationTool（macOS 部分） | macOS 14+ / AppKit |
 | Process | Foundation.Process | TerminalCommandTool + ShortcutsTool CLI（macOS） | macOS 14+ / Foundation |
 | Shortcuts CLI | shortcuts run / shortcuts list | RunShortcutTool / ListShortcutsTool（macOS） | macOS 14+ / Shortcuts.app |
+| Rust (aether-core) | `rust/aether-core/` | 纯 Rust 算法 crate（sha2 / unicode-segmentation / tokenizers / candle / wasmtime / regex） | Rust 1.75+ |
+| Rust (aether-core-ffi) | `rust/aether-core-ffi/` | C ABI 绑定层（staticlib / cdylib / rlib），条件编译支持 wasm32 / android | Rust 1.75+ |
+| cbindgen | `rust/aether-core-ffi/cbindgen.toml` | 自动生成 C 头文件 `aether_core_ffi.h` | cbindgen 0.26+ |
+| xcframework | `Packages/AetherCore/aether_core.xcframework/` | 三架构（ios-arm64 / ios-arm64-simulator / macos-arm64）静态库包 | Xcode 16+ |
 
 ---
 
@@ -1572,6 +1605,21 @@ AetherUITests/                # 7 个 UIT 文件 / 30 用例
 └── Info.plist
 
 Aether.xcodeproj/             # Xcode 工程文件
+rust/
+├── aether-core/               # 纯 Rust 算法 crate
+└── aether-core-ffi/           # C ABI 绑定层 + cbindgen.toml
+Packages/
+└── AetherCore/                # SPM 模块化包
+    ├── Package.swift
+    ├── Sources/
+    │   ├── AetherFoundation/  # 核心协议与常量（LLMProvider / ToolProtocol / APIConfig）
+    │   ├── AetherRust/        # Rust FFI Swift 包装器（10 个文件）
+    │   ├── AetherServices/    # 服务层（LLM / RAG / Cache / Plugin / Telemetry 等）
+    │   ├── AetherDesign/      # 设计系统 Token（颜色 / 字体 / 圆角 / 布局）
+    │   └── AetherUI/          # 通用 UI 组件（AvatarView / CardStyle / ErrorBanner 等）
+    ├── Tests/
+    │   └── AetherCoreTests/
+    └── aether_core.xcframework/  # Rust 三架构静态库
 doc/
 ├── ARCHITECTURE.md              # 本文件
 ├── USAGE.md
