@@ -179,7 +179,15 @@ export async function handleDeleteConversation(request, env, ctx, id) {
   if (!env.DB) return jsonError(503, "数据库未配置");
 
   try {
-    // 先删消息（外键级联在 D1 需显式开启 PRAGMA，这里手动删更稳妥）
+    // 先校验会话属于当前用户，避免越权删除他人消息（IDOR）
+    const conv = await env.DB.prepare(
+      `SELECT id FROM conversations WHERE id = ?1 AND user_id = ?2`
+    )
+      .bind(id, auth.userId)
+      .first();
+    if (!conv) return jsonError(404, "会话不存在");
+
+    // 已确认归属，删除消息（外键级联在 D1 需显式开启 PRAGMA，这里手动删更稳妥）
     await env.DB.prepare(`DELETE FROM messages WHERE conversation_id = ?1`).bind(id).run();
     const { changes } = await env.DB.prepare(
       `DELETE FROM conversations WHERE id = ?1 AND user_id = ?2`
