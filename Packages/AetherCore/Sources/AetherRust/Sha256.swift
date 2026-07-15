@@ -21,7 +21,7 @@ public final class AetherRustSha256: @unchecked Sendable {
     public func update(_ data: Data) {
         data.withUnsafeBytes { (rawBuffer: UnsafeRawBufferPointer) in
             guard let base = rawBuffer.baseAddress, rawBuffer.count > 0 else { return }
-            aether_sha256_update(state, base.assumingMemoryBound(to: UInt8.self), rawBuffer.count)
+            aether_sha256_update(state, base.assumingMemoryBound(to: UInt8.self), UInt(rawBuffer.count))
         }
     }
 

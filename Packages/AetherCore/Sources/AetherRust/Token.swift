@@ -11,7 +11,7 @@ public enum AetherRustToken {
     /// 空字符串返回 0。
     public static func estimateTokens(_ s: String) -> Int {
         return s.withCString { ptr in
-            aether_estimate_tokens(ptr)
+            Int(aether_estimate_tokens(ptr))
         }
     }
 }

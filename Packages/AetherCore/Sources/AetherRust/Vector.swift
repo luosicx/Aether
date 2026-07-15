@@ -12,7 +12,7 @@ public enum AetherRustVector {
         guard !a.isEmpty, !b.isEmpty else { return 0 }
         return a.withUnsafeBufferPointer { aBuf in
             b.withUnsafeBufferPointer { bBuf in
-                aether_cosine_f32(aBuf.baseAddress, aBuf.count, bBuf.baseAddress, bBuf.count)
+                aether_cosine_f32(aBuf.baseAddress, UInt(aBuf.count), bBuf.baseAddress, UInt(bBuf.count))
             }
         }
     }
@@ -22,7 +22,7 @@ public enum AetherRustVector {
         guard !a.isEmpty, !b.isEmpty else { return 0 }
         return a.withUnsafeBufferPointer { aBuf in
             b.withUnsafeBufferPointer { bBuf in
-                aether_cosine_f64(aBuf.baseAddress, aBuf.count, bBuf.baseAddress, bBuf.count)
+                aether_cosine_f64(aBuf.baseAddress, UInt(aBuf.count), bBuf.baseAddress, UInt(bBuf.count))
             }
         }
     }

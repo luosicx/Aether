@@ -13,7 +13,7 @@ public enum AetherRustChunker {
     /// 与 `DocumentChunker.chunkDocument` 的纯 Swift 实现行为一致。
     public static func chunkDocument(_ text: String, maxChars: Int, overlapChars: Int) -> [String] {
         return text.withCString { ptr in
-            guard let raw = aether_chunk_document(ptr, maxChars, overlapChars) else {
+            guard let raw = aether_chunk_document(ptr, UInt(maxChars), UInt(overlapChars)) else {
                 return [text]
             }
             defer { aether_free_string(raw) }
