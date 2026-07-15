@@ -639,9 +639,7 @@ pub unsafe extern "C" fn aether_sandbox_instance_free(instance: *mut AetherSandb
 // 然后调用 aether-core 的纯逻辑 InferenceEngine::load_from_components。
 
 #[cfg(not(target_arch = "wasm32"))]
-use aether_core::inference::{
-    InferenceConfig, InferenceEngine, InferenceError,
-};
+use aether_core::inference::{InferenceConfig, InferenceEngine, InferenceError};
 #[cfg(not(target_arch = "wasm32"))]
 use candle_core::Device;
 #[cfg(not(target_arch = "wasm32"))]
@@ -731,7 +729,11 @@ pub unsafe extern "C" fn aether_inference_load_model(
 
     let engine = &mut *engine;
     let result = load_model_impl(&mut engine.inner, &dir_str, config);
-    if result.is_ok() { 0 } else { 1 }
+    if result.is_ok() {
+        0
+    } else {
+        1
+    }
 }
 
 /// 加载模型实现（host target）：读取 config.json / tokenizer.json / mmap safetensors。
@@ -760,8 +762,8 @@ fn load_model_impl(
 
     // EOS token id：从 config.json 原始 JSON 提取
     if config.eos_token_id.is_none() {
-        let v: serde_json::Value = serde_json::from_str(&config_str)
-            .map_err(|e| InferenceError::Load(e.to_string()))?;
+        let v: serde_json::Value =
+            serde_json::from_str(&config_str).map_err(|e| InferenceError::Load(e.to_string()))?;
         if let Some(eos) = v.get("eos_token_id").and_then(|x| x.as_u64()) {
             config.eos_token_id = Some(eos as u32);
         }

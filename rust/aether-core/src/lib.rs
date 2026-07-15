@@ -28,7 +28,11 @@ pub use token::estimate_tokens;
 pub use vector::{cosine_similarity_f32, cosine_similarity_f64, top_k_f32};
 
 #[cfg(not(target_arch = "wasm32"))]
-pub use sandbox::{Sandbox, SandboxConfig, SandboxError, SandboxInstance, SandboxModule, SandboxResult};
+pub use sandbox::{
+    Sandbox, SandboxConfig, SandboxError, SandboxInstance, SandboxModule, SandboxResult,
+};
 
 #[cfg(not(target_arch = "wasm32"))]
-pub use inference::{InferenceConfig, InferenceEngine, InferenceError, LoadedModel, GeneratedToken};
+pub use inference::{
+    GeneratedToken, InferenceConfig, InferenceEngine, InferenceError, LoadedModel,
+};

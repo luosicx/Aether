@@ -125,8 +125,8 @@ impl InferenceEngine {
         device: Device,
         config: InferenceConfig,
     ) -> Result<(), InferenceError> {
-        let model = Qwen2Model::new(model_config, vb)
-            .map_err(|e| InferenceError::Load(e.to_string()))?;
+        let model =
+            Qwen2Model::new(model_config, vb).map_err(|e| InferenceError::Load(e.to_string()))?;
 
         let loaded = LoadedModel {
             model,
@@ -187,8 +187,7 @@ impl InferenceEngine {
             let seqlen_offset = input_ids.len().saturating_sub(1);
 
             // 构造输入 tensor
-            let input_tensor = Tensor::new(input_ids.as_slice(), &loaded.device)?
-                .unsqueeze(0)?;
+            let input_tensor = Tensor::new(input_ids.as_slice(), &loaded.device)?.unsqueeze(0)?;
 
             // 前向传播（无 KV cache，每次全量；简化实现，正确但较慢）
             let logits = loaded.model.forward(&input_tensor, seqlen_offset, None)?;

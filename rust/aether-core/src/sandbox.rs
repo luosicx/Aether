@@ -99,8 +99,7 @@ impl Sandbox {
         cfg.target("pulley64")
             .map_err(|e| SandboxError::Compile(e.to_string()))?;
 
-        let engine =
-            Engine::new(&cfg).map_err(|e| SandboxError::Compile(e.to_string()))?;
+        let engine = Engine::new(&cfg).map_err(|e| SandboxError::Compile(e.to_string()))?;
         Ok(Self { engine, config })
     }
 
@@ -111,8 +110,8 @@ impl Sandbox {
 
     /// 编译 WASM 模块（字节码或 WAT 文本）。
     pub fn load(&self, wasm: &[u8]) -> Result<SandboxModule, SandboxError> {
-        let module = Module::new(&self.engine, wasm)
-            .map_err(|e| SandboxError::Compile(e.to_string()))?;
+        let module =
+            Module::new(&self.engine, wasm).map_err(|e| SandboxError::Compile(e.to_string()))?;
         Ok(SandboxModule {
             module,
             engine: self.engine.clone(),
@@ -140,15 +139,13 @@ impl SandboxModule {
         // 获取线性内存导出
         let memory = instance.get_memory(&mut store, "memory").or_else(|| {
             // 尝试获取第一个导出的 memory
-            self.module
-                .exports()
-                .find_map(|export| {
-                    if export.ty().memory().is_some() {
-                        instance.get_memory(&mut store, export.name())
-                    } else {
-                        None
-                    }
-                })
+            self.module.exports().find_map(|export| {
+                if export.ty().memory().is_some() {
+                    instance.get_memory(&mut store, export.name())
+                } else {
+                    None
+                }
+            })
         });
 
         // 获取 execute 函数导出
@@ -177,18 +174,16 @@ impl SandboxInstance {
             .execute_fn
             .as_ref()
             .ok_or(SandboxError::MissingExecute)?;
-        execute_fn
-            .call(&mut self.store, arg)
-            .map_err(|e| {
-                // wasmtime 29 的 fuel 耗尽 trap 消息不含 "fuel" 字样，
-                // 通过检查调用后剩余 fuel 是否为 0 来判断。
-                let fuel = self.store.get_fuel().unwrap_or(u64::MAX);
-                if fuel == 0 {
-                    SandboxError::OutOfFuel
-                } else {
-                    SandboxError::Call(e.to_string())
-                }
-            })
+        execute_fn.call(&mut self.store, arg).map_err(|e| {
+            // wasmtime 29 的 fuel 耗尽 trap 消息不含 "fuel" 字样，
+            // 通过检查调用后剩余 fuel 是否为 0 来判断。
+            let fuel = self.store.get_fuel().unwrap_or(u64::MAX);
+            if fuel == 0 {
+                SandboxError::OutOfFuel
+            } else {
+                SandboxError::Call(e.to_string())
+            }
+        })
     }
 
     /// 调用插件的 `execute` 函数，传入 JSON 参数，返回 JSON 结果。
