@@ -16,12 +16,35 @@
  */
 typedef struct AetherRateLimiter AetherRateLimiter;
 
+#if !defined(__wasm32__)
+/**
+ * C 侧持有的沙箱引擎。opaque（字段含跨 crate 类型，cbindgen 生成 opaque typedef）。
+ */
+typedef struct AetherSandbox AetherSandbox;
+#endif
+
+#if !defined(__wasm32__)
+/**
+ * C 侧持有的沙箱实例。opaque。
+ */
+typedef struct AetherSandboxInstance AetherSandboxInstance;
+#endif
+
+#if !defined(__wasm32__)
+/**
+ * C 侧持有的已加载模块。opaque。
+ */
+typedef struct AetherSandboxModule AetherSandboxModule;
+#endif
+
 typedef struct BTreeMap_i64__AccumulatedToolCall BTreeMap_i64__AccumulatedToolCall;
 
+#if defined(__wasm32__)
 /**
  * SHA-256 流式哈希器（Workers 端预留，当前无调用方）。
  */
 typedef struct Sha256 Sha256;
+#endif
 
 /**
  * C 侧持有的解析器状态（跨调用累积 tool_calls）。
@@ -224,5 +247,108 @@ AETHER_EXPORT void aether_rate_limiter_reset(struct AetherRateLimiter *state, ui
  * `state` 来自 `aether_rate_limiter_new`，且只能释放一次。
  */
 AETHER_EXPORT void aether_rate_limiter_free(struct AetherRateLimiter *state);
+
+#if !defined(__wasm32__)
+/**
+ * 创建沙箱引擎。Pulley 解释器（无 JIT），iOS 友好。
+ * - `max_fuel`: CPU 指令限额（30 秒 ≈ 30_000_000_000）
+ * - `max_memory_bytes`: 线性内存上限（字节，50 MB = 52_428_800）
+ * 失败返回空指针。
+ */
+AETHER_EXPORT
+struct AetherSandbox *aether_sandbox_new(uint64_t max_fuel,
+                                         uintptr_t max_memory_bytes);
+#endif
+
+#if !defined(__wasm32__)
+/**
+ * 编译 WASM 模块（字节码）。失败返回空指针。
+ * # Safety
+ * `sandbox` 来自 `aether_sandbox_new`；`wasm` 指向 `wasm_len` 字节。
+ */
+AETHER_EXPORT
+struct AetherSandboxModule *aether_sandbox_load(struct AetherSandbox *sandbox,
+                                                const uint8_t *wasm,
+                                                uintptr_t wasm_len);
+#endif
+
+#if !defined(__wasm32__)
+/**
+ * 实例化模块，返回可调用实例。失败返回空指针。
+ * 初始 fuel = 创建引擎时的 max_fuel。
+ * # Safety
+ * `module` 来自 `aether_sandbox_load`。
+ */
+AETHER_EXPORT
+struct AetherSandboxInstance *aether_sandbox_instantiate(struct AetherSandboxModule *module);
+#endif
+
+#if !defined(__wasm32__)
+/**
+ * 调用插件的 execute 函数，传入 JSON 参数，返回结果 JSON 字符串。
+ * 成功：`{"ok":true,"output":"...","fuelRemaining":N,"outOfFuel":false}`
+ * 失败：`{"ok":false,"error":"OutOfFuel|MissingExecute|..."}`
+ * 调用方需用 `aether_free_string` 释放返回值。
+ * # Safety
+ * `instance` 来自 `aether_sandbox_instantiate`；`args_json` 合法 NUL 结尾 UTF-8。
+ */
+AETHER_EXPORT
+char *aether_sandbox_call_json(struct AetherSandboxInstance *instance,
+                               const char *args_json);
+#endif
+
+#if !defined(__wasm32__)
+/**
+ * 直接调用 execute（数值参数），返回结果。失败返回 0。
+ * # Safety
+ * `instance` 来自 `aether_sandbox_instantiate`。
+ */
+AETHER_EXPORT int32_t aether_sandbox_call_raw(struct AetherSandboxInstance *instance, int32_t arg);
+#endif
+
+#if !defined(__wasm32__)
+/**
+ * 剩余 fuel。
+ * # Safety
+ * `instance` 来自 `aether_sandbox_instantiate`。
+ */
+AETHER_EXPORT uint64_t aether_sandbox_fuel_remaining(struct AetherSandboxInstance *instance);
+#endif
+
+#if !defined(__wasm32__)
+/**
+ * 重置 fuel 到初始值。
+ * # Safety
+ * `instance` 来自 `aether_sandbox_instantiate`。
+ */
+AETHER_EXPORT void aether_sandbox_refill_fuel(struct AetherSandboxInstance *instance);
+#endif
+
+#if !defined(__wasm32__)
+/**
+ * 释放沙箱引擎。空指针安全。
+ * # Safety
+ * `sandbox` 来自 `aether_sandbox_new`，且只能释放一次。
+ */
+AETHER_EXPORT void aether_sandbox_free(struct AetherSandbox *sandbox);
+#endif
+
+#if !defined(__wasm32__)
+/**
+ * 释放已加载模块。空指针安全。
+ * # Safety
+ * `module` 来自 `aether_sandbox_load`，且只能释放一次。
+ */
+AETHER_EXPORT void aether_sandbox_module_free(struct AetherSandboxModule *module);
+#endif
+
+#if !defined(__wasm32__)
+/**
+ * 释放沙箱实例。空指针安全。
+ * # Safety
+ * `instance` 来自 `aether_sandbox_instantiate`，且只能释放一次。
+ */
+AETHER_EXPORT void aether_sandbox_instance_free(struct AetherSandboxInstance *instance);
+#endif
 
 #endif  /* AETHER_CORE_FFI_H */

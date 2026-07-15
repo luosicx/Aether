@@ -16,3 +16,11 @@ thiserror = { workspace = true }
 regex = { workspace = true }
 unicode-segmentation = { workspace = true }
 sha2 = { workspace = true }
+
+# wasmtime 仅用于 host target（Apple/Android），wasm32 不支持
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+wasmtime = { workspace = true }
+
+# WAT 文本 → WASM 字节码（仅测试用，生产插件应为已编译的 .wasm）
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+wat = "1"

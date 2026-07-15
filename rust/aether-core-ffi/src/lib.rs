@@ -418,6 +418,220 @@ pub unsafe extern "C" fn aether_rate_limiter_free(state: *mut AetherRateLimiter)
     }
 }
 
+// ===== 插件沙箱 C ABI（仅 host target，wasm32 不编译） =====
+//
+// 对应原 `PluginSandbox.swift`（声明式伪沙箱 → wasmtime 真隔离）。
+// 三层 opaque 句柄：AetherSandbox（引擎）/ AetherSandboxModule（编译产物）/
+// AetherSandboxInstance（运行时实例）。
+
+#[cfg(not(target_arch = "wasm32"))]
+use aether_core::sandbox::{Sandbox, SandboxError, SandboxInstance, SandboxModule};
+
+/// C 侧持有的沙箱引擎。opaque（字段含跨 crate 类型，cbindgen 生成 opaque typedef）。
+#[cfg(not(target_arch = "wasm32"))]
+pub struct AetherSandbox {
+    inner: Sandbox,
+}
+
+/// C 侧持有的已加载模块。opaque。
+#[cfg(not(target_arch = "wasm32"))]
+pub struct AetherSandboxModule {
+    inner: SandboxModule,
+}
+
+/// C 侧持有的沙箱实例。opaque。
+#[cfg(not(target_arch = "wasm32"))]
+pub struct AetherSandboxInstance {
+    inner: SandboxInstance,
+}
+
+/// 创建沙箱引擎。Pulley 解释器（无 JIT），iOS 友好。
+///
+/// - `max_fuel`: CPU 指令限额（30 秒 ≈ 30_000_000_000）
+/// - `max_memory_bytes`: 线性内存上限（字节，50 MB = 52_428_800）
+///
+/// 失败返回空指针。
+#[cfg(not(target_arch = "wasm32"))]
+#[no_mangle]
+pub extern "C" fn aether_sandbox_new(max_fuel: u64, max_memory_bytes: usize) -> *mut AetherSandbox {
+    use aether_core::sandbox::SandboxConfig;
+    let config = SandboxConfig {
+        max_fuel,
+        max_memory_bytes,
+    };
+    match Sandbox::new(config) {
+        Ok(s) => Box::into_raw(Box::new(AetherSandbox { inner: s })),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// 编译 WASM 模块（字节码）。失败返回空指针。
+/// # Safety
+/// `sandbox` 来自 `aether_sandbox_new`；`wasm` 指向 `wasm_len` 字节。
+#[cfg(not(target_arch = "wasm32"))]
+#[no_mangle]
+pub unsafe extern "C" fn aether_sandbox_load(
+    sandbox: *mut AetherSandbox,
+    wasm: *const u8,
+    wasm_len: usize,
+) -> *mut AetherSandboxModule {
+    if sandbox.is_null() || wasm.is_null() || wasm_len == 0 {
+        return std::ptr::null_mut();
+    }
+    let sandbox = &*sandbox;
+    let bytes = std::slice::from_raw_parts(wasm, wasm_len);
+    match sandbox.inner.load(bytes) {
+        Ok(m) => Box::into_raw(Box::new(AetherSandboxModule { inner: m })),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// 实例化模块，返回可调用实例。失败返回空指针。
+/// 初始 fuel = 创建引擎时的 max_fuel。
+/// # Safety
+/// `module` 来自 `aether_sandbox_load`。
+#[cfg(not(target_arch = "wasm32"))]
+#[no_mangle]
+pub unsafe extern "C" fn aether_sandbox_instantiate(
+    module: *mut AetherSandboxModule,
+) -> *mut AetherSandboxInstance {
+    if module.is_null() {
+        return std::ptr::null_mut();
+    }
+    let module = &*module;
+    match module.inner.instantiate() {
+        Ok(i) => Box::into_raw(Box::new(AetherSandboxInstance { inner: i })),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// 调用插件的 execute 函数，传入 JSON 参数，返回结果 JSON 字符串。
+/// 成功：`{"ok":true,"output":"...","fuelRemaining":N,"outOfFuel":false}`
+/// 失败：`{"ok":false,"error":"OutOfFuel|MissingExecute|..."}`
+/// 调用方需用 `aether_free_string` 释放返回值。
+/// # Safety
+/// `instance` 来自 `aether_sandbox_instantiate`；`args_json` 合法 NUL 结尾 UTF-8。
+#[cfg(not(target_arch = "wasm32"))]
+#[no_mangle]
+pub unsafe extern "C" fn aether_sandbox_call_json(
+    instance: *mut AetherSandboxInstance,
+    args_json: *const c_char,
+) -> *mut c_char {
+    if instance.is_null() {
+        return to_cstring(r#"{"ok":false,"error":"NullInstance"}"#);
+    }
+    let args = if args_json.is_null() {
+        ""
+    } else {
+        match CStr::from_ptr(args_json).to_str() {
+            Ok(s) => s,
+            Err(_) => return to_cstring(r#"{"ok":false,"error":"InvalidUtf8"}"#),
+        }
+    };
+    let instance = &mut *instance;
+    match instance.inner.call_json(args) {
+        Ok(r) => {
+            let output_json = serde_json::to_string(&r.output).unwrap_or_else(|_| "null".into());
+            let json = format!(
+                r#"{{"ok":true,"output":{},"fuelRemaining":{},"outOfFuel":{}}}"#,
+                output_json, r.fuel_remaining, r.out_of_fuel
+            );
+            to_cstring(&json)
+        }
+        Err(e) => {
+            let err_str = match e {
+                SandboxError::OutOfFuel => "OutOfFuel",
+                SandboxError::MemoryLimit => "MemoryLimit",
+                SandboxError::MissingExecute => "MissingExecute",
+                SandboxError::MissingMemory => "MissingMemory",
+                SandboxError::Compile(_) => "Compile",
+                SandboxError::Instantiate(_) => "Instantiate",
+                SandboxError::Call(_) => "Call",
+                SandboxError::Utf8(_) => "Utf8",
+            };
+            let json = format!(r#"{{"ok":false,"error":"{}"}}"#, err_str);
+            to_cstring(&json)
+        }
+    }
+}
+
+/// 直接调用 execute（数值参数），返回结果。失败返回 0。
+/// # Safety
+/// `instance` 来自 `aether_sandbox_instantiate`。
+#[cfg(not(target_arch = "wasm32"))]
+#[no_mangle]
+pub unsafe extern "C" fn aether_sandbox_call_raw(
+    instance: *mut AetherSandboxInstance,
+    arg: i32,
+) -> i32 {
+    if instance.is_null() {
+        return 0;
+    }
+    let instance = &mut *instance;
+    instance.inner.call_raw(arg).unwrap_or(0)
+}
+
+/// 剩余 fuel。
+/// # Safety
+/// `instance` 来自 `aether_sandbox_instantiate`。
+#[cfg(not(target_arch = "wasm32"))]
+#[no_mangle]
+pub unsafe extern "C" fn aether_sandbox_fuel_remaining(
+    instance: *mut AetherSandboxInstance,
+) -> u64 {
+    if instance.is_null() {
+        return 0;
+    }
+    let instance = &*instance;
+    instance.inner.fuel_remaining()
+}
+
+/// 重置 fuel 到初始值。
+/// # Safety
+/// `instance` 来自 `aether_sandbox_instantiate`。
+#[cfg(not(target_arch = "wasm32"))]
+#[no_mangle]
+pub unsafe extern "C" fn aether_sandbox_refill_fuel(instance: *mut AetherSandboxInstance) {
+    if instance.is_null() {
+        return;
+    }
+    let instance = &mut *instance;
+    instance.inner.refill_fuel();
+}
+
+/// 释放沙箱引擎。空指针安全。
+/// # Safety
+/// `sandbox` 来自 `aether_sandbox_new`，且只能释放一次。
+#[cfg(not(target_arch = "wasm32"))]
+#[no_mangle]
+pub unsafe extern "C" fn aether_sandbox_free(sandbox: *mut AetherSandbox) {
+    if !sandbox.is_null() {
+        drop(Box::from_raw(sandbox));
+    }
+}
+
+/// 释放已加载模块。空指针安全。
+/// # Safety
+/// `module` 来自 `aether_sandbox_load`，且只能释放一次。
+#[cfg(not(target_arch = "wasm32"))]
+#[no_mangle]
+pub unsafe extern "C" fn aether_sandbox_module_free(module: *mut AetherSandboxModule) {
+    if !module.is_null() {
+        drop(Box::from_raw(module));
+    }
+}
+
+/// 释放沙箱实例。空指针安全。
+/// # Safety
+/// `instance` 来自 `aether_sandbox_instantiate`，且只能释放一次。
+#[cfg(not(target_arch = "wasm32"))]
+#[no_mangle]
+pub unsafe extern "C" fn aether_sandbox_instance_free(instance: *mut AetherSandboxInstance) {
+    if !instance.is_null() {
+        drop(Box::from_raw(instance));
+    }
+}
+
 /// FFI 友好的序列化视图：字段名统一 camelCase，`kind`→`type` 与 Swift 对齐。
 fn to_parsed_chunk_json(p: &ParsedChunk) -> *mut c_char {
     #[derive(serde::Serialize)]

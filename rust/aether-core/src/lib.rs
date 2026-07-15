@@ -9,6 +9,10 @@ pub mod sse;
 pub mod token;
 pub mod vector;
 
+// sandbox 仅 host target 可用（wasmtime 不支持 wasm32）
+#[cfg(not(target_arch = "wasm32"))]
+pub mod sandbox;
+
 pub use chunk::chunk_document;
 pub use ratelimit::TokenBucket;
 pub use redact::redact;
@@ -18,3 +22,6 @@ pub use sse::{
 };
 pub use token::estimate_tokens;
 pub use vector::{cosine_similarity_f32, cosine_similarity_f64, top_k_f32};
+
+#[cfg(not(target_arch = "wasm32"))]
+pub use sandbox::{Sandbox, SandboxConfig, SandboxError, SandboxInstance, SandboxModule, SandboxResult};
