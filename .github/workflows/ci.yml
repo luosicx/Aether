@@ -21,7 +21,7 @@ jobs:
         uses: actions/download-artifact@v7
         with:
           name: aether-core-xcframework
-          path: Packages/AetherCore/aether_core.xcframework
+          path: Packages/AetherCore
 
       - name: Select Xcode (latest)
         uses: maxim-lobanov/setup-xcode@v1
@@ -270,7 +270,7 @@ jobs:
         uses: actions/download-artifact@v7
         with:
           name: aether-core-xcframework
-          path: Packages/AetherCore/aether_core.xcframework
+          path: Packages/AetherCore
 
       - name: Select Xcode (latest)
         uses: maxim-lobanov/setup-xcode@v1
@@ -337,7 +337,7 @@ jobs:
         uses: actions/download-artifact@v7
         with:
           name: aether-core-xcframework
-          path: Packages/AetherCore/aether_core.xcframework
+          path: Packages/AetherCore
 
       - name: Select Xcode (latest)
         uses: maxim-lobanov/setup-xcode@v1
@@ -409,7 +409,7 @@ jobs:
         uses: actions/download-artifact@v7
         with:
           name: aether-core-xcframework
-          path: Packages/AetherCore/aether_core.xcframework
+          path: Packages/AetherCore
 
       - name: Select Xcode (latest)
         uses: maxim-lobanov/setup-xcode@v1
@@ -471,7 +471,7 @@ jobs:
         uses: actions/download-artifact@v7
         with:
           name: aether-core-xcframework
-          path: Packages/AetherCore/aether_core.xcframework
+          path: Packages/AetherCore
 
       - name: Select Xcode (latest)
         uses: maxim-lobanov/setup-xcode@v1
@@ -855,10 +855,13 @@ jobs:
       - name: build wasm (Cloudflare Workers)
         run: ./scripts/build-wasm.sh
 
-      - name: build android targets
+      - name: check android targets
+        # 用 cargo check 而非 build：仅验证平台条件代码（jni.rs 等）能编译，
+        # 不触发链接（ubuntu runner 无 Android NDK linker）。
+        # 实际 Android 产物构建由 android-build job 负责（目前未集成 Rust native lib）。
         run: |
-          cargo build -p aether-core-ffi --target aarch64-linux-android
-          cargo build -p aether-core-ffi --target x86_64-linux-android
+          cargo check -p aether-core-ffi --target aarch64-linux-android
+          cargo check -p aether-core-ffi --target x86_64-linux-android
 
       - name: Upload wasm artifact
         uses: actions/upload-artifact@v7
@@ -910,6 +913,6 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: aether-core-xcframework
-          path: Packages/AetherCore/aether_core.xcframework
+          path: Packages/AetherCore
           if-no-files-found: error
           retention-days: 7
