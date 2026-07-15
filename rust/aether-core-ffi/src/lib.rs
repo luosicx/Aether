@@ -8,7 +8,7 @@ use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_void};
 
 use aether_core::{
-    cosine_similarity_f32, cosine_similarity_f64, extract_content, parse_chunk,
+    cosine_similarity_f32, cosine_similarity_f64, estimate_tokens, extract_content, parse_chunk,
     parse_with_tool_accumulation, top_k_f32, AccumulatedToolCall, ParsedChunk,
 };
 
@@ -198,6 +198,24 @@ pub unsafe extern "C" fn aether_top_k_f32_json(input: *const c_char) -> *mut c_c
     )
     .map(|j| to_cstring(&j))
     .unwrap_or(std::ptr::null_mut())
+}
+
+// ===== Token 计数 C ABI =====
+
+/// 粗略估算字符串的 token 数（与 Swift `String.estimatedTokens` 算法一致）。
+/// 空指针返回 0。
+/// # Safety
+/// `s` 必须是合法 NUL 结尾 UTF-8。
+#[no_mangle]
+pub unsafe extern "C" fn aether_estimate_tokens(s: *const c_char) -> usize {
+    if s.is_null() {
+        return 0;
+    }
+    let s = match CStr::from_ptr(s).to_str() {
+        Ok(s) => s,
+        Err(_) => return 0,
+    };
+    estimate_tokens(s)
 }
 
 /// FFI 友好的序列化视图：字段名统一 camelCase，`kind`→`type` 与 Swift 对齐。

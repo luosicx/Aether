@@ -114,3 +114,17 @@ impl VectorMath {
         .ok()
     }
 }
+
+/// Token 计数（Workers 端 rag.js 分块 / 上下文窗口管理用）。
+#[wasm_bindgen]
+#[allow(non_snake_case)]
+pub struct TokenCounter;
+
+#[wasm_bindgen]
+#[allow(non_snake_case)]
+impl TokenCounter {
+    /// 粗略估算字符串的 token 数（与 Swift `String.estimatedTokens` 算法一致）。
+    pub fn estimateTokens(s: &str) -> usize {
+        aether_core::estimate_tokens(s)
+    }
+}

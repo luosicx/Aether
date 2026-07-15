@@ -93,4 +93,12 @@ double aether_cosine_f64(const double *a,
  */
 AETHER_EXPORT char *aether_top_k_f32_json(const char *input);
 
+/**
+ * 粗略估算字符串的 token 数（与 Swift `String.estimatedTokens` 算法一致）。
+ * 空指针返回 0。
+ * # Safety
+ * `s` 必须是合法 NUL 结尾 UTF-8。
+ */
+AETHER_EXPORT uintptr_t aether_estimate_tokens(const char *s);
+
 #endif  /* AETHER_CORE_FFI_H */

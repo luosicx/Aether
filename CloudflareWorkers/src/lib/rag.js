@@ -124,6 +124,29 @@ export function chunkText(text, chunkSize = 500, overlap = 50) {
   return chunks;
 }
 
+// TokenCounter WASM 懒加载单例（cosine 计算已迁移至 Rust aether-core-ffi）
+let _tokenCounter = null;
+async function getTokenCounter() {
+  if (_tokenCounter) return _tokenCounter;
+  const mod = await import("../../wasm/aether_sse.js");
+  await mod.default();
+  _tokenCounter = mod.TokenCounter;
+  return _tokenCounter;
+}
+
+/**
+ * 粗略估算字符串的 token 数（与 Swift `String.estimatedTokens` 算法一致）。
+ * 算法：英文按空格分词 × 1.3 + 非 ASCII 字符 × 1.5。
+ * 用于上下文窗口管理与文档分块预算估算。
+ * @param {string} text
+ * @returns {Promise<number>} 估算的 token 数
+ */
+export async function estimateTokens(text) {
+  if (!text || typeof text !== "string") return 0;
+  const TokenCounter = await getTokenCounter();
+  return TokenCounter.estimateTokens(text);
+}
+
 /**
  * 生成简单 UUID（Workers 无原生 crypto.randomUUID 兜底）
  * @returns {string}

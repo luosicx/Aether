@@ -2,9 +2,11 @@
 #![forbid(unsafe_code)]
 
 pub mod sse;
+pub mod token;
 pub mod vector;
 
 pub use sse::{
     extract_content, parse_chunk, parse_with_tool_accumulation, AccumulatedToolCall, ParsedChunk,
 };
+pub use token::estimate_tokens;
 pub use vector::{cosine_similarity_f32, cosine_similarity_f64, top_k_f32};
