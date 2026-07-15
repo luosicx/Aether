@@ -50,28 +50,17 @@ typedef struct AetherSandboxInstance AetherSandboxInstance;
 typedef struct AetherSandboxModule AetherSandboxModule;
 #endif
 
-typedef struct BTreeMap_i64__AccumulatedToolCall BTreeMap_i64__AccumulatedToolCall;
-
-#if defined(__wasm32__)
-/**
- * SHA-256 流式哈希器（Workers 端预留，当前无调用方）。
- */
-typedef struct Sha256 Sha256;
-#endif
-
 /**
  * C 侧持有的解析器状态（跨调用累积 tool_calls）。
+ * opaque（字段含跨 crate 类型 BTreeMap，cbindgen 生成 opaque typedef）。
  */
-typedef struct AetherSseState {
-  struct BTreeMap_i64__AccumulatedToolCall inner;
-} AetherSseState;
+typedef struct AetherSseState AetherSseState;
 
 /**
  * C 侧持有的 SHA-256 哈希器状态（流式 update）。
+ * opaque（字段含跨 crate 类型 Sha256，cbindgen 生成 opaque typedef）。
  */
-typedef struct AetherSha256 {
-  struct Sha256 inner;
-} AetherSha256;
+typedef struct AetherSha256 AetherSha256;
 
 AETHER_EXPORT struct AetherSseState *aether_sse_state_new(void);
 

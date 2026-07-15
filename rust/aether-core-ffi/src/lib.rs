@@ -14,7 +14,9 @@ use aether_core::{
 };
 
 /// C 侧持有的解析器状态（跨调用累积 tool_calls）。
-#[repr(C)]
+// 不加 `#[repr(C)]`：字段类型 `BTreeMap` 跨 crate 无法布局，
+// cbindgen 生成 opaque typedef（与 AetherInferenceEngine 等一致），
+// 跨 FFI 仅以 `*mut AetherSseState` 传递，不需要 C 布局。
 pub struct AetherSseState {
     inner: BTreeMap<i64, AccumulatedToolCall>,
 }
@@ -270,7 +272,8 @@ pub unsafe extern "C" fn aether_chunk_document(
 // ===== SHA-256 C ABI（流式） =====
 
 /// C 侧持有的 SHA-256 哈希器状态（流式 update）。
-#[repr(C)]
+// 不加 `#[repr(C)]`：字段类型 `Sha256` 跨 crate 无法布局，
+// cbindgen 生成 opaque typedef，跨 FFI 仅以 `*mut AetherSha256` 传递。
 pub struct AetherSha256 {
     inner: Sha256,
 }
