@@ -55,10 +55,7 @@ private struct TopKPair: Decodable {
     let index: Int
     let score: Float
 
-    private enum CodingKeys: String, CodingKey {
-        // JSON 数组解码：使用 UnkeyedContainer 而非键名
-    }
-
+    // JSON 数组解码：使用 UnkeyedContainer，无需 CodingKeys
     init(from decoder: Decoder) throws {
         var c = try decoder.unkeyedContainer()
         index = try c.decode(Int.self)

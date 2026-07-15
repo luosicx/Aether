@@ -400,13 +400,6 @@
 			remoteGlobalIDString = 3E5AA27405E11EA8C5B0C6DB;
 			remoteInfo = "Aether-macOS";
 		};
-		E675934DC0576EBA520F2587 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 7C5EF9114C3CBE2937F8D8FA /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = E23E24C20D3BDA0C23D4DB83;
-			remoteInfo = "Aether-iOS";
-		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
@@ -1738,7 +1731,6 @@
 			buildRules = (
 			);
 			dependencies = (
-				CFC8B2DED07D909326F68594 /* PBXTargetDependency */,
 				80145CE557A8E962C328363A /* PBXTargetDependency */,
 			);
 			name = AetherTests;
@@ -2319,12 +2311,6 @@
 			name = "Aether-macOS";
 			target = 3E5AA27405E11EA8C5B0C6DB /* Aether-macOS */;
 			targetProxy = 19570A7C106F8A3D402C4A64 /* PBXContainerItemProxy */;
-		};
-		CFC8B2DED07D909326F68594 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			name = "Aether-iOS";
-			target = E23E24C20D3BDA0C23D4DB83 /* Aether-iOS */;
-			targetProxy = E675934DC0576EBA520F2587 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
