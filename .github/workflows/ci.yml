@@ -115,7 +115,9 @@ jobs:
           # - Crash/: Crash reporting (requires crash integration SDK)
           # - Search/: Spotlight indexer (requires Spotlight integration)
           # Note: AetherTests/ is NOT excluded - test code coverage contributes to overall coverage
-          EXCLUDE_PATTERNS = ["/Views/", "/DesignSystem/", "/App/AetherApp", "/Protocols/", "/Actors/", "/AetherUITests/", "/AetherWatch/", "/AetherDesign/", "/AetherUI/", "/AppIntents/", "/OnDevice/", "/Health/", "/Connectivity/", "/Crash/", "/Search/"]
+          # - macOS-only tools (TerminalCommandTool/SafariControlTool/FileOperationTool/WindowManagementTool):
+          #   excluded from iOS coverage because iOS tests cannot run them (0% on iOS, tested on macOS instead)
+          EXCLUDE_PATTERNS = ["/Views/", "/DesignSystem/", "/App/AetherApp", "/Protocols/", "/Actors/", "/AetherUITests/", "/AetherWatch/", "/AetherDesign/", "/AetherUI/", "/AppIntents/", "/OnDevice/", "/Health/", "/Connectivity/", "/Crash/", "/Search/", "TerminalCommandTool.swift", "SafariControlTool.swift", "FileOperationTool.swift", "WindowManagementTool.swift"]
           for m in pattern.finditer(text):
               path = m.group(1)
               cov = int(m.group(3))
