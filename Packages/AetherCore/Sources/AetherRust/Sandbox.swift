@@ -26,7 +26,7 @@ public final class AetherRustSandbox: @unchecked Sendable {
     ///   - maxFuel: CPU 指令限额（30 秒 ≈ 30_000_000_000）
     ///   - maxMemoryBytes: 线性内存上限（字节，50 MB = 52_428_800）
     public init?(maxFuel: UInt64 = 30_000_000_000, maxMemoryBytes: Int = 50 * 1024 * 1024) {
-        guard let h = aether_sandbox_new(maxFuel, maxMemoryBytes) else { return nil }
+        guard let h = aether_sandbox_new(maxFuel, UInt(maxMemoryBytes)) else { return nil }
         self.handle = h
     }
 
@@ -41,7 +41,7 @@ public final class AetherRustSandbox: @unchecked Sendable {
         guard count > 0 else { return nil }
         let module = wasm.withUnsafeBytes { (ptr: UnsafeRawBufferPointer) -> OpaquePointer? in
             guard let base = ptr.baseAddress else { return nil }
-            return aether_sandbox_load(handle, base.assumingMemoryBound(to: UInt8.self), count)
+            return aether_sandbox_load(handle, base.assumingMemoryBound(to: UInt8.self), UInt(count))
         }
         guard let m = module else { return nil }
         return AetherRustSandboxModule(handle: m)

@@ -57,7 +57,7 @@ public actor RateLimiter {
         if Self.useRust, let bucket = chatBucket {
             let nowMs = UInt64(Date().timeIntervalSince1970 * 1000)
             if let retryAfter = bucket.acquire(1.0, nowMs: nowMs) {
-                throw LLMError.rateLimited(retryAfter: Int(retryAfter.rounded(.up)))
+                throw LLMError.rateLimited(retryAfter: retryAfter.rounded(.up))
             }
             return
         }
@@ -69,7 +69,7 @@ public actor RateLimiter {
         if Self.useRust, let bucket = embedBucket {
             let nowMs = UInt64(Date().timeIntervalSince1970 * 1000)
             if let retryAfter = bucket.acquire(1.0, nowMs: nowMs) {
-                throw LLMError.rateLimited(retryAfter: Int(retryAfter.rounded(.up)))
+                throw LLMError.rateLimited(retryAfter: retryAfter.rounded(.up))
             }
             return
         }

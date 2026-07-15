@@ -33,9 +33,7 @@ jobs:
 
       - name: Build for Testing
         id: build
-        continue-on-error: true
         run: |
-          set +e
           xcodebuild build-for-testing \
             -project Aether.xcodeproj \
             -scheme Aether-iOS \
@@ -292,9 +290,7 @@ jobs:
 
       - name: Build for Testing
         id: build
-        continue-on-error: true
         run: |
-          set +e
           xcodebuild build-for-testing \
             -project Aether.xcodeproj \
             -scheme Aether-iOS \
@@ -370,9 +366,7 @@ jobs:
 
       - name: Build for Testing
         id: build
-        continue-on-error: true
         run: |
-          set +e
           xcodebuild build-for-testing \
             -project Aether.xcodeproj \
             -scheme Aether-iOS \
@@ -450,9 +444,7 @@ jobs:
 
       - name: Build for Testing (macOS)
         id: build_macos
-        continue-on-error: true
         run: |
-          set +e
           xcodebuild build-for-testing \
             -project Aether.xcodeproj \
             -scheme Aether-macOS \
@@ -523,9 +515,7 @@ jobs:
 
       - name: Build for Testing (macOS)
         id: build_macos
-        continue-on-error: true
         run: |
-          set +e
           xcodebuild build-for-testing \
             -project Aether.xcodeproj \
             -scheme Aether-macOS \
