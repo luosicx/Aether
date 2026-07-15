@@ -1,42 +1,50 @@
 /**
- * 限流中间件：内存计数器实现每分钟限流
+ * 限流中间件：令牌桶限流器（WASM，Rust aether-core token-bucket）
  *
- * 与现有 worker.js 一致：基于单个 Worker 实例内存 Map，
- * 非全局持久化；不同实例间不共享。
+ * 基于 Cloudflare Workers 内存 Map 存储 per-userId RateLimiter 实例。
+ * 非全局持久化；不同 Worker 实例间不共享。
  * 生产环境如需精确限流，建议改用 Durable Objects 或 KV 计数器。
  *
- * 默认每 userId 每分钟 60 次。
+ * 默认每 userId 每分钟 60 次（capacity=60, refillRate=1/sec）。
  */
 
-// 内存计数器：userId -> { count, windowStart }
+// RateLimiter WASM 懒加载单例
+let _RateLimiterCtor = null;
+async function getRateLimiterCtor() {
+  if (_RateLimiterCtor) return _RateLimiterCtor;
+  const mod = await import("../../wasm/aether_sse.js");
+  await mod.default();
+  _RateLimiterCtor = mod.RateLimiter;
+  return _RateLimiterCtor;
+}
+
+// 内存计数器：userId -> RateLimiter 实例
 const rateLimitMap = new Map();
 
-// 限流窗口（毫秒）
-const WINDOW_MS = 60_000;
-
 /**
- * 检查限流
+ * 检查限流（令牌桶算法）
  * @param {string} userId
  * @param {Object} env - 保留参数以便后续切换为 KV/Durable Objects 限流
  * @param {number} limit - 每分钟允许的请求数，默认 60
- * @returns {{allowed: boolean, retryAfter?: number, remaining?: number}}
+ * @returns {Promise<{allowed: boolean, retryAfter?: number, remaining?: number}>}
  */
-export function checkRateLimit(userId, env, limit = 60) {
+export async function checkRateLimit(userId, env, limit = 60) {
   const now = Date.now();
-  let entry = rateLimitMap.get(userId);
-  if (!entry || now - entry.windowStart >= WINDOW_MS) {
-    entry = { count: 0, windowStart: now };
-    rateLimitMap.set(userId, entry);
-  }
-  entry.count += 1;
+  const RateLimiter = await getRateLimiterCtor();
 
-  if (entry.count > limit) {
-    // 计算距窗口重置的剩余秒数（至少 1 秒）
-    const retryAfter = Math.max(1, Math.ceil((WINDOW_MS - (now - entry.windowStart)) / 1000));
-    return { allowed: false, retryAfter };
+  let bucket = rateLimitMap.get(userId);
+  if (!bucket) {
+    // capacity = limit, refillRate = limit / 60 tokens/sec
+    bucket = new RateLimiter(limit, limit / 60.0, now);
+    rateLimitMap.set(userId, bucket);
   }
 
-  return { allowed: true, remaining: Math.max(0, limit - entry.count) };
+  const retryAfter = bucket.acquire(1.0, now);
+  if (retryAfter > 0) {
+    return { allowed: false, retryAfter: Math.ceil(retryAfter) };
+  }
+
+  return { allowed: true, remaining: Math.floor(bucket.availableTokens(now)) };
 }
 
 /**

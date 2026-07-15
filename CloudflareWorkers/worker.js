@@ -185,7 +185,7 @@ async function dispatch(route, request, env, ctx) {
 
   // 2. 限流（仅 chat 端点）
   if (route.rateLimited) {
-    const rl = checkRateLimit(auth.userId, env, 60);
+    const rl = await checkRateLimit(auth.userId, env, 60);
     if (!rl.allowed) {
       return rateLimitResponse(rl.retryAfter);
     }
@@ -265,7 +265,7 @@ async function proxyLLM(request, env, ctx) {
   }
 
   // 2. 限流：复用内存计数器（按 token 维度，与原实现一致）
-  const rl = checkRateLimit(bffToken, env, 60);
+  const rl = await checkRateLimit(bffToken, env, 60);
   if (!rl.allowed) {
     return rateLimitResponse(rl.retryAfter);
   }

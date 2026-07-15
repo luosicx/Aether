@@ -9,8 +9,8 @@ use std::os::raw::{c_char, c_void};
 
 use aether_core::{
     chunk_document, cosine_similarity_f32, cosine_similarity_f64, estimate_tokens, extract_content,
-    parse_chunk, parse_with_tool_accumulation, redact, sha256_hex, top_k_f32, AccumulatedToolCall,
-    ParsedChunk, Sha256,
+    parse_chunk, parse_with_tool_accumulation, ratelimit::TokenBucket, redact, sha256_hex,
+    top_k_f32, AccumulatedToolCall, ParsedChunk, Sha256,
 };
 
 /// C 侧持有的解析器状态（跨调用累积 tool_calls）。
@@ -335,6 +335,87 @@ pub unsafe extern "C" fn aether_sha256_hex(data: *const u8, len: usize) -> *mut 
     }
     let slice = std::slice::from_raw_parts(data, len);
     to_cstring(&sha256_hex(slice))
+}
+
+// ===== 令牌桶限流 C ABI =====
+
+/// C 侧持有的令牌桶限流器状态。
+/// 不加 `#[repr(C)]`，cbindgen 生成 opaque typedef（字段含跨 crate 类型）。
+pub struct AetherRateLimiter {
+    inner: TokenBucket,
+}
+
+/// 创建令牌桶限流器。初始令牌数 = 容量（满桶）。
+/// 调用方负责通过 `aether_rate_limiter_free` 释放。
+/// - `capacity`: 桶容量（最大令牌数）
+/// - `refill_rate`: 每秒补充令牌数
+/// - `now_ms`: 当前 epoch 毫秒时间戳
+#[no_mangle]
+pub extern "C" fn aether_rate_limiter_new(
+    capacity: f64,
+    refill_rate: f64,
+    now_ms: u64,
+) -> *mut AetherRateLimiter {
+    Box::into_raw(Box::new(AetherRateLimiter {
+        inner: TokenBucket::new(capacity, refill_rate, now_ms),
+    }))
+}
+
+/// 尝试获取 `n` 个令牌。
+/// 成功返回 0，失败返回正数（距下次有足够令牌的预估等待秒数）。
+/// # Safety
+/// `state` 来自 `aether_rate_limiter_new`。
+#[no_mangle]
+pub unsafe extern "C" fn aether_rate_limiter_acquire(
+    state: *mut AetherRateLimiter,
+    n: f64,
+    now_ms: u64,
+) -> f64 {
+    if state.is_null() {
+        return 1.0;
+    }
+    let state = &mut *state;
+    match state.inner.acquire(n, now_ms) {
+        Ok(()) => 0.0,
+        Err(retry_after) => retry_after,
+    }
+}
+
+/// 当前可用令牌数（触发补充后）。
+/// # Safety
+/// `state` 来自 `aether_rate_limiter_new`。
+#[no_mangle]
+pub unsafe extern "C" fn aether_rate_limiter_available(
+    state: *mut AetherRateLimiter,
+    now_ms: u64,
+) -> f64 {
+    if state.is_null() {
+        return 0.0;
+    }
+    let state = &mut *state;
+    state.inner.available_tokens(now_ms)
+}
+
+/// 重置桶到满容量。
+/// # Safety
+/// `state` 来自 `aether_rate_limiter_new`。
+#[no_mangle]
+pub unsafe extern "C" fn aether_rate_limiter_reset(state: *mut AetherRateLimiter, now_ms: u64) {
+    if state.is_null() {
+        return;
+    }
+    let state = &mut *state;
+    state.inner.reset(now_ms);
+}
+
+/// 释放令牌桶限流器。空指针安全。
+/// # Safety
+/// `state` 来自 `aether_rate_limiter_new`，且只能释放一次。
+#[no_mangle]
+pub unsafe extern "C" fn aether_rate_limiter_free(state: *mut AetherRateLimiter) {
+    if !state.is_null() {
+        drop(Box::from_raw(state));
+    }
 }
 
 /// FFI 友好的序列化视图：字段名统一 camelCase，`kind`→`type` 与 Swift 对齐。

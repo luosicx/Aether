@@ -186,3 +186,39 @@ impl Sha256 {
         self.inner.finalize()
     }
 }
+
+/// 令牌桶限流器（Workers 端 ratelimit.js 用）。
+#[wasm_bindgen]
+pub struct RateLimiter {
+    inner: aether_core::TokenBucket,
+}
+
+#[wasm_bindgen]
+impl RateLimiter {
+    /// 创建令牌桶。`capacity` 为桶容量，`refillRate` 为每秒补充令牌数，
+    /// `nowMs` 为当前 epoch 毫秒时间戳（f64 避免 JS BigInt 兼容问题）。
+    #[wasm_bindgen(constructor)]
+    pub fn new(capacity: f64, refillRate: f64, nowMs: f64) -> RateLimiter {
+        RateLimiter {
+            inner: aether_core::TokenBucket::new(capacity, refillRate, nowMs as u64),
+        }
+    }
+
+    /// 尝试获取 `n` 个令牌。成功返回 0，失败返回正数（预估等待秒数）。
+    pub fn acquire(&mut self, n: f64, nowMs: f64) -> f64 {
+        match self.inner.acquire(n, nowMs as u64) {
+            Ok(()) => 0.0,
+            Err(retry_after) => retry_after,
+        }
+    }
+
+    /// 当前可用令牌数（触发补充后）。
+    pub fn availableTokens(&mut self, nowMs: f64) -> f64 {
+        self.inner.available_tokens(nowMs as u64)
+    }
+
+    /// 重置桶到满容量。
+    pub fn reset(&mut self, nowMs: f64) {
+        self.inner.reset(nowMs as u64);
+    }
+}

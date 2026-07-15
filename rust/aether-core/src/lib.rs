@@ -2,6 +2,7 @@
 #![forbid(unsafe_code)]
 
 pub mod chunk;
+pub mod ratelimit;
 pub mod redact;
 pub mod sha;
 pub mod sse;
@@ -9,6 +10,7 @@ pub mod token;
 pub mod vector;
 
 pub use chunk::chunk_document;
+pub use ratelimit::TokenBucket;
 pub use redact::redact;
 pub use sha::{sha256_hex, Sha256};
 pub use sse::{
