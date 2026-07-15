@@ -947,6 +947,347 @@ final class SSEParserRustTests: XCTestCase {
         XCTAssertEqual(p.extractContent(line), "Hi")
     }
 
-    func testDone() {
+    func testDoneReturnsNil() {
         let p = AetherRustSSEParser()
-        XCTAssertNil(p.parseChunk("data: [DONE]
+        // [DONE] 在 parseChunk 语义里是 Some(None)，Swift wrapper 转为 nil
+        XCTAssertNil(p.parseChunk("data: [DONE]"))
+    }
+
+    func testNonDataLineReturnsNil() {
+        let p = AetherRustSSEParser()
+        XCTAssertNil(p.parseChunk(": keepalive"))
+    }
+
+    func testToolCallAccumulation() {
+        let p = AetherRustSSEParser()
+        let first = #"data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"get_weather","arguments":""}}]}}]}"#
+        let r1 = p.parseWithTools(first)
+        XCTAssertNotNil(r1)
+        XCTAssertEqual(r1?.toolCalls?.first?.name, "get_weather")
+        // 第二片只追加 arguments
+        let second = #"data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\"city\":\"BJ\"}"}}]}}]}"#
+        let r2 = p.parseWithTools(second)
+        XCTAssertEqual(r2?.toolCalls?.first?.arguments, #"{"city":"BJ"}"#)
+    }
+}
+```
+
+> 注：Swift wrapper 内部用独立 `AccumulatedToolCall` 私有类型解码；`SSEParser.parseWithToolAccumulation` 再映射到 `AetherServices` 的公开 `AccumulatedToolCall`（字段 `type` ← Rust `kind`）。
+
+- [ ] **Step 9: 编译并运行 Swift 测试**
+
+Run（`cd /workspace/Packages/AetherCore`）：`swift test --filter SSEParserRustTests`
+Expected: 4 个测试全部通过。
+
+- [ ] **Step 10: 跑既有 SSE 测试确保无回归**
+
+Run：`swift test --filter SSEParser`
+Expected: 既有 `AetherTests`/`AetherCoreTests` 中 SSE 相关用例仍通过。
+
+- [ ] **Step 11: 提交**
+
+```bash
+git add rust/scripts/build-apple.sh Packages/AetherCore/ AetherTests/LLM/SSEParserRustTests.swift
+git commit -m "feat(apple): 接入 Rust xcframework，SSEParser 转发到 aether-core"
+```
+
+---
+
+## Task 5: Cloudflare Workers 接入（wasm-pack + llm.js 改调 WASM）
+
+本 Task 把 `parseSSEEvent` 替换为调用 Rust 编译的 WASM。D1/KV 绑定与 `worker.js` 入口保持不变，仅 `src/lib/llm.js` 内部改实现。
+
+**Files:**
+- Create: `rust/scripts/build-wasm.sh`
+- Create: `CloudflareWorkers/wasm/`（产物目录，gitignore 产物本体）
+- Modify: `CloudflareWorkers/src/lib/llm.js`
+- Modify: `CloudflareWorkers/package.json`
+- Create: `CloudflareWorkers/test/llm.wasm.test.js`
+
+- [ ] **Step 1: 编写 WASM 构建脚本** `rust/scripts/build-wasm.sh`：
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+OUT="../CloudflareWorkers/wasm"
+mkdir -p "$OUT"
+
+wasm-pack build aether-core-ffi \
+  --target web \
+  --release \
+  --out-dir "$OUT" \
+  --out-name aether_sse
+
+echo "==> 产出: $OUT/aether_sse.js, $OUT/aether_sse_bg.wasm"
+```
+
+Run：`chmod +x rust/scripts/build-wasm.sh && rust/scripts/build-wasm.sh`
+Expected: 生成 `CloudflareWorkers/wasm/aether_sse.js` 与 `aether_sse_bg.wasm`。
+
+- [ ] **Step 2: 更新 Workers package.json**
+
+修改 `CloudflareWorkers/package.json`，在 `scripts` 新增 `"build:wasm": "../rust/scripts/build-wasm.sh"`，并在 `devDependencies` 增加 `"wasm-pack": "^0.12"`。
+
+```json
+{
+  "name": "aether-bff",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "vitest run",
+    "build:wasm": "../rust/scripts/build-wasm.sh"
+  },
+  "devDependencies": {
+    "wrangler": "^3",
+    "vitest": "^1",
+    "wasm-pack": "^0.12"
+  }
+}
+```
+
+- [ ] **Step 3: 改造 llm.js 调用 WASM**
+
+修改 `CloudflareWorkers/src/lib/llm.js`，把 `parseSSEEvent` 改为调用 WASM 导出。模块加载放在文件顶部（懒加载单例）：
+
+```javascript
+// 顶部新增：WASM 模块懒加载
+let _wasmInstance = null;
+async function getWasm() {
+  if (_wasmInstance) return _wasmInstance;
+  const { SseState } = await import("../wasm/aether_sse.js");
+  _wasmInstance = { SseState, state: new SseState() };
+  return _wasmInstance;
+}
+
+/**
+ * 解析单条 SSE 事件，返回增量文本（若为 [DONE] 或无 content 则返回 null）
+ * 实现已迁移至 Rust（aether-core-ffi，wasm-pack 产物）。
+ * @param {string} rawEvent
+ * @returns {Promise<string|null>}
+ */
+async function parseSSEEvent(rawEvent) {
+  const wasm = await getWasm();
+  // 取 data: 行（保留原多行容错）
+  const lines = rawEvent.split("\n");
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("data:")) continue;
+    return wasm.state.extractContent(trimmed);
+  }
+  return null;
+}
+```
+
+> 注：原 `parseSSEEvent` 是同步函数，被 `streamDelta` 调用。改为 async 后，`streamDelta` 的调用点需相应 `await`。检查 `llm.js` 中 `const delta = parseSSEEvent(buffer)` 改为 `const delta = await parseSSEEvent(buffer)`。
+
+- [ ] **Step 4: 处理 streamDelta 调用点同步→异步**
+
+在 `CloudflareWorkers/src/lib/llm.js` 的 `streamDelta` 内，把 `const delta = parseSSEEvent(...)` 改为 `const delta = await parseSSEEvent(...)`，并把 `streamDelta` 标记为 `async function*`（若尚未是）。
+
+- [ ] **Step 5: 写 Workers 侧回归测试** `CloudflareWorkers/test/llm.wasm.test.js`：
+
+```javascript
+import { describe, it, expect, beforeAll } from "vitest";
+import { SseState } from "../wasm/aether_sse.js";
+
+describe("WASM SSE parser", () => {
+  let state;
+  beforeAll(() => { state = new SseState(); });
+
+  it("extracts content", () => {
+    const line = `data: {"choices":[{"delta":{"content":"Hi"}}]}`;
+    expect(state.extractContent(line)).toBe("Hi");
+  });
+
+  it("returns null for [DONE]", () => {
+    expect(state.extractContent("data: [DONE]")).toBeNull();
+  });
+
+  it("returns null for non-data lines", () => {
+    expect(state.extractContent(": keepalive")).toBeNull();
+  });
+
+  it("accumulates tool calls across chunks", () => {
+    const s = new SseState();
+    const first = `data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c1","type":"function","function":{"name":"get_weather","arguments":""}}]}}]}`;
+    s.parseWithTools(first);
+    const second = `data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\\"city\\":\\"BJ\\"}"}}]}}]}`;
+    const r = JSON.parse(s.parseWithTools(second));
+    expect(r.toolCalls[0].arguments).toBe('{"city":"BJ"}');
+  });
+});
+```
+
+- [ ] **Step 6: 运行 Workers 测试**
+
+Run（`cd /workspace/CloudflareWorkers`）：`npm run build:wasm && npx vitest run test/llm.wasm.test.js`
+Expected: 4 个用例通过。
+
+- [ ] **Step 7: 跑既有 Workers 测试确保无回归**
+
+Run：`npx vitest run`
+Expected: 既有 SSE 相关用例仍通过；若有 `streamDelta` 同步断言，需同步更新为 await。
+
+- [ ] **Step 8: 提交**
+
+```bash
+git add rust/scripts/build-wasm.sh CloudflareWorkers/
+git commit -m "feat(bff): parseSSEEvent 改调 Rust WASM，统一 SSE 解析"
+```
+
+---
+
+## Task 6: CI 集成（GitHub Actions 新增 Rust job）
+
+本 Task 在 `.github/workflows/ci.yml` 新增 Rust 构建+测试 job，并把 `build-apple.sh`、`build-wasm.sh` 串入产物矩阵。
+
+**Files:**
+- Modify: `.github/workflows/ci.yml`
+
+- [ ] **Step 1: 新增 rust job**
+
+在 `.github/workflows/ci.yml` 顶层 `jobs:` 下追加：
+
+```yaml
+  rust:
+    name: Rust core (fmt + clippy + test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+      - name: Install wasm-pack
+        run: cargo install wasm-pack || true
+      - name: Install targets
+        run: rustup target add wasm32-unknown-unknown aarch64-linux-android x86_64-linux-android
+      - name: fmt
+        run: cargo fmt --all -- --check
+      - name: clippy
+        run: cargo clippy --all-targets -- -D warnings
+      - name: test aether-core
+        run: cargo test -p aether-core
+      - name: build wasm
+        run: ./scripts/build-wasm.sh
+      - name: build android targets
+        run: |
+          cargo build -p aether-core-ffi --target aarch64-linux-android
+          cargo build -p aether-core-ffi --target x86_64-linux-android
+```
+
+> 注：Apple xcframework 构建需 macOS runner，单独成 job（`rust-apple`，runs-on: macos-latest），此处省略以保持本计划聚焦；首个落地单元可不依赖 xcframework 产物（CI 仅校验 Rust 侧 + WASM）。
+
+- [ ] **Step 2: 校验 workflow 语法**
+
+Run（`cd /workspace`）：`python3 -c "import yaml; yaml.safe_load(open('.github/workflows/ci.yml'))"`
+Expected: 无异常。
+
+- [ ] **Step 3: 提交**
+
+```bash
+git add .github/workflows/ci.yml
+git commit -m "ci(rust): 新增 Rust fmt/clippy/test/wasm/android 构建 job"
+```
+
+---
+
+## 后续计划路线图（各自独立成文）
+
+以下模块按"高风险高收益"排序，每个都是独立的后续计划，不在本计划范围内：
+
+1. **向量数学 / 语义缓存**：`SemanticCache.swift`（`@MainActor` 线性扫 100 项）+ `RAGService.swift`（重复 cosine、O(N×D) 暴力扫）→ Rust + 可选 SIMD/ANN 索引（`usearch`/`instant-distance`）。收益：移出主线程、统一重复实现。
+2. **token 计数**：`String+TokenCount.swift`（粗估 `asciiWords×1.3 + nonASCII×1.5`）→ `tiktoken-rs` 精确 BPE，跨 5 端共享。
+3. **安全正则**：`PromptInjectionDetector.swift` + `TelemetrySanitizer.swift` → Rust `regex`，客户端与服务端统一强制（BFF 目前无注入检测/脱敏）。
+4. **文档分块**：`DocumentChunker.swift`（Apple `NLTokenizer`）+ `CloudflareWorkers/src/lib/rag.js` `chunkText` → 共享 Rust `unicode-segmentation`，去 Apple-only 依赖。
+5. **SHA-256 流式哈希**：`MLXInferenceEngine.swift:176-190`（模型文件完整性校验）→ `sha2` crate。
+6. **PDF 抽取**：`PDFExtractor.swift`（Apple `PDFKit`，仅 Apple 端可用）→ Rust `pdf-extract`，赋能 Android/Windows/Workers。
+7. **插件沙箱**：`PluginSandbox.swift`（当前仅声明式权限检查，`maxExecutionTime=30s`/`maxMemoryMB=50` 未强制）→ `wasmtime` 嵌入，真正隔离+限额。
+8. **端侧推理**：`MLXInferenceEngine.swift`（Apple MLX，仅 Apple 端）→ `candle`/`llama.cpp`，赋能 Android/Windows。
+9. **速率限制**：`RateLimiter.swift`（客户端 token-bucket）+ `CloudflareWorkers/src/lib/ratelimit.js`（服务端 per-Worker Map，代码注释建议改 Durable Objects）→ 共享 Rust token-bucket。
+
+---
+
+## 自审（Self-Review）
+
+**1. Spec 覆盖：** 用户诉求为"引入 Rust 处理安全缺陷、内存问题、运算速度，先给出计划"。
+- 安全缺陷：本计划把"所有 unsafe 集中到 `aether-core-ffi`，核心 crate `#![forbid(unsafe_code)]`"写入架构；SSE 解析处理不可信网络输入（内存敏感）。✅
+- 内存问题：SSE 缓冲累积、`aether_free_string` 显式释放、空指针检查均覆盖。✅
+- 运算速度：本计划以 SSE 为首个落地单元（本身非算力热点，但打通 FFI/WASM/JNI 全链路）；路线图列出 SIMD 向量数学、SHA-256 等真正的算力热点。✅
+- "先给出计划"：交付物为计划文档。✅
+
+**2. 占位符扫描：** 已检查无 "TBD/TODO/类似 Task N/补充错误处理" 等占位符；每步均给出具体代码与命令。唯一标注"省略"处为 Task 6 的 `rust-apple` macOS job（明确说明原因且非阻塞）。
+
+**3. 类型一致性：**
+- Rust `AccumulatedToolCall` 字段 `kind`（避让关键字）→ FFI View JSON key `kind` → Swift 私有 `AccumulatedToolCall.CodingKeys.kind` → 公开 `AetherServices.AccumulatedToolCall.type`，映射在 `SSEParser.parseWithToolAccumulation` 中显式完成（`type: tc.kind`）。✅
+- Rust `ParsedChunk { content, tool_calls }` → FFI View `{ content, tool_calls }`（serde 默认 snake_case）→ Swift wrapper 改用 `toolCalls`，在 `to_parsed_chunk_json`/`parseWithTools` 中通过自定义 View/JSON 字段处理。注意：FFI C ABI View 用 snake_case `tool_calls`，Swift wrapper 解码用 camelCase `toolCalls`——需对齐。**修正点**：C ABI 的 `to_parsed_chunk_json` 与 WASM 的 `parseWithTools` 应使用同一字段名。本计划中 C ABI View 用 `tool_calls`（snake_case），而 WASM `parseWithTools` 用 `toolCalls`（camelCase，通过 `serde_json::json!`）。Swift wrapper 通过 `ParsedChunkView`（CodingKeys `toolCalls`）解码 WASM 路径；C ABI 路径则需对应 snake_case。**为避免歧义，统一为 camelCase**：把 `to_parsed_chunk_json` 的 `View` 字段改为 `toolCalls`（加 `#[serde(rename = "toolCalls")]`）。
+
+> **自审修正（已在下方执行）：** 见下方"类型一致性修正"。
+
+### 类型一致性修正
+
+修改 `rust/aether-core-ffi/src/lib.rs` 的 `to_parsed_chunk_json`，使 FFI View 字段与 WASM/Swift 一致（camelCase `toolCalls`，并补 `kind`→`type` 映射以匹配 Swift 公开类型）：
+
+```rust
+fn to_parsed_chunk_json(p: &ParsedChunk) -> *mut c_char {
+    #[derive(serde::Serialize)]
+    struct ViewTool<'a> {
+        id: &'a str,
+        #[serde(rename = "type")]
+        kind: &'a str,
+        name: &'a str,
+        arguments: &'a str,
+    }
+    #[derive(serde::Serialize)]
+    struct View<'a> {
+        content: &'a Option<String>,
+        #[serde(rename = "toolCalls")]
+        tool_calls: Vec<ViewTool>,
+    }
+    let tools: Vec<ViewTool> = p.tool_calls.as_ref().map(|v| {
+        v.iter().map(|t| ViewTool {
+            id: &t.id, kind: &t.kind, name: &t.name, arguments: &t.arguments,
+        }).collect()
+    }).unwrap_or_default();
+    let view = View {
+        content: &p.content,
+        tool_calls: tools,
+    };
+    serde_json::to_string(&view).map(|j| to_cstring(&j)).unwrap_or(std::ptr::null_mut())
+}
+```
+
+对应地，Swift wrapper `SSE.swift` 的 `ParsedChunkView.toolCalls` 现可与 C ABI 路径一致解码；`AccumulatedToolCall` 私有类型 `CodingKeys.kind` 改为 `type`：
+
+```swift
+private struct AccumulatedToolCall: Decodable {
+    let id: String
+    let type: String   // JSON key "type"（FFI View 已 rename）
+    let name: String
+    let arguments: String
+}
+```
+
+并相应调整 `SSEParser.parseWithToolAccumulation` 映射：`type: tc.type`（Rust `kind` → JSON `type` → Swift `type`，与公开 `AccumulatedToolCall.type` 直接对齐，无需再改名）。
+
+---
+
+## 执行交付物
+
+本计划完成后将产出：
+- `rust/` Rust workspace（2 crate，全测试通过，CI 集成）
+- Apple 平台 `AetherRust` SPM target，`SSEParser.swift` 转发到 Rust
+- Cloudflare Workers `parseSSEEvent` 调用 Rust WASM
+- 4 端 SSE 解析统一为单一 Rust 实现，消除行为发散
+- CI 校验 Rust fmt/clippy/test + WASM + Android 交叉编译
+
+后续 9 个模块各自独立成计划，按路线图推进。
+
