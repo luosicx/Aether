@@ -69,6 +69,7 @@ public final class PluginSandbox {
         guard Self.useRust else {
             return AetherRustSandboxResult(json: #"{"ok":false,"error":"RustDisabled"}"#)
         }
+        #if !os(iOS)
         let maxFuel = UInt64(maxExecutionTime * 1_000_000_000)
         let maxMemoryBytes = maxMemoryMB * 1024 * 1024
         guard let sandbox = AetherRustSandbox(maxFuel: maxFuel, maxMemoryBytes: maxMemoryBytes) else {
@@ -81,6 +82,11 @@ public final class PluginSandbox {
             return AetherRustSandboxResult(json: #"{"ok":false,"error":"InstantiateFailed"}"#)
         }
         return instance.callJson(argsJson)
+        #else
+        // iOS 上 wasmtime 不支持，useRust 已为 false，guard 已返回。
+        // 此分支不可达，仅为满足编译器返回类型要求。
+        return AetherRustSandboxResult(json: #"{"ok":false,"error":"RustDisabled"}"#)
+        #endif
     }
 
     // MARK: - Private

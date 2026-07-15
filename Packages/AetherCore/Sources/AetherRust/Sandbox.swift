@@ -111,6 +111,8 @@ public final class AetherRustSandboxInstance: @unchecked Sendable {
     }
 }
 
+#endif // !os(iOS)
+
 /// 沙箱执行结果（解析自 Rust 侧返回的 JSON）。
 public struct AetherRustSandboxResult: Equatable {
     /// 是否执行成功。
@@ -152,5 +154,3 @@ public struct AetherRustSandboxResult: Equatable {
         self.error = payload.error
     }
 }
-
-#endif // !os(iOS)
