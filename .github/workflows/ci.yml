@@ -954,9 +954,12 @@ jobs:
       - name: Build static libs
         working-directory: rust
         run: |
-          cargo build -p aether-core-ffi --release --target aarch64-apple-ios
-          cargo build -p aether-core-ffi --release --target aarch64-apple-ios-sim
-          cargo build -p aether-core-ffi --release --target aarch64-apple-darwin
+          # 用 --crate-type staticlib 只构建静态库（.a），
+          # 避免 iOS device target 上 cdylib 链接失败
+          # （onig_sys 的 C 代码编译为 iOS 18.5，链接目标 iOS 10.0，符号不兼容）
+          cargo rustc -p aether-core-ffi --release --target aarch64-apple-ios --crate-type staticlib
+          cargo rustc -p aether-core-ffi --release --target aarch64-apple-ios-sim --crate-type staticlib
+          cargo rustc -p aether-core-ffi --release --target aarch64-apple-darwin --crate-type staticlib
 
       - name: Create xcframework
         run: |
