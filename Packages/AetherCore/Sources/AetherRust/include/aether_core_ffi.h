@@ -13,11 +13,23 @@
 typedef struct BTreeMap_i64__AccumulatedToolCall BTreeMap_i64__AccumulatedToolCall;
 
 /**
+ * SHA-256 流式哈希器（Workers 端预留，当前无调用方）。
+ */
+typedef struct Sha256 Sha256;
+
+/**
  * C 侧持有的解析器状态（跨调用累积 tool_calls）。
  */
 typedef struct AetherSseState {
   struct BTreeMap_i64__AccumulatedToolCall inner;
 } AetherSseState;
+
+/**
+ * C 侧持有的 SHA-256 哈希器状态（流式 update）。
+ */
+typedef struct AetherSha256 {
+  struct Sha256 inner;
+} AetherSha256;
 
 AETHER_EXPORT struct AetherSseState *aether_sse_state_new(void);
 
@@ -109,5 +121,56 @@ AETHER_EXPORT uintptr_t aether_estimate_tokens(const char *s);
  * `input` 必须是合法 NUL 结尾 UTF-8。
  */
 AETHER_EXPORT char *aether_redact(const char *input);
+
+/**
+ * 对文档分块，返回 JSON 字符串数组 `["chunk1","chunk2",...]`。
+ * `max_chars == 0` 或空文本返回 `[]`。失败返回空指针。
+ * 调用方需用 `aether_free_string` 释放返回值。
+ * # Safety
+ * `input` 必须是合法 NUL 结尾 UTF-8。
+ */
+AETHER_EXPORT
+char *aether_chunk_document(const char *input,
+                            uintptr_t max_chars,
+                            uintptr_t overlap_chars);
+
+/**
+ * 创建新的 SHA-256 哈希器。调用方负责通过 `aether_sha256_free` 释放。
+ */
+AETHER_EXPORT struct AetherSha256 *aether_sha256_new(void);
+
+/**
+ * 追加数据到哈希。空指针安全（no-op）。
+ * # Safety
+ * `state` 来自 `aether_sha256_new`；`data` 指向 `len` 个有效字节。
+ */
+AETHER_EXPORT
+void aether_sha256_update(struct AetherSha256 *state,
+                          const uint8_t *data,
+                          uintptr_t len);
+
+/**
+ * 完成哈希，返回小写十六进制字符串（64 字符，NUL 结尾）。
+ * 不消费 state，调用方仍需 `aether_sha256_free` 释放。
+ * 返回的字符串需用 `aether_free_string` 释放。空指针 state 返回空串。
+ * # Safety
+ * `state` 来自 `aether_sha256_new`。
+ */
+AETHER_EXPORT char *aether_sha256_finalize(struct AetherSha256 *state);
+
+/**
+ * 释放 SHA-256 哈希器。空指针安全。
+ * # Safety
+ * `state` 来自 `aether_sha256_new`，且只能释放一次。
+ */
+AETHER_EXPORT void aether_sha256_free(struct AetherSha256 *state);
+
+/**
+ * 一次性计算字节数组的 SHA-256，返回小写 hex 字符串。
+ * 调用方需用 `aether_free_string` 释放返回值。空指针返回空串。
+ * # Safety
+ * `data` 指向 `len` 个有效字节。
+ */
+AETHER_EXPORT char *aether_sha256_hex(const uint8_t *data, uintptr_t len);
 
 #endif  /* AETHER_CORE_FFI_H */

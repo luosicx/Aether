@@ -9,7 +9,8 @@ use std::os::raw::{c_char, c_void};
 
 use aether_core::{
     chunk_document, cosine_similarity_f32, cosine_similarity_f64, estimate_tokens, extract_content,
-    parse_chunk, parse_with_tool_accumulation, redact, top_k_f32, AccumulatedToolCall, ParsedChunk,
+    parse_chunk, parse_with_tool_accumulation, redact, sha256_hex, top_k_f32, AccumulatedToolCall,
+    ParsedChunk, Sha256,
 };
 
 /// C 侧持有的解析器状态（跨调用累积 tool_calls）。
@@ -264,6 +265,76 @@ pub unsafe extern "C" fn aether_chunk_document(
     serde_json::to_string(&chunks)
         .map(|j| to_cstring(&j))
         .unwrap_or(std::ptr::null_mut())
+}
+
+// ===== SHA-256 C ABI（流式） =====
+
+/// C 侧持有的 SHA-256 哈希器状态（流式 update）。
+#[repr(C)]
+pub struct AetherSha256 {
+    inner: Sha256,
+}
+
+/// 创建新的 SHA-256 哈希器。调用方负责通过 `aether_sha256_free` 释放。
+#[no_mangle]
+pub extern "C" fn aether_sha256_new() -> *mut AetherSha256 {
+    Box::into_raw(Box::new(AetherSha256 {
+        inner: Sha256::new(),
+    }))
+}
+
+/// 追加数据到哈希。空指针安全（no-op）。
+/// # Safety
+/// `state` 来自 `aether_sha256_new`；`data` 指向 `len` 个有效字节。
+#[no_mangle]
+pub unsafe extern "C" fn aether_sha256_update(
+    state: *mut AetherSha256,
+    data: *const u8,
+    len: usize,
+) {
+    if state.is_null() || data.is_null() || len == 0 {
+        return;
+    }
+    let state = &mut *state;
+    let slice = std::slice::from_raw_parts(data, len);
+    state.inner.update(slice);
+}
+
+/// 完成哈希，返回小写十六进制字符串（64 字符，NUL 结尾）。
+/// 不消费 state，调用方仍需 `aether_sha256_free` 释放。
+/// 返回的字符串需用 `aether_free_string` 释放。空指针 state 返回空串。
+/// # Safety
+/// `state` 来自 `aether_sha256_new`。
+#[no_mangle]
+pub unsafe extern "C" fn aether_sha256_finalize(state: *mut AetherSha256) -> *mut c_char {
+    if state.is_null() {
+        return to_cstring("");
+    }
+    let state = &*state;
+    to_cstring(&state.inner.finalize())
+}
+
+/// 释放 SHA-256 哈希器。空指针安全。
+/// # Safety
+/// `state` 来自 `aether_sha256_new`，且只能释放一次。
+#[no_mangle]
+pub unsafe extern "C" fn aether_sha256_free(state: *mut AetherSha256) {
+    if !state.is_null() {
+        drop(Box::from_raw(state));
+    }
+}
+
+/// 一次性计算字节数组的 SHA-256，返回小写 hex 字符串。
+/// 调用方需用 `aether_free_string` 释放返回值。空指针返回空串。
+/// # Safety
+/// `data` 指向 `len` 个有效字节。
+#[no_mangle]
+pub unsafe extern "C" fn aether_sha256_hex(data: *const u8, len: usize) -> *mut c_char {
+    if data.is_null() || len == 0 {
+        return to_cstring(&sha256_hex(b""));
+    }
+    let slice = std::slice::from_raw_parts(data, len);
+    to_cstring(&sha256_hex(slice))
 }
 
 /// FFI 友好的序列化视图：字段名统一 camelCase，`kind`→`type` 与 Swift 对齐。

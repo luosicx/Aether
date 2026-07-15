@@ -1,6 +1,7 @@
 import Foundation
 import CryptoKit
 import AetherFoundation
+import AetherRust
 
 /// Day 16: 端侧模型下载器（actor 隔离，保证并发安全）。
 /// 基于 URLSessionDownloadTask 流式下载模型文件，支持进度回调、取消、断点续传与 SHA256 校验。
@@ -8,6 +9,9 @@ import AetherFoundation
 actor OnDeviceModelDownloader {
     /// 单例
     static let shared = OnDeviceModelDownloader()
+
+    /// 切换开关：true 走 Rust 核心，false 走下方纯 Swift 兜底实现。
+    private static let useRust = true
 
     /// 当前下载进度（0.0-1.0）
     private(set) var progress: Double = 0.0
@@ -307,6 +311,16 @@ actor OnDeviceModelDownloader {
 
     /// 计算文件 SHA256 摘要（分块读取，避免大文件一次性载入内存）
     private func sha256(of path: URL) -> String {
+        if Self.useRust {
+            return aetherSha256(of: path)
+        }
+        return sha256Swift(of: path)
+    }
+
+    // MARK: - 纯 Swift 兜底实现（保留以便回退）
+
+    /// CryptoKit SHA256 兜底实现。
+    private func sha256Swift(of path: URL) -> String {
         var hasher = SHA256()
         guard let fileHandle = try? FileHandle(forReadingFrom: path) else { return "" }
         let chunkSize = 4 * 1024 * 1024

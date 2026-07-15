@@ -160,3 +160,29 @@ impl Chunker {
         serde_json::to_string(&chunks).unwrap_or_else(|_| "[]".to_string())
     }
 }
+
+/// SHA-256 流式哈希器（Workers 端预留，当前无调用方）。
+#[wasm_bindgen]
+pub struct Sha256 {
+    inner: aether_core::Sha256,
+}
+
+#[wasm_bindgen]
+impl Sha256 {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> Sha256 {
+        Sha256 {
+            inner: aether_core::Sha256::new(),
+        }
+    }
+
+    /// 追加数据到哈希。
+    pub fn update(&mut self, data: &[u8]) {
+        self.inner.update(data);
+    }
+
+    /// 完成哈希，返回小写十六进制字符串（64 字符）。
+    pub fn finalize(&self) -> String {
+        self.inner.finalize()
+    }
+}

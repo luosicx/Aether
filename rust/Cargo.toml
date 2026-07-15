@@ -14,4 +14,5 @@ serde_json = "1"
 thiserror = "1"
 regex = { version = "1", default-features = false, features = ["std", "unicode"] }
 unicode-segmentation = "1"
+sha2 = "0.10"
 aether-core = { path = "aether-core" }

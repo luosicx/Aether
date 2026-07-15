@@ -1,6 +1,7 @@
 import Foundation
 import CryptoKit
 import AetherFoundation
+import AetherRust
 #if canImport(MLXLLM)
 import MLX
 import MLXLMCommon
@@ -15,6 +16,9 @@ import MLXLLM
 actor MLXInferenceEngine {
     /// 单例，全局共享一个推理引擎实例（避免重复加载模型占用内存）
     static let shared = MLXInferenceEngine()
+
+    /// 切换开关：true 走 Rust 核心，false 走下方纯 Swift 兜底实现。
+    private static let useRust = true
 
     /// 模型是否已加载到内存（外部只读，供 OfflineLLMProvider 等检查加载状态）
     private(set) var isLoaded = false
@@ -174,6 +178,16 @@ actor MLXInferenceEngine {
     /// - Parameter path: 文件路径
     /// - Returns: 十六进制小写摘要字符串
     private func sha256(of path: URL) -> String {
+        if Self.useRust {
+            return aetherSha256(of: path)
+        }
+        return sha256Swift(of: path)
+    }
+
+    // MARK: - 纯 Swift 兜底实现（保留以便回退）
+
+    /// CryptoKit SHA256 兜底实现。
+    private func sha256Swift(of path: URL) -> String {
         var hasher = SHA256()
         guard let fileHandle = try? FileHandle(forReadingFrom: path) else { return "" }
         // 分块读取（每块 4MB），逐块更新哈希
