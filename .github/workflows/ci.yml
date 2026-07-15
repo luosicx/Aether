@@ -778,3 +778,59 @@ jobs:
           path: windows/Aether.Windows/bin/Debug/
           if-no-files-found: error
           retention-days: 7
+
+  # Rust 核心：fmt + clippy + 单测 + WASM 构建 + Android 交叉编译。
+  # Apple xcframework 构建需 macOS runner，单独成 job（rust-apple），此处省略以保持聚焦；
+  # 首个落地单元（SSE）可不依赖 xcframework 产物（CI 仅校验 Rust 侧 + WASM）。
+  rust:
+    name: Rust core (fmt + clippy + test)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+
+      - name: Install wasm-pack
+        run: cargo install wasm-pack || true
+
+      - name: Install cross-compile targets
+        run: rustup target add wasm32-unknown-unknown aarch64-linux-android x86_64-linux-android
+
+      - name: fmt
+        run: cargo fmt --all -- --check
+
+      - name: clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: test aether-core
+        run: cargo test -p aether-core
+
+      - name: build wasm (Cloudflare Workers)
+        run: ./scripts/build-wasm.sh
+
+      - name: build android targets
+        run: |
+          cargo build -p aether-core-ffi --target aarch64-linux-android
+          cargo build -p aether-core-ffi --target x86_64-linux-android
+
+      - name: Upload wasm artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: aether-sse-wasm
+          path: |
+            CloudflareWorkers/wasm/aether_sse.js
+            CloudflareWorkers/wasm/aether_sse_bg.wasm
+          if-no-files-found: error
+          retention-days: 7

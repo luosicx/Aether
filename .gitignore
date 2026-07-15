@@ -33,3 +33,6 @@ TestResults.xcresult/
 
 # i18n extraction intermediate JSON
 scripts/*.json
+
+# Node 依赖（CloudflareWorkers 等）
+node_modules/

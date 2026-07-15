@@ -166,13 +166,13 @@ export async function* callLLMStream(env, model, messages, opts = {}) {
       while ((idx = buffer.indexOf("\n\n")) !== -1) {
         const rawEvent = buffer.slice(0, idx);
         buffer = buffer.slice(idx + 2);
-        const delta = parseSSEEvent(rawEvent);
+        const delta = await parseSSEEvent(rawEvent);
         if (delta) yield delta;
       }
     }
     // 处理尾部残余
     if (buffer.trim()) {
-      const delta = parseSSEEvent(buffer);
+      const delta = await parseSSEEvent(buffer);
       if (delta) yield delta;
     }
   } finally {
@@ -184,28 +184,33 @@ export async function* callLLMStream(env, model, messages, opts = {}) {
   }
 }
 
+// 顶部：WASM 模块懒加载单例（首次调用 parseSSEEvent 时实例化）
+// wasm-bindgen --target web 产物需先调用 default export (init) 完成异步初始化，
+// 再实例化 SseState。init 内部有缓存，重复调用无副作用。
+let _wasmState = null;
+async function getWasmState() {
+  if (_wasmState) return _wasmState;
+  const mod = await import("../../wasm/aether_sse.js");
+  await mod.default();
+  _wasmState = new mod.SseState();
+  return _wasmState;
+}
+
 /**
  * 解析单条 SSE 事件，返回增量文本（若为 [DONE] 或无 content 则返回 null）
+ * 实现已迁移至 Rust（aether-core-ffi，wasm-pack 产物），JS 仅做 data: 行提取与 WASM 调用。
  * @param {string} rawEvent
- * @returns {string|null}
+ * @returns {Promise<string|null>}
  */
-function parseSSEEvent(rawEvent) {
-  // 取 data: 行
+async function parseSSEEvent(rawEvent) {
+  const wasm = await getWasmState();
+  // 取 data: 行（保留原多行容错）
   const lines = rawEvent.split("\n");
   for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed.startsWith("data:")) continue;
-    const data = trimmed.slice(5).trim();
-    if (!data || data === "[DONE]") return null;
-    try {
-      const obj = JSON.parse(data);
-      const delta = obj && obj.choices && obj.choices[0] && obj.choices[0].delta;
-      if (delta && typeof delta.content === "string" && delta.content.length > 0) {
-        return delta.content;
-      }
-    } catch (_) {
-      // 忽略解析失败的事件（如 keep-alive 注释）
-    }
+    const delta = wasm.extractContent(trimmed);
+    if (delta) return delta;
   }
   return null;
 }

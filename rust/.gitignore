@@ -1,0 +1,2 @@
+# Rust 编译产物（由 cargo/wasm-pack 重新生成）
+target/

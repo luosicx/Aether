@@ -19,9 +19,16 @@ let package = Package(
             name: "AetherFoundation",
             dependencies: []
         ),
+        .binaryTarget(name: "AetherRustBin", path: "aether_core.xcframework"),
+        .target(
+            name: "AetherRust",
+            dependencies: ["AetherRustBin"],
+            path: "Sources/AetherRust",
+            publicHeadersPath: "include"
+        ),
         .target(
             name: "AetherServices",
-            dependencies: ["AetherFoundation"]
+            dependencies: ["AetherFoundation", "AetherRust"]
         ),
         .target(
             name: "AetherDesign",

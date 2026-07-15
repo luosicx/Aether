@@ -1,0 +1,5 @@
+module AetherRustC {
+    header "aether_core_ffi.h"
+    link "aether_core_ffi"
+    export *
+}
