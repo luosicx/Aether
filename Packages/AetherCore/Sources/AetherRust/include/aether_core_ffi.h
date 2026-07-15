@@ -10,6 +10,13 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#if !defined(__wasm32__)
+/**
+ * C 侧持有的推理引擎。opaque（字段含跨 crate 类型）。
+ */
+typedef struct AetherInferenceEngine AetherInferenceEngine;
+#endif
+
 /**
  * C 侧持有的令牌桶限流器状态。
  * 不加 `#[repr(C)]`，cbindgen 生成 opaque typedef（字段含跨 crate 类型）。
@@ -251,8 +258,10 @@ AETHER_EXPORT void aether_rate_limiter_free(struct AetherRateLimiter *state);
 #if !defined(__wasm32__)
 /**
  * 创建沙箱引擎。Pulley 解释器（无 JIT），iOS 友好。
+ *
  * - `max_fuel`: CPU 指令限额（30 秒 ≈ 30_000_000_000）
  * - `max_memory_bytes`: 线性内存上限（字节，50 MB = 52_428_800）
+ *
  * 失败返回空指针。
  */
 AETHER_EXPORT
@@ -349,6 +358,88 @@ AETHER_EXPORT void aether_sandbox_module_free(struct AetherSandboxModule *module
  * `instance` 来自 `aether_sandbox_instantiate`，且只能释放一次。
  */
 AETHER_EXPORT void aether_sandbox_instance_free(struct AetherSandboxInstance *instance);
+#endif
+
+#if !defined(__wasm32__)
+/**
+ * 创建推理引擎。返回的引擎未加载模型，需调用 `aether_inference_load_model`。
+ */
+AETHER_EXPORT struct AetherInferenceEngine *aether_inference_new(void);
+#endif
+
+#if !defined(__wasm32__)
+/**
+ * 加载本地 safetensors 模型目录。
+ *
+ * model_dir 应包含：config.json / tokenizer.json / model.safetensors
+ *
+ * 参数（JSON）：
+ * ```json
+ * {"temperature":0.7,"maxTokens":1024,"repeatPenalty":1.1,
+ *  "repeatLastN":64,"topP":0.9,"seed":null,"eosTokenId":null}
+ * ```
+ * seed / eosTokenId 为 null 时使用默认（seed 随机，eosTokenId 从 config.json 读取）。
+ *
+ * 返回：成功 0，失败返回 1（错误信息通过 aether_inference_last_error 获取）。
+ * # Safety
+ * `engine` 来自 `aether_inference_new`；`model_dir` 合法 NUL 结尾 UTF-8。
+ */
+AETHER_EXPORT
+int32_t aether_inference_load_model(struct AetherInferenceEngine *engine,
+                                    const char *model_dir,
+                                    const char *params_json);
+#endif
+
+#if !defined(__wasm32__)
+/**
+ * 流式生成文本，返回 JSON 数组（每个元素含 text 与 isEnd）。
+ * 格式：`[{"text":"hello","isEnd":false},...]`
+ * 调用方需用 `aether_free_string` 释放返回值。失败返回空指针。
+ * # Safety
+ * `engine` 来自 `aether_inference_new` 且已加载模型；`prompt` 合法 NUL 结尾 UTF-8。
+ */
+AETHER_EXPORT
+char *aether_inference_generate(struct AetherInferenceEngine *engine,
+                                const char *prompt);
+#endif
+
+#if !defined(__wasm32__)
+/**
+ * 一次性生成完整文本，返回拼接后的字符串。
+ * 调用方需用 `aether_free_string` 释放返回值。失败返回空指针。
+ * # Safety
+ * `engine` 来自 `aether_inference_new` 且已加载模型；`prompt` 合法 NUL 结尾 UTF-8。
+ */
+AETHER_EXPORT
+char *aether_inference_generate_text(struct AetherInferenceEngine *engine,
+                                     const char *prompt);
+#endif
+
+#if !defined(__wasm32__)
+/**
+ * 模型是否已加载。
+ * # Safety
+ * `engine` 来自 `aether_inference_new`。
+ */
+AETHER_EXPORT bool aether_inference_is_loaded(const struct AetherInferenceEngine *engine);
+#endif
+
+#if !defined(__wasm32__)
+/**
+ * 卸载模型，释放内存。
+ * # Safety
+ * `engine` 来自 `aether_inference_new`。
+ */
+AETHER_EXPORT void aether_inference_unload(struct AetherInferenceEngine *engine);
+#endif
+
+#if !defined(__wasm32__)
+/**
+ * 释放推理引擎。空指针安全。
+ * # Safety
+ * `engine` 来自 `aether_inference_new`，且只能释放一次。
+ */
+AETHER_EXPORT void aether_inference_free(struct AetherInferenceEngine *engine);
 #endif
 
 #endif  /* AETHER_CORE_FFI_H */

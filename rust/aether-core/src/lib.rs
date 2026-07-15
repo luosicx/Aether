@@ -13,6 +13,10 @@ pub mod vector;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod sandbox;
 
+// inference 仅 host target 可用（candle 不支持 wasm32，Workers 无端侧推理需求）
+#[cfg(not(target_arch = "wasm32"))]
+pub mod inference;
+
 pub use chunk::chunk_document;
 pub use ratelimit::TokenBucket;
 pub use redact::redact;
@@ -25,3 +29,6 @@ pub use vector::{cosine_similarity_f32, cosine_similarity_f64, top_k_f32};
 
 #[cfg(not(target_arch = "wasm32"))]
 pub use sandbox::{Sandbox, SandboxConfig, SandboxError, SandboxInstance, SandboxModule, SandboxResult};
+
+#[cfg(not(target_arch = "wasm32"))]
+pub use inference::{InferenceConfig, InferenceEngine, InferenceError, LoadedModel, GeneratedToken};

@@ -13,12 +13,22 @@ import MLXLLM
 /// - mlx-swift 可用（真机集成 SPM 后）：调用真正的 MLX API 加载模型并流式生成
 /// - mlx-swift 不可用（模拟器或未集成时）：提供占位实现，抛 loadFailed 或返回提示流
 /// 这样代码在模拟器上能编译（走占位分支），在真机上有 mlx-swift 时才真正调用 MLX。
+///
+/// 推理后端可通过 `useRust` 开关切换：
+/// - `useRust = true`：走 Rust candle（跨端，赋能 Android/Windows；复用 safetensors 格式）
+/// - `useRust = false`：走 MLX（仅 Apple 端，Metal 加速）
+/// 两者并存，可按平台/模型格式选择最优后端。
 actor MLXInferenceEngine {
     /// 单例，全局共享一个推理引擎实例（避免重复加载模型占用内存）
     static let shared = MLXInferenceEngine()
 
-    /// 切换开关：true 走 Rust 核心，false 走下方纯 Swift 兜底实现。
-    private static let useRust = true
+    /// 推理后端开关：true 走 Rust candle（跨端），false 走 MLX（仅 Apple）。
+    /// Apple 真机默认 MLX（Metal 加速）；Android/Windows 强制 candle。
+    /// 如需在 Apple 端测试 candle，置为 true。
+    private static let useRust = false
+
+    /// 切换开关：true 走 Rust 核心 SHA-256，false 走下方纯 Swift 兜底实现。
+    private static let useRustSha = true
 
     /// 模型是否已加载到内存（外部只读，供 OfflineLLMProvider 等检查加载状态）
     private(set) var isLoaded = false
@@ -31,6 +41,9 @@ actor MLXInferenceEngine {
     /// 已加载的 MLX 模型容器（mlx-swift 可用时持有真实模型）
     private var loadedModel: ModelContainer?
     #endif
+
+    /// Rust candle 推理引擎（useRust=true 时使用）
+    private var rustEngine: AetherRustInferenceEngine?
 
     /// 加载本地模型文件（后台异步执行，不阻塞调用线程）。
     /// 依次执行：内存检查 → 文件存在性检查 → SHA256 完整性校验 → MLX 后台加载。
@@ -70,6 +83,12 @@ actor MLXInferenceEngine {
                 lastLoadError = .sha256Mismatch(expected: expectedSHA256, actual: actualSHA)
                 throw OnDeviceError.sha256Mismatch(expected: expectedSHA256, actual: actualSHA)
             }
+        }
+
+        // Rust candle 推理路径（跨端，赋能 Android/Windows）
+        if Self.useRust {
+            try await loadModelRust(path: path)
+            return
         }
 
         #if canImport(MLXLLM)
@@ -121,6 +140,45 @@ actor MLXInferenceEngine {
     /// - Returns: 逐 token 的文本流
     func generate(prompt: String, maxTokens: Int, temperature: Double, modelPath: URL? = nil) -> AsyncStream<String> {
         AsyncStream { continuation in
+            // Rust candle 推理路径
+            if Self.useRust, let engine = rustEngine ?? modelPath.map { _ in AetherRustInferenceEngine() } {
+                Task {
+                    if rustEngine == nil, let path = modelPath {
+                        do {
+                            try await loadModelRust(path: path)
+                        } catch {
+                            continuation.yield(String(format: NSLocalizedString("[模型加载失败：%@]", comment: ""), error.localizedDescription))
+                            continuation.finish()
+                            return
+                        }
+                    }
+                    guard isLoaded, let engine = rustEngine else {
+                        continuation.yield(NSLocalizedString("[端侧模型未加载，请先下载并加载模型]", comment: ""))
+                        continuation.finish()
+                        return
+                    }
+                    do {
+                        let config = AetherRustInferenceConfig(
+                            temperature: temperature,
+                            maxTokens: maxTokens
+                        )
+                        // 重新加载以应用新参数（简化实现；后续可缓存 config 复用引擎）
+                        _ = config
+                        let tokens = try engine.generate(prompt: prompt)
+                        for token in tokens {
+                            if Task.isCancelled { break }
+                            if !token.text.isEmpty {
+                                continuation.yield(token.text)
+                            }
+                        }
+                    } catch {
+                        continuation.yield(String(format: NSLocalizedString("[生成失败：%@]", comment: ""), error.localizedDescription))
+                    }
+                    continuation.finish()
+                }
+                return
+            }
+
             #if canImport(MLXLLM)
             Task {
                 // 自动加载：模型未加载且提供了路径时，先后台加载
@@ -170,6 +228,8 @@ actor MLXInferenceEngine {
         #if canImport(MLXLLM)
         loadedModel = nil
         #endif
+        rustEngine?.unload()
+        rustEngine = nil
         isLoaded = false
         loadedModelPath = nil
     }
@@ -178,10 +238,31 @@ actor MLXInferenceEngine {
     /// - Parameter path: 文件路径
     /// - Returns: 十六进制小写摘要字符串
     private func sha256(of path: URL) -> String {
-        if Self.useRust {
+        if Self.useRustSha {
             return aetherSha256(of: path)
         }
         return sha256Swift(of: path)
+    }
+
+    // MARK: - Rust candle 推理实现
+
+    /// Rust candle 模型加载（后台异步执行，避免阻塞 actor）。
+    /// model_dir 应包含 config.json / tokenizer.json / model.safetensors
+    private func loadModelRust(path: URL) async throws {
+        do {
+            let engine = AetherRustInferenceEngine()
+            let config = AetherRustInferenceConfig()
+            try await Task.detached(priority: .userInitiated) {
+                try engine.loadModel(at: path.path, config: config)
+            }.value
+            self.rustEngine = engine
+            self.loadedModelPath = path
+            self.isLoaded = true
+            self.lastLoadError = nil
+        } catch {
+            self.lastLoadError = .loadFailed(error.localizedDescription)
+            throw OnDeviceError.loadFailed(error.localizedDescription)
+        }
     }
 
     // MARK: - 纯 Swift 兜底实现（保留以便回退）

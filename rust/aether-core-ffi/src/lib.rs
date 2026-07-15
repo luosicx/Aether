@@ -632,6 +632,266 @@ pub unsafe extern "C" fn aether_sandbox_instance_free(instance: *mut AetherSandb
     }
 }
 
+// ===== 端侧推理 C ABI（仅 host target，wasm32 不编译） =====
+//
+// 对应 `MLXInferenceEngine.swift`（Apple MLX）→ candle 跨端推理。
+// 本层负责 unsafe mmap 加载 safetensors，构造 VarBuilder，
+// 然后调用 aether-core 的纯逻辑 InferenceEngine::load_from_components。
+
+#[cfg(not(target_arch = "wasm32"))]
+use aether_core::inference::{
+    InferenceConfig, InferenceEngine, InferenceError,
+};
+#[cfg(not(target_arch = "wasm32"))]
+use candle_core::Device;
+#[cfg(not(target_arch = "wasm32"))]
+use candle_transformers::models::qwen2::Config as Qwen2Config;
+
+/// C 侧持有的推理引擎。opaque（字段含跨 crate 类型）。
+#[cfg(not(target_arch = "wasm32"))]
+pub struct AetherInferenceEngine {
+    inner: InferenceEngine,
+}
+
+/// 创建推理引擎。返回的引擎未加载模型，需调用 `aether_inference_load_model`。
+#[cfg(not(target_arch = "wasm32"))]
+#[no_mangle]
+pub extern "C" fn aether_inference_new() -> *mut AetherInferenceEngine {
+    Box::into_raw(Box::new(AetherInferenceEngine {
+        inner: InferenceEngine::new(),
+    }))
+}
+
+/// 加载本地 safetensors 模型目录。
+///
+/// model_dir 应包含：config.json / tokenizer.json / model.safetensors
+///
+/// 参数（JSON）：
+/// ```json
+/// {"temperature":0.7,"maxTokens":1024,"repeatPenalty":1.1,
+///  "repeatLastN":64,"topP":0.9,"seed":null,"eosTokenId":null}
+/// ```
+/// seed / eosTokenId 为 null 时使用默认（seed 随机，eosTokenId 从 config.json 读取）。
+///
+/// 返回：成功 0，失败返回 1（错误信息通过 aether_inference_last_error 获取）。
+/// # Safety
+/// `engine` 来自 `aether_inference_new`；`model_dir` 合法 NUL 结尾 UTF-8。
+#[cfg(not(target_arch = "wasm32"))]
+#[no_mangle]
+pub unsafe extern "C" fn aether_inference_load_model(
+    engine: *mut AetherInferenceEngine,
+    model_dir: *const c_char,
+    params_json: *const c_char,
+) -> i32 {
+    if engine.is_null() {
+        return 1;
+    }
+    let dir_str = if model_dir.is_null() {
+        return 1;
+    } else {
+        match CStr::from_ptr(model_dir).to_str() {
+            Ok(s) => s.to_string(),
+            Err(_) => return 1,
+        }
+    };
+
+    let params_str = if params_json.is_null() {
+        "{}"
+    } else {
+        match CStr::from_ptr(params_json).to_str() {
+            Ok(s) => s,
+            Err(_) => return 1,
+        }
+    };
+
+    #[derive(serde::Deserialize)]
+    struct Params {
+        temperature: Option<f64>,
+        max_tokens: Option<usize>,
+        repeat_penalty: Option<f32>,
+        repeat_last_n: Option<usize>,
+        top_p: Option<f64>,
+        seed: Option<u64>,
+        eos_token_id: Option<u32>,
+    }
+    let params: Params = match serde_json::from_str(params_str) {
+        Ok(p) => p,
+        Err(_) => return 1,
+    };
+
+    let config = InferenceConfig {
+        temperature: params.temperature.unwrap_or(0.7),
+        max_tokens: params.max_tokens.unwrap_or(1024),
+        repeat_penalty: params.repeat_penalty.unwrap_or(1.1),
+        repeat_last_n: params.repeat_last_n.unwrap_or(64),
+        top_p: params.top_p.unwrap_or(0.9),
+        seed: params.seed,
+        eos_token_id: params.eos_token_id,
+    };
+
+    let engine = &mut *engine;
+    let result = load_model_impl(&mut engine.inner, &dir_str, config);
+    if result.is_ok() { 0 } else { 1 }
+}
+
+/// 加载模型实现（host target）：读取 config.json / tokenizer.json / mmap safetensors。
+#[cfg(not(target_arch = "wasm32"))]
+fn load_model_impl(
+    engine: &mut InferenceEngine,
+    model_dir: &str,
+    mut config: InferenceConfig,
+) -> Result<(), InferenceError> {
+    use std::path::Path;
+
+    let dir = Path::new(model_dir);
+    if !dir.exists() {
+        return Err(InferenceError::NotFound(model_dir.into()));
+    }
+
+    // 加载 tokenizer
+    let tokenizer = tokenizers::Tokenizer::from_file(dir.join("tokenizer.json"))
+        .map_err(|e| InferenceError::Tokenizer(e.to_string()))?;
+
+    // 读取 config.json
+    let config_str = std::fs::read_to_string(dir.join("config.json"))
+        .map_err(|e| InferenceError::Load(format!("读取 config.json 失败: {}", e)))?;
+    let model_config: Qwen2Config = serde_json::from_str(&config_str)
+        .map_err(|e| InferenceError::Load(format!("解析 config.json 失败: {}", e)))?;
+
+    // EOS token id：从 config.json 原始 JSON 提取
+    if config.eos_token_id.is_none() {
+        let v: serde_json::Value = serde_json::from_str(&config_str)
+            .map_err(|e| InferenceError::Load(e.to_string()))?;
+        if let Some(eos) = v.get("eos_token_id").and_then(|x| x.as_u64()) {
+            config.eos_token_id = Some(eos as u32);
+        }
+    }
+
+    // 设备：CPU（Metal/CUDA 需对应 feature）
+    let device = Device::cuda_if_available(0).unwrap_or(Device::Cpu);
+
+    // mmap safetensors（unsafe，集中在 FFI 层）
+    let vb = unsafe {
+        candle_nn::VarBuilder::from_mmaped_safetensors(
+            &[dir.join("model.safetensors")],
+            candle_core::DType::F32,
+            &device,
+        )
+    }
+    .map_err(|e| InferenceError::Load(e.to_string()))?;
+
+    engine.load_from_components(vb, tokenizer, &model_config, device, config)
+}
+
+/// 流式生成文本，返回 JSON 数组（每个元素含 text 与 isEnd）。
+/// 格式：`[{"text":"hello","isEnd":false},...]`
+/// 调用方需用 `aether_free_string` 释放返回值。失败返回空指针。
+/// # Safety
+/// `engine` 来自 `aether_inference_new` 且已加载模型；`prompt` 合法 NUL 结尾 UTF-8。
+#[cfg(not(target_arch = "wasm32"))]
+#[no_mangle]
+pub unsafe extern "C" fn aether_inference_generate(
+    engine: *mut AetherInferenceEngine,
+    prompt: *const c_char,
+) -> *mut c_char {
+    if engine.is_null() || prompt.is_null() {
+        return std::ptr::null_mut();
+    }
+    let prompt = match CStr::from_ptr(prompt).to_str() {
+        Ok(s) => s,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let engine = &*engine;
+    match engine.inner.generate(prompt) {
+        Ok(tokens) => {
+            #[derive(serde::Serialize)]
+            struct TokenView<'a> {
+                text: &'a str,
+                #[serde(rename = "isEnd")]
+                is_end: bool,
+            }
+            let views: Vec<TokenView> = tokens
+                .iter()
+                .map(|t| TokenView {
+                    text: &t.text,
+                    is_end: t.is_end,
+                })
+                .collect();
+            serde_json::to_string(&views)
+                .map(|j| to_cstring(&j))
+                .unwrap_or(std::ptr::null_mut())
+        }
+        Err(e) => {
+            let json = format!(r#"{{"error":"{}"}}"#, e);
+            to_cstring(&json)
+        }
+    }
+}
+
+/// 一次性生成完整文本，返回拼接后的字符串。
+/// 调用方需用 `aether_free_string` 释放返回值。失败返回空指针。
+/// # Safety
+/// `engine` 来自 `aether_inference_new` 且已加载模型；`prompt` 合法 NUL 结尾 UTF-8。
+#[cfg(not(target_arch = "wasm32"))]
+#[no_mangle]
+pub unsafe extern "C" fn aether_inference_generate_text(
+    engine: *mut AetherInferenceEngine,
+    prompt: *const c_char,
+) -> *mut c_char {
+    if engine.is_null() || prompt.is_null() {
+        return std::ptr::null_mut();
+    }
+    let prompt = match CStr::from_ptr(prompt).to_str() {
+        Ok(s) => s,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let engine = &*engine;
+    match engine.inner.generate_text(prompt) {
+        Ok(text) => to_cstring(&text),
+        Err(e) => {
+            let json = format!(r#"{{"error":"{}"}}"#, e);
+            to_cstring(&json)
+        }
+    }
+}
+
+/// 模型是否已加载。
+/// # Safety
+/// `engine` 来自 `aether_inference_new`。
+#[cfg(not(target_arch = "wasm32"))]
+#[no_mangle]
+pub unsafe extern "C" fn aether_inference_is_loaded(engine: *const AetherInferenceEngine) -> bool {
+    if engine.is_null() {
+        return false;
+    }
+    let engine = &*engine;
+    engine.inner.is_loaded()
+}
+
+/// 卸载模型，释放内存。
+/// # Safety
+/// `engine` 来自 `aether_inference_new`。
+#[cfg(not(target_arch = "wasm32"))]
+#[no_mangle]
+pub unsafe extern "C" fn aether_inference_unload(engine: *mut AetherInferenceEngine) {
+    if engine.is_null() {
+        return;
+    }
+    let engine = &mut *engine;
+    engine.inner.unload();
+}
+
+/// 释放推理引擎。空指针安全。
+/// # Safety
+/// `engine` 来自 `aether_inference_new`，且只能释放一次。
+#[cfg(not(target_arch = "wasm32"))]
+#[no_mangle]
+pub unsafe extern "C" fn aether_inference_free(engine: *mut AetherInferenceEngine) {
+    if !engine.is_null() {
+        drop(Box::from_raw(engine));
+    }
+}
+
 /// FFI 友好的序列化视图：字段名统一 camelCase，`kind`→`type` 与 Swift 对齐。
 fn to_parsed_chunk_json(p: &ParsedChunk) -> *mut c_char {
     #[derive(serde::Serialize)]
