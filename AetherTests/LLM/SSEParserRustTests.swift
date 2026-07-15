@@ -1,6 +1,6 @@
 import XCTest
 @testable import AetherServices
-@testable import AetherRust
+import AetherRust
 
 /// Rust SSE 解析器 Swift 回归测试。
 /// 注意：本测试需要 aether_core.xcframework 已构建（macOS 环境）。

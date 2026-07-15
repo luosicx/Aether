@@ -130,7 +130,7 @@ public struct AetherRustSandboxResult: Equatable {
     /// JSON 格式：
     /// - 成功：`{"ok":true,"output":"...","fuelRemaining":N,"outOfFuel":false}`
     /// - 失败：`{"ok":false,"error":"OutOfFuel|..."}`
-    init(json: String) {
+    public init(json: String) {
         struct Payload: Decodable {
             let ok: Bool
             let output: String?
