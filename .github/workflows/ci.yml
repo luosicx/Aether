@@ -930,7 +930,9 @@ jobs:
 
   # Apple xcframework 构建：编译 Rust 静态库 → 打包为 xcframework。
   # 所有 Swift 测试 job 依赖此 job 的 artifact（unit-tests/ui-tests/security-tests/-macos）。
-  # 仅构建 CI 所需 target：iOS Simulator arm64 + macOS arm64（macos-15 runner 为 Apple Silicon）。
+  # 构建 iOS device + iOS Simulator + macOS 三个 slice（macos-15 runner 为 Apple Silicon）。
+  # AetherTests 的 SDKROOT=iphoneos，macOS scheme 构建时 implicit dependency 会拉入
+  # Aether-iOS target（为 iOS device 构建），xcframework 必须含 iOS device slice。
   rust-apple:
     name: Apple xcframework
     runs-on: macos-15
@@ -941,7 +943,7 @@ jobs:
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-ios-sim,aarch64-apple-darwin
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim,aarch64-apple-darwin
 
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
@@ -952,12 +954,15 @@ jobs:
       - name: Build static libs
         working-directory: rust
         run: |
+          cargo build -p aether-core-ffi --release --target aarch64-apple-ios
           cargo build -p aether-core-ffi --release --target aarch64-apple-ios-sim
           cargo build -p aether-core-ffi --release --target aarch64-apple-darwin
 
       - name: Create xcframework
         run: |
           xcodebuild -create-xcframework \
+            -library rust/target/aarch64-apple-ios/release/libaether_core_ffi.a \
+            -headers Packages/AetherCore/Sources/AetherRust/include \
             -library rust/target/aarch64-apple-ios-sim/release/libaether_core_ffi.a \
             -headers Packages/AetherCore/Sources/AetherRust/include \
             -library rust/target/aarch64-apple-darwin/release/libaether_core_ffi.a \
