@@ -8,6 +8,7 @@ on:
 
 jobs:
   unit-tests:
+    needs: rust-apple
     runs-on: macos-15
     timeout-minutes: 45
     outputs:
@@ -15,6 +16,12 @@ jobs:
       coverage_pass: ${{ steps.coverage.outputs.coverage_pass }}
     steps:
       - uses: actions/checkout@v5
+
+      - name: Download xcframework
+        uses: actions/download-artifact@v7
+        with:
+          name: aether-core-xcframework
+          path: Packages/AetherCore/aether_core.xcframework
 
       - name: Select Xcode (latest)
         uses: maxim-lobanov/setup-xcode@v1
@@ -253,10 +260,17 @@ jobs:
           retention-days: 7
 
   ui-tests:
+    needs: rust-apple
     runs-on: macos-15
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v5
+
+      - name: Download xcframework
+        uses: actions/download-artifact@v7
+        with:
+          name: aether-core-xcframework
+          path: Packages/AetherCore/aether_core.xcframework
 
       - name: Select Xcode (latest)
         uses: maxim-lobanov/setup-xcode@v1
@@ -313,10 +327,17 @@ jobs:
           echo "xcodebuild exited non-zero but all UIT tests passed (simulator instability)"
 
   security-tests:
+    needs: rust-apple
     runs-on: macos-15
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
+
+      - name: Download xcframework
+        uses: actions/download-artifact@v7
+        with:
+          name: aether-core-xcframework
+          path: Packages/AetherCore/aether_core.xcframework
 
       - name: Select Xcode (latest)
         uses: maxim-lobanov/setup-xcode@v1
@@ -378,10 +399,17 @@ jobs:
           echo "xcodebuild exited non-zero but all security tests passed (simulator instability)"
 
   security-tests-macos:
+    needs: rust-apple
     runs-on: macos-15
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
+
+      - name: Download xcframework
+        uses: actions/download-artifact@v7
+        with:
+          name: aether-core-xcframework
+          path: Packages/AetherCore/aether_core.xcframework
 
       - name: Select Xcode (latest)
         uses: maxim-lobanov/setup-xcode@v1
@@ -433,10 +461,17 @@ jobs:
           echo "xcodebuild exited non-zero but all macOS security tests passed (simulator instability)"
 
   unit-tests-macos:
+    needs: rust-apple
     runs-on: macos-15
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v5
+
+      - name: Download xcframework
+        uses: actions/download-artifact@v7
+        with:
+          name: aether-core-xcframework
+          path: Packages/AetherCore/aether_core.xcframework
 
       - name: Select Xcode (latest)
         uses: maxim-lobanov/setup-xcode@v1
@@ -832,5 +867,49 @@ jobs:
           path: |
             CloudflareWorkers/wasm/aether_sse.js
             CloudflareWorkers/wasm/aether_sse_bg.wasm
+          if-no-files-found: error
+          retention-days: 7
+
+  # Apple xcframework 构建：编译 Rust 静态库 → 打包为 xcframework。
+  # 所有 Swift 测试 job 依赖此 job 的 artifact（unit-tests/ui-tests/security-tests/-macos）。
+  # 仅构建 CI 所需 target：iOS Simulator arm64 + macOS arm64（macos-15 runner 为 Apple Silicon）。
+  rust-apple:
+    name: Apple xcframework
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios-sim,aarch64-apple-darwin
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+          key: apple-xcframework
+
+      - name: Build static libs
+        working-directory: rust
+        run: |
+          cargo build -p aether-core-ffi --release --target aarch64-apple-ios-sim
+          cargo build -p aether-core-ffi --release --target aarch64-apple-darwin
+
+      - name: Create xcframework
+        run: |
+          xcodebuild -create-xcframework \
+            -library rust/target/aarch64-apple-ios-sim/release/libaether_core_ffi.a \
+            -headers Packages/AetherCore/Sources/AetherRust/include \
+            -library rust/target/aarch64-apple-darwin/release/libaether_core_ffi.a \
+            -headers Packages/AetherCore/Sources/AetherRust/include \
+            -output Packages/AetherCore/aether_core.xcframework
+
+      - name: Upload xcframework artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: aether-core-xcframework
+          path: Packages/AetherCore/aether_core.xcframework
           if-no-files-found: error
           retention-days: 7
