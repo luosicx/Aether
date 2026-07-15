@@ -9,8 +9,8 @@ pub mod sse;
 pub mod token;
 pub mod vector;
 
-// sandbox 仅非 wasm32 + 非 iOS 可用（wasmtime 不支持 wasm32 和 iOS target）
-#[cfg(not(any(target_arch = "wasm32", target_os = "ios")))]
+// sandbox 仅非 wasm32 + 非 iOS + 非 Android 可用（wasmtime 不支持这些 target）
+#[cfg(not(any(target_arch = "wasm32", target_os = "ios", target_os = "android")))]
 pub mod sandbox;
 
 // inference 排除 wasm32 和 android（candle fullfp16 编译问题，Android 后续里程碑）
@@ -27,7 +27,7 @@ pub use sse::{
 pub use token::estimate_tokens;
 pub use vector::{cosine_similarity_f32, cosine_similarity_f64, top_k_f32};
 
-#[cfg(not(any(target_arch = "wasm32", target_os = "ios")))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "ios", target_os = "android")))]
 pub use sandbox::{
     Sandbox, SandboxConfig, SandboxError, SandboxInstance, SandboxModule, SandboxResult,
 };
