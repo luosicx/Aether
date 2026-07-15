@@ -390,6 +390,13 @@
 		PLUG1N00000000000000012 /* PluginSettingsUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = PLUG1N000000000000000011 /* PluginSettingsUITests.swift */; };
 		T21A000000000000000002A /* ForkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T21A000000000000000002B /* ForkTests.swift */; };
 		T22A000000000000000004A /* RichMessageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T22A000000000000000004B /* RichMessageTests.swift */; };
+		BE887B5940B74245B1409A9E /* SSEParserRustTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB80A30E3C8A4992AE56E69E /* SSEParserRustTests.swift */; };
+		7380B8F859E842EF8CB1C681 /* Sha256RustTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B60E99A6BF94565B2B517B2 /* Sha256RustTests.swift */; };
+		1604C7E91322474690794695 /* TokenRustTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F447A2DA33774DD4B46A8908 /* TokenRustTests.swift */; };
+		8957F28F66B340C0ACFB74C3 /* VectorRustTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE3EEA826DD547AFA3281B6E /* VectorRustTests.swift */; };
+		A96C6919872E43629B76934E /* RedactorRustTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78DE8551234B487B959A11FD /* RedactorRustTests.swift */; };
+		D63422AAA6284BC68E296D81 /* ChunkerRustTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF31C32D67E245369A38B5F8 /* ChunkerRustTests.swift */; };
+		7AF7F1A93B964C469AFBE281 /* RateLimiterRustTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7DE67C0A3A1463B8F4CFF01 /* RateLimiterRustTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -729,6 +736,13 @@
 		T22A000000000000000002B /* RichMessageCard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RichMessageCard.swift; sourceTree = "<group>"; };
 		T22A000000000000000003B /* InlineChartView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InlineChartView.swift; sourceTree = "<group>"; };
 		T22A000000000000000004B /* RichMessageTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RichMessageTests.swift; sourceTree = "<group>"; };
+		FB80A30E3C8A4992AE56E69E /* SSEParserRustTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SSEParserRustTests.swift; sourceTree = "<group>"; };
+		5B60E99A6BF94565B2B517B2 /* Sha256RustTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Sha256RustTests.swift; sourceTree = "<group>"; };
+		F447A2DA33774DD4B46A8908 /* TokenRustTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TokenRustTests.swift; sourceTree = "<group>"; };
+		EE3EEA826DD547AFA3281B6E /* VectorRustTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VectorRustTests.swift; sourceTree = "<group>"; };
+		78DE8551234B487B959A11FD /* RedactorRustTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RedactorRustTests.swift; sourceTree = "<group>"; };
+		FF31C32D67E245369A38B5F8 /* ChunkerRustTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChunkerRustTests.swift; sourceTree = "<group>"; };
+		F7DE67C0A3A1463B8F4CFF01 /* RateLimiterRustTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RateLimiterRustTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1381,6 +1395,13 @@
 				26A1B2C3D4E5F6000100A010 /* Personalization */,
 				PLUG1N000000000000000014 /* Plugin */,
 				A1B2C3D4E5F6071809AB1003 /* PromptInjectionDetectorTests.swift */,
+				FB80A30E3C8A4992AE56E69E /* SSEParserRustTests.swift */,
+				5B60E99A6BF94565B2B517B2 /* Sha256RustTests.swift */,
+				F447A2DA33774DD4B46A8908 /* TokenRustTests.swift */,
+				EE3EEA826DD547AFA3281B6E /* VectorRustTests.swift */,
+				78DE8551234B487B959A11FD /* RedactorRustTests.swift */,
+				FF31C32D67E245369A38B5F8 /* ChunkerRustTests.swift */,
+				F7DE67C0A3A1463B8F4CFF01 /* RateLimiterRustTests.swift */,
 			);
 			path = AetherTests;
 			sourceTree = "<group>";
@@ -2179,6 +2200,13 @@
 				T22A000000000000000004A /* RichMessageTests.swift in Sources */,
 				25A1B2C3D4E5F6000100A006 /* ThemeManagerTests.swift in Sources */,
 				26A1B2C3D4E5F6000100A001 /* AIPersonaTests.swift in Sources */,
+				BE887B5940B74245B1409A9E /* SSEParserRustTests.swift in Sources */,
+				7380B8F859E842EF8CB1C681 /* Sha256RustTests.swift in Sources */,
+				1604C7E91322474690794695 /* TokenRustTests.swift in Sources */,
+				8957F28F66B340C0ACFB74C3 /* VectorRustTests.swift in Sources */,
+				A96C6919872E43629B76934E /* RedactorRustTests.swift in Sources */,
+				D63422AAA6284BC68E296D81 /* ChunkerRustTests.swift in Sources */,
+				7AF7F1A93B964C469AFBE281 /* RateLimiterRustTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
