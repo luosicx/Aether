@@ -1,5 +1,6 @@
 import XCTest
 @testable import AetherServices
+import AetherFoundation
 import AetherRust
 
 /// Rust SSE 解析器 Swift 回归测试。
