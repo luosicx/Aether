@@ -14,7 +14,7 @@
 //! - 参数 JSON 由宿主写入线性内存偏移 0，长度由 args_len 传入
 //! - 返回值 JSON 写入线性内存偏移 0，返回其长度（0 表示无返回值）
 
-#![cfg(not(target_arch = "wasm32"))]
+#![cfg(not(any(target_arch = "wasm32", target_os = "ios")))]
 
 use wasmtime::{Engine, Func, Instance, Linker, Memory, Module, Store, TypedFunc};
 

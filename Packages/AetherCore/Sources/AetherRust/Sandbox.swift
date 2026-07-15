@@ -1,6 +1,10 @@
 import Foundation
 import AetherRustC
 
+// wasmtime 不支持 iOS target，沙箱仅 macOS/Android 可用。
+// iOS 上 AetherRustSandbox 不可用，PluginSandbox.useRust 在 iOS 上为 false。
+#if !os(iOS)
+
 /// Swift 友好的 Rust wasmtime 插件沙箱包装。
 ///
 /// 将 `PluginSandbox.swift`（原声明式伪沙箱，maxExecutionTime/maxMemoryMB 未强制）
@@ -148,3 +152,5 @@ public struct AetherRustSandboxResult: Equatable {
         self.error = payload.error
     }
 }
+
+#endif // !os(iOS)

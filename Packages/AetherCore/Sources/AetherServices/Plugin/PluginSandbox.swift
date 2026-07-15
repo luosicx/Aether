@@ -15,7 +15,12 @@ import AetherRust
 /// 如需回退到原声明式伪沙箱（不执行 WASM），将 `useRust` 置为 false。
 public final class PluginSandbox {
     /// 切换开关：true 走 Rust wasmtime 真隔离，false 走原声明式伪沙箱（不执行 WASM）。
+    /// wasmtime 不支持 iOS target，iOS 上强制 false（声明式伪沙箱兜底）。
+    #if os(iOS)
+    private static let useRust = false
+    #else
     private static let useRust = true
+    #endif
 
     /// 关联的插件清单
     private let manifest: PluginManifest

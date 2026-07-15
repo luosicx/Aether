@@ -9,12 +9,12 @@ pub mod sse;
 pub mod token;
 pub mod vector;
 
-// sandbox 仅 host target 可用（wasmtime 不支持 wasm32）
-#[cfg(not(target_arch = "wasm32"))]
+// sandbox 仅非 wasm32 + 非 iOS 可用（wasmtime 不支持 wasm32 和 iOS target）
+#[cfg(not(any(target_arch = "wasm32", target_os = "ios")))]
 pub mod sandbox;
 
-// inference 仅 host target 可用（candle 不支持 wasm32，Workers 无端侧推理需求）
-#[cfg(not(target_arch = "wasm32"))]
+// inference 排除 wasm32 和 android（candle fullfp16 编译问题，Android 后续里程碑）
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 pub mod inference;
 
 pub use chunk::chunk_document;
@@ -27,12 +27,12 @@ pub use sse::{
 pub use token::estimate_tokens;
 pub use vector::{cosine_similarity_f32, cosine_similarity_f64, top_k_f32};
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "ios")))]
 pub use sandbox::{
     Sandbox, SandboxConfig, SandboxError, SandboxInstance, SandboxModule, SandboxResult,
 };
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 pub use inference::{
     GeneratedToken, InferenceConfig, InferenceEngine, InferenceError, LoadedModel,
 };

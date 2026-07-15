@@ -424,23 +424,23 @@ pub unsafe extern "C" fn aether_rate_limiter_free(state: *mut AetherRateLimiter)
 // 三层 opaque 句柄：AetherSandbox（引擎）/ AetherSandboxModule（编译产物）/
 // AetherSandboxInstance（运行时实例）。
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "ios", target_os = "android")))]
 use aether_core::sandbox::{Sandbox, SandboxError, SandboxInstance, SandboxModule};
 
 /// C 侧持有的沙箱引擎。opaque（字段含跨 crate 类型，cbindgen 生成 opaque typedef）。
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "ios", target_os = "android")))]
 pub struct AetherSandbox {
     inner: Sandbox,
 }
 
 /// C 侧持有的已加载模块。opaque。
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "ios", target_os = "android")))]
 pub struct AetherSandboxModule {
     inner: SandboxModule,
 }
 
 /// C 侧持有的沙箱实例。opaque。
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "ios", target_os = "android")))]
 pub struct AetherSandboxInstance {
     inner: SandboxInstance,
 }
@@ -451,7 +451,7 @@ pub struct AetherSandboxInstance {
 /// - `max_memory_bytes`: 线性内存上限（字节，50 MB = 52_428_800）
 ///
 /// 失败返回空指针。
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "ios", target_os = "android")))]
 #[no_mangle]
 pub extern "C" fn aether_sandbox_new(max_fuel: u64, max_memory_bytes: usize) -> *mut AetherSandbox {
     use aether_core::sandbox::SandboxConfig;
@@ -468,7 +468,7 @@ pub extern "C" fn aether_sandbox_new(max_fuel: u64, max_memory_bytes: usize) -> 
 /// 编译 WASM 模块（字节码）。失败返回空指针。
 /// # Safety
 /// `sandbox` 来自 `aether_sandbox_new`；`wasm` 指向 `wasm_len` 字节。
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "ios", target_os = "android")))]
 #[no_mangle]
 pub unsafe extern "C" fn aether_sandbox_load(
     sandbox: *mut AetherSandbox,
@@ -490,7 +490,7 @@ pub unsafe extern "C" fn aether_sandbox_load(
 /// 初始 fuel = 创建引擎时的 max_fuel。
 /// # Safety
 /// `module` 来自 `aether_sandbox_load`。
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "ios", target_os = "android")))]
 #[no_mangle]
 pub unsafe extern "C" fn aether_sandbox_instantiate(
     module: *mut AetherSandboxModule,
@@ -511,7 +511,7 @@ pub unsafe extern "C" fn aether_sandbox_instantiate(
 /// 调用方需用 `aether_free_string` 释放返回值。
 /// # Safety
 /// `instance` 来自 `aether_sandbox_instantiate`；`args_json` 合法 NUL 结尾 UTF-8。
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "ios", target_os = "android")))]
 #[no_mangle]
 pub unsafe extern "C" fn aether_sandbox_call_json(
     instance: *mut AetherSandboxInstance,
@@ -558,7 +558,7 @@ pub unsafe extern "C" fn aether_sandbox_call_json(
 /// 直接调用 execute（数值参数），返回结果。失败返回 0。
 /// # Safety
 /// `instance` 来自 `aether_sandbox_instantiate`。
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "ios", target_os = "android")))]
 #[no_mangle]
 pub unsafe extern "C" fn aether_sandbox_call_raw(
     instance: *mut AetherSandboxInstance,
@@ -574,7 +574,7 @@ pub unsafe extern "C" fn aether_sandbox_call_raw(
 /// 剩余 fuel。
 /// # Safety
 /// `instance` 来自 `aether_sandbox_instantiate`。
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "ios", target_os = "android")))]
 #[no_mangle]
 pub unsafe extern "C" fn aether_sandbox_fuel_remaining(
     instance: *mut AetherSandboxInstance,
@@ -589,7 +589,7 @@ pub unsafe extern "C" fn aether_sandbox_fuel_remaining(
 /// 重置 fuel 到初始值。
 /// # Safety
 /// `instance` 来自 `aether_sandbox_instantiate`。
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "ios", target_os = "android")))]
 #[no_mangle]
 pub unsafe extern "C" fn aether_sandbox_refill_fuel(instance: *mut AetherSandboxInstance) {
     if instance.is_null() {
@@ -602,7 +602,7 @@ pub unsafe extern "C" fn aether_sandbox_refill_fuel(instance: *mut AetherSandbox
 /// 释放沙箱引擎。空指针安全。
 /// # Safety
 /// `sandbox` 来自 `aether_sandbox_new`，且只能释放一次。
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "ios", target_os = "android")))]
 #[no_mangle]
 pub unsafe extern "C" fn aether_sandbox_free(sandbox: *mut AetherSandbox) {
     if !sandbox.is_null() {
@@ -613,7 +613,7 @@ pub unsafe extern "C" fn aether_sandbox_free(sandbox: *mut AetherSandbox) {
 /// 释放已加载模块。空指针安全。
 /// # Safety
 /// `module` 来自 `aether_sandbox_load`，且只能释放一次。
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "ios", target_os = "android")))]
 #[no_mangle]
 pub unsafe extern "C" fn aether_sandbox_module_free(module: *mut AetherSandboxModule) {
     if !module.is_null() {
@@ -624,7 +624,7 @@ pub unsafe extern "C" fn aether_sandbox_module_free(module: *mut AetherSandboxMo
 /// 释放沙箱实例。空指针安全。
 /// # Safety
 /// `instance` 来自 `aether_sandbox_instantiate`，且只能释放一次。
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "ios", target_os = "android")))]
 #[no_mangle]
 pub unsafe extern "C" fn aether_sandbox_instance_free(instance: *mut AetherSandboxInstance) {
     if !instance.is_null() {
@@ -638,21 +638,21 @@ pub unsafe extern "C" fn aether_sandbox_instance_free(instance: *mut AetherSandb
 // 本层负责 unsafe mmap 加载 safetensors，构造 VarBuilder，
 // 然后调用 aether-core 的纯逻辑 InferenceEngine::load_from_components。
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 use aether_core::inference::{InferenceConfig, InferenceEngine, InferenceError};
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 use candle_core::Device;
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 use candle_transformers::models::qwen2::Config as Qwen2Config;
 
 /// C 侧持有的推理引擎。opaque（字段含跨 crate 类型）。
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 pub struct AetherInferenceEngine {
     inner: InferenceEngine,
 }
 
 /// 创建推理引擎。返回的引擎未加载模型，需调用 `aether_inference_load_model`。
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 #[no_mangle]
 pub extern "C" fn aether_inference_new() -> *mut AetherInferenceEngine {
     Box::into_raw(Box::new(AetherInferenceEngine {
@@ -674,7 +674,7 @@ pub extern "C" fn aether_inference_new() -> *mut AetherInferenceEngine {
 /// 返回：成功 0，失败返回 1（错误信息通过 aether_inference_last_error 获取）。
 /// # Safety
 /// `engine` 来自 `aether_inference_new`；`model_dir` 合法 NUL 结尾 UTF-8。
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 #[no_mangle]
 pub unsafe extern "C" fn aether_inference_load_model(
     engine: *mut AetherInferenceEngine,
@@ -737,7 +737,7 @@ pub unsafe extern "C" fn aether_inference_load_model(
 }
 
 /// 加载模型实现（host target）：读取 config.json / tokenizer.json / mmap safetensors。
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 fn load_model_impl(
     engine: &mut InferenceEngine,
     model_dir: &str,
@@ -790,7 +790,7 @@ fn load_model_impl(
 /// 调用方需用 `aether_free_string` 释放返回值。失败返回空指针。
 /// # Safety
 /// `engine` 来自 `aether_inference_new` 且已加载模型；`prompt` 合法 NUL 结尾 UTF-8。
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 #[no_mangle]
 pub unsafe extern "C" fn aether_inference_generate(
     engine: *mut AetherInferenceEngine,
@@ -834,7 +834,7 @@ pub unsafe extern "C" fn aether_inference_generate(
 /// 调用方需用 `aether_free_string` 释放返回值。失败返回空指针。
 /// # Safety
 /// `engine` 来自 `aether_inference_new` 且已加载模型；`prompt` 合法 NUL 结尾 UTF-8。
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 #[no_mangle]
 pub unsafe extern "C" fn aether_inference_generate_text(
     engine: *mut AetherInferenceEngine,
@@ -860,7 +860,7 @@ pub unsafe extern "C" fn aether_inference_generate_text(
 /// 模型是否已加载。
 /// # Safety
 /// `engine` 来自 `aether_inference_new`。
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 #[no_mangle]
 pub unsafe extern "C" fn aether_inference_is_loaded(engine: *const AetherInferenceEngine) -> bool {
     if engine.is_null() {
@@ -873,7 +873,7 @@ pub unsafe extern "C" fn aether_inference_is_loaded(engine: *const AetherInferen
 /// 卸载模型，释放内存。
 /// # Safety
 /// `engine` 来自 `aether_inference_new`。
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 #[no_mangle]
 pub unsafe extern "C" fn aether_inference_unload(engine: *mut AetherInferenceEngine) {
     if engine.is_null() {
@@ -886,7 +886,7 @@ pub unsafe extern "C" fn aether_inference_unload(engine: *mut AetherInferenceEng
 /// 释放推理引擎。空指针安全。
 /// # Safety
 /// `engine` 来自 `aether_inference_new`，且只能释放一次。
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 #[no_mangle]
 pub unsafe extern "C" fn aether_inference_free(engine: *mut AetherInferenceEngine) {
     if !engine.is_null() {

@@ -14,7 +14,7 @@
 //! - aether-core/inference.rs（本文件）：推理逻辑（纯 safe Rust）
 //! - aether-core-ffi：unsafe mmap 加载 safetensors，构造 VarBuilder，调用本模块
 
-#![cfg(not(target_arch = "wasm32"))]
+#![cfg(not(any(target_arch = "wasm32", target_os = "android")))]
 
 use std::sync::Mutex;
 
