@@ -6,6 +6,40 @@
 
 ## [Unreleased]
 
+首个正式版本 1.0.0 已发布，后续变更将记录于此。
+
+---
+
+## [1.0.0] - 2026-07-15
+
+### 多平台首发版本
+
+Aether v1.0.0 首次以多平台形式发布，覆盖 iOS / macOS / Android / Windows / Cloudflare Workers (BFF) 五端：
+
+- **iOS（iOS 17+）**：SwiftUI 原生 App，含完整对话 / RAG / 工具调用 / 健康洞察 / 端侧 MLX 推理 / Apple Intents / Widget / Watch App。GitHub Release 提供 iOS Simulator 包（unsigned，用于模拟器调试），App Store 分发通过 TestFlight。
+- **macOS（macOS 14+）**：与 iOS 共享 SwiftUI / SwiftData 代码，含菜单栏 / 多窗口 / macOS 独有 11 个工具（AppleScript / Terminal / OCR / Screenshot 等）。GitHub Release 提供 unsigned `.dmg`。
+- **Android（API 29+）**：Kotlin + Jetpack Compose 客户端，复用 BFF 网关，本地 Room 持久化。GitHub Release 提供 release APK（debug 签名，可直接安装）。
+- **Windows（.NET 8 + WPF）**：C# 桌面客户端，复用 BFF 网关。GitHub Release 提供 win-x64 自包含压缩包（无需目标机安装 .NET）。
+- **Cloudflare Workers BFF**：跨平台业务网关，统一鉴权 / 限流 / 路由 / RAG 检索。GitHub Release 提供 BFF 源码包。
+
+### 平台产物清单
+
+| 产物 | 平台 | 文件名 | 说明 |
+| --- | --- | --- | --- |
+| iOS Simulator App | iOS 17+ | `Aether-iOS-1.0.0-simulator.zip` | 无签名 simulator 包，仅供模拟器调试 |
+| macOS DMG | macOS 14+ | `Aether-macOS-1.0.0-unsigned.dmg` | 无签名 `.dmg`，需手动允许运行 |
+| Android APK | Android API 29+ | `Aether-Android-1.0.0.apk` | Release 构建配置 + debug 签名 |
+| Windows Zip | Windows 10/11 x64 | `Aether-Windows-1.0.0-win-x64.zip` | .NET 8 自包含，无需运行时依赖 |
+| BFF 源码包 | Cloudflare Workers | `Aether-BFF-1.0.0.zip` | `wrangler deploy` 部署 |
+| 源码归档 | 通用 | `Aether-1.0.0-source.tar.gz` / `.zip` | 标签指向的完整源码 |
+
+### 版本号
+
+- iOS / macOS：`CFBundleShortVersionString = 1.0.0`，`CFBundleVersion = 100`
+- Android：`versionName = "1.0.0"`，`versionCode = 100`
+- Windows：`Version = 1.0.0`，`AssemblyVersion / FileVersion = 1.0.0.0`
+- BFF（package.json）：`1.0.0`
+
 ### Added
 - **多语言扩展至 8 种语言**：`Localizable.xcstrings` 从 3 种语言（zh-Hans / zh-Hant / en）扩展至 8 种（新增 ja 日语 / ko 韩语 / fr 法语 / de 德语 / es 西班牙语），i18n keys 覆盖全部核心 UI 文案
 - **Watch App 源代码**：新增 `AetherWatch/` 目录，包含 `WatchApp.swift`（TabView 三标签：快速对话 / 健康洞察 / 设置）、`WatchQuickChatView.swift`（快捷对话发送）、`WatchHealthInsightView.swift`（健康洞察浏览）；通过 `WatchConnectivityService` 与 iOS 主 App 双向同步（transferUserInfo 推送健康洞察）。⚠️ Watch target 需在 Xcode 中手动创建并关联源文件
