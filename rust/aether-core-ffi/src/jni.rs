@@ -1,6 +1,10 @@
 //! Android JNI 绑定（仅 Android target 编译）。
+//!
+//! jni 0.21 生命周期模型：JNIEnv<'local> 的 'local 代表 local reference frame，
+//! new_string 返回 JString<'local>。JNI 导出函数返回 Java 对象时用 into_raw()
+//! 转为原始 jstring 指针（所有权转移给 JVM），规避 'static 约束。
 
-use jni::objects::{JClass, JObject, JString};
+use jni::objects::{JClass, JString};
 use jni::JNIEnv;
 use std::collections::BTreeMap;
 
@@ -13,15 +17,24 @@ thread_local! {
         std::cell::RefCell::new(BTreeMap::new());
 }
 
+/// 创建 JString 并转为原始 jstring 指针（所有权转移给 JVM）。
+/// 分配失败返回 null。
+fn new_jstring(env: &mut JNIEnv, s: &str) -> jni::sys::jstring {
+    match env.new_string(s) {
+        Ok(js) => js.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
 #[no_mangle]
 pub extern "system" fn Java_com_aether_rust_SseBridge_parseWithTools(
     mut env: JNIEnv,
     _class: JClass,
     line: JString,
-) -> JString<'static> {
+) -> jni::sys::jstring {
     let line: String = match env.get_string(&line) {
         Ok(s) => s.into(),
-        Err(_) => return env.new_string("").unwrap_or(JObject::null().into()),
+        Err(_) => return new_jstring(&mut env, ""),
     };
     let json = ACC.with(|acc| {
         let mut acc = acc.borrow_mut();
@@ -34,8 +47,8 @@ pub extern "system" fn Java_com_aether_rust_SseBridge_parseWithTools(
         })
     });
     match json {
-        Some(j) => env.new_string(j).unwrap_or(JObject::null().into()),
-        None => env.new_string("").unwrap_or(JObject::null().into()),
+        Some(j) => new_jstring(&mut env, &j),
+        None => new_jstring(&mut env, ""),
     }
 }
 
