@@ -1,6 +1,7 @@
 import XCTest
 import SwiftData
 @testable import Aether
+import AetherFoundation
 
 /// SwiftDataMessageRepository 单元测试：使用 in-memory ModelContainer
 @MainActor
@@ -288,7 +289,8 @@ final class SwiftDataConversationRepositoryTests: XCTestCase {
 
         let found = try await repo.fetch(id: id)
         XCTAssertEqual(found?.title, "查找")
-        XCTAssertNil(try await repo.fetch(id: UUID()), "不存在的 id 应返回 nil")
+        let notFound = try await repo.fetch(id: UUID())
+        XCTAssertNil(notFound, "不存在的 id 应返回 nil")
     }
 
     func testSaveUpdatesExisting() async throws {
@@ -427,7 +429,7 @@ final class SwiftDataMemoryRepositoryTests: XCTestCase {
         XCTAssertEqual(all.count, 1)
         XCTAssertEqual(all.first?.content, "更新内容")
         XCTAssertEqual(all.first?.category, "fact")
-        XCTAssertEqual(all.first?.importance, 0.8, accuracy: 0.001)
+        XCTAssertEqual(all.first?.importance ?? 0, 0.8, accuracy: 0.001)
         XCTAssertEqual(all.first?.embedding, [1.0, 2.0])
         XCTAssertNotNil(all.first?.sourceConversationId)
     }
