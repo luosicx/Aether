@@ -52,16 +52,19 @@ pub extern "system" fn Java_com_aether_rust_VectorMath_cosineF64(
     a: jni::sys::jdoubleArray,
     b: jni::sys::jdoubleArray,
 ) -> jni::sys::jdouble {
-    // get_double_array_elements 返回 AutoElements，Deref 到 &[jdouble]，
-    // drop 时自动 release，无需手动 unsafe。
+    // jni 0.21 API：
+    // - JPrimitiveArray::<T>::from_raw 从原始 jarray 指针构造类型化数组包装
+    // - JNIEnv::get_array_elements 为 unsafe，需传入 ReleaseMode，
+    //   返回 AutoElements<T>（实现 Deref<Target=[T]>，可直接当 &[T] 用）
+    // - 只读访问用 NoCopyBack（JNI_ABORT），避免回写开销
+    use jni::objects::{JPrimitiveArray, ReleaseMode};
+    use jni::sys::jdouble;
     let result = (|| {
-        let a_arr = env
-            .get_double_array_elements(a, jni::objects::JObject::null())
-            .ok()?;
-        let b_arr = env
-            .get_double_array_elements(b, jni::objects::JObject::null())
-            .ok()?;
-        Some(aether_core::cosine_similarity_f64(&a_arr, &b_arr))
+        let a_arr = unsafe { JPrimitiveArray::<jdouble>::from_raw(a) };
+        let b_arr = unsafe { JPrimitiveArray::<jdouble>::from_raw(b) };
+        let a_elems = unsafe { env.get_array_elements(&a_arr, ReleaseMode::NoCopyBack) }.ok()?;
+        let b_elems = unsafe { env.get_array_elements(&b_arr, ReleaseMode::NoCopyBack) }.ok()?;
+        Some(aether_core::cosine_similarity_f64(&a_elems, &b_elems))
     })();
     result.unwrap_or(0.0)
 }
