@@ -143,3 +143,20 @@ impl Redactor {
         aether_core::redact(s)
     }
 }
+
+/// 文档分块器（Workers 端 rag.js 文档索引用）。
+#[wasm_bindgen]
+#[allow(non_snake_case)]
+pub struct Chunker;
+
+#[wasm_bindgen]
+#[allow(non_snake_case)]
+impl Chunker {
+    /// 对文档分块，返回 JSON 字符串数组 `["chunk1","chunk2",...]`。
+    /// 按 UAX #29 句子边界切分，累积到 `max_chars` 后落盘，
+    /// 相邻块用 `overlap_chars` 个字符拼接保证上下文连续。
+    pub fn chunkDocument(text: &str, maxChars: usize, overlapChars: usize) -> String {
+        let chunks = aether_core::chunk_document(text, maxChars, overlapChars);
+        serde_json::to_string(&chunks).unwrap_or_else(|_| "[]".to_string())
+    }
+}

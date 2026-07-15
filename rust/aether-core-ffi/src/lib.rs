@@ -8,8 +8,8 @@ use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_void};
 
 use aether_core::{
-    cosine_similarity_f32, cosine_similarity_f64, estimate_tokens, extract_content, parse_chunk,
-    parse_with_tool_accumulation, redact, top_k_f32, AccumulatedToolCall, ParsedChunk,
+    chunk_document, cosine_similarity_f32, cosine_similarity_f64, estimate_tokens, extract_content,
+    parse_chunk, parse_with_tool_accumulation, redact, top_k_f32, AccumulatedToolCall, ParsedChunk,
 };
 
 /// C 侧持有的解析器状态（跨调用累积 tool_calls）。
@@ -236,6 +236,34 @@ pub unsafe extern "C" fn aether_redact(input: *const c_char) -> *mut c_char {
     };
     let redacted = redact(s);
     to_cstring(&redacted)
+}
+
+// ===== 文档分块 C ABI =====
+
+/// 对文档分块，返回 JSON 字符串数组 `["chunk1","chunk2",...]`。
+/// `max_chars == 0` 或空文本返回 `[]`。失败返回空指针。
+/// 调用方需用 `aether_free_string` 释放返回值。
+/// # Safety
+/// `input` 必须是合法 NUL 结尾 UTF-8。
+#[no_mangle]
+pub unsafe extern "C" fn aether_chunk_document(
+    input: *const c_char,
+    max_chars: usize,
+    overlap_chars: usize,
+) -> *mut c_char {
+    if input.is_null() {
+        return serde_json::to_string::<[String; 0]>(&[])
+            .map(|j| to_cstring(&j))
+            .unwrap_or(std::ptr::null_mut());
+    }
+    let s = match CStr::from_ptr(input).to_str() {
+        Ok(s) => s,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let chunks = chunk_document(s, max_chars, overlap_chars);
+    serde_json::to_string(&chunks)
+        .map(|j| to_cstring(&j))
+        .unwrap_or(std::ptr::null_mut())
 }
 
 /// FFI 友好的序列化视图：字段名统一 camelCase，`kind`→`type` 与 Swift 对齐。
