@@ -35,6 +35,7 @@ dependencies = [
  "serde_json",
  "tokenizers",
  "wasm-bindgen",
+ "wasmtime",
 ]
 
 [[package]]
