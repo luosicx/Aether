@@ -9,7 +9,7 @@ use std::os::raw::{c_char, c_void};
 
 use aether_core::{
     cosine_similarity_f32, cosine_similarity_f64, estimate_tokens, extract_content, parse_chunk,
-    parse_with_tool_accumulation, top_k_f32, AccumulatedToolCall, ParsedChunk,
+    parse_with_tool_accumulation, redact, top_k_f32, AccumulatedToolCall, ParsedChunk,
 };
 
 /// C 侧持有的解析器状态（跨调用累积 tool_calls）。
@@ -216,6 +216,26 @@ pub unsafe extern "C" fn aether_estimate_tokens(s: *const c_char) -> usize {
         Err(_) => return 0,
     };
     estimate_tokens(s)
+}
+
+// ===== 脱敏 C ABI =====
+
+/// 对输入字符串脱敏（UUID/邮箱/URL/Token/密码字段/路径）。
+/// 返回新分配的 NUL 结尾 UTF-8 字符串，调用方需用 `aether_free_string` 释放。
+/// 输入空指针返回空串（非空指针，需释放）。
+/// # Safety
+/// `input` 必须是合法 NUL 结尾 UTF-8。
+#[no_mangle]
+pub unsafe extern "C" fn aether_redact(input: *const c_char) -> *mut c_char {
+    if input.is_null() {
+        return to_cstring("");
+    }
+    let s = match CStr::from_ptr(input).to_str() {
+        Ok(s) => s,
+        Err(_) => return to_cstring(""),
+    };
+    let redacted = redact(s);
+    to_cstring(&redacted)
 }
 
 /// FFI 友好的序列化视图：字段名统一 camelCase，`kind`→`type` 与 Swift 对齐。

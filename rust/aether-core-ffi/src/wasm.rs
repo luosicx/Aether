@@ -128,3 +128,18 @@ impl TokenCounter {
         aether_core::estimate_tokens(s)
     }
 }
+
+/// 脱敏器（Workers 端 chat.js 用户消息 / 错误信息脱敏用）。
+#[wasm_bindgen]
+#[allow(non_snake_case)]
+pub struct Redactor;
+
+#[wasm_bindgen]
+#[allow(non_snake_case)]
+impl Redactor {
+    /// 对输入字符串脱敏（UUID/邮箱/URL/Token/密码字段/路径）。
+    /// 返回脱敏后的新字符串，原字符串不变。
+    pub fn redact(s: &str) -> String {
+        aether_core::redact(s)
+    }
+}

@@ -24,6 +24,7 @@
  */
 
 import { jsonError } from "../lib/llm.js";
+import { redact } from "../lib/redact.js";
 import { buildContext, callLLMStream } from "../lib/llm.js";
 import { fetchRelevantMemories } from "../lib/memory.js";
 import { searchDocuments } from "../lib/rag.js";
@@ -179,7 +180,9 @@ export async function handleChatStream(request, env, ctx) {
       await writer.write(encoder.encode(`data: ${doneData}\n\n`));
       await writer.write(encoder.encode(`data: [DONE]\n\n`));
     } catch (err) {
-      const errMsg = err && err.message ? err.message : "LLM 调用失败";
+      const rawMsg = err && err.message ? err.message : "LLM 调用失败";
+      // 脱敏错误信息，避免上游返回的 token/路径/URL 泄露给客户端
+      const errMsg = await redact(rawMsg);
       const errData = JSON.stringify({ type: "error", message: errMsg });
       // 写错误前先 flush 已有内容
       try {

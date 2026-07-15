@@ -101,4 +101,13 @@ AETHER_EXPORT char *aether_top_k_f32_json(const char *input);
  */
 AETHER_EXPORT uintptr_t aether_estimate_tokens(const char *s);
 
+/**
+ * 对输入字符串脱敏（UUID/邮箱/URL/Token/密码字段/路径）。
+ * 返回新分配的 NUL 结尾 UTF-8 字符串，调用方需用 `aether_free_string` 释放。
+ * 输入空指针返回空串（非空指针，需释放）。
+ * # Safety
+ * `input` 必须是合法 NUL 结尾 UTF-8。
+ */
+AETHER_EXPORT char *aether_redact(const char *input);
+
 #endif  /* AETHER_CORE_FFI_H */
