@@ -1,12 +1,81 @@
 /**
  * RAG 文档分块检索
  *
- * 简化版：基于 SQL LIKE 文本匹配 document_chunks。
- * 后续可扩展为向量检索（embedding 列已预留）。
+ * 支持两种检索模式：
+ * 1. 向量检索（searchDocumentsByVector）：基于 embedding 余弦相似度，cosine 计算走 Rust WASM
+ * 2. 关键词检索（searchDocuments）：SQL LIKE 兜底，embedding 不可用时使用
  */
 
+// WASM VectorMath 懒加载单例（cosine 计算已迁移至 Rust aether-core-ffi）
+let _vectorMath = null;
+async function getVectorMath() {
+  if (_vectorMath) return _vectorMath;
+  const mod = await import("../../wasm/aether_sse.js");
+  await mod.default();
+  _vectorMath = mod.VectorMath;
+  return _vectorMath;
+}
+
 /**
- * 检索与查询相关的文档分块
+ * 向量检索：用 embedding 余弦相似度检索最相关分块。
+ * 仅返回 embedding 非空的分块；无可用 embedding 时回退到关键词检索。
+ * @param {Object} env - 含 D1 绑定 env.DB
+ * @param {string} userId
+ * @param {number[]} queryEmbedding - 查询向量（与文档 embedding 同维度）
+ * @param {number} limit - 返回条数上限，默认 5
+ * @returns {Promise<Array>}
+ */
+export async function searchDocumentsByVector(env, userId, queryEmbedding, limit = 5) {
+  if (!env.DB || !queryEmbedding || queryEmbedding.length === 0) return [];
+
+  try {
+    // 拉取该用户所有有 embedding 的分块
+    const { results } = await env.DB.prepare(
+      `SELECT dc.id, dc.document_id, dc.content, dc.metadata, dc.chunk_index, dc.weight,
+              d.title AS document_title
+       FROM document_chunks dc
+       INNER JOIN documents d ON d.id = dc.document_id
+       WHERE d.user_id = ?1 AND dc.embedding IS NOT NULL`
+    ).bind(userId).all();
+
+    if (!results || results.length === 0) return [];
+
+    // 解析 embedding（JSON 字符串 → number[]）并过滤无效项
+    const valid = results
+      .map((r) => {
+        try {
+          const emb = JSON.parse(r.embedding);
+          return emb && Array.isArray(emb) && emb.length === queryEmbedding.length
+            ? { row: r, embedding: Float32Array.from(emb) }
+            : null;
+        } catch (_) {
+          return null;
+        }
+      })
+      .filter(Boolean);
+
+    if (valid.length === 0) return [];
+
+    // WASM cosine 逐项打分
+    const VectorMath = await getVectorMath();
+    const queryF32 = Float32Array.from(queryEmbedding);
+    const scored = valid.map(({ row, embedding }) => ({
+      row,
+      score: VectorMath.cosineF32(queryF32, embedding),
+    }));
+
+    // 降序取前 limit
+    scored.sort((a, b) => b.score - a.score);
+    return scored.slice(0, limit).map((s) => s.row);
+  } catch (err) {
+    console.error("searchDocumentsByVector error:", err && err.message);
+    return [];
+  }
+}
+
+/**
+ * 关键词检索（兜底）：基于 SQL LIKE 文本匹配 document_chunks。
+ * embedding 不可用时使用。
  * @param {Object} env - 含 D1 绑定 env.DB
  * @param {string} userId
  * @param {string} query - 用户查询文本

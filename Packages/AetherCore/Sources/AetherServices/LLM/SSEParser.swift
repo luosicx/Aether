@@ -1,6 +1,8 @@
 import Foundation
 import AetherFoundation
-import AetherRust
+// 将 AetherRust（含 AetherRustVector / AetherRustSSEParser）透出给 AetherServices 的导入方，
+// 使 App target（RAGService / MemoryService 等）无需在 Xcode 工程中单独链接 AetherRust product。
+@_exported import AetherRust
 
 /// DeepSeek SSE 流解析器，@unchecked Sendable 允许跨 actor 使用。
 /// 实现已迁移至 Rust（aether-core），本类仅做转发与类型映射。

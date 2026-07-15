@@ -8,7 +8,8 @@ use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_void};
 
 use aether_core::{
-    extract_content, parse_chunk, parse_with_tool_accumulation, AccumulatedToolCall, ParsedChunk,
+    cosine_similarity_f32, cosine_similarity_f64, extract_content, parse_chunk,
+    parse_with_tool_accumulation, top_k_f32, AccumulatedToolCall, ParsedChunk,
 };
 
 /// C 侧持有的解析器状态（跨调用累积 tool_calls）。
@@ -121,6 +122,82 @@ fn to_cstring(s: &str) -> *mut c_char {
     CString::new(s)
         .map(|c| c.into_raw())
         .unwrap_or(std::ptr::null_mut())
+}
+
+// ===== 向量数学 C ABI =====
+//
+// cosine 直接返回标量（无分配）；top_k 因 corpus 为变长二维数组，用 JSON 进出。
+
+/// f32 余弦相似度。空指针或长度不等返回 0。
+/// # Safety
+/// `a`/`b` 必须指向至少 `a_len`/`b_len` 个有效 f32。
+#[no_mangle]
+pub unsafe extern "C" fn aether_cosine_f32(
+    a: *const f32,
+    a_len: usize,
+    b: *const f32,
+    b_len: usize,
+) -> f32 {
+    if a.is_null() || b.is_null() {
+        return 0.0;
+    }
+    let a = std::slice::from_raw_parts(a, a_len);
+    let b = std::slice::from_raw_parts(b, b_len);
+    cosine_similarity_f32(a, b)
+}
+
+/// f64 余弦相似度。空指针或长度不等返回 0。
+/// # Safety
+/// `a`/`b` 必须指向至少 `a_len`/`b_len` 个有效 f64。
+#[no_mangle]
+pub unsafe extern "C" fn aether_cosine_f64(
+    a: *const f64,
+    a_len: usize,
+    b: *const f64,
+    b_len: usize,
+) -> f64 {
+    if a.is_null() || b.is_null() {
+        return 0.0;
+    }
+    let a = std::slice::from_raw_parts(a, a_len);
+    let b = std::slice::from_raw_parts(b, b_len);
+    cosine_similarity_f64(a, b)
+}
+
+/// top-K 检索（f32）。输入 JSON：`{"query":[...],"corpus":[[...],[...]],"k":5}`；
+/// 输出 JSON：`[[index,score],...]`（降序）。失败返回空指针。
+/// # Safety
+/// `input` 必须是合法 NUL 结尾 UTF-8。
+#[no_mangle]
+pub unsafe extern "C" fn aether_top_k_f32_json(input: *const c_char) -> *mut c_char {
+    if input.is_null() {
+        return std::ptr::null_mut();
+    }
+    let input = match CStr::from_ptr(input).to_str() {
+        Ok(s) => s,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    #[derive(serde::Deserialize)]
+    struct In {
+        query: Vec<f32>,
+        corpus: Vec<Vec<f32>>,
+        k: usize,
+    }
+    let parsed: In = match serde_json::from_str(input) {
+        Ok(v) => v,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    let corpus_refs: Vec<&[f32]> = parsed.corpus.iter().map(|s| s.as_slice()).collect();
+    let result = top_k_f32(&parsed.query, &corpus_refs, parsed.k);
+    // 序列化为 [[index, score], ...]
+    serde_json::to_string(
+        &result
+            .iter()
+            .map(|(i, s)| (*i as u64, *s))
+            .collect::<Vec<_>>(),
+    )
+    .map(|j| to_cstring(&j))
+    .unwrap_or(std::ptr::null_mut())
 }
 
 /// FFI 友好的序列化视图：字段名统一 camelCase，`kind`→`type` 与 Swift 对齐。

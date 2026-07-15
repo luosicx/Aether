@@ -9,7 +9,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include "stdint.h"
 
 typedef struct BTreeMap_i64__AccumulatedToolCall BTreeMap_i64__AccumulatedToolCall;
 
@@ -63,5 +62,35 @@ AETHER_EXPORT void aether_free_string(char *ptr);
  * `ptr` 必须由本 crate 产生，且只能释放一次。
  */
 AETHER_EXPORT void aether_free(void *ptr);
+
+/**
+ * f32 余弦相似度。空指针或长度不等返回 0。
+ * # Safety
+ * `a`/`b` 必须指向至少 `a_len`/`b_len` 个有效 f32。
+ */
+AETHER_EXPORT
+float aether_cosine_f32(const float *a,
+                        uintptr_t a_len,
+                        const float *b,
+                        uintptr_t b_len);
+
+/**
+ * f64 余弦相似度。空指针或长度不等返回 0。
+ * # Safety
+ * `a`/`b` 必须指向至少 `a_len`/`b_len` 个有效 f64。
+ */
+AETHER_EXPORT
+double aether_cosine_f64(const double *a,
+                         uintptr_t a_len,
+                         const double *b,
+                         uintptr_t b_len);
+
+/**
+ * top-K 检索（f32）。输入 JSON：`{"query":[...],"corpus":[[...],[...]],"k":5}`；
+ * 输出 JSON：`[[index,score],...]`（降序）。失败返回空指针。
+ * # Safety
+ * `input` 必须是合法 NUL 结尾 UTF-8。
+ */
+AETHER_EXPORT char *aether_top_k_f32_json(const char *input);
 
 #endif  /* AETHER_CORE_FFI_H */

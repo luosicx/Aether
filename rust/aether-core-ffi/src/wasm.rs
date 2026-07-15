@@ -79,3 +79,38 @@ impl SseState {
             .and_then(|p| serde_json::to_string(&View::from(&p)).ok())
     }
 }
+
+/// 向量数学：cosine 相似度与 top-K 检索（Workers 端 rag.js 用）。
+#[wasm_bindgen]
+#[allow(non_snake_case)]
+pub struct VectorMath;
+
+#[wasm_bindgen]
+#[allow(non_snake_case)]
+impl VectorMath {
+    /// f32 余弦相似度。长度不等或空返回 0。
+    pub fn cosineF32(a: &[f32], b: &[f32]) -> f32 {
+        aether_core::cosine_similarity_f32(a, b)
+    }
+
+    /// f64 余弦相似度。长度不等或空返回 0。
+    pub fn cosineF64(a: &[f64], b: &[f64]) -> f64 {
+        aether_core::cosine_similarity_f64(a, b)
+    }
+
+    /// top-K 检索。返回 JSON：`[[index,score],...]`（降序）。
+    /// `corpus_json` 为 number[][] 的 JSON 字符串（裸数组），`query` 为 Float32Array/number[]。
+    pub fn topKF32(query: &[f32], corpus_json: &str, k: usize) -> Option<String> {
+        // 直接反序列化裸数组 number[][]（不包裹在对象中）
+        let corpus: Vec<Vec<f32>> = serde_json::from_str(corpus_json).ok()?;
+        let refs: Vec<&[f32]> = corpus.iter().map(|s| s.as_slice()).collect();
+        let result = aether_core::top_k_f32(query, &refs, k);
+        serde_json::to_string(
+            &result
+                .iter()
+                .map(|(i, s)| (*i as u64, *s))
+                .collect::<Vec<_>>(),
+        )
+        .ok()
+    }
+}

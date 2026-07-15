@@ -43,3 +43,25 @@ pub extern "system" fn Java_com_aether_rust_SseBridge_parseWithTools(
 pub extern "system" fn Java_com_aether_rust_SseBridge_reset(_env: JNIEnv, _class: JClass) {
     ACC.with(|acc| acc.borrow_mut().clear());
 }
+
+/// f64 余弦相似度（Android RAG/Memory 用）。入参两个 double[]，返回 double。
+#[no_mangle]
+pub extern "system" fn Java_com_aether_rust_VectorMath_cosineF64(
+    mut env: JNIEnv,
+    _class: JClass,
+    a: jni::sys::jdoubleArray,
+    b: jni::sys::jdoubleArray,
+) -> jni::sys::jdouble {
+    // get_double_array_elements 返回 AutoElements，Deref 到 &[jdouble]，
+    // drop 时自动 release，无需手动 unsafe。
+    let result = (|| {
+        let a_arr = env
+            .get_double_array_elements(a, jni::objects::JObject::null())
+            .ok()?;
+        let b_arr = env
+            .get_double_array_elements(b, jni::objects::JObject::null())
+            .ok()?;
+        Some(aether_core::cosine_similarity_f64(&a_arr, &b_arr))
+    })();
+    result.unwrap_or(0.0)
+}
