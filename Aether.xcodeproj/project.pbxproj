@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 46;
+	objectVersion = 60;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -38,6 +38,7 @@
 		11111111111111111111A00B /* PreferenceExtractorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11111111111111111111A00C /* PreferenceExtractorTests.swift */; };
 		11111111111111111111A0D3 /* ContextWindowManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11111111111111111111A0D4 /* ContextWindowManagerTests.swift */; };
 		11111111111111111111A0D7 /* SemanticMemoryStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11111111111111111111A0D8 /* SemanticMemoryStoreTests.swift */; };
+		119F3C302AD2D99B3654BF38 /* SwiftDataRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2F02E2D70C1519B594088E1 /* SwiftDataRepositoryTests.swift */; };
 		119FB8FB06360855631FB56D /* AetherApp-iOS.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2318B28DC6BD8174A0D26D1 /* AetherApp-iOS.swift */; };
 		11F93F53B58375E35B0DB358 /* LogUploaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E42EAA429A0EACAC0015EDBF /* LogUploaderTests.swift */; };
 		125648899EA29454D6A910E3 /* MCPClientManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000003 /* MCPClientManager.swift */; };
@@ -112,6 +113,14 @@
 		400BE1EB7355860031E1C862 /* HealthInsightGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B25FA2E8C8F8B141EE7979C0 /* HealthInsightGenerator.swift */; };
 		41A1E1251671090359343A04 /* ChatInputBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE000000000000000000E001 /* ChatInputBar.swift */; };
 		42627293504388411664256B /* APIConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B0A1ECFB82B1D23FC44A565 /* APIConfig.swift */; };
+		443FE5B93007FF16007F645B /* AetherFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 6EBBF8B827948C71D0146EFA /* AetherFoundation */; };
+		443FE5BA3007FF16007F645B /* AetherServices in Frameworks */ = {isa = PBXBuildFile; productRef = 61F040C5759A54BEE5570F77 /* AetherServices */; };
+		443FE5BB3007FF16007F645B /* AetherDesign in Frameworks */ = {isa = PBXBuildFile; productRef = BDB2A3C283EB38931165A5A9 /* AetherDesign */; };
+		443FE5BC3007FF16007F645B /* AetherUI in Frameworks */ = {isa = PBXBuildFile; productRef = 8E5669BB90D7AB3818F7BB35 /* AetherUI */; };
+		443FE5BD3007FF16007F645B /* AetherFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = 5184FCE31E12D3B454FCF9A7 /* AetherFoundation */; };
+		443FE5BE3007FF16007F645B /* AetherServices in Frameworks */ = {isa = PBXBuildFile; productRef = AC6401E4592088E8E65E745D /* AetherServices */; };
+		443FE5BF3007FF16007F645B /* AetherDesign in Frameworks */ = {isa = PBXBuildFile; productRef = 1DCC328AFC40E666ED95AABB /* AetherDesign */; };
+		443FE5C03007FF16007F645B /* AetherUI in Frameworks */ = {isa = PBXBuildFile; productRef = D9449C6001615A4D026BAE9A /* AetherUI */; };
 		444B93B8D9697FC13D3E9CD6 /* AetherUITestsLaunchUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58F00D3C33FDF8C0E086A75B /* AetherUITestsLaunchUITests.swift */; };
 		44BE0D6457E5F6D209A9DF76 /* BFFConfigTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7174DD376D0FB906D72EC321 /* BFFConfigTests.swift */; };
 		44C4BDE88C9CD162A7314821 /* ModelProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D85D1EEA7BB50448FF2B87CB /* ModelProviderTests.swift */; };
@@ -206,7 +215,6 @@
 		82F3A7ADBD7632EF8B6D438C /* ConversationRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71448489A337347C27C0FF7A /* ConversationRow.swift */; };
 		8339EC3D44AC63D82A6B0A92 /* ConversationListVMTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C7A78FB407F23E4958426F0 /* ConversationListVMTests.swift */; };
 		84B130A2073A3D550F160B8F /* ChatStorageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50A0526B29D955F2EDE4AE27 /* ChatStorageTests.swift */; };
-		119F3C302AD2D99B3654BF38 /* SwiftDataRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2F02E2D70C1519B594088E1 /* SwiftDataRepositoryTests.swift */; };
 		856DD13E84B852F190662B73 /* SafariControlToolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A206F966AD71EE3FC67D265 /* SafariControlToolTests.swift */; };
 		860916F6BC022204B51AB08F /* FeedbackService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E27FA6BB882FAC9DB53C2BBC /* FeedbackService.swift */; };
 		874C279F31C4D35E6450646B /* TTSVoicePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 952D9E0A4EA04301E9214147 /* TTSVoicePickerView.swift */; };
@@ -391,6 +399,13 @@
 		T21A000000000000000002A /* ForkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T21A000000000000000002B /* ForkTests.swift */; };
 		T22A000000000000000004A /* RichMessageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = T22A000000000000000004B /* RichMessageTests.swift */; };
 /* End PBXBuildFile section */
+		BE887B5940B74245B1409A9E /* SSEParserRustTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB80A30E3C8A4992AE56E69E /* SSEParserRustTests.swift */; };
+		7380B8F859E842EF8CB1C681 /* Sha256RustTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B60E99A6BF94565B2B517B2 /* Sha256RustTests.swift */; };
+		1604C7E91322474690794695 /* TokenRustTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F447A2DA33774DD4B46A8908 /* TokenRustTests.swift */; };
+		8957F28F66B340C0ACFB74C3 /* VectorRustTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE3EEA826DD547AFA3281B6E /* VectorRustTests.swift */; };
+		A96C6919872E43629B76934E /* RedactorRustTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78DE8551234B487B959A11FD /* RedactorRustTests.swift */; };
+		D63422AAA6284BC68E296D81 /* ChunkerRustTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF31C32D67E245369A38B5F8 /* ChunkerRustTests.swift */; };
+		7AF7F1A93B964C469AFBE281 /* RateLimiterRustTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7DE67C0A3A1463B8F4CFF01 /* RateLimiterRustTests.swift */; };
 
 /* Begin PBXContainerItemProxy section */
 		19570A7C106F8A3D402C4A64 /* PBXContainerItemProxy */ = {
@@ -466,7 +481,7 @@
 		2F1C63B538D08AA782CFD591 /* FeedbackServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FeedbackServiceTests.swift; sourceTree = "<group>"; };
 		30E623C6BCBBD8112F16FE09 /* StepCardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StepCardView.swift; sourceTree = "<group>"; };
 		31CD6FD5F21DEE9B2C4112DB /* RateLimiterTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RateLimiterTests.swift; sourceTree = "<group>"; };
-		32B243600898D3CA4E4F334A /* ToolRegistry+macOS.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "ToolRegistry+macOS.swift"; path = "ToolRegistry+macOS.swift"; sourceTree = "<group>"; };
+		32B243600898D3CA4E4F334A /* ToolRegistry+macOS.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "ToolRegistry+macOS.swift"; sourceTree = "<group>"; };
 		32CF7DEBCDA67603FA06F82A /* OnDeviceModelDownloader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OnDeviceModelDownloader.swift; sourceTree = "<group>"; };
 		33CA17C53B9626062C3D8FF7 /* EmbeddingService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EmbeddingService.swift; sourceTree = "<group>"; };
 		34F68ADC3B02EB2833170347 /* TelemetryServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TelemetryServiceTests.swift; sourceTree = "<group>"; };
@@ -496,7 +511,6 @@
 		4FAF2B17E25952B326EA81B8 /* RemoteConfigServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RemoteConfigServiceTests.swift; sourceTree = "<group>"; };
 		501EED80772D5EB29BFBDBF0 /* WatchHealthInsightView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WatchHealthInsightView.swift; sourceTree = "<group>"; };
 		50A0526B29D955F2EDE4AE27 /* ChatStorageTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatStorageTests.swift; sourceTree = "<group>"; };
-		F2F02E2D70C1519B594088E1 /* SwiftDataRepositoryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SwiftDataRepositoryTests.swift; sourceTree = "<group>"; };
 		51CA7C67CE5E48DA208A2E41 /* DeviceInfoToolTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DeviceInfoToolTests.swift; sourceTree = "<group>"; };
 		524445AF7F84FC560DB29595 /* AppManagementTool.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppManagementTool.swift; sourceTree = "<group>"; };
 		53DF1292AE7033CD9C1C4696 /* OnDeviceConfigTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OnDeviceConfigTests.swift; sourceTree = "<group>"; };
@@ -650,7 +664,7 @@
 		D4C460DB51E05D323191DFB2 /* InputAutomationToolTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InputAutomationToolTests.swift; sourceTree = "<group>"; };
 		D59836B8AB70EDB0A5902FEA /* AlarmTool.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AlarmTool.swift; sourceTree = "<group>"; };
 		D63FA27DCA83DBC1D7D68337 /* AppManagementToolTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppManagementToolTests.swift; sourceTree = "<group>"; };
-		D7130DB653489B91489AAB81 /* AetherApp-macOS.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "AetherApp-macOS.swift"; path = "AetherApp-macOS.swift"; sourceTree = "<group>"; };
+		D7130DB653489B91489AAB81 /* AetherApp-macOS.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "AetherApp-macOS.swift"; sourceTree = "<group>"; };
 		D7FD3F32A5AECEAA36F9409B /* TerminalCommandToolTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TerminalCommandToolTests.swift; sourceTree = "<group>"; };
 		D842BF7926D190F85405FFF0 /* SemanticCache.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SemanticCache.swift; sourceTree = "<group>"; };
 		D85D1EEA7BB50448FF2B87CB /* ModelProviderTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ModelProviderTests.swift; sourceTree = "<group>"; };
@@ -688,16 +702,17 @@
 		F1E2D3C4B5A6003300000001 /* LanguageManagerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LanguageManagerTests.swift; sourceTree = "<group>"; };
 		F1E2D3C4B5A6004400000001 /* AppIntentsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppIntentsTests.swift; sourceTree = "<group>"; };
 		F1E2D3C4B5A6978869504142 /* DraggableConversation.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DraggableConversation.swift; sourceTree = "<group>"; };
-		F2318B28DC6BD8174A0D26D1 /* AetherApp-iOS.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "AetherApp-iOS.swift"; path = "AetherApp-iOS.swift"; sourceTree = "<group>"; };
+		F2318B28DC6BD8174A0D26D1 /* AetherApp-iOS.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "AetherApp-iOS.swift"; sourceTree = "<group>"; };
 		F268C2AABC9BF6C7BC1684EF /* AetherWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = AetherWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		F28A1CFC98C7601B399A721C /* FeedbackBar.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FeedbackBar.swift; sourceTree = "<group>"; };
+		F2F02E2D70C1519B594088E1 /* SwiftDataRepositoryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SwiftDataRepositoryTests.swift; sourceTree = "<group>"; };
 		F38DFCE93DCA5A78D5F2FCB5 /* AetherUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = AetherUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F3E4D5C6B7A89012FEDCBA98 /* OnDeviceModelDownloaderTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OnDeviceModelDownloaderTests.swift; sourceTree = "<group>"; };
 		F58331A65E86DA0CEB1581D3 /* PerformanceMonitor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PerformanceMonitor.swift; sourceTree = "<group>"; };
 		F5CA73A703EA43A66AEB945B /* ModelProviderFactory.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ModelProviderFactory.swift; sourceTree = "<group>"; };
 		F7881B5C521F43DAC7D578C1 /* HealthInsightTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HealthInsightTests.swift; sourceTree = "<group>"; };
 		F7968844D2C435C17D9287AE /* ToolProtocol.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ToolProtocol.swift; sourceTree = "<group>"; };
-		F7CCDD0FBB64B720FDBE0C9F /* AetherApp+Shared.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "AetherApp+Shared.swift"; path = "AetherApp+Shared.swift"; sourceTree = "<group>"; };
+		F7CCDD0FBB64B720FDBE0C9F /* AetherApp+Shared.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "AetherApp+Shared.swift"; sourceTree = "<group>"; };
 		F8A1E8E3AD963D550FB726E1 /* FinderToolTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FinderToolTests.swift; sourceTree = "<group>"; };
 		F936BCEB4EC7376088083678 /* MessageFeedbackTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MessageFeedbackTests.swift; sourceTree = "<group>"; };
 		F97334550988F39508D64025 /* TaskListView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TaskListView.swift; sourceTree = "<group>"; };
@@ -730,6 +745,13 @@
 		T22A000000000000000003B /* InlineChartView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InlineChartView.swift; sourceTree = "<group>"; };
 		T22A000000000000000004B /* RichMessageTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RichMessageTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+		FB80A30E3C8A4992AE56E69E /* SSEParserRustTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SSEParserRustTests.swift; sourceTree = "<group>"; };
+		5B60E99A6BF94565B2B517B2 /* Sha256RustTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Sha256RustTests.swift; sourceTree = "<group>"; };
+		F447A2DA33774DD4B46A8908 /* TokenRustTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TokenRustTests.swift; sourceTree = "<group>"; };
+		EE3EEA826DD547AFA3281B6E /* VectorRustTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VectorRustTests.swift; sourceTree = "<group>"; };
+		78DE8551234B487B959A11FD /* RedactorRustTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RedactorRustTests.swift; sourceTree = "<group>"; };
+		FF31C32D67E245369A38B5F8 /* ChunkerRustTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChunkerRustTests.swift; sourceTree = "<group>"; };
+		F7DE67C0A3A1463B8F4CFF01 /* RateLimiterRustTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RateLimiterRustTests.swift; sourceTree = "<group>"; };
 
 /* Begin PBXFrameworksBuildPhase section */
 		04624F5D5D63D96ED2240DE1 /* Frameworks */ = {
@@ -748,6 +770,10 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				443FE5C03007FF16007F645B /* AetherUI in Frameworks */,
+				443FE5BF3007FF16007F645B /* AetherDesign in Frameworks */,
+				443FE5BE3007FF16007F645B /* AetherServices in Frameworks */,
+				443FE5BD3007FF16007F645B /* AetherFoundation in Frameworks */,
 				A0E2EDB1888276AEE3DA4192 /* Foundation.framework in Frameworks */,
 				7F3E37EF1D8F8FCD90B0ED87 /* Foundation.framework in Frameworks */,
 				57A49F28B6DA9DACCE8B7A2B /* Foundation.framework in Frameworks */,
@@ -773,6 +799,10 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				443FE5BC3007FF16007F645B /* AetherUI in Frameworks */,
+				443FE5BB3007FF16007F645B /* AetherDesign in Frameworks */,
+				443FE5BA3007FF16007F645B /* AetherServices in Frameworks */,
+				443FE5B93007FF16007F645B /* AetherFoundation in Frameworks */,
 				0F789566992943562E260FF4 /* Cocoa.framework in Frameworks */,
 				FBAADE265A7FF17CEEA13425 /* Foundation.framework in Frameworks */,
 				2A3BA26F867E6E3595DD6947 /* Foundation.framework in Frameworks */,
@@ -1035,7 +1065,6 @@
 				A2F7349A21CF97B72D3EC019 /* WatchQuickChatView.swift */,
 				501EED80772D5EB29BFBDBF0 /* WatchHealthInsightView.swift */,
 			);
-			name = Views;
 			path = Views;
 			sourceTree = "<group>";
 		};
@@ -1071,7 +1100,6 @@
 				40A01499600B5E94CC7FBA21 /* RecentConversationsWidget.swift */,
 				A74F810B1CDC6B254C1FED4F /* AetherWidgets.entitlements */,
 			);
-			name = AetherWidgets;
 			path = AetherWidgets;
 			sourceTree = "<group>";
 		};
@@ -1221,7 +1249,6 @@
 			children = (
 				7CD5B5E6832A7DD738D35CF5 /* AppGroupContainer.swift */,
 			);
-			name = Shared;
 			path = Shared;
 			sourceTree = "<group>";
 		};
@@ -1382,6 +1409,13 @@
 				PLUG1N000000000000000014 /* Plugin */,
 				A1B2C3D4E5F6071809AB1003 /* PromptInjectionDetectorTests.swift */,
 			);
+				FB80A30E3C8A4992AE56E69E /* SSEParserRustTests.swift */,
+				5B60E99A6BF94565B2B517B2 /* Sha256RustTests.swift */,
+				F447A2DA33774DD4B46A8908 /* TokenRustTests.swift */,
+				EE3EEA826DD547AFA3281B6E /* VectorRustTests.swift */,
+				78DE8551234B487B959A11FD /* RedactorRustTests.swift */,
+				FF31C32D67E245369A38B5F8 /* ChunkerRustTests.swift */,
+				F7DE67C0A3A1463B8F4CFF01 /* RateLimiterRustTests.swift */,
 			path = AetherTests;
 			sourceTree = "<group>";
 		};
@@ -1499,7 +1533,6 @@
 				1362189DB8BC590B96012A25 /* WatchApp.swift */,
 				CD13DE3814A7CEE4409CED97 /* AetherWatch.entitlements */,
 			);
-			name = AetherWatch;
 			path = AetherWatch;
 			sourceTree = "<group>";
 		};
@@ -1640,7 +1673,6 @@
 				04879F15D9AD460DE51D1D94 /* SwiftDataMemoryRepository.swift */,
 				C26F009FBEDBC323154172D8 /* SwiftDataDocumentRepository.swift */,
 			);
-			name = Repositories;
 			path = Repositories;
 			sourceTree = "<group>";
 		};
@@ -1826,11 +1858,6 @@
 			attributes = {
 				LastSwiftUpdateCheck = 1600;
 				LastUpgradeCheck = 1600;
-				TargetAttributes = {
-					B06AF15605D68E7EA565058C = {
-						ProvisioningStyle = Automatic;
-					};
-				};
 			};
 			buildConfigurationList = 71FBA09C0546F01C73A17485 /* Build configuration list for PBXProject "Aether" */;
 			compatibilityVersion = "Xcode 3.2";
@@ -1844,7 +1871,7 @@
 			);
 			mainGroup = F6EDA5921F96C29E03FAE5B7;
 			packageReferences = (
-				48A5D2DC0BCE8A25546C161F /* XCLocalSwiftPackageReference "AetherCore" */,
+				48A5D2DC0BCE8A25546C161F /* XCLocalSwiftPackageReference "Packages/AetherCore" */,
 			);
 			productRefGroup = C72E2CD02F9E5E945F8318E8 /* Products */;
 			projectDirPath = "";
@@ -2179,6 +2206,13 @@
 				T22A000000000000000004A /* RichMessageTests.swift in Sources */,
 				25A1B2C3D4E5F6000100A006 /* ThemeManagerTests.swift in Sources */,
 				26A1B2C3D4E5F6000100A001 /* AIPersonaTests.swift in Sources */,
+				BE887B5940B74245B1409A9E /* SSEParserRustTests.swift in Sources */,
+				7380B8F859E842EF8CB1C681 /* Sha256RustTests.swift in Sources */,
+				1604C7E91322474690794695 /* TokenRustTests.swift in Sources */,
+				8957F28F66B340C0ACFB74C3 /* VectorRustTests.swift in Sources */,
+				A96C6919872E43629B76934E /* RedactorRustTests.swift in Sources */,
+				D63422AAA6284BC68E296D81 /* ChunkerRustTests.swift in Sources */,
+				7AF7F1A93B964C469AFBE281 /* RateLimiterRustTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2324,15 +2358,17 @@
 				CODE_SIGN_ENTITLEMENTS = "Aether/Aether-iOS.entitlements";
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "";
 				CODE_SIGN_IDENTITY = "Apple Development";
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = YZD665FDV5;
+				DEVELOPMENT_TEAM = 5GS65QWF63;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Aether/Resources/Info-iOS.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "以太";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
 				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
 					"-framework",
 					WatchConnectivity,
@@ -2404,7 +2440,8 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_OPTIMIZATION_LEVEL = "-Owholemodule";
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
@@ -2445,7 +2482,10 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Aether/Resources/Info-macOS.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "以太";
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
 					"-framework",
@@ -2476,7 +2516,11 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AetherUITests/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.aether.uitests;
 				PRODUCT_NAME = AetherUITests;
@@ -2559,15 +2603,17 @@
 				CODE_SIGN_ENTITLEMENTS = "Aether/Aether-iOS.entitlements";
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "";
 				CODE_SIGN_IDENTITY = "Apple Development";
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = YZD665FDV5;
+				DEVELOPMENT_TEAM = 5GS65QWF63;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Aether/Resources/Info-iOS.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "以太";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
 				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
 					"-framework",
 					WatchConnectivity,
@@ -2677,7 +2723,11 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = AetherUITests/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.aether.uitests;
 				PRODUCT_NAME = AetherUITests;
@@ -2706,7 +2756,10 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Aether/Resources/Info-macOS.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "以太";
-				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
 					"-framework",
@@ -2818,7 +2871,7 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		48A5D2DC0BCE8A25546C161F /* XCLocalSwiftPackageReference "AetherCore" */ = {
+		48A5D2DC0BCE8A25546C161F /* XCLocalSwiftPackageReference "Packages/AetherCore" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/AetherCore;
 		};
@@ -2827,62 +2880,62 @@
 /* Begin XCSwiftPackageProductDependency section */
 		1DCC328AFC40E666ED95AABB /* AetherDesign */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 48A5D2DC0BCE8A25546C161F /* XCLocalSwiftPackageReference "AetherCore" */;
+			package = 48A5D2DC0BCE8A25546C161F /* XCLocalSwiftPackageReference "Packages/AetherCore" */;
 			productName = AetherDesign;
 		};
 		5184FCE31E12D3B454FCF9A7 /* AetherFoundation */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 48A5D2DC0BCE8A25546C161F /* XCLocalSwiftPackageReference "AetherCore" */;
+			package = 48A5D2DC0BCE8A25546C161F /* XCLocalSwiftPackageReference "Packages/AetherCore" */;
 			productName = AetherFoundation;
 		};
 		61F040C5759A54BEE5570F77 /* AetherServices */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 48A5D2DC0BCE8A25546C161F /* XCLocalSwiftPackageReference "AetherCore" */;
+			package = 48A5D2DC0BCE8A25546C161F /* XCLocalSwiftPackageReference "Packages/AetherCore" */;
 			productName = AetherServices;
 		};
 		6C9647999E877BE8D357BACD /* AetherServices */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 48A5D2DC0BCE8A25546C161F /* XCLocalSwiftPackageReference "AetherCore" */;
+			package = 48A5D2DC0BCE8A25546C161F /* XCLocalSwiftPackageReference "Packages/AetherCore" */;
 			productName = AetherServices;
 		};
 		6EBBF8B827948C71D0146EFA /* AetherFoundation */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 48A5D2DC0BCE8A25546C161F /* XCLocalSwiftPackageReference "AetherCore" */;
+			package = 48A5D2DC0BCE8A25546C161F /* XCLocalSwiftPackageReference "Packages/AetherCore" */;
 			productName = AetherFoundation;
 		};
 		81AB67E38E720155C30ECA6E /* AetherUI */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 48A5D2DC0BCE8A25546C161F /* XCLocalSwiftPackageReference "AetherCore" */;
+			package = 48A5D2DC0BCE8A25546C161F /* XCLocalSwiftPackageReference "Packages/AetherCore" */;
 			productName = AetherUI;
 		};
 		8E5669BB90D7AB3818F7BB35 /* AetherUI */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 48A5D2DC0BCE8A25546C161F /* XCLocalSwiftPackageReference "AetherCore" */;
+			package = 48A5D2DC0BCE8A25546C161F /* XCLocalSwiftPackageReference "Packages/AetherCore" */;
 			productName = AetherUI;
 		};
 		91D92519C4FD978FF3825901 /* AetherFoundation */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 48A5D2DC0BCE8A25546C161F /* XCLocalSwiftPackageReference "AetherCore" */;
+			package = 48A5D2DC0BCE8A25546C161F /* XCLocalSwiftPackageReference "Packages/AetherCore" */;
 			productName = AetherFoundation;
 		};
 		AC6401E4592088E8E65E745D /* AetherServices */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 48A5D2DC0BCE8A25546C161F /* XCLocalSwiftPackageReference "AetherCore" */;
+			package = 48A5D2DC0BCE8A25546C161F /* XCLocalSwiftPackageReference "Packages/AetherCore" */;
 			productName = AetherServices;
 		};
 		BDB2A3C283EB38931165A5A9 /* AetherDesign */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 48A5D2DC0BCE8A25546C161F /* XCLocalSwiftPackageReference "AetherCore" */;
+			package = 48A5D2DC0BCE8A25546C161F /* XCLocalSwiftPackageReference "Packages/AetherCore" */;
 			productName = AetherDesign;
 		};
 		C295F3FC39AC474138D29295 /* AetherDesign */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 48A5D2DC0BCE8A25546C161F /* XCLocalSwiftPackageReference "AetherCore" */;
+			package = 48A5D2DC0BCE8A25546C161F /* XCLocalSwiftPackageReference "Packages/AetherCore" */;
 			productName = AetherDesign;
 		};
 		D9449C6001615A4D026BAE9A /* AetherUI */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 48A5D2DC0BCE8A25546C161F /* XCLocalSwiftPackageReference "AetherCore" */;
+			package = 48A5D2DC0BCE8A25546C161F /* XCLocalSwiftPackageReference "Packages/AetherCore" */;
 			productName = AetherUI;
 		};
 /* End XCSwiftPackageProductDependency section */
