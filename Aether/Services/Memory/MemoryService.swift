@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import AetherServices
 
 /// 记忆管理服务，封装 Memory 的存储、语义检索（基于 embedding 相似度）与关键词搜索。@MainActor 隔离。
 ///

@@ -1,4 +1,6 @@
 import SwiftUI
+import AetherFoundation
+import AetherUI
 
 /// Day 16: 端侧模型管理页（模型目录版）。
 /// 顶部选择下载源（国内 ModelScope / 国外 HuggingFace），下方列出可用模型，

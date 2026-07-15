@@ -1,4 +1,5 @@
 import SwiftUI
+import AetherDesign
 
 /// Markdown 表格渲染视图
 struct MarkdownTableView: View {

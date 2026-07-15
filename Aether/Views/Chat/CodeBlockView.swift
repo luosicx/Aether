@@ -1,4 +1,5 @@
 import SwiftUI
+import AetherDesign
 
 /// 代码块视图：深浅色双主题 / 语法高亮 / 等宽字体 / 圆角 / 横向滚动
 struct CodeBlockView: View {

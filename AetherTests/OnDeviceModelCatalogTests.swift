@@ -1,4 +1,8 @@
 import XCTest
+import AetherFoundation
+import AetherServices
+import AetherDesign
+import AetherUI
 @testable import Aether
 
 /// 端侧模型目录单元测试：验证目录结构、模型字段完整性与双源 URL 有效性。

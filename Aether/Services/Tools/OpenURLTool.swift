@@ -4,6 +4,7 @@
 /// 调用方式：execute(arguments: ["url": "..."])，url 为必填参数。
 /// iOS 通过 UIApplication.shared.open 打开，macOS 通过 NSWorkspace.shared.open 打开。
 import Foundation
+import AetherFoundation
 #if os(iOS)
 import UIKit
 #else

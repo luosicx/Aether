@@ -7,6 +7,7 @@
 /// macOS 通过 Process 调用 shortcuts CLI 实现，iOS 通过 NSUserActivity 触发。
 /// 调用方式：各工具的 execute(arguments:) 方法。
 import Foundation
+import AetherFoundation
 #if os(macOS)
 import AppKit
 #endif

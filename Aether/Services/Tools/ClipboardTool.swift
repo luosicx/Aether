@@ -6,6 +6,7 @@
 /// iOS 通过 UIPasteboard 实现，macOS 通过 NSPasteboard 实现。
 /// 调用方式：read_clipboard 无参数；write_clipboard 需传 text 参数。
 import Foundation
+import AetherFoundation
 #if os(iOS)
 import UIKit
 #else

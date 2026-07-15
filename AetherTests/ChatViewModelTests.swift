@@ -1,6 +1,10 @@
 import XCTest
 import SwiftData
 import Speech
+import AetherFoundation
+import AetherServices
+import AetherDesign
+import AetherUI
 @testable import Aether
 
 /// ChatViewModel 单元测试（SubTask 17.1 - 17.10）

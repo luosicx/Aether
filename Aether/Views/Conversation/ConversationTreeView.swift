@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import AetherDesign
 
 /// Task 21: 对话树视图——递归展示对话分支与版本关系。
 /// 以根对话为起点，按 parentConversationID 链展示所有子对话，

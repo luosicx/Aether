@@ -1,7 +1,6 @@
 import SwiftUI
 import SwiftData
 
-#if os(macOS)
 
 // MARK: - Task 20: 多窗口对话 ID 环境值
 
@@ -46,4 +45,3 @@ struct DraggableConversation: View {
     }
 }
 
-#endif

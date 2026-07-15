@@ -1,4 +1,5 @@
 import SwiftUI
+import AetherDesign
 
 /// Task 27: 对话气泡样式枚举
 /// rawValue 与 UserPreference.bubbleStyle 对齐

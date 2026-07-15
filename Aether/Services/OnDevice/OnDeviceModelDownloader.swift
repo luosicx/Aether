@@ -1,5 +1,6 @@
 import Foundation
 import CryptoKit
+import AetherFoundation
 
 /// Day 16: 端侧模型下载器（actor 隔离，保证并发安全）。
 /// 基于 URLSessionDownloadTask 流式下载模型文件，支持进度回调、取消、断点续传与 SHA256 校验。

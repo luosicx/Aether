@@ -8,6 +8,7 @@
 import Foundation
 import EventKit
 import UserNotifications
+import AetherFoundation
 
 /// 工具注册中心，单例。默认注册 4 个工具：AlarmTool / ReminderTool / DateTimeTool / CalculatorTool。@MainActor 隔离。
 @MainActor
@@ -50,7 +51,9 @@ final class ToolRegistry {
     /// 当前已启用的工具名集合。初始化时从 UserDefaults 恢复默认值。
     private(set) var enabledTools: Set<String> = []
 
-    /// 私有初始化，注册全部工具（跨平台 + macOS 独有条件注册）
+    /// 私有初始化，注册跨平台工具（14 个）。
+    /// macOS 独有工具通过 ToolRegistry+macOS.swift 的 registerMacOSTools() 注册，
+    /// 在 macOS App init() 中调用。
     private init() {
         // 原有 4 个工具
         register(tool: AlarmTool())
@@ -69,20 +72,6 @@ final class ToolRegistry {
         register(tool: RunShortcutTool())
         register(tool: ListShortcutsTool())
         register(tool: CreateShortcutTool())
-        // macOS 独有工具（11 个，条件注册）
-        #if os(macOS)
-        register(tool: AppleScriptTool())
-        register(tool: ScreenshotTool())
-        register(tool: OCRTool())
-        register(tool: TerminalCommandTool())
-        register(tool: WindowManagementTool())
-        register(tool: AppManagementTool())
-        register(tool: FileOperationTool())
-        register(tool: FinderTool())
-        register(tool: SafariControlTool())
-        register(tool: SystemControlTool())
-        register(tool: InputAutomationTool())
-        #endif
 
         // 注册完成后，按默认值 + UserDefaults 恢复启用状态
         restoreEnabledStates()
@@ -209,7 +198,8 @@ final class ToolRegistry {
     // MARK: - Private Helpers
 
     /// 从 UserDefaults 恢复所有已注册工具的启用状态。无记录时按 defaultDisabledTools 决定默认值。
-    private func restoreEnabledStates() {
+    /// Task 2.6: 改为 internal 以允许 ToolRegistry+macOS 扩展在注册 macOS 工具后重新调用。
+    func restoreEnabledStates() {
         var result = Set<String>()
         for name in tools.keys {
             let key = userDefaultsKey(for: name)

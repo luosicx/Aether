@@ -1,5 +1,6 @@
 import XCTest
 import SwiftData
+import AetherFoundation
 @testable import Aether
 
 /// ChatViewModel 工具安全集成测试：验证未启用/未授权工具不会被真实执行，并向 LLM 返回错误。

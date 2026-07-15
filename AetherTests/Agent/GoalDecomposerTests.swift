@@ -1,5 +1,9 @@
 import XCTest
 import SwiftData
+import AetherFoundation
+import AetherServices
+import AetherDesign
+import AetherUI
 @testable import Aether
 
 /// Task 9: GoalDecomposer 与 AgentTask / SubTask 单元测试

@@ -1,4 +1,5 @@
 import Foundation
+import AetherFoundation
 
 /// Task 6: 从对话历史中提取出的单条用户偏好。
 /// category 取值："tone" / "tool" / "fact" / "persona"。

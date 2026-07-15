@@ -1,6 +1,9 @@
 import Foundation
 import SwiftData
 import Observation
+import AetherFoundation
+import AetherServices
+import AetherUI
 #if os(iOS)
 import ActivityKit
 #endif
@@ -90,6 +93,11 @@ final class ChatViewModel {
     var contextWindowManager: ContextWindowManager?
     /// Task 8: 语义记忆存储（可选，nil 时不注入相关记忆到 systemPrompt）
     var semanticMemoryStore: SemanticMemoryStore?
+    // Task 3.1 Step 4: 仓储协议注入（可选，nil 时降级到 ModelContext 直查）
+    /// 会话仓储。注入后供未来 DTO 化查询使用；当前 @Model 操作仍走 ModelContext.save。
+    var conversationRepo: ConversationRepository?
+    /// 消息仓储。注入后供未来 DTO 化查询使用；当前 @Model 操作仍走 ModelContext.save。
+    var messageRepo: MessageRepository?
     // Task 7: 提示注入检测弹窗显示状态
     var showInjectionWarning: Bool = false
     // Task 7: 提示注入检测弹窗提示文案

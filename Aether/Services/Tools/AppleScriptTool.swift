@@ -3,8 +3,8 @@
 /// 通过 NSAppleScript 在 macOS 上执行任意 AppleScript 脚本，返回脚本输出或错误信息。
 /// 常用于自动化控制 Finder、Safari、System Events 等系统应用。
 /// 调用方式：execute(arguments: ["script": "..."])，script 为必填参数。
-#if os(macOS)
 import Foundation
+import AetherFoundation
 
 /// macOS AppleScript 执行工具
 final class AppleScriptTool: ToolProtocol, @unchecked Sendable {
@@ -47,4 +47,3 @@ final class AppleScriptTool: ToolProtocol, @unchecked Sendable {
         return result.isEmpty ? "已执行（无输出）" : result
     }
 }
-#endif

@@ -1,4 +1,8 @@
 import XCTest
+import AetherFoundation
+import AetherServices
+import AetherDesign
+import AetherUI
 @testable import Aether
 
 /// Task 2 测试：MCP 工具自动注册到 ToolRegistry 的动态注册能力。

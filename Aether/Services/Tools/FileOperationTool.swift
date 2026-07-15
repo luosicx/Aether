@@ -4,9 +4,9 @@
 /// 删除（移到废纸篓）以及获取文件信息。
 /// 调用方式：execute(arguments: ["action": "...", "path": "...", ...])，action 为必填参数。
 /// 主要 action：list/search/copy/move/rename/delete/info。
-#if os(macOS)
 import Foundation
 import AppKit
+import AetherFoundation
 
 /// macOS 文件操作工具
 final class FileOperationTool: ToolProtocol, @unchecked Sendable {
@@ -239,4 +239,3 @@ private extension String {
         return self == pattern
     }
 }
-#endif

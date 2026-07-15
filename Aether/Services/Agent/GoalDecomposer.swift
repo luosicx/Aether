@@ -1,4 +1,5 @@
 import Foundation
+import AetherFoundation
 
 /// Task 9: 目标分解器。调用 LLM 将用户原始目标分解为可执行的子任务列表。
 ///

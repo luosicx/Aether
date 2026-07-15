@@ -1,5 +1,6 @@
 import SwiftUI
 import PhotosUI
+import AetherDesign
 
 struct ChatInputBar: View {
     @Binding var inputText: String

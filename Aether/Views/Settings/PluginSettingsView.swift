@@ -1,4 +1,7 @@
 import SwiftUI
+import AetherFoundation
+import AetherServices
+import AetherDesign
 
 /// 插件管理设置页。展示已安装插件列表，支持安装、卸载与权限查看。
 ///

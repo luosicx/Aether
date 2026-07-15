@@ -1,5 +1,7 @@
 import Foundation
 import SwiftData
+import AetherFoundation
+import AetherServices
 
 /// 知识库 ViewModel，管理文档导入与列表展示。使用 @Observable + @MainActor 隔离。
 @Observable

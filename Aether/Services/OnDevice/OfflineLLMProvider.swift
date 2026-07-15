@@ -1,4 +1,6 @@
 import Foundation
+import AetherFoundation
+import AetherServices
 
 /// Day 16: 端侧离线 LLM Provider。实现 LLMProvider 协议，将请求转发给 MLXInferenceEngine。
 /// - chat：将 messages 按 Llama-3 chat template 拼接为 prompt，调用 MLX 流式生成

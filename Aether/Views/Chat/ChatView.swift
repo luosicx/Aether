@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import AetherDesign
 
 struct ChatView: View {
     @Environment(\.modelContext) private var modelContext
@@ -179,6 +180,9 @@ struct ChatView: View {
                 KnowledgeBaseView(provider: viewModel.selectedProvider)
             }
             .onAppear {
+                // Task 3.1 Step 4: 注入 SwiftData 仓储实现，供 ChatViewModel 未来 DTO 化查询
+                viewModel.conversationRepo = SwiftDataConversationRepository(context: modelContext)
+                viewModel.messageRepo = SwiftDataMessageRepository(context: modelContext)
                 viewModel.selectedModel = settingsVM.selectedModel
                 // Day 13: 同步 provider
                 viewModel.selectedProvider = settingsVM.selectedProvider

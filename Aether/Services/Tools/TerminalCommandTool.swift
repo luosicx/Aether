@@ -3,8 +3,8 @@
 /// 通过 Process 直接执行白名单内的系统命令，不再使用 /bin/bash -c。
 /// 内置命令解析器：按空格分词、支持简单引号、拒绝 shell 元字符与路径遍历。
 /// 调用方式：execute(arguments: ["command": "..."])，command 为必填参数。
-#if os(macOS)
 import Foundation
+import AetherFoundation
 
 /// macOS 命令行执行工具，仅执行白名单内的命令并返回输出
 final class TerminalCommandTool: ToolProtocol, @unchecked Sendable {
@@ -315,4 +315,3 @@ extension TerminalCommandTool.ValidationError: LocalizedError {
         }
     }
 }
-#endif

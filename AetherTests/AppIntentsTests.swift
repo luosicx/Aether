@@ -1,5 +1,9 @@
 import XCTest
 import AppIntents
+import AetherFoundation
+import AetherServices
+import AetherDesign
+import AetherUI
 @testable import Aether
 
 /// Day 18: AppIntents 目录三个 Intent 的单元测试

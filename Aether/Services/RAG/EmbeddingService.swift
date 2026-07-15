@@ -1,4 +1,6 @@
 import Foundation
+import AetherFoundation
+import AetherServices
 
 /// 嵌入服务，封装 LLMProvider 的 embed 能力，提供批量分片聚合
 class EmbeddingService {

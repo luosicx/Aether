@@ -1,4 +1,5 @@
 import SwiftUI
+import AetherDesign
 
 struct TypingIndicator: View {
     @State private var phase: CGFloat = 0

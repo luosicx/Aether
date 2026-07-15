@@ -4,9 +4,9 @@
 /// 键盘文本输入、快捷键组合、滚轮滚动。
 /// 调用方式：execute(arguments: ["action": "...", ...])，action 为必填参数。
 /// 主要 action：mouse_move/mouse_click/mouse_drag/key_type/key_combo/scroll。
-#if os(macOS)
 import Foundation
 import CoreGraphics
+import AetherFoundation
 
 /// macOS 输入自动化工具：模拟鼠标移动/点击/拖拽、键盘输入、滚轮滚动
 final class InputAutomationTool: ToolProtocol, @unchecked Sendable {
@@ -184,4 +184,3 @@ final class InputAutomationTool: ToolProtocol, @unchecked Sendable {
         return mapping[key.lowercased()]
     }
 }
-#endif

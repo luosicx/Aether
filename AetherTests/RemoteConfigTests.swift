@@ -1,4 +1,8 @@
 import XCTest
+import AetherFoundation
+import AetherServices
+import AetherDesign
+import AetherUI
 @testable import Aether
 
 /// RemoteConfig 单元测试：验证 Codable 编解码、默认值、featureFlags 嵌套结构。

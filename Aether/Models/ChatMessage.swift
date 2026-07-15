@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import AetherFoundation
 
 /// 持久化聊天消息，关联 Conversation，支持文本/图片/工具调用
 @Model

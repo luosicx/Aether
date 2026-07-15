@@ -4,6 +4,7 @@
 /// 调用方式：execute(arguments: [:])，无入参。
 /// iOS 通过 UIDevice 读取型号/版本/电量，macOS 通过 ProcessInfo 读取 OS 版本。
 import Foundation
+import AetherFoundation
 #if os(iOS)
 import UIKit
 #endif

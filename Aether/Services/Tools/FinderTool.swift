@@ -4,9 +4,9 @@
 /// 调用方式：execute(arguments: ["action": "get_selection"|"reveal"|"open", "path": "..."])，
 /// action 为必填参数，path 在 reveal/open 时需要。
 /// 获取选中项通过 NSAppleScript 调用 Finder 脚本实现，reveal/open 通过 NSWorkspace 实现。
-#if os(macOS)
 import Foundation
 import AppKit
+import AetherFoundation
 
 /// macOS Finder 操作工具
 final class FinderTool: ToolProtocol, @unchecked Sendable {
@@ -95,4 +95,3 @@ final class FinderTool: ToolProtocol, @unchecked Sendable {
         return output?.stringValue ?? "已执行（无输出）"
     }
 }
-#endif

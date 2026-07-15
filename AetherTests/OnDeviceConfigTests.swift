@@ -1,4 +1,8 @@
 import XCTest
+import AetherFoundation
+import AetherServices
+import AetherDesign
+import AetherUI
 @testable import Aether
 
 /// Day 16: 端侧推理配置 + ModelProvider.onDevice 元信息单元测试。

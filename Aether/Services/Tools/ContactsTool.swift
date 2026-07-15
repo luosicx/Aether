@@ -5,6 +5,7 @@
 /// 搜索流程：请求通讯录权限 -> 按姓名匹配 + 按电话号码匹配 -> 合并去重 -> 格式化返回。
 import Foundation
 import Contacts
+import AetherFoundation
 
 /// 通讯录搜索工具，通过 Contacts 框架按姓名或电话号码搜索联系人
 final class ContactsTool: ToolProtocol, @unchecked Sendable {

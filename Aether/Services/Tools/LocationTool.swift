@@ -6,6 +6,7 @@
 /// 定位权限被拒或超时会以字符串形式返回提示而非抛异常。
 import Foundation
 import CoreLocation
+import AetherFoundation
 
 /// 定位相关错误
 private enum LocationError: Error {

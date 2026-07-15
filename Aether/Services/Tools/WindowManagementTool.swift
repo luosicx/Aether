@@ -4,10 +4,10 @@
 /// 移动窗口、调整窗口大小、最小化窗口。
 /// 调用方式：execute(arguments: ["action": "...", "app": "...", ...])，action 为必填参数。
 /// 主要 action：list/focus/move/resize/minimize。
-#if os(macOS)
 import Foundation
 import AppKit
 import ApplicationServices
+import AetherFoundation
 
 /// macOS 窗口管理工具
 final class WindowManagementTool: ToolProtocol, @unchecked Sendable {
@@ -180,4 +180,3 @@ final class WindowManagementTool: ToolProtocol, @unchecked Sendable {
         return "已执行"
     }
 }
-#endif

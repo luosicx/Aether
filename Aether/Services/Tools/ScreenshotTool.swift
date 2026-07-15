@@ -3,10 +3,10 @@
 /// 通过 CoreGraphics 的 CGDisplayCreateImage 截取指定显示器屏幕，保存为 PNG 文件并返回文件路径。
 /// 调用方式：execute(arguments: ["display_id": 0])，display_id 可选，不传则截取主显示器。
 /// 截图保存到系统临时目录，文件名以时间戳命名。
-#if os(macOS)
 import Foundation
 import AppKit
 import CoreGraphics
+import AetherFoundation
 
 /// macOS 截屏工具
 final class ScreenshotTool: ToolProtocol, @unchecked Sendable {
@@ -61,4 +61,3 @@ final class ScreenshotTool: ToolProtocol, @unchecked Sendable {
         return filePath
     }
 }
-#endif

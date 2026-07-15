@@ -1,5 +1,9 @@
 import XCTest
 import SwiftUI
+import AetherFoundation
+import AetherServices
+import AetherDesign
+import AetherUI
 @testable import Aether
 
 final class DesignTokensTests: XCTestCase {

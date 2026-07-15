@@ -2,6 +2,7 @@
 import Foundation
 import HealthKit
 import os
+import AetherServices
 
 /// Day 17: 一天的健康数据聚合摘要，供 HealthInsightGenerator 与 ChatViewModel 注入上下文使用。
 struct HealthDailySummary: Codable, Sendable {
@@ -37,7 +38,7 @@ enum HealthKitError: LocalizedError, Sendable {
 /// - 未授权时所有查询返回空数据（不抛错），便于上层优雅降级
 /// - `fetchDailySummary()` 聚合最近 1 天数据为 `HealthDailySummary`
 /// - 类标记 `@unchecked Sendable`：HKHealthStore 本身线程安全，isAuthorized 用 OSAllocatedUnfairLock 保护（async 安全）
-final class HealthKitService: @unchecked Sendable {
+final class HealthKitService: HealthDataSource, @unchecked Sendable {
     /// HealthKit 存储，设备不支持时为 nil
     private let healthStore: HKHealthStore?
     /// 授权状态锁，async 安全的 OSAllocatedUnfairLock

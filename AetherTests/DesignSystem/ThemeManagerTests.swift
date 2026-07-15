@@ -1,5 +1,9 @@
 import XCTest
 import SwiftUI
+import AetherFoundation
+import AetherServices
+import AetherDesign
+import AetherUI
 @testable import Aether
 
 /// Task 25: 主题管理器单元测试

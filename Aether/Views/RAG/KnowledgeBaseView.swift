@@ -1,5 +1,7 @@
 import SwiftUI
 import SwiftData
+import AetherFoundation
+import AetherUI
 
 struct KnowledgeBaseView: View {
     @Environment(\.modelContext) private var modelContext

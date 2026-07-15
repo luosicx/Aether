@@ -1,4 +1,5 @@
 import SwiftUI
+import AetherFoundation
 
 /// MCP Server 管理设置页。
 ///

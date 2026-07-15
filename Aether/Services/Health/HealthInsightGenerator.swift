@@ -1,66 +1,61 @@
 import Foundation
 import SwiftData
 import UserNotifications
+import AetherFoundation
+import AetherServices
 
-/// Day 17: 健康洞察生成器。读取 HealthKit 数据后调用 LLM 生成健康建议，并持久化到 SwiftData。
+/// Day 17: 健康洞察生成器。读取健康数据后调用 LLM 生成健康建议，并持久化到 SwiftData。
+///
+/// Task 2.4: 通过注入 HealthDataSource 协议解耦对 HealthKit 的直接依赖。
+/// - iOS: 注入 HealthKitAdapter（实现 HealthDataSource）
+/// - macOS: 注入 nil（无健康数据，跳过健康上下文）
 ///
 /// 设计要点：
 /// - 用 `actor` 隔离，避免与主线程共享 ModelContext 引发数据竞争
-/// - 通过工厂方法 `make(modelContext:)` 注入默认 LLMProvider 与 HealthKitService
+/// - 通过工厂方法 `make(modelContext:)` 注入默认 LLMProvider 与 HealthDataSource
 /// - 生成完成后追加免责声明，并通过 `sendInsightNotification` 推送本地通知
 actor HealthInsightGenerator {
     /// LLM 供应商，用于生成洞察文本
     private let llmProvider: LLMProvider
     /// SwiftData 上下文，用于持久化 HealthInsight
     private let modelContext: ModelContext
-    #if os(iOS)
-    /// HealthKit 读取服务
-    private let healthKitService: HealthKitService
-    #endif
+    /// 健康数据源（平台无关协议）。nil 时使用空数据跳过健康上下文（macOS 默认）
+    private let dataSource: HealthDataSource?
 
     /// 创建 HealthInsightGenerator 实例
     /// - Parameters:
     ///   - llmProvider: LLM 供应商
-    ///   - healthKitService: HealthKit 读取服务
+    ///   - dataSource: 健康数据源（iOS 注入 HealthKitAdapter，macOS 注入 nil）
     ///   - modelContext: SwiftData 上下文
-    #if os(iOS)
-    init(llmProvider: LLMProvider, healthKitService: HealthKitService, modelContext: ModelContext) {
+    init(llmProvider: LLMProvider, dataSource: HealthDataSource?, modelContext: ModelContext) {
         self.llmProvider = llmProvider
-        self.healthKitService = healthKitService
+        self.dataSource = dataSource
         self.modelContext = modelContext
     }
-    #else
-    /// macOS 下创建 HealthInsightGenerator 实例（HealthKit 不可用）
-    /// - Parameters:
-    ///   - llmProvider: LLM 供应商
-    ///   - modelContext: SwiftData 上下文
-    init(llmProvider: LLMProvider, modelContext: ModelContext) {
-        self.llmProvider = llmProvider
-        self.modelContext = modelContext
-    }
-    #endif
 
     /// 生成健康洞察。读取 N 天健康数据后调用 LLM 生成建议，写入 SwiftData。
     /// - Parameter days: 聚合最近 N 天数据，默认 7 天
     /// - Returns: 持久化后的 HealthInsight 实例
     func generateInsight(days: Int = 7) async throws -> HealthInsight {
-        // 1. 调用 HealthKitService 读取 N 天数据（未授权时返回空字典，不抛错）
-        #if os(iOS)
-        let heartRate = try await healthKitService.fetchHeartRate(days: days)
-        let sleep = try await healthKitService.fetchSleepAnalysis(days: days)
-        let steps = try await healthKitService.fetchStepCount(days: days)
-        #else
-        // macOS: HealthKit 不可用，使用空数据跳过健康上下文
-        let heartRate: [Date: Double] = [:]
-        let sleep: [Date: Double] = [:]
-        let steps: [Date: Int] = [:]
-        #endif
+        // 1. 通过数据源协议读取 N 天数据（无数据源或未授权时返回空字典，不抛错）
+        let heartRate: [Date: Double]
+        let sleep: [Date: Double]
+        let steps: [Date: Int]
+
+        if let dataSource {
+            heartRate = (try? await dataSource.fetchHeartRate(days: days)) ?? [:]
+            sleep = (try? await dataSource.fetchSleepAnalysis(days: days)) ?? [:]
+            steps = (try? await dataSource.fetchStepCount(days: days)) ?? [:]
+        } else {
+            heartRate = [:]
+            sleep = [:]
+            steps = [:]
+        }
 
         // 2. 构造 prompt（含聚合数据 + 用户偏好 + "请基于以下健康数据给出 3 条具体建议"）
         let prompt = constructPrompt(heartRate: heartRate, sleep: sleep, steps: steps, days: days)
 
         // 3. 调用 LLMProvider.chat 生成洞察文本
-        // LLMProvider.chat 返回 AsyncStream<String>（非 throws），直接迭代累积
         let messages: [APIMessage] = [
             APIMessage(role: "system", content: "你是健康助手，根据用户的健康数据给出具体可行的建议。", images: nil, toolCallId: nil, toolName: nil, toolCalls: nil),
             APIMessage(role: "user", content: prompt, images: nil, toolCallId: nil, toolName: nil, toolCalls: nil)
@@ -111,16 +106,18 @@ actor HealthInsightGenerator {
         UNUserNotificationCenter.current().add(request)
     }
 
-    /// 工厂方法：注入默认 LLMProvider（DeepSeek）与 HealthKitService。
+    /// 工厂方法：注入默认 LLMProvider（DeepSeek）与平台对应的 HealthDataSource。
     /// - Parameter modelContext: SwiftData 上下文
     /// - Returns: 配置好的 HealthInsightGenerator
     static func make(modelContext: ModelContext) -> HealthInsightGenerator {
         let provider = ModelProviderFactory.make(.deepseek)
+        // Task 2.4: iOS 注入 HealthKitService（实现 HealthDataSource），macOS 注入 nil
         #if os(iOS)
-        return HealthInsightGenerator(llmProvider: provider, healthKitService: HealthKitService(), modelContext: modelContext)
+        let dataSource: HealthDataSource? = HealthKitService()
         #else
-        return HealthInsightGenerator(llmProvider: provider, modelContext: modelContext)
+        let dataSource: HealthDataSource? = nil
         #endif
+        return HealthInsightGenerator(llmProvider: provider, dataSource: dataSource, modelContext: modelContext)
     }
 
     /// 构造发送给 LLM 的 prompt，包含聚合后的健康数据与请求建议的指令。

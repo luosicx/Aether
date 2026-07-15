@@ -1,5 +1,9 @@
 import XCTest
 import SwiftUI
+import AetherFoundation
+import AetherServices
+import AetherDesign
+import AetherUI
 @testable import Aether
 
 /// Task 17-19 设计系统测试：AnimationTokens、AetherIcon、DeviceType

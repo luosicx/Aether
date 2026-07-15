@@ -1,4 +1,6 @@
 import SwiftUI
+import AetherDesign
+import AetherUI
 
 /// Day 10: 独立的流式气泡视图，隔离 streamingText 渲染
 /// 避免 chunk 更新触发 MessageListView 的 ForEach messages 全量重算

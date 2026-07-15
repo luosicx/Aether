@@ -5,6 +5,7 @@
 /// 不传城市则调用 LocationTool 获取当前位置，再调用 Forecast API 取当前天气。
 /// 调用方式：execute(arguments: ["city": "..."])，city 可选，不传则用当前定位。
 import Foundation
+import AetherFoundation
 
 /// 天气查询工具，使用 Open-Meteo 免费 API（无需 API Key）。
 /// 支持按城市名或当前定位查询：城市名经 Geocoding API 转坐标，
