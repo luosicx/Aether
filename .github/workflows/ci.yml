@@ -735,6 +735,9 @@ jobs:
     needs: [coverage-summary, unit-tests-macos, rust]
     runs-on: macos-15
     if: always()
+    permissions:
+      contents: read
+      pull-requests: write  # 用于自动发布 SonarCloud 分析报告到 PR 评论
     steps:
       - uses: actions/checkout@v5
         with:
@@ -898,6 +901,243 @@ jobs:
           # 待 xccov 稳定或迁移到 xcresulttool 后可在 properties 中恢复为 true。
           args: >
             ${{ github.event_name == 'pull_request' && format('-Dsonar.pullrequest.key={0} -Dsonar.pullrequest.branch={1} -Dsonar.pullrequest.base={2} -Dsonar.pullrequest.provider=github -Dsonar.pullrequest.github.repository=luosicx/Aether', github.event.pull_request.number, github.head_ref, github.base_ref) || '' }}
+
+      - name: Post SonarCloud report to PR
+        # 仅在 PR 事件时执行：SonarCloud 分析完成后，自动将质量门状态、
+        # 代码问题、覆盖率和评级作为评论发布到 PR。
+        # 若同一 PR 已有报告评论，则更新而非重复创建。
+        if: github.event_name == 'pull_request'
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PROJECT_KEY: luosicx_Aether
+          COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 - << 'PYEOF'
+          import json, os, sys, time, urllib.request, urllib.error, base64, subprocess
+
+          sonar_host = (os.environ.get('SONAR_HOST_URL') or 'https://sonarcloud.io').rstrip('/')
+          sonar_token = os.environ['SONAR_TOKEN']
+          project_key = os.environ['PROJECT_KEY']
+          pr_number = os.environ['PR_NUMBER']
+          commit_sha = os.environ.get('COMMIT_SHA', '')[:7]
+          repo = 'luosicx/Aether'
+
+          auth = base64.b64encode(f'{sonar_token}:'.encode()).decode()
+          headers = {'Authorization': f'Basic {auth}'}
+
+          def api_get(url, timeout=30):
+              req = urllib.request.Request(url, headers=headers)
+              with urllib.request.urlopen(req, timeout=timeout) as resp:
+                  return json.loads(resp.read())
+
+          # 1. 轮询质量门状态（分析报告上传后需数秒处理）
+          print(f"Polling SonarCloud quality gate for PR #{pr_number}...")
+          qg = None
+          for attempt in range(15):
+              try:
+                  qg = api_get(f'{sonar_host}/api/qualitygates/project_status?projectKey={project_key}&pullRequest={pr_number}')
+                  if qg.get('projectStatus', {}).get('status'):
+                      print(f"  Quality gate ready (attempt {attempt+1}/15)")
+                      break
+              except urllib.error.HTTPError:
+                  if attempt == 0:
+                      print(f"  Waiting for analysis to be processed...")
+              except Exception as e:
+                  print(f"  attempt {attempt+1}: {e}")
+              time.sleep(5)
+
+          if not qg:
+              print("WARNING: SonarCloud quality gate unavailable, skipping PR comment")
+              sys.exit(0)
+
+          # 2. 获取度量指标
+          metrics = 'new_bugs,new_vulnerabilities,new_code_smells,new_coverage,new_duplicated_lines_density,new_lines,new_security_hotspots,new_security_hotspots_reviewed,bugs,vulnerabilities,code_smells,coverage,duplicated_lines_density,ncloc,sqale_rating,reliability_rating,security_rating'
+          try:
+              mr = api_get(f'{sonar_host}/api/measures/component?component={project_key}&pullRequest={pr_number}&metricKeys={metrics}')
+              measures = {m['metric']: m for m in mr.get('component', {}).get('measures', [])}
+          except Exception as e:
+              print(f"WARNING: measures fetch failed: {e}")
+              measures = {}
+
+          # 3. 获取问题列表
+          try:
+              ir = api_get(f'{sonar_host}/api/issues/search?componentKeys={project_key}&pullRequest={pr_number}&ps=100')
+              issues = ir.get('issues', [])
+          except Exception as e:
+              print(f"WARNING: issues fetch failed: {e}")
+              issues = []
+
+          # --- 辅助函数 ---
+          def rating_letter(val):
+              try:
+                  return chr(64 + int(float(val)))  # 1->A, 2->B, ...
+              except (ValueError, TypeError):
+                  return val or 'N/A'
+
+          def period(key, default='0'):
+              m = measures.get(key)
+              if not m:
+                  return default
+              ps = m.get('periods', [])
+              return ps[0].get('value', default) if ps else default
+
+          def val(m_key, default='N/A'):
+              m = measures.get(m_key)
+              return m.get('value', default) if m else default
+
+          # --- 提取数据 ---
+          ps = qg.get('projectStatus', {})
+          qg_status = ps.get('status', 'UNKNOWN')
+          conditions = ps.get('conditions', [])
+
+          new_bugs = period('new_bugs')
+          new_vulns = period('new_vulnerabilities')
+          new_smells = period('new_code_smells')
+          new_hotspots = period('new_security_hotspots')
+          new_coverage = period('new_coverage', 'N/A')
+          new_dup = period('new_duplicated_lines_density', 'N/A')
+          new_lines = period('new_lines')
+          hotspots_reviewed = period('new_security_hotspots_reviewed', 'N/A')
+
+          total_bugs = val('bugs', '0')
+          total_vulns = val('vulnerabilities', '0')
+          total_smells = val('code_smells', '0')
+          total_coverage = val('coverage', 'N/A')
+          total_dup = val('duplicated_lines_density', 'N/A')
+          ncloc = val('ncloc', 'N/A')
+
+          rel_rating = rating_letter(val('reliability_rating'))
+          sec_rating = rating_letter(val('security_rating'))
+          maint_rating = rating_letter(val('sqale_rating'))
+
+          # 质量门条件表
+          metric_names = {
+              'new_reliability_rating': '新代码可靠性评级',
+              'new_security_rating': '新代码安全性评级',
+              'new_maintainability_rating': '新代码可维护性评级',
+              'new_coverage': '新代码覆盖率',
+              'new_duplicated_lines_density': '新代码重复率',
+              'new_security_hotspots_reviewed': '安全热点审查率',
+          }
+          cond_rows = []
+          for c in conditions:
+              mk = c.get('metricKey', '')
+              name = metric_names.get(mk, mk)
+              cstatus = c.get('status', '')
+              icon = '✅' if cstatus == 'OK' else '❌'
+              comp = c.get('comparator', '')
+              threshold = c.get('errorThreshold', '')
+              actual = c.get('actualValue', '')
+              comp_text = {'LT': '≥', 'GT': '≤'}.get(comp, comp)
+              cond_rows.append(f'| {name} | {comp_text} {threshold} | {actual} | {icon} {cstatus} |')
+
+          # --- 生成 Markdown ---
+          qg_icon = '✅ PASSED' if qg_status == 'OK' else '❌ FAILED' if qg_status == 'ERROR' else qg_status
+          dashboard_url = f"{sonar_host}/dashboard?id={project_key}&pullRequest={pr_number}"
+
+          md = []
+          md.append('<!-- sonarcloud-report -->')
+          md.append('## 🔍 SonarCloud 代码质量分析报告')
+          md.append('')
+          md.append(f'**分析提交:** `{commit_sha}`  ')
+          md.append(f'**SonarCloud 面板:** [查看完整报告]({dashboard_url})')
+          md.append('')
+          md.append('---')
+          md.append('')
+          md.append(f'### 质量门状态: {qg_icon}')
+          md.append('')
+          md.append('| 条件 | 阈值 | 实际值 | 结果 |')
+          md.append('|------|------|--------|------|')
+          md.extend(cond_rows)
+          md.append('')
+          md.append('### 代码问题统计')
+          md.append('')
+          md.append('| 类型 | 新代码 | 全量代码 |')
+          md.append('|------|--------|----------|')
+          md.append(f'| 🐛 Bug | {new_bugs} | {total_bugs} |')
+          md.append(f'| 🔒 漏洞 | {new_vulns} | {total_vulns} |')
+          md.append(f'| 💨 代码异味 | {new_smells} | {total_smells} |')
+          md.append(f'| 🔥 安全热点 | {new_hotspots} | — |')
+          md.append('')
+          md.append('### 覆盖率与代码指标')
+          md.append('')
+          md.append('| 指标 | 值 |')
+          md.append('|------|-----|')
+          md.append(f'| 新代码行数 | {new_lines} 行 |')
+          md.append(f'| 新代码覆盖率 | {new_coverage}% |')
+          md.append(f'| 整体覆盖率 | {total_coverage}% |')
+          md.append(f'| 新代码重复率 | {new_dup}% |')
+          md.append(f'| 整体重复率 | {total_dup}% |')
+          md.append(f'| 代码行数 (NCLOC) | {ncloc} |')
+          md.append('')
+          md.append('### 代码评级')
+          md.append('')
+          md.append('| 维度 | 评级 |')
+          md.append('|------|------|')
+          md.append(f'| 可靠性 | {rel_rating} |')
+          md.append(f'| 安全性 | {sec_rating} |')
+          md.append(f'| 可维护性 | {maint_rating} |')
+          md.append('')
+
+          # 问题详情（如果有）
+          if issues:
+              md.append('### 问题详情')
+              md.append('')
+              md.append('| 严重度 | 类型 | 文件 | 描述 |')
+              md.append('|--------|------|------|------|')
+              for i in issues[:20]:
+                  sev = i.get('severity', '')
+                  typ = i.get('type', '')
+                  comp = i.get('component', '').replace(f'{project_key}:', '')
+                  line = i.get('line', '')
+                  msg = i.get('message', '')[:80]
+                  loc = f'{comp}:{line}' if line else comp
+                  md.append(f'| {sev} | {typ} | {loc} | {msg} |')
+              if len(issues) > 20:
+                  md.append(f'| ... | ... | ... | 还有 {len(issues)-20} 个问题 |')
+              md.append('')
+
+          md.append('---')
+          md.append('> _由 CI `code-quality` job 自动生成，数据来源: SonarCloud API_')
+
+          comment_body = '\n'.join(md)
+
+          # --- 发布/更新 PR 评论 ---
+          comment_file = '/tmp/sonar_comment.md'
+          with open(comment_file, 'w') as f:
+              f.write(comment_body)
+
+          # 查找已有评论（通过 HTML 标记 sonarcloud-report）
+          result = subprocess.run(
+              ['gh', 'api', f'repos/{repo}/issues/{pr_number}/comments', '--paginate',
+               '--jq', '.[] | select(.body | contains("<!-- sonarcloud-report -->")) | .id'],
+              capture_output=True, text=True
+          )
+          existing_ids = [x.strip() for x in result.stdout.strip().split('\n') if x.strip()]
+
+          if existing_ids:
+              comment_id = existing_ids[0]
+              print(f"Updating existing comment {comment_id}")
+              subprocess.run(
+                  ['gh', 'api', '--method', 'PATCH',
+                   f'repos/{repo}/issues/comments/{comment_id}',
+                   '-F', f'body=@{comment_file}'],
+                  check=True
+              )
+              print(f"Updated comment {comment_id}")
+          else:
+              print("Creating new PR comment")
+              subprocess.run(
+                  ['gh', 'api', '--method', 'POST',
+                   f'repos/{repo}/issues/{pr_number}/comments',
+                   '-F', f'body=@{comment_file}'],
+                  check=True
+              )
+              print("Created new comment")
+          PYEOF
 
   # Android 客户端构建验证
   android-build:
