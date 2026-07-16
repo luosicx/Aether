@@ -133,4 +133,3 @@ buildConfigField("String", "BFF_BASE_URL", "\"https://aether-bff.example.com\"")
 
 - **未集成 Rust JNI**：Rust 侧的 `jni.rs` 已实现 FFI 桥接，但 Android 项目侧尚无对应的 Kotlin 桥接代码，因此 Android 端暂不调用 Rust core（向量 / 分块 / 限流等能力）。
 - **无测试覆盖**：Android 端目前无单元测试 / UI 测试，CI 仅做 `assembleDebug` 编译验证。
-- **android/ 目录下存在重复文件**：目录中带有 ` 2` 后缀的重复文件（如 `build.gradle 2.kts`、`MainActivity 2.kt` 等），是历史同步产物，**需清理后才能成功构建**。清理前直接 `make build-android` 可能因重复源文件导致编译冲突。
