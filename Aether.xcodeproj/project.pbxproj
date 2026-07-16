@@ -408,6 +408,20 @@
 			remoteGlobalIDString = 3E5AA27405E11EA8C5B0C6DB;
 			remoteInfo = "Aether-macOS";
 		};
+		A1B2C3D4E5F6A7B8C9D0E1F2 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7C5EF9114C3CBE2937F8D8FA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E23E24C20D3BDA0C23D4DB83;
+			remoteInfo = "Aether-iOS";
+		};
+		B1C2D3E4F5A6B7C8D9E0F1A2 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7C5EF9114C3CBE2937F8D8FA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E23E24C20D3BDA0C23D4DB83;
+			remoteInfo = "Aether-iOS";
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -1766,6 +1780,7 @@
 			);
 			dependencies = (
 				80145CE557A8E962C328363A /* PBXTargetDependency */,
+				C1D2E3F4A5B6C7D8E9F0A1B2 /* PBXTargetDependency */,
 			);
 			name = AetherTests;
 			packageProductDependencies = (
@@ -1823,6 +1838,7 @@
 			buildRules = (
 			);
 			dependencies = (
+				D1E2F3A4B5C6D7E8F9A0B1C2 /* PBXTargetDependency */,
 			);
 			name = AetherUITests;
 			productName = AetherUITests;
@@ -2347,6 +2363,18 @@
 			name = "Aether-macOS";
 			target = 3E5AA27405E11EA8C5B0C6DB /* Aether-macOS */;
 			targetProxy = 19570A7C106F8A3D402C4A64 /* PBXContainerItemProxy */;
+		};
+		C1D2E3F4A5B6C7D8E9F0A1B2 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = "Aether-iOS";
+			target = E23E24C20D3BDA0C23D4DB83 /* Aether-iOS */;
+			targetProxy = A1B2C3D4E5F6A7B8C9D0E1F2 /* PBXContainerItemProxy */;
+		};
+		D1E2F3A4B5C6D7E8F9A0B1C2 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = "Aether-iOS";
+			target = E23E24C20D3BDA0C23D4DB83 /* Aether-iOS */;
+			targetProxy = B1C2D3E4F5A6B7C8D9E0F1A2 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
