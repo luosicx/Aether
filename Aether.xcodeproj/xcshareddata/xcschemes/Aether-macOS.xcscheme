@@ -34,6 +34,20 @@
                ReferencedContainer = "container:Aether.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "D98AD396A6D4DD6ACC7428FA"
+               BuildableName = "AetherUITests.xctest"
+               BlueprintName = "AetherUITests"
+               ReferencedContainer = "container:Aether.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction
@@ -50,6 +64,16 @@
                BlueprintIdentifier = "8DE141236A8DDF7895D8AB48"
                BuildableName = "AetherTests.xctest"
                BlueprintName = "AetherTests"
+               ReferencedContainer = "container:Aether.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "D98AD396A6D4DD6ACC7428FA"
+               BuildableName = "AetherUITests.xctest"
+               BlueprintName = "AetherUITests"
                ReferencedContainer = "container:Aether.xcodeproj">
             </BuildableReference>
          </TestableReference>
