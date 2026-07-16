@@ -418,7 +418,6 @@
 		05219D01EA46579E5C0F8054 /* TerminalCommandTool.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TerminalCommandTool.swift; sourceTree = "<group>"; };
 		05901B8A22C088927620C3AE /* IntentChatServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = IntentChatServiceTests.swift; sourceTree = "<group>"; };
 		06338EAB3D44F558619E23D1 /* LaunchScreen.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LaunchScreen.swift; sourceTree = "<group>"; };
-		0724C7D7F16CF6D4E26B31C8 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		08C042865F8B84CA2740C947 /* ChatView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatView.swift; sourceTree = "<group>"; };
 		0A53D759B12CCF9A30101BEB /* SwitchConversationIntent.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SwitchConversationIntent.swift; sourceTree = "<group>"; };
 		0AF59624B6F92514E3E2971E /* ConversationList.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ConversationList.swift; sourceTree = "<group>"; };
@@ -1498,7 +1497,6 @@
 			isa = PBXGroup;
 			children = (
 				8DEC7FB7EDCBF9E610EA1C1D /* Assets.xcassets */,
-				0724C7D7F16CF6D4E26B31C8 /* Info.plist */,
 				B2C3D4E5F6A7B8C9D0E1F2A3 /* Localizable.xcstrings */,
 				932EDF6C3BAF37E458955B1D /* PrivacyInfo.xcprivacy */,
 			);
@@ -2350,9 +2348,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = "Aether/Aether-iOS.entitlements";
-				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "";
 				CODE_SIGN_IDENTITY = "Apple Development";
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = YZD665FDV5;
 				ENABLE_PREVIEWS = YES;
@@ -2463,9 +2459,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = "Aether/Aether-macOS.entitlements";
-				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "";
 				CODE_SIGN_IDENTITY = "-";
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEVELOPMENT_TEAM = YZD665FDV5;
@@ -2475,14 +2469,6 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "以太";
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
-					"-framework",
-					WatchConnectivity,
-				);
-				"OTHER_LDFLAGS[sdk=iphonesimulator*]" = (
-					"-framework",
-					WatchConnectivity,
-				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -Xfrontend -disable-sandbox";
 				PRODUCT_BUNDLE_IDENTIFIER = com.aether.app.macos;
 				PRODUCT_NAME = Aether;
@@ -2585,9 +2571,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = "Aether/Aether-iOS.entitlements";
-				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "";
 				CODE_SIGN_IDENTITY = "Apple Development";
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = YZD665FDV5;
 				ENABLE_PREVIEWS = YES;
@@ -2724,9 +2708,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = "Aether/Aether-macOS.entitlements";
-				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "";
 				CODE_SIGN_IDENTITY = "-";
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEVELOPMENT_TEAM = YZD665FDV5;
@@ -2736,14 +2718,6 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "以太";
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
-					"-framework",
-					WatchConnectivity,
-				);
-				"OTHER_LDFLAGS[sdk=iphonesimulator*]" = (
-					"-framework",
-					WatchConnectivity,
-				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -Xfrontend -disable-sandbox";
 				PRODUCT_BUNDLE_IDENTIFIER = com.aether.app.macos;
 				PRODUCT_NAME = Aether;

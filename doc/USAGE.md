@@ -707,7 +707,7 @@ Rust `aether-core-ffi` 通过 `AetherRustBin` xcframework 提供跨平台统一�
 # 1. 本地构建
 xcodebuild build \
   -project Aether.xcodeproj \
-  -scheme Aether \
+  -scheme Aether-iOS \
   -destination 'platform=iOS Simulator,name=iPhone 17,OS=latest' \
   -configuration Debug \
   CODE_SIGNING_ALLOWED=NO
@@ -715,7 +715,7 @@ xcodebuild build \
 # 2. 运行 UT（2092 用例，0 skip）
 xcodebuild test \
   -project Aether.xcodeproj \
-  -scheme Aether \
+  -scheme Aether-iOS \
   -destination 'platform=iOS Simulator,name=iPhone 17,OS=latest' \
   -only-testing:AetherTests \
   CODE_SIGNING_ALLOWED=NO
@@ -723,7 +723,7 @@ xcodebuild test \
 # 3. 运行 UIT（30 用例，0 skip）
 xcodebuild test \
   -project Aether.xcodeproj \
-  -scheme Aether \
+  -scheme Aether-iOS \
   -destination 'platform=iOS Simulator,name=iPhone 17,OS=latest' \
   -only-testing:AetherUITests \
   CODE_SIGNING_ALLOWED=NO
@@ -731,7 +731,7 @@ xcodebuild test \
 # 4. 全量测试（UT + UIT）
 xcodebuild test \
   -project Aether.xcodeproj \
-  -scheme Aether \
+  -scheme Aether-iOS \
   -destination 'platform=iOS Simulator,name=iPhone 17,OS=latest' \
   CODE_SIGNING_ALLOWED=NO
 ```
