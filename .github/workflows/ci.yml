@@ -738,6 +738,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write  # 用于自动发布 SonarCloud 分析报告到 PR 评论
+      issues: write  # 用于删除旧 PR 评论（PR 评论在 API 中属于 issue comments）
     steps:
       - uses: actions/checkout@v5
         with:
@@ -1114,7 +1115,8 @@ jobs:
           with open(comment_file, 'w') as f:
               f.write(comment_body)
 
-          # 查找已有评论（通过 HTML 标记 sonarcloud-report）
+          # 查找所有旧报告评论并删除（通过 HTML 标记 sonarcloud-report）
+          # 删除全部旧评论后创建新评论，确保 PR 上始终只有一条最新报告
           result = subprocess.run(
               ['gh', 'api', f'repos/{repo}/issues/{pr_number}/comments', '--paginate',
                '--jq', '.[] | select(.body | contains("<!-- sonarcloud-report -->")) | .id'],
@@ -1123,24 +1125,23 @@ jobs:
           existing_ids = [x.strip() for x in result.stdout.strip().split('\n') if x.strip()]
 
           if existing_ids:
-              comment_id = existing_ids[0]
-              print(f"Updating existing comment {comment_id}")
-              subprocess.run(
-                  ['gh', 'api', '--method', 'PATCH',
-                   f'repos/{repo}/issues/comments/{comment_id}',
-                   '-F', f'body=@{comment_file}'],
-                  check=True
-              )
-              print(f"Updated comment {comment_id}")
-          else:
-              print("Creating new PR comment")
-              subprocess.run(
-                  ['gh', 'api', '--method', 'POST',
-                   f'repos/{repo}/issues/{pr_number}/comments',
-                   '-F', f'body=@{comment_file}'],
-                  check=True
-              )
-              print("Created new comment")
+              for cid in existing_ids:
+                  print(f"Deleting old comment {cid}")
+                  subprocess.run(
+                      ['gh', 'api', '--method', 'DELETE',
+                       f'repos/{repo}/issues/comments/{cid}'],
+                      capture_output=True
+                  )
+
+          # 创建新评论（始终为最新内容，出现在 PR 评论列表顶部）
+          print("Creating new PR comment")
+          subprocess.run(
+              ['gh', 'api', '--method', 'POST',
+               f'repos/{repo}/issues/{pr_number}/comments',
+               '-F', f'body=@{comment_file}'],
+              check=True
+          )
+          print("Created new comment")
           PYEOF
 
   # Android 客户端构建验证
