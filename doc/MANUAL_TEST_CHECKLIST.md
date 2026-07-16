@@ -2296,6 +2296,184 @@
   - **预期结果**：模型下载进度正常更新，校验通过后可加载推理；端侧模式下发送消息收到 token 级流式响应（非假流式）
   - **失败排查**：检查 mlx-swift SPM 解析；查看 ModelContainer.load；检查 MLXEngine.generate AsyncStream；查看内存检测 os_proc_available_memory
 
+## 34. Rust FFI 核心能力验证
+
+> 验证 10 个 Rust FFI 模块（aether-core-ffi → AetherRustBin xcframework）在 iOS/macOS 上的正确性。
+
+### 34.1 Sha256 流式哈希
+
+- [ ] 文件哈希计算正确
+  - **前置条件**：iOS/macOS 端，已知任意文件路径
+  - **操作步骤**：
+    1. 在代码中调用 `aetherSha256(of: filePath)`
+    2. 对比系统 `shasum -a 256` 结果
+  - **预期结果**：Rust 哈希与系统 shasum 结果一致
+  - **失败排查**：检查 `AetherRustSha256.update` 分块读取；查看 `finalize` hex 编码
+
+- [ ] 大文件（> 100MB）分块哈希无内存溢出
+  - **前置条件**：准备好 > 100MB 测试文件
+  - **操作步骤**：
+    1. 调用 `aetherSha256(of: largeFilePath)`
+    2. 监控内存占用
+  - **预期结果**：4MB chunk 分块读取，内存占用稳定，不溢出
+  - **失败排查**：检查 chunk 大小配置；查看 autoreleasepool 使用
+
+### 34.2 Token 计数估算
+
+- [ ] 中文/英文/混合文本 Token 计数合理
+  - **前置条件**：iOS/macOS 端
+  - **操作步骤**：
+    1. 调用 `AetherRustToken.estimateTokens("你好世界")` 
+    2. 调用 `AetherRustToken.estimateTokens("Hello World")`
+    3. 调用 `AetherRustToken.estimateTokens("你好 Hello 世界 World")`
+  - **预期结果**：中文约 4 个 token，英文约 2 个 token，混合文本合理
+  - **失败排查**：检查 Rust 侧 token 计数算法；对比 `String.estimatedTokens` 粗估结果
+
+### 34.3 Chunker 文档分块
+
+- [ ] 中文文档按句子边界分块
+  - **前置条件**：iOS/macOS 端
+  - **操作步骤**：
+    1. 准备一段中文长文本（含多句话）
+    2. 调用 `AetherRustChunker.chunkDocument(text, maxChars: 200, overlapChars: 50)`
+  - **预期结果**：分块按句子边界断开，不会在句子中间截断，chunk 之间有 overlap
+  - **失败排查**：检查 `unicode-segmentation` UAX #29 实现；查看 maxChars/overlapChars 参数
+
+- [ ] 英文文档分块正确处理标点
+  - **前置条件**：iOS/macOS 端
+  - **操作步骤**：
+    1. 准备一段英文长文本
+    2. 调用分块方法
+  - **预期结果**：按英文句号/问号/感叹号边界分块
+  - **失败排查**：检查 Unicode 句子边界检测；对比 NLTokenizer 结果
+
+### 34.4 Vector 向量运算
+
+- [ ] 余弦相似度计算正确
+  - **前置条件**：iOS/macOS 端
+  - **操作步骤**：
+    1. 调用 `AetherRustVector.cosine(vecA, vecB)` 计算相同向量 → 应为 1.0
+    2. 计算正交向量 → 应为 0.0
+    3. 计算随机向量对
+  - **预期结果**：相同向量 = 1.0，正交 ≈ 0.0，f32/f64 结果一致
+  - **失败排查**：检查 Rust 侧 dot product 与 norm 计算；查看 f32/f64 精度
+
+- [ ] Top-K 检索返回正确排序
+  - **前置条件**：iOS/macOS 端
+  - **操作步骤**：
+    1. 准备一组向量 + 查询向量
+    2. 调用 `AetherRustVector.topK(query, vectors, k: 3)`
+  - **预期结果**：返回余弦相似度最高的 3 条，按相似度降序排列
+  - **失败排查**：检查 JSON 序列化/反序列化；查看返回数组排序
+
+### 34.5 SSE 流解析
+
+- [ ] 普通 SSE 事件解析正确
+  - **前置条件**：iOS/macOS 端
+  - **操作步骤**：
+    1. 创建 `AetherRustSSEParser`
+    2. 调用 `parseChunk("data: {\"choices\":[{\"delta\":{\"content\":\"你好\"}}]}\n\n")`
+    3. 调用 `extractContent()`
+  - **预期结果**：提取到 "你好" 内容
+  - **失败排查**：检查 SSE 解析状态机；查看 data: 字段解析
+
+- [ ] tool_calls 跨 chunk 累积正确
+  - **前置条件**：iOS/macOS 端
+  - **操作步骤**：
+    1. 创建 `AetherRustSSEParser`
+    2. 分多次调用 `parseWithTools` 传入 tool_calls delta（跨多个 chunk）
+    3. 查看累积的 tool_calls 结果
+  - **预期结果**：tool_calls 跨 chunk 正确累积，最终工具名和参数完整
+  - **失败排查**：检查 `AetherSseState` 跨 chunk 累积逻辑；查看 tool_calls JSON 合并
+
+### 34.6 Sandbox WASM 沙箱（macOS）
+
+- [ ] WASM 模块加载与执行
+  - **前置条件**：macOS 端，已编译 WASM 插件
+  - **操作步骤**：
+    1. 创建 `AetherRustSandbox`
+    2. 编译 WASM 模块 → `AetherRustSandboxModule`
+    3. 创建实例 → `AetherRustSandboxInstance`
+    4. 调用 `execute` 方法
+  - **预期结果**：WASM 插件正常加载并执行，返回结果
+  - **失败排查**：检查 `wasmtime` Pulley 解释器；查看 CPU fuel 配置
+
+- [ ] 资源限制生效（CPU fuel + 内存）
+  - **前置条件**：macOS 端，已加载 WASM 实例
+  - **操作步骤**：
+    1. 配置极低 CPU fuel 与内存限额
+    2. 执行计算密集型 WASM 插件
+  - **预期结果**：超限时插件被终止，不导致宿主崩溃
+  - **失败排查**：检查 `wasmtime` Store 配置；查看 fuel/memory 限制
+
+### 34.7 Inference 推理引擎（macOS）
+
+- [ ] 模型加载成功
+  - **前置条件**：macOS 端，已下载 safetensors 模型
+  - **操作步骤**：
+    1. 创建 `AetherRustInferenceEngine`，传入模型目录路径
+    2. 配置 `AetherRustInferenceConfig`（temperature/maxTokens/repeatPenalty/topP/seed）
+  - **预期结果**：模型加载成功，无报错
+  - **失败排查**：检查 Candle 框架 safetensors 加载；查看模型路径
+
+- [ ] 流式生成正确
+  - **前置条件**：模型已加载
+  - **操作步骤**：
+    1. 调用 `generate(prompt)` 获取流式 token 数组
+    2. 调用 `generateText(prompt)` 获取一次性完整文本
+  - **预期结果**：流式返回 token 数组，一次性返回完整文本，内容连贯
+  - **失败排查**：检查 Candle generate 实现；查看 temperature/topP 采样
+
+### 34.8 RateLimiter 令牌桶限流
+
+- [ ] 令牌获取与消耗正确
+  - **前置条件**：iOS/macOS 端
+  - **操作步骤**：
+    1. 创建 `AetherRustTokenBucket(capacity: 10, refillRate: 1.0)`
+    2. 调用 `acquire(nowMs, tokens: 1)` 10 次
+    3. 第 11 次调用 `acquire`
+  - **预期结果**：前 10 次成功，第 11 次返回 false（令牌不足）
+  - **失败排查**：检查连续 refill 算法；查看 `nowMs` 时间戳计算
+
+- [ ] 令牌随时间恢复
+  - **前置条件**：iOS/macOS 端，已消耗全部令牌
+  - **操作步骤**：
+    1. 等待 2 秒后再次调用 `acquire(nowMs + 2000, tokens: 1)`
+  - **预期结果**：令牌恢复 2 个，可成功获取
+  - **失败排查**：检查 refill 速率计算；查看 `availableTokens` 方法
+
+### 34.9 Redactor 敏感信息脱敏
+
+- [ ] UUID 脱敏正确
+  - **前置条件**：iOS/macOS 端
+  - **操作步骤**：
+    1. 调用 `AetherRustRedactor.redact("ID: 550e8400-e29b-41d4-a716-446655440000")`
+  - **预期结果**：UUID 被替换为 `[REDACTED-UUID]`
+  - **失败排查**：检查 Rust `regex` crate UUID 正则
+
+- [ ] 邮箱/URL/Token 脱敏正确
+  - **前置条件**：iOS/macOS 端
+  - **操作步骤**：
+    1. 调用 `AetherRustRedactor.redact("contact: user@example.com, url: https://secret.com, token: sk-abc123def")`
+  - **预期结果**：邮箱 → `[REDACTED-EMAIL]`，URL → `[REDACTED-URL]`，Token → `[REDACTED-TOKEN]`
+  - **失败排查**：检查各 RE2 正则模式；查看脱敏替换逻辑
+
+### 34.10 FFIError 错误处理
+
+- [ ] nullResult 错误正确抛出
+  - **前置条件**：iOS/macOS 端
+  - **操作步骤**：
+    1. 模拟 Rust 侧返回 null 指针的情况
+  - **预期结果**：Swift 侧抛出 `AetherRustError.nullResult`
+  - **失败排查**：检查 C 指针校验；查看 `AetherRustError` 错误描述
+
+- [ ] invalidUTF8 错误正确抛出
+  - **前置条件**：iOS/macOS 端
+  - **操作步骤**：
+    1. 模拟 Rust 侧返回无效 UTF-8 字节
+  - **预期结果**：Swift 侧抛出 `AetherRustError.invalidUTF8`
+  - **失败排查**：检查 `String(cString:)` 初始化；查看错误捕获
+
 ## 手测环境要求
 
 | 功能模块 | 设备要求 | 备注 |

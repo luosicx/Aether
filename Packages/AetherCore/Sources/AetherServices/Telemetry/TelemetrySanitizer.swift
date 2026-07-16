@@ -1,23 +1,27 @@
 import Foundation
 import AetherFoundation
+import AetherRust
 
 /// 遥测日志脱敏工具：在事件入队/上传前移除用户敏感上下文。
 /// 使用正则表达式顺序替换，覆盖常见敏感模式（路径、URL、UUID、邮箱、Token、密码字段等）。
+///
+/// 正则匹配已迁移至 Rust（aether-core，regex crate 线性时间 NFA + SIMD），
+/// 统一 Apple/Workers/Android 三端脱敏算法。
+/// 如需回退到纯 Swift 实现，将 `useRust` 置为 false 即可。
 public enum TelemetrySanitizer {
+    /// 切换开关：true 走 Rust 核心，false 走下方纯 Swift 兜底实现。
+    private static let useRust = true
+
     /// 对输入字符串进行脱敏处理，返回替换后的字符串。
     /// 普通错误信息（如 "Network timeout"）不会被修改。
     public static func redact(_ input: String) -> String {
-        var result = input
-        for (regex, replacement) in patterns {
-            result = regex.stringByReplacingMatches(
-                in: result,
-                options: [],
-                range: NSRange(location: 0, length: result.utf16.count),
-                withTemplate: replacement
-            )
+        if Self.useRust {
+            return AetherRustRedactor.redact(input)
         }
-        return result
+        return redactSwift(input)
     }
+
+    // MARK: - 纯 Swift 兜底实现（保留以便回退）
 
     /// 脱敏规则列表。顺序影响结果：URL 先于路径处理，避免路径规则误伤 URL 的 path 部分。
     /// 使用 try? 配合 guard let 安全创建正则表达式，避免语法错误导致 crash
@@ -59,5 +63,19 @@ public enum TelemetrySanitizer {
     ].compactMap { (maybeRegex, replacement) in
         guard let regex = maybeRegex else { return nil }
         return (regex, replacement)
+    }
+
+    /// 纯 Swift 脱敏实现（保留以便回退）。
+    private static func redactSwift(_ input: String) -> String {
+        var result = input
+        for (regex, replacement) in patterns {
+            result = regex.stringByReplacingMatches(
+                in: result,
+                options: [],
+                range: NSRange(location: 0, length: result.utf16.count),
+                withTemplate: replacement
+            )
+        }
+        return result
     }
 }

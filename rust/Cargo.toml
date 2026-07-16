@@ -1,0 +1,25 @@
+[workspace]
+resolver = "2"
+members = ["aether-core", "aether-core-ffi"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["Aether Contributors"]
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+regex = { version = "1", default-features = false, features = ["std", "unicode"] }
+unicode-segmentation = "1"
+sha2 = "0.10"
+wasmtime = { version = "29", default-features = false, features = ["runtime", "cranelift", "pulley"] }
+# candle 端侧推理（CPU 默认；Metal 通过 feature 开启，iOS 真机构建时启用）
+candle-core = { version = "0.8", default-features = false }
+candle-nn = { version = "0.8", default-features = false }
+candle-transformers = { version = "0.8", default-features = false }
+tokenizers = { version = "0.20", default-features = false, features = ["onig"] }
+hf-hub = { version = "0.3", default-features = false }
+aether-core = { path = "aether-core" }

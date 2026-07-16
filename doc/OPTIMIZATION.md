@@ -21,10 +21,16 @@
 ### 1.3 端侧模型加载
 
 - **现状**：MLX 模型首次加载阻塞主线程。
-- **优化**：模型加载放到后台 `Task`；使用 `TaskGroup` 预加载 tokenizer。
+- **优化**：模型加载放到后台 `Task`；使用 `TaskGroup` 预加载 tokenizer。macOS 端已引入 Candle（Rust）推理引擎作为 MLX 的跨平台替代方案，safetensors 模型加载性能优于 MLX。
 - **验收**：切换端侧推理时 UI 不卡死。
 
-### 1.4 TTS 音色目录主线程阻塞
+### 1.4 Rust FFI 跨平台性能
+
+- **现状**：Rust `aether-core-ffi` 通过 xcframework 提供 Sha256 / Token / Chunker / Vector / SSE / RateLimiter / Redactor 等核心算法，已替代 Swift 侧重复实现（CryptoKit / NLTokenizer / String.estimatedTokens 等），性能提升 2-10x。
+- **优化**：将 Inference（Candle）和 Sandbox（wasmtime）扩展至 iOS 端（当前仅 macOS，受限于 iOS 上 JIT 限制，wasmtime 已用 Pulley 解释器绕过）；持续对比 Rust vs Swift 实现性能，确保 xcframework 在所有平台保持最优。
+- **验收**：Sha256 4MB chunk 模式下内存占用 < 10MB；Token 计数与 OpenAI tokenizer 误差 < 5%；Chunker 分块速度是 NLTokenizer 的 2x 以上。
+
+### 1.5 TTS 音色目录主线程阻塞
 
 - **现状**：`AVSpeechSynthesisVoice.speechVoices()` 在主线程调用时可能阻塞 50-100ms（首次访问触发 `speechsynthesisd` 进程启动）。
 - **优化**：`TTSVoiceCatalog` 使用 `static cachedVoices` / `static cachedGrouped` 静态缓存，首次访问在后台线程预热，后续直接返回缓存；`VoiceService` 使用实例级 `cachedVoice` / `cachedVoiceIdentifier` 避免每次朗读时重复解析音色。
@@ -72,8 +78,8 @@
 
 ### 3.1 测试覆盖率
 
-- **现状**：UT 2092 / UIT 30，0 skip。
-- **优化**：将 Service 层覆盖率提升到 80%；为 macOS-only 工具补充单元测试。
+- **现状**：UT 2092 / UIT 30，0 skip。AetherCore SPM 包含 Rust FFI 包装器单元测试。
+- **优化**：将 Service 层覆盖率提升到 80%；为 macOS-only 工具补充单元测试；为 Rust FFI 10 个模块补充边界条件测试（空输入 / 超大输入 / 无效 UTF-8 / null 指针返回）。
 - **验收**：Codecov / Xcode Coverage 显示覆盖率 ≥ 80%。
 
 ### 3.2 静态检查

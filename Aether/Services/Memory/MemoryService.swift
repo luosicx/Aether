@@ -139,12 +139,24 @@ final class MemoryService {
 
     // MARK: - 相似度计算
 
+    /// 切换开关：true 走 Rust 核心（AetherRustVector.cosineF64），false 走下方纯 Swift 兜底。
+    private static let useRust = true
+
     /// 计算两个向量的余弦相似度。长度不等或空向量返回 0；零范数返回 0。
     /// - Parameters:
     ///   - a: 向量 A
     ///   - b: 向量 B
     /// - Returns: 余弦相似度，范围 -1.0 ~ 1.0
     func cosineSimilarity(_ a: [Double], _ b: [Double]) -> Double {
+        if Self.useRust {
+            return AetherRustVector.cosine(a, b)
+        }
+        return cosineSimilaritySwift(a, b)
+    }
+
+    // MARK: - 纯 Swift 兜底实现（保留以便回退）
+
+    private func cosineSimilaritySwift(_ a: [Double], _ b: [Double]) -> Double {
         guard a.count == b.count, !a.isEmpty else { return 0 }
         var dot: Double = 0
         var normA: Double = 0

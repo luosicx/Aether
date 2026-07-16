@@ -1,6 +1,6 @@
 # Aether（以太）
 
-> 一个原生 SwiftUI AI 对话助手，支持 iOS / iPad / macOS 三端，采用**液态玻璃 + 深空主题**视觉语言。基于多 LLM Provider（DeepSeek / Qwen / BFF 代理 / 端侧 MLX），覆盖流式对话、RAG 知识库、ReAct 工具调用、语义缓存、端侧离线推理、语音合成与识别、健康洞察、灵动岛 Live Activity、Watch App、桌面 Widget、DeepLink 等能力。支持 8 种语言（简中 / 繁中 / 英 / 日 / 韩 / 法 / 德 / 西）。
+> 一个原生 SwiftUI AI 对话助手，支持 iOS / iPad / macOS 三端，采用**液态玻璃 + 深空主题**视觉语言。基于多 LLM Provider（DeepSeek / Qwen / BFF 代理 / 端侧 MLX），覆盖流式对话、RAG 知识库、ReAct 工具调用、语义缓存、端侧离线推理、语音合成与识别、健康洞察、灵动岛 Live Activity、Watch App、桌面 Widget、DeepLink 等能力。底层引入 Rust 核心引擎（aether-core-ffi，xcframework 分发），提供跨平台统一的高性能算法（SHA-256 哈希、Token 计数、文档分块、向量相似度、SSE 解析、WASM 沙箱、Candle 推理、令牌桶限流、敏感信息脱敏）。支持 8 种语言（简中 / 繁中 / 英 / 日 / 韩 / 法 / 德 / 西）。
 
 ## 截图
 
@@ -34,7 +34,10 @@
 
 - **SwiftUI**（`@Observable` / `@Bindable` / `@FocusState` / NavigationSplitView）
 - **SwiftData**（`@Model` 宏自动生成 schema 与迁移，7 个持久化实体）
+- **Rust**（aether-core-ffi，C ABI 绑定，xcframework 三架构分发，cbindgen 生成头文件）
 - **MLX**（端侧推理，Llama-3.2-1B-Instruct Q4_K_M 量化）
+- **Candle**（Rust 跨平台推理引擎，safetensors 模型，macOS）
+- **wasmtime**（Rust WASM 运行时，Pulley 解释器，无 JIT，macOS）
 - **AVFoundation**（AVAudioSession / AVSpeechSynthesizer 语音输入输出）
 - **BackgroundTasks**（BGTaskScheduler 后台刷新，iOS）
 - **ActivityKit**（Live Activities 灵动岛，iOS）
@@ -45,15 +48,34 @@
 
 1. clone 仓库
 2. 用 Xcode 16+ 打开 `Aether.xcodeproj`
-3. iOS 运行：选 iPhone 17 模拟器 → `Cmd + R`
-4. macOS 运行：选 My Mac 目标 → `Cmd + R`
-5. 运行后进入设置填入 DeepSeek API Key（https://platform.deepseek.com 申请）
+3. **Rust 依赖**（可选，xcframework 已预编译）：
+   ```bash
+   rustup target add aarch64-apple-ios aarch64-apple-ios-simulator aarch64-apple-darwin
+   cd rust/aether-core-ffi && cargo build --release
+   ```
+4. iOS 运行：选 iPhone 17 模拟器 → `Cmd + R`
+5. macOS 运行：选 My Mac 目标 → `Cmd + R`
+6. 运行后进入设置填入 DeepSeek API Key（https://platform.deepseek.com 申请）
 
 ## 项目结构
 
 项目采用 MVVM + Service 分层架构，详见 [架构文档](doc/ARCHITECTURE.md)。简要结构：
 
 ```
+Aether.xcodeproj/           # Xcode 工程文件
+rust/
+├── aether-core/             # 纯 Rust 算法 crate（sha2 / unicode-segmentation / tokenizers / candle / wasmtime / regex）
+└── aether-core-ffi/         # C ABI 绑定层 + cbindgen.toml
+Packages/
+└── AetherCore/              # SPM 模块化包
+    ├── Sources/
+    │   ├── AetherFoundation/  # 核心协议与常量（LLMProvider / ToolProtocol / APIConfig）
+    │   ├── AetherRust/        # Rust FFI Swift 包装器（10 个文件）
+    │   ├── AetherServices/    # 服务层（LLM / RAG / Cache / Plugin / Telemetry 等）
+    │   ├── AetherDesign/      # 设计系统 Token（颜色 / 字体 / 圆角 / 布局）
+    │   └── AetherUI/          # 通用 UI 组件（AvatarView / CardStyle / ErrorBanner 等）
+    ├── Tests/AetherCoreTests/
+    └── aether_core.xcframework/  # Rust 三架构静态库
 Aether/                     # 主 App（iOS / iPad / macOS）
 ├── App/                    # App 入口（AetherApp.swift，含 DeepLink 处理）
 ├── AppIntents/             # App Intents（AskAether / NewConversation / SwitchConversation）
@@ -97,6 +119,7 @@ AetherUITests/              # UI 测试（2 文件 / 13 用例）
 - watchOS Deployment Target 10+（Watch App 可选）
 - DeepSeek API Key（云端模式）
 - mlx-swift SPM 依赖（端侧推理可选）
+- Rust 1.75+（构建 aether-core-ffi xcframework 需要，可选）
 - App Group `group.com.aether.app`（Widget 共享 SwiftData 可选）
 
 > **Watch App 与 Widget 注意事项**：源代码已就绪（`AetherWatch/` 与 `AetherWidgets/`），但需在 Xcode 中手动创建对应的 target 并关联源文件、配置 App Group 与 Capabilities。详见 [贡献指南](doc/CONTRIBUTING.md) 中的 Watch / Widget 开发指南。

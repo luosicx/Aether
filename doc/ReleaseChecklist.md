@@ -290,6 +290,55 @@
   FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: "group.com.aether.app")
   ```
 
+## 4.21 xcframework 构建验证
+
+> Rust `aether-core-ffi` crate 编译为三架构 xcframework，作为 `AetherRustBin` binaryTarget 被 Swift Package 引用。
+
+- [ ] Rust 工具链已安装（`rustup show` 确认 Rust 1.75+）
+- [ ] iOS/macOS 交叉编译目标已安装：
+  ```bash
+  rustup target add aarch64-apple-ios aarch64-apple-ios-simulator aarch64-apple-darwin
+  ```
+- [ ] aether-core 纯逻辑 crate 编译通过：
+  ```bash
+  cd rust/aether-core && cargo build
+  ```
+- [ ] aether-core-ffi C ABI 绑定层编译通过（三架构）：
+  ```bash
+  cd rust/aether-core-ffi
+  cargo build --target aarch64-apple-ios
+  cargo build --target aarch64-apple-ios-simulator
+  cargo build --target aarch64-apple-darwin
+  ```
+- [ ] cbindgen 生成 C 头文件正确：
+  ```bash
+  cd rust/aether-core-ffi && cbindgen --config cbindgen.toml --crate aether-core-ffi --output aether_core_ffi.h
+  ```
+- [ ] 头文件 `aether_core_ffi.h` 包含所有 10 个模块的 FFI 函数声明（sha256_* / token_* / chunker_* / vector_* / sse_* / sandbox_* / inference_* / ratelimit_* / redact_* / free_string），有 `AETHER_CORE_FFI_H` include guard
+- [ ] xcframework 打包成功：
+  ```bash
+  xcodebuild -create-xcframework \
+    -library rust/aether-core-ffi/target/aarch64-apple-ios/release/libaether_core_ffi.a \
+    -headers rust/aether-core-ffi/aether_core_ffi.h \
+    -library rust/aether-core-ffi/target/aarch64-apple-ios-simulator/release/libaether_core_ffi.a \
+    -headers rust/aether-core-ffi/aether_core_ffi.h \
+    -library rust/aether-core-ffi/target/aarch64-apple-darwin/release/libaether_core_ffi.a \
+    -headers rust/aether-core-ffi/aether_core_ffi.h \
+    -output Packages/AetherCore/aether_core.xcframework
+  ```
+- [ ] xcframework 含三个 slice：
+  ```bash
+  xcodebuild -check-xcframework Packages/AetherCore/aether_core.xcframework
+  ```
+  预期输出：`ios-arm64: OK` / `ios-arm64-simulator: OK` / `macos-arm64: OK`
+- [ ] `Package.swift` 中 `AetherRustBin` binaryTarget 指向 xcframework 路径正确
+- [ ] `module.modulemap` 存在于 xcframework 各 slice 的 `Headers/` 目录中
+- [ ] AetherRust Swift 10 个包装器文件编译通过（`Packages/AetherCore/Sources/AetherRust/*.swift`）
+- [ ] AetherCore 单元测试通过：
+  ```bash
+  cd Packages/AetherCore && swift test
+  ```
+
 ## 5. 提交审核前最终检查
 
 ### 5.1 功能验证

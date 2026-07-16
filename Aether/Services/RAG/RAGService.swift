@@ -1,13 +1,19 @@
 import Foundation
 import SwiftData
+import AetherServices
 
 /// RAG 检索增强生成服务，负责文档索引、相似度检索、上下文增强。@MainActor 隔离。
+///
+/// cosine 计算已迁移至 Rust（aether-core，AetherRustVector），统一 SemanticCache/MemoryService 三端实现。
+/// `retrieve` 与 `buildAugmentedContext` 共享同一 `scoredChunks` 私有方法，消除原双重暴力扫描。
 @MainActor
 final class RAGService {
     /// 文档分块器
     private let chunker = DocumentChunker()
     /// 嵌入服务（可注入，默认 EmbeddingService()）
     private let embeddingService: EmbeddingService
+    /// 切换开关：true 走 Rust 核心，false 走下方纯 Swift 兜底实现。
+    private static let useRust = true
 
     /// 注入嵌入服务，默认 EmbeddingService()
     init(embeddingService: EmbeddingService = EmbeddingService()) {
@@ -47,15 +53,8 @@ final class RAGService {
         guard let queryEmbedding = queryEmbeddings.first, !queryEmbedding.isEmpty else { return [] }
         let descriptor = FetchDescriptor<DocumentChunk>()
         let allChunks = try modelContext.fetch(descriptor)
-        let scored = allChunks.map { chunk -> (DocumentChunk, Double) in
-            let similarity = cosineSimilarity(queryEmbedding, chunk.embedding)
-            // 最终得分 = cosine 相似度 * chunk.weight（默认 1.0；反馈闭环会调整 weight）
-            let score = similarity * Double(chunk.weight)
-            return (chunk, score)
-        }
-        return scored
-            .sorted { $0.1 > $1.1 }
-            .prefix(topK)
+        // 共享评分逻辑：最终得分 = cosine * weight（默认 1.0；反馈闭环会调整 weight）
+        return scoredChunks(queryEmbedding: queryEmbedding, chunks: allChunks, topK: topK, applyWeight: true)
             .map(\.0)
     }
 
@@ -70,13 +69,8 @@ final class RAGService {
         }
         let descriptor = FetchDescriptor<DocumentChunk>()
         let allChunks = try modelContext.fetch(descriptor)
-        let scored = allChunks.map { chunk -> (DocumentChunk, Double) in
-            let similarity = cosineSimilarity(queryEmbedding, chunk.embedding)
-            return (chunk, similarity)
-        }
-        let relevantChunks = scored
-            .sorted { $0.1 > $1.1 }
-            .prefix(5)
+        // buildAugmentedContext 不应用 weight（仅 retrieve 的反馈闭环用 weight）
+        let relevantChunks = scoredChunks(queryEmbedding: queryEmbedding, chunks: allChunks, topK: 5, applyWeight: false)
             .map(\.0)
         guard !relevantChunks.isEmpty else { return ("", [], queryEmbedding) }
         let context = relevantChunks
@@ -87,8 +81,36 @@ final class RAGService {
         return (prompt, relevantChunks, queryEmbedding)
     }
 
+    // MARK: - 共享评分逻辑（消除 retrieve / buildAugmentedContext 双重暴力扫描）
+
+    /// 对 chunks 计算 cosine 相似度并按降序取前 topK。
+    /// - Parameter applyWeight: true 时最终得分 = cosine * chunk.weight（retrieve 用）；
+    ///   false 时仅用 cosine 原始值（buildAugmentedContext 用）。
+    private func scoredChunks(queryEmbedding: [Float], chunks: [DocumentChunk], topK: Int, applyWeight: Bool) -> [(DocumentChunk, Double)] {
+        chunks
+            .map { chunk -> (DocumentChunk, Double) in
+                let similarity = cosineSimilarity(queryEmbedding, chunk.embedding)
+                let score = applyWeight ? similarity * Double(chunk.weight) : similarity
+                return (chunk, score)
+            }
+            .sorted { $0.1 > $1.1 }
+            .prefix(topK)
+            .map { ($0.0, $0.1) }
+    }
+
+    // MARK: - 余弦相似度（转发 Rust）
+
     /// 计算余弦相似度。长度不等或空向量返回 0。零范数返回 0。
     private func cosineSimilarity(_ a: [Float], _ b: [Float]) -> Double {
+        if Self.useRust {
+            return Double(AetherRustVector.cosine(a, b))
+        }
+        return cosineSimilaritySwift(a, b)
+    }
+
+    // MARK: - 纯 Swift 兜底实现（保留以便回退）
+
+    private func cosineSimilaritySwift(_ a: [Float], _ b: [Float]) -> Double {
         guard a.count == b.count, !a.isEmpty else { return 0 }
         var dot: Float = 0
         var normA: Float = 0

@@ -44,7 +44,7 @@
 *   **强调色**：使用**紫色**作为主要强调色，**电光蓝**用于可交互元素。
 *   **渐变**：在关键UI元素上使用**紫-蓝渐变**，体现Aether的能量感。
 
-> **Design Token 落地（`ColorTokens.swift`）**：以下语义颜色 token 已在 `Aether/DesignSystem/ColorTokens.swift` 中统一定义，所有视图应直接引用这些 token，不硬编码 `Color.red` / `Color(.systemGray5)`。
+> **Design Token 落地（`Packages/AetherCore/Sources/AetherDesign/ColorTokens.swift`）**：以下语义颜色 token 已在 AetherDesign SPM 模块中统一定义，所有视图应直接引用这些 token，不硬编码 `Color.red` / `Color(.systemGray5)`。
 >
 > | Token | 说明 |
 > |------|------|
@@ -63,22 +63,31 @@
 *   **中文**：可搭配`苹方`或`思源黑体`，保持同样的现代感。
 *   **排版**：采用**大标题、强对比**的策略。
 
-> **字体 Token 落地（`TypographyTokens.swift`）**：以下 Aether 品牌字体 token 已在 `Aether/DesignSystem/TypographyTokens.swift` 中统一定义，中文由系统 PingFang SC 自动 fallback，无需显式指定。
+> **字体 Token 落地（`Packages/AetherCore/Sources/AetherDesign/TypographyTokens.swift`）**：以下 Aether 品牌字体 token 已在 AetherDesign SPM 模块中统一定义，中文由系统 PingFang SC 自动 fallback，无需显式指定。
 >
 > | Token | 说明 |
 > |------|------|
 > | `Font.aetherTitle` | Aether 标题（28pt semibold） |
 > | `Font.aetherDisplay` | Aether 展示字体，开屏 Logo / 大标题（48pt bold） |
 > | `Font.aetherBody` | Aether 正文（16pt regular） |
+> | `Font.bodyAI` | AI 对话正文（`.body`） |
+> | `Font.subheadlineAI` | AI 副标题（`.subheadline`） |
+> | `Font.captionAI` | AI 注释（`.caption2`） |
+> | `Font.headlineAI` | AI 标题（`.headline`） |
+> | `Font.titleAI` | AI 大标题（`.title2`） |
+> | `Font.emptyStateTitle` | 空状态大标题（34pt light） |
+> | `Font.monoAI` | 等宽字体（工具消息 / 代码） |
+> | `Font.toolLabel` | 工具标签（caption2 medium） |
 
 #### 圆角系统
-> **圆角 Token 落地（`DesignTokens.swift`）**：以下圆角 token 已在 `Aether/DesignSystem/DesignTokens.swift` 的 `CornerRadius` 中统一定义，适配液态玻璃的圆润感。
+> **圆角 Token 落地（`Packages/AetherCore/Sources/AetherDesign/DesignTokens.swift` 中的 `CornerRadius`）**：以下圆角 token 已在 AetherDesign SPM 模块中统一定义，适配液态玻璃的圆润感。
 >
 > | Token | 值 | 说明 |
 > |------|----|------|
 > | `CornerRadius.small` | 12 | 小元素（按钮、标签） |
 > | `CornerRadius.medium` | 16 | 中等元素（卡片、输入框） |
 > | `CornerRadius.large` | 24 | 大元素（弹窗、面板） |
+> | `CornerRadius.pill` | 999 | 胶囊形（全圆角） |
 
 #### 液态玻璃实现说明
 > SwiftUI 中通过系统 Material 实现毛玻璃效果。`Color.bubbleAI` 已设为 `liquidGlass`，配合以下修饰符使用：

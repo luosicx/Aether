@@ -7,7 +7,7 @@ final class NotificationServiceTests: XCTestCase {
 
     /// requestAuthorization 不应抛错（completion-based，失败静默）
     func testRequestAuthorizationDoesNotThrow() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["CI"] != nil, "跳过：CI 环境无法处理权限弹窗")
+        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil, "跳过：模拟器/CI 环境无法处理权限弹窗")
         service.requestAuthorization()
         // 给 completion handler 一点时间执行
         try? await Task.sleep(nanoseconds: 200_000_000)
