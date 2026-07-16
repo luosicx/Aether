@@ -133,7 +133,7 @@ public class ModelsTest
     }
 
     [Fact]
-    public void ChatRequest_JsonSerialize_ProducesExpectedFields()
+    public void ChatRequest_JsonSerialize_ProduExpectedFields()
     {
         var req = new ChatRequest
         {
@@ -143,7 +143,8 @@ public class ModelsTest
             MemoryEnabled = false
         };
 
-        var json = JsonSerializer.Serialize(req);
+        var options = new JsonSerializerOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+        var json = JsonSerializer.Serialize(req, options);
         Assert.Contains("\"message\":\"测试消息\"", json);
         Assert.Contains("\"conversationId\":\"conv-1\"", json);
         Assert.Contains("\"model\":\"gpt-4\"", json);
