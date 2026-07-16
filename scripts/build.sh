@@ -308,14 +308,18 @@ case "$SUBCOMMAND" in
         run_build "Aether-macOS" "$destination"
         ;;
     build-watch)
-        if [ -z "$DESTINATION" ]; then
+        if [ -n "$DESTINATION" ]; then
+            destination="$DESTINATION"
+        else
             watch_name=$(detect_watch_simulator)
             destination="platform=watchOS Simulator,name=${watch_name}"
         fi
         run_build "AetherWatch" "$destination"
         ;;
     build-widget)
-        if [ -z "$DESTINATION" ]; then
+        if [ -n "$DESTINATION" ]; then
+            destination="$DESTINATION"
+        else
             sim_name=$(detect_ios_simulator)
             destination="platform=iOS Simulator,name=${sim_name}"
         fi
