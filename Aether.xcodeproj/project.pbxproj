@@ -264,6 +264,7 @@
 		AA8E2F66D43C247272278B9A /* DeviceInfoToolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51CA7C67CE5E48DA208A2E41 /* DeviceInfoToolTests.swift */; };
 		AABBCCDDEEFF001122334457 /* TelemetrySanitizerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDDEEFF001122334458 /* TelemetrySanitizerTests.swift */; };
 		ABCDEF00000000000000000B /* MCPClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF00000000000000000A /* MCPClientTests.swift */; };
+		ABCDEF00000000000000001B /* SSETransportEndpointSecurityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF00000000000000001A /* SSETransportEndpointSecurityTests.swift */; };
 		ABCDEF00000000000000000D /* ToolRegistryDynamicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF00000000000000000C /* ToolRegistryDynamicTests.swift */; };
 		ABCDEF000000000000000019 /* MCPSettingsUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000018 /* MCPSettingsUITests.swift */; };
 		AC366DF5EADABBF21F4694BC /* ConversationList.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AF59624B6F92514E3E2971E /* ConversationList.swift */; };
@@ -604,6 +605,7 @@
 		ABCDEF000000000000000005 /* MCPConfig.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MCPConfig.swift; sourceTree = "<group>"; };
 		ABCDEF000000000000000007 /* MCPToolAdapter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MCPToolAdapter.swift; sourceTree = "<group>"; };
 		ABCDEF00000000000000000A /* MCPClientTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MCPClientTests.swift; sourceTree = "<group>"; };
+		ABCDEF00000000000000001A /* SSETransportEndpointSecurityTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SSETransportEndpointSecurityTests.swift; sourceTree = "<group>"; };
 		ABCDEF00000000000000000C /* ToolRegistryDynamicTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ToolRegistryDynamicTests.swift; sourceTree = "<group>"; };
 		ABCDEF000000000000000010 /* MCPResourceService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MCPResourceService.swift; sourceTree = "<group>"; };
 		ABCDEF000000000000000012 /* MCPPromptService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MCPPromptService.swift; sourceTree = "<group>"; };
@@ -1457,6 +1459,7 @@
 			isa = PBXGroup;
 			children = (
 				ABCDEF00000000000000000A /* MCPClientTests.swift */,
+				ABCDEF00000000000000001A /* SSETransportEndpointSecurityTests.swift */,
 				ABCDEF00000000000000000C /* ToolRegistryDynamicTests.swift */,
 				ABCDEF000000000000000016 /* MCPResourcePromptTests.swift */,
 			);
@@ -2193,6 +2196,7 @@
 				9A1B2C3D4E5F607100C00101 /* AgentOrchestratorTests.swift in Sources */,
 				A1E2F3A4B5C6D7E8F9A0B1CB /* DesignSystemTests.swift in Sources */,
 				ABCDEF00000000000000000B /* MCPClientTests.swift in Sources */,
+				ABCDEF00000000000000001B /* SSETransportEndpointSecurityTests.swift in Sources */,
 				ABCDEF00000000000000000D /* ToolRegistryDynamicTests.swift in Sources */,
 				PLUG1N00000000000000000E /* PluginManagerTests.swift in Sources */,
 				PLUG1N00000000000000010 /* PluginSandboxTests.swift in Sources */,

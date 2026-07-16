@@ -145,6 +145,46 @@ final class TerminalCommandToolTests: XCTestCase {
         assertParseThrows("ls \(sshPath)", expected: .pathTraversal)
     }
 
+    // MARK: - 大小写绕过防护测试（V5：APFS 大小写不敏感文件系统绕过）
+
+    /// 敏感路径 home 段大小写变体应被拒绝。
+    /// 安全审计 [V5] 指出：原大小写敏感的 hasPrefix 比较在 APFS（默认大小写不敏感）
+    /// 上可被 /Users/Alice/.ssh 绕过 /Users/alice/.ssh。修复改为大小写不敏感比较。
+    /// 此测试镜像 FileOperationToolTests 的同名测试，覆盖 TerminalCommandTool 的同名修复。
+    func testSensitivePathCaseInsensitiveBypassRejected() {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        // 将 home 路径末段大写化，模拟大小写绕过：/Users/alice → /Users/ALICE
+        let lastSegment = FileManager.default.homeDirectoryForCurrentUser.lastPathComponent
+        let capitalizedHome = home.replacingOccurrences(
+            of: lastSegment,
+            with: lastSegment.uppercased()
+        )
+        assertParseThrows("ls \(capitalizedHome)/.ssh/id_rsa", expected: .pathTraversal)
+    }
+
+    /// 敏感路径 .SSH 大写应被拒绝（与 FileOperationTool 的 .SSH 测试对齐）
+    func testSensitivePathDotSSHUppercaseRejected() {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        assertParseThrows("ls \(home)/.SSH/id_rsa", expected: .pathTraversal)
+    }
+
+    /// 敏感路径 .AWS 大写应被拒绝（覆盖 AWS 凭证泄露路径）
+    func testSensitivePathDotAWSUppercaseRejected() {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        assertParseThrows("ls \(home)/.AWS/credentials", expected: .pathTraversal)
+    }
+
+    /// 同时大写 home 段与敏感目录段也应被拒绝（组合绕过尝试）
+    func testSensitivePathCombinedCaseBypassRejected() {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let lastSegment = FileManager.default.homeDirectoryForCurrentUser.lastPathComponent
+        let capitalizedHome = home.replacingOccurrences(
+            of: lastSegment,
+            with: lastSegment.uppercased()
+        )
+        assertParseThrows("ls \(capitalizedHome)/.SSH/id_rsa", expected: .pathTraversal)
+    }
+
     func testCatRemovedFromWhitelist() {
         // cat 已从白名单移除，防止读取任意敏感文件
         assertParseThrows("cat /etc/passwd", expected: .notInWhitelist)

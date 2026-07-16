@@ -179,7 +179,9 @@ final class SSETransport: @unchecked Sendable, MCPTransport {
     /// 消息流 continuation
     private var continuation: AsyncStream<Data>.Continuation?
     /// POST 请求端点（由 endpoint 事件设置）
-    private var postEndpoint: URL?
+    /// internal + private(set)：测试可读取当前值以验证 endpoint 同源校验逻辑，
+    /// 但仅能由 SSETransport 内部设置。
+    internal private(set) var postEndpoint: URL?
     /// 线程安全锁
     private let lock = NSLock()
 
@@ -296,7 +298,10 @@ final class SSETransport: @unchecked Sendable, MCPTransport {
     /// 处理 SSE 事件
     /// - endpoint 事件：设置 POST 端点 URL（校验与 SSE 连接同源，防劫持）
     /// - message 事件：yield JSON-RPC 响应到消息流
-    private func handleSSEEvent(event: String, data: String) {
+    ///
+    /// internal：测试直接调用以验证 endpoint 同源校验逻辑（防 V4 回归），
+    /// 与 TerminalCommandTool.parseCommand 的 testability 模式一致。
+    internal func handleSSEEvent(event: String, data: String) {
         switch event {
         case "endpoint":
             // endpoint URL 可能是相对路径，基于 SSE URL 解析
