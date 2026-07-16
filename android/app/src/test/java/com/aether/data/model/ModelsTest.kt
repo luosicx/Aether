@@ -12,7 +12,7 @@ import org.junit.Test
  */
 class ModelsTest {
 
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
     @Test
     fun conversationRoundTripSerialization() {

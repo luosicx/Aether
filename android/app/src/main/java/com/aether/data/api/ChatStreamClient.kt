@@ -63,7 +63,7 @@ class ChatStreamClient(private val client: HttpClient, private val config: BffCo
                     val parsed = Json { ignoreUnknownKeys = true }
                         .parseToJsonElement(rust).jsonObject
                     val contentElem = parsed["content"]
-                    return if (contentElem != null && contentElem is kotlinx.serialization.json.JsonPrimitive) {
+                    return if (contentElem != null && contentElem is kotlinx.serialization.json.JsonPrimitive && contentElem !is kotlinx.serialization.json.JsonNull) {
                         contentElem.jsonPrimitive.content
                     } else {
                         null
@@ -89,7 +89,7 @@ class ChatStreamClient(private val client: HttpClient, private val config: BffCo
             val type = obj["type"]?.jsonPrimitive?.content
             if (type == "delta") {
                 val contentElem = obj["content"]
-                if (contentElem != null && contentElem is kotlinx.serialization.json.JsonPrimitive) {
+                if (contentElem != null && contentElem is kotlinx.serialization.json.JsonPrimitive && contentElem !is kotlinx.serialization.json.JsonNull) {
                     contentElem.jsonPrimitive.content
                 } else {
                     null
