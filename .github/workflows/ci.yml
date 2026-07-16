@@ -1146,6 +1146,7 @@ jobs:
 
   # Android 客户端构建验证
   android-build:
+    needs: rust
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -1165,6 +1166,25 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
+      - name: Download Rust .so artifacts
+        # 下载 rust job 构建的 Android .so 产物，放入 jniLibs 供 APK 打包
+        uses: actions/download-artifact@v7
+        with:
+          name: aether-core-android-so
+          path: downloaded-so
+
+      - name: Place .so into jniLibs
+        # 将两个 ABI 的 .so 分别放入对应目录：
+        # arm64-v8a/ → aarch64-linux-android 构建产物
+        # x86_64/   → x86_64-linux-android 构建产物
+        # 用 find 定位：upload-artifact 会剥离公共前缀，下载后路径不含 rust/target/
+        run: |
+          mkdir -p android/app/src/main/jniLibs/arm64-v8a
+          mkdir -p android/app/src/main/jniLibs/x86_64
+          find downloaded-so -name "libaether_core_ffi.so" -path "*aarch64*" -exec cp {} android/app/src/main/jniLibs/arm64-v8a/ \;
+          find downloaded-so -name "libaether_core_ffi.so" -path "*x86_64*" -exec cp {} android/app/src/main/jniLibs/x86_64/ \;
+          ls -R android/app/src/main/jniLibs/
+
       - name: Generate Gradle Wrapper
         working-directory: android
         run: gradle wrapper --gradle-version 8.7
@@ -1172,6 +1192,10 @@ jobs:
       - name: Build Debug APK
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Run unit tests
+        working-directory: android
+        run: ./gradlew testDebugUnitTest --no-daemon --stacktrace
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v7
@@ -1261,12 +1285,36 @@ jobs:
         run: ./scripts/build-wasm.sh
 
       - name: check android targets
-        # 用 cargo check 而非 build：仅验证平台条件代码（jni.rs 等）能编译，
-        # 不触发链接（ubuntu runner 无 Android NDK linker）。
-        # 实际 Android 产物构建由 android-build job 负责（目前未集成 Rust native lib）。
+        # 先用 cargo check 快速验证平台条件代码（jni.rs 等）能编译，
+        # 后续步骤会安装 NDK 并做完整 .so 构建。
         run: |
           cargo check -p aether-core-ffi --target aarch64-linux-android
           cargo check -p aether-core-ffi --target x86_64-linux-android
+
+      - name: Setup Android NDK
+        # 安装 NDK 供 cargo-ndk 链接 .so 产物（arm64-v8a / x86_64）
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'ndk;27.0.12077973'
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk || true
+
+      - name: Build Android .so (aarch64 + x86_64)
+        # cargo-ndk 自动配置 NDK linker，构建两个 ABI 的 cdylib 产物。
+        # 产物路径：rust/target/{aarch64,x86_64}-linux-android/release/libaether_core_ffi.so
+        run: |
+          cargo ndk -t arm64-v8a -t x86_64 build -p aether-core-ffi --release --crate-type cdylib
+
+      - name: Upload Android .so artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: aether-core-android-so
+          path: |
+            rust/target/aarch64-linux-android/release/libaether_core_ffi.so
+            rust/target/x86_64-linux-android/release/libaether_core_ffi.so
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Upload Rust coverage report
         if: always()

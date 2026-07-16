@@ -17,6 +17,8 @@ android {
         versionName = "1.0.0"
         // BFF 端点配置（可在 build.gradle 中覆盖）
         buildConfigField("String", "BFF_BASE_URL", "\"https://aether-bff.example.com\"")
+        // 启用 Rust SSE 解析路径（JNI 不可用时自动回退到 Kotlin 实现）
+        buildConfigField("boolean", "USE_RUST_SSE", "true")
     }
 
     buildFeatures {
@@ -31,6 +33,15 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
+
+    // jniLibs 目录：CI 构建的 Rust .so 产物放置于此，打包进 APK
+    sourceSets["main"].jniLibs.srcDirs("src/main/jniLibs")
+
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
 }
 
 dependencies {
@@ -62,4 +73,11 @@ dependencies {
     // Kotlinx Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+
+    // ===== 单元测试依赖 =====
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
+    testImplementation("androidx.room:room-testing:2.6.1")
+    testImplementation("org.robolectric:robolectric:4.12.2")
+    testImplementation("io.ktor:ktor-client-mock:2.3.12")
 }

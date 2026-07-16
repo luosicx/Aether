@@ -129,7 +129,17 @@ buildConfigField("String", "BFF_BASE_URL", "\"https://aether-bff.example.com\"")
 
 ---
 
-## 8. 已知限制
+## 8. 已知限制与集成状态
 
-- **未集成 Rust JNI**：Rust 侧的 `jni.rs` 已实现 FFI 桥接，但 Android 项目侧尚无对应的 Kotlin 桥接代码，因此 Android 端暂不调用 Rust core（向量 / 分块 / 限流等能力）。
-- **无测试覆盖**：Android 端目前无单元测试 / UI 测试，CI 仅做 `assembleDebug` 编译验证。
+- **Rust JNI 已集成**：Android 端已集成 Rust core 的 JNI 桥接（SSE 解析 + 向量数学）。
+  - Kotlin 桥接代码位于 `com.aether.rust` 包：`SseBridge`（SSE 解析）、`VectorMath`（余弦相似度）。
+  - `.so` 产物由 CI `rust` job 通过 `cargo-ndk` 构建（`aarch64-linux-android` + `x86_64-linux-android`），上传为 artifact `aether-core-android-so`。
+  - `android-build` CI job 下载 `.so` 并放入 `android/app/src/main/jniLibs/{arm64-v8a,x86_64}/`，通过 Gradle jniLibs 打包进 APK。
+  - `ChatStreamClient` SSE 解析优先走 Rust JNI（`BuildConfig.USE_RUST_SSE = true`），JNI 不可用时自动回退到纯 Kotlin 实现。
+- **基础单元测试已覆盖**：Android 端已新增基础单元测试，CI 执行 `testDebugUnitTest`：
+  - `ModelsTest`：Conversation / ChatMessage / Memory JSON 序列化与默认值。
+  - `BffConfigTest`：BffConfig 默认值 + BffConfigStore 读写（Robolectric + DataStore）。
+  - `ConversationRepositoryTest`：Room DAO CRUD + 排序 + 级联删除（Room in-memory database）。
+  - `SseBridgeTest`：JNI 不可用时的 Kotlin 回退路径。
+  - `VectorMathTest`：JNI 不可用时的 `cosineF64Safe` 回退（返回 0.0）。
+- **JNI 在纯 JVM 测试中不可用**：单元测试运行在 JVM（无 `.so`），`SseBridge` / `VectorMath` 的 native 方法不可调用，测试覆盖回退路径而非 native 路径。Native 路径需在真机/模拟器插桩测试中验证。
