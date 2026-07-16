@@ -68,23 +68,27 @@ struct RecentConversationsTimelineProvider: TimelineProvider {
                 configurations: config
             )
             let context = ModelContext(container)
-            // 排序：isPinned > order > createdAt（与主 App 一致）
+            // 排序：isPinned > createdAt（isPinned 为 Bool，无法用 Foundation.SortDescriptor，
+            // 改为先按 createdAt 倒序获取，再在内存中按 isPinned > createdAt 排序）
             let descriptor = FetchDescriptor<Conversation>(
-                sortBy: [
-                    SortDescriptor(\.isPinned, order: .reverse),
-                    SortDescriptor(\.createdAt, order: .reverse)
-                ]
+                sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
             )
-            descriptor.fetchLimit = 3
+            descriptor.fetchLimit = 20
             let conversations = try context.fetch(descriptor)
-            let summaries = conversations.map { conv in
+            let sorted = conversations.sorted { lhs, rhs in
+                if lhs.isPinned != rhs.isPinned {
+                    return lhs.isPinned
+                }
+                return lhs.createdAt > rhs.createdAt
+            }
+            let summaries = sorted.prefix(3).map { conv in
                 ConversationSummary(
                     id: conv.id,
                     title: conv.title,
                     lastMessage: conv.messages.last?.content
                 )
             }
-            return RecentConversationsEntry(date: Date(), conversations: summaries)
+            return RecentConversationsEntry(date: Date(), conversations: Array(summaries))
         } catch {
             return nil
         }
