@@ -70,7 +70,7 @@ struct RecentConversationsTimelineProvider: TimelineProvider {
             let context = ModelContext(container)
             // 排序：isPinned > createdAt（isPinned 为 Bool，无法用 Foundation.SortDescriptor，
             // 改为先按 createdAt 倒序获取，再在内存中按 isPinned > createdAt 排序）
-            let descriptor = FetchDescriptor<Conversation>(
+            var descriptor = FetchDescriptor<Conversation>(
                 sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
             )
             descriptor.fetchLimit = 20
