@@ -6,7 +6,9 @@
         android:label="以太"
         android:icon="@android:drawable/sym_def_app_icon"
         android:theme="@style/Theme.Aether"
-        android:allowBackup="true">
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules">
         <activity
             android:name=".MainActivity"
             android:exported="true"

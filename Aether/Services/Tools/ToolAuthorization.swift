@@ -24,10 +24,11 @@ final class ToolAuthorization: @unchecked Sendable {
     private(set) var alwaysAuthorized: Set<String> = []
 
     /// 禁止「始终允许」的工具集合：这些工具风险过高，每次调用都必须用户确认。
-    /// 包括任意 AppleScript 执行和终端命令执行。
+    /// 包括任意 AppleScript 执行、终端命令执行和快捷指令执行。
     private let neverAlwaysAllow: Set<String> = [
         "run_applescript",
-        "run_terminal_command"
+        "run_terminal_command",
+        "run_shortcut"
     ]
 
     private let alwaysAuthorizedKeyPrefix = "aether.tool.auth.always."
