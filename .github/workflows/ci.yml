@@ -8,7 +8,7 @@ on:
 
 jobs:
   unit-tests:
-    needs: [rust-apple, rust]
+    needs: [rust-apple, rust, watch-widget-build]
     runs-on: macos-15
     timeout-minutes: 45
     outputs:
@@ -706,33 +706,52 @@ jobs:
   # Note: xcrun xccov view --report 在 Xcode 26.3 上不可用（返回空），
   # coverage_pass 可能为空。仅在显式 coverage_pass=false 时阻塞。
   coverage-summary:
-    needs: [unit-tests, unit-tests-macos, ui-tests, rust]
+    # 统合所有平台测试 job 的结果（iOS / macOS / Android / Windows / Rust / Security）
+    # 任一上游测试失败均会反映到此处，作为 PR 合并的总质量门
+    needs: [unit-tests, unit-tests-macos, ui-tests, android-build, windows-build, rust, security-tests, security-tests-macos]
     runs-on: ubuntu-latest
     if: always()
     steps:
-      - name: Check coverage from unit-tests output
+      - name: Aggregate platform test results
         run: |
+          echo "=== Platform Test Results ==="
+          echo "unit-tests (iOS):        ${{ needs.unit-tests.result }}"
+          echo "unit-tests-macos:        ${{ needs.unit-tests-macos.result }}"
+          echo "ui-tests:                ${{ needs.ui-tests.result }}"
+          echo "android-build (test):    ${{ needs.android-build.result }}"
+          echo "windows-build (test):    ${{ needs.windows-build.result }}"
+          echo "rust (core test):         ${{ needs.rust.result }}"
+          echo "security-tests:          ${{ needs.security-tests.result }}"
+          echo "security-tests-macos:    ${{ needs.security-tests-macos.result }}"
+          echo ""
+          echo "=== Coverage Gate ==="
           echo "Coverage pass: '${{ needs.unit-tests.outputs.coverage_pass }}'"
           echo "Coverage pct: '${{ needs.unit-tests.outputs.coverage_pct }}'"
-          # unit-tests 失败时，覆盖率检查已无效，但不阻塞 coverage-summary
-          # （实际测试失败由 unit-tests job 本身报告）
-          if [ "${{ needs.unit-tests.result }}" != "success" ]; then
-            echo "WARNING: unit-tests job did not succeed (result=${{ needs.unit-tests.result }}), skipping coverage gate"
-            echo "Coverage gate skipped due to upstream test job failure."
-            exit 0
+          # 任一上游测试 job 失败（非 success/skipped）均阻塞合并
+          FAILED_JOBS=""
+          for job in unit-tests unit-tests-macos ui-tests android-build windows-build rust security-tests security-tests-macos; do
+            RESULT="${{ needs[format('{0}', job)].result }}"
+            echo "Checking $job: $RESULT"
+            if [ "$RESULT" != "success" ] && [ "$RESULT" != "skipped" ]; then
+              FAILED_JOBS="$FAILED_JOBS $job"
+            fi
+          done
+          if [ -n "$FAILED_JOBS" ]; then
+            echo "FAIL: Upstream test jobs did not succeed:$FAILED_JOBS"
+            exit 1
           fi
-          # 仅在显式 coverage_pass=false 时阻塞（覆盖率确实低于阈值）
+          # 所有测试 job 成功后，检查覆盖率门槛
           if [ "${{ needs.unit-tests.outputs.coverage_pass }}" = "false" ]; then
             echo "FAIL: Coverage ${{ needs.unit-tests.outputs.coverage_pct }}% < 80% threshold (iOS + Rust)"
             echo "Please add tests to improve coverage."
             exit 1
           fi
-          # coverage_pass 为 true 或为空（xccov 不可用）时均通过
-          echo "PASS: Coverage ${{ needs.unit-tests.outputs.coverage_pct }}% ≥ 80% (iOS + Rust, or coverage tool unavailable)"
+          echo "PASS: All platform tests succeeded and coverage ${{ needs.unit-tests.outputs.coverage_pct }}% ≥ 80%"
 
   # Code quality status check: SonarQube static analysis
   code-quality:
-    needs: [coverage-summary, unit-tests-macos, rust]
+    # 依赖 coverage-summary（即所有测试 job 完成）后再运行 SonarQube 分析
+    needs: [coverage-summary]
     runs-on: macos-15
     if: always()
     permissions:
@@ -1207,6 +1226,7 @@ jobs:
 
   # Windows 客户端构建验证
   windows-build:
+    needs: rust
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
