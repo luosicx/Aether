@@ -1959,9 +1959,6 @@
 				8CF13E717D61D1637FF87029 /* HealthInsight.swift in Sources */,
 				D195DF25F099CBCAE6A7D571 /* DocumentChunk.swift in Sources */,
 				0F77C6F31E5AD98E37B4FFE2 /* MessageFeedback.swift in Sources */,
-				52830AC65B873752473D1AAB /* ChatChunk.swift in Sources */,
-				D9D9FFDA235F8B780E21097B /* LLMProvider.swift in Sources */,
-				88199CE49623E7EFD2E03C72 /* APIConfig.swift in Sources */,
 				CC74E9DCE8360907A2F360C3 /* AppGroupContainer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -2237,9 +2234,6 @@
 				D7CC48932318EB13EABAB59A /* HealthInsight.swift in Sources */,
 				B1FD28B97E1DFC80DF6D04DA /* DocumentChunk.swift in Sources */,
 				3C9E92BE0322159A79BF0AB2 /* MessageFeedback.swift in Sources */,
-				45E5F10C712E4EF727390CB5 /* ChatChunk.swift in Sources */,
-				599D3D46B298671B77BB2F71 /* LLMProvider.swift in Sources */,
-				42627293504388411664256B /* APIConfig.swift in Sources */,
 				3FB5DC6E3F012B35C7B139CA /* AppGroupContainer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

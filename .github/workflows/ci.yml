@@ -1446,7 +1446,11 @@ jobs:
           xcode-version: 'latest'
 
       - name: Build Watch App
+        env:
+          DESTINATION: 'generic/platform=watchOS Simulator'
         run: make build-watch
 
       - name: Build Widget Extension
+        env:
+          DESTINATION: 'generic/platform=iOS Simulator'
         run: make build-widget
