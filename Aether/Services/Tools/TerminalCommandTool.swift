@@ -137,10 +137,12 @@ final class TerminalCommandTool: ToolProtocol, @unchecked Sendable {
         let arguments = Array(tokens.dropFirst())
         for argument in arguments {
             if argument.contains("..") { throw ValidationError.pathTraversal }
-            // 检查参数是否指向敏感路径
+            // 检查参数是否指向敏感路径（大小写不敏感比较，防止 APFS 大小写绕过）
             let standardized = (argument as NSString).standardizingPath
+            let lowercased = standardized.lowercased()
             for prefix in sensitivePathPrefixes {
-                if standardized == prefix || standardized.hasPrefix(prefix + "/") {
+                let prefixLower = prefix.lowercased()
+                if lowercased == prefixLower || lowercased.hasPrefix(prefixLower + "/") {
                     throw ValidationError.pathTraversal
                 }
             }

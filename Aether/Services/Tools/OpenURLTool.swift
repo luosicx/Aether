@@ -13,6 +13,11 @@ import AppKit
 
 /// 打开 URL 工具：用系统默认方式打开 URL（浏览器、深链接、系统设置）
 final class OpenURLTool: ToolProtocol, @unchecked Sendable {
+    /// 允许的 URL scheme 白名单。
+    /// 防止 file://（打开本地文件可能触发代码执行）、javascript:（执行 JS）、
+    /// shortcuts://（绕过 run_shortcut 工具层授权）、prefs:（系统设置深层面板）等危险 scheme。
+    private static let allowedSchemes: Set<String> = ["http", "https", "mailto", "tel", "sms"]
+
     /// 工具定义
     /// - name: `open_url`
     /// - parameters: `url`（必填，String）— 要打开的 URL，需包含 scheme
@@ -40,9 +45,11 @@ final class OpenURLTool: ToolProtocol, @unchecked Sendable {
         guard let urlString = arguments["url"] as? String, !urlString.isEmpty else {
             return "错误：请提供 URL"
         }
-        // 校验 URL 合法性，必须包含 scheme（http/https/mailto/app prefs 等）
-        guard let url = URL(string: urlString), url.scheme != nil else {
-            return "错误：URL 无效"
+        // 校验 URL 合法性，scheme 必须在白名单内
+        guard let url = URL(string: urlString),
+              let scheme = url.scheme?.lowercased(),
+              Self.allowedSchemes.contains(scheme) else {
+            return "错误：URL 无效或 scheme 不被允许，仅支持 http/https/mailto/tel/sms"
         }
         #if os(iOS)
         await UIApplication.shared.open(url)

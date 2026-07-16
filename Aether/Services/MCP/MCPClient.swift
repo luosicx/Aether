@@ -294,17 +294,28 @@ final class SSETransport: @unchecked Sendable, MCPTransport {
     // MARK: - 私有方法
 
     /// 处理 SSE 事件
-    /// - endpoint 事件：设置 POST 端点 URL
+    /// - endpoint 事件：设置 POST 端点 URL（校验与 SSE 连接同源，防劫持）
     /// - message 事件：yield JSON-RPC 响应到消息流
     private func handleSSEEvent(event: String, data: String) {
         switch event {
         case "endpoint":
             // endpoint URL 可能是相对路径，基于 SSE URL 解析
-            if let url = URL(string: data, relativeTo: self.url) {
-                lock.lock()
-                postEndpoint = url
-                lock.unlock()
+            guard let url = URL(string: data, relativeTo: self.url) else { return }
+            // 安全校验：endpoint 必须与 SSE 连接同源（scheme + host + port），
+            // 防止恶意 MCP Server 将后续请求（含 Authorization 头）劫持到攻击者服务器
+            guard let sseScheme = self.url.scheme,
+                  let sseHost = self.url.host,
+                  let endpointScheme = url.scheme,
+                  let endpointHost = url.host,
+                  endpointScheme.lowercased() == sseScheme.lowercased(),
+                  endpointHost.lowercased() == sseHost.lowercased(),
+                  (url.port ?? self.url.port) == (self.url.port ?? url.port) else {
+                // 拒绝跨域 endpoint
+                return
             }
+            lock.lock()
+            postEndpoint = url
+            lock.unlock()
         case "message":
             // JSON-RPC 响应
             if let data = data.data(using: .utf8) {

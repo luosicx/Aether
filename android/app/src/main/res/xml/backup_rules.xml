@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 全量备份规则：排除 DataStore 目录，防止 BFF Token 经备份泄露。
+     注：allowBackup 已设为 false，此文件作为双重防护。 -->
+<full-backup-content>
+    <exclude domain="file" path="datastore/" />
+</full-backup-content>

@@ -14,7 +14,8 @@ final class ToolRegistryTests: XCTestCase {
         "run_applescript",
         "control_safari",
         "create_shortcut",
-        "simulate_input"
+        "simulate_input",
+        "run_shortcut"
     ]
     private var originalEnabledStates: [String: Bool] = [:]
 
@@ -89,6 +90,16 @@ final class ToolRegistryTests: XCTestCase {
     /// simulate_input 应在默认禁用列表中
     func testSimulateInputDefaultDisabled() {
         XCTAssertFalse(registry.isEnabled(name: "simulate_input"), "simulate_input 默认应被禁用")
+    }
+
+    /// run_shortcut 应在默认禁用列表中（防止无需授权执行任意快捷指令）
+    func testRunShortcutDefaultDisabled() {
+        XCTAssertFalse(registry.isEnabled(name: "run_shortcut"), "run_shortcut 默认应被禁用")
+    }
+
+    /// run_shortcut 应需要授权
+    func testRunShortcutRequiresAuthorization() {
+        XCTAssertTrue(registry.requiresAuthorization(name: "run_shortcut"), "run_shortcut 应需授权")
     }
 
     /// `execute(name:arguments:)` 对未启用工具抛出错误（domain = ToolRegistry，code = 3）

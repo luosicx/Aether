@@ -52,14 +52,17 @@ final class FileOperationTool: ToolProtocol, @unchecked Sendable {
 
     /// 校验路径是否安全：不在敏感目录黑名单内。
     /// 对路径做标准化（解析 `..`、符号链接、冗余分隔符）后检查前缀。
+    /// 大小写不敏感比较，防止在大小写不敏感文件系统（APFS 默认）上绕过。
     /// - Parameter path: 用户提供的原始路径
     /// - Returns: 通过校验的标准化路径，或 nil 表示路径被拒绝
     private func validatePath(_ path: String) -> String? {
         // 标准化路径：解析 .. 和 . 等
         let standardized = (path as NSString).standardizingPath
-        // 检查是否命中敏感目录黑名单
+        // 大小写不敏感比较，防止 /Users/Alice/.ssh 绕过 /Users/alice/.ssh
+        let lowercased = standardized.lowercased()
         for prefix in sensitivePathPrefixes {
-            if standardized == prefix || standardized.hasPrefix(prefix + "/") {
+            let prefixLower = prefix.lowercased()
+            if lowercased == prefixLower || lowercased.hasPrefix(prefixLower + "/") {
                 return nil
             }
         }

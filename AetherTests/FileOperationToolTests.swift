@@ -313,5 +313,33 @@ final class FileOperationToolTests: XCTestCase {
         ])
         XCTAssertEqual(result, "错误：拒绝访问敏感路径")
     }
+
+    // MARK: - 大小写绕过防护测试
+
+    /// 敏感路径大小写变体应被拒绝（APFS 大小写不敏感）
+    func testSensitivePathCaseInsensitiveBypassRejected() async throws {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        // 将 home 路径中某段改为大写，模拟大小写绕过
+        // 例如 /Users/alice/.ssh → /Users/Alice/.ssh
+        let capitalizedHome = home.replacingOccurrences(
+            of: FileManager.default.homeDirectoryForCurrentUser.lastPathComponent,
+            with: FileManager.default.homeDirectoryForCurrentUser.lastPathComponent.uppercased()
+        )
+        let result = try await tool.execute(arguments: [
+            "action": "list",
+            "path": "\(capitalizedHome)/.ssh"
+        ])
+        XCTAssertEqual(result, "错误：拒绝访问敏感路径", "大小写变体应被拒绝")
+    }
+
+    /// 敏感路径大小写变体（.SSH 大写）应被拒绝
+    func testSensitivePathCaseInsensitiveDotSSHRejected() async throws {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let result = try await tool.execute(arguments: [
+            "action": "info",
+            "path": "\(home)/.SSH/id_rsa"
+        ])
+        XCTAssertEqual(result, "错误：拒绝访问敏感路径", ".SSH 大写应被拒绝")
+    }
 }
 #endif
