@@ -1233,7 +1233,7 @@ jobs:
         # 构建 Windows x64 cdylib 产物，供 WPF 项目 P/Invoke 调用
         # 产物路径：rust/target/x86_64-pc-windows-msvc/release/aether_core_ffi.dll
         working-directory: rust
-        run: cargo build -p aether-core-ffi --target x86_64-pc-windows-msvc --release --crate-type cdylib
+        run: cargo build -p aether-core-ffi --target x86_64-pc-windows-msvc --release
 
       - name: Upload Rust DLL artifact
         uses: actions/upload-artifact@v4
@@ -1339,9 +1339,10 @@ jobs:
 
       - name: Build Android .so (aarch64 + x86_64)
         # cargo-ndk 自动配置 NDK linker，构建两个 ABI 的 cdylib 产物。
+        # Cargo.toml 已声明 crate-type = ["staticlib", "cdylib", "rlib"]，无需 --crate-type 标志。
         # 产物路径：rust/target/{aarch64,x86_64}-linux-android/release/libaether_core_ffi.so
         run: |
-          cargo ndk -t arm64-v8a -t x86_64 build -p aether-core-ffi --release --crate-type cdylib
+          cargo ndk -t arm64-v8a -t x86_64 build -p aether-core-ffi --release
 
       - name: Upload Android .so artifact
         uses: actions/upload-artifact@v7
