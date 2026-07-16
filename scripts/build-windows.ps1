@@ -12,7 +12,7 @@
 .PARAMETER Command
     build     执行 dotnet restore + dotnet build --configuration Debug (默认)
     publish   执行 dotnet publish -c Release -r win-x64 --self-contained
-    test      执行 dotnet test (当前无测试项目，预留命令)
+    test      执行 dotnet test windows/Aether.Windows.Tests/ (xUnit)
     clean     执行 dotnet clean
 
 .PARAMETER Configuration
@@ -131,16 +131,24 @@ function Invoke-Test {
     Write-Info "开始运行 Windows 测试"
     Write-Info "工作目录: $projectDir"
 
-    # 当前无测试项目，预留命令
-    $testProjects = Get-ChildItem -Path $projectDir -Filter "*Test*.csproj" -Recurse -ErrorAction SilentlyContinue
-    if (-not $testProjects) {
-        Write-Warn "当前 Windows 项目下未找到测试项目 (*Test*.csproj)"
+    # 测试项目位于 windows/Aether.Windows.Tests/（与 Aether.Windows 平级）
+    $testProjectDir = Join-Path $scriptRoot ".." "windows" "Aether.Windows.Tests"
+    $testProjectDir = (Resolve-Path -LiteralPath $testProjectDir -ErrorAction SilentlyContinue).Path
+
+    if ([string]::IsNullOrEmpty($testProjectDir) -or -not (Test-Path -LiteralPath $testProjectDir)) {
+        Write-Warn "未找到测试项目目录 windows/Aether.Windows.Tests/"
         Write-Warn "test 命令已预留，待添加测试项目后即可使用"
         return
     }
 
-    Write-Info "执行 dotnet test"
-    dotnet test
+    $testCsproj = Get-ChildItem -Path $testProjectDir -Filter "*.csproj" -ErrorAction SilentlyContinue | Select-Object -First 1
+    if (-not $testCsproj) {
+        Write-Warn "windows/Aether.Windows.Tests/ 下未找到 .csproj 文件"
+        return
+    }
+
+    Write-Info "执行 dotnet test $($testCsproj.FullName) --configuration $Configuration"
+    dotnet test $testCsproj.FullName --configuration $Configuration --logger trx
     if ($LASTEXITCODE -ne 0) {
         Write-Err "dotnet test 失败 (exit=$LASTEXITCODE)"
         exit $LASTEXITCODE
