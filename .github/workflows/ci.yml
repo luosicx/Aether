@@ -1338,3 +1338,29 @@ jobs:
           path: Packages/AetherCore
           if-no-files-found: error
           retention-days: 7
+
+  # Watch/Widget 构建验证：依赖 rust-apple xcframework 产物，
+  # 验证 watchOS App 与 Widget Extension 能正常构建，构建失败阻塞 PR。
+  watch-widget-build:
+    needs: rust-apple
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Download xcframework
+        uses: actions/download-artifact@v7
+        with:
+          name: aether-core-xcframework
+          path: Packages/AetherCore
+
+      - name: Select Xcode (latest)
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: 'latest'
+
+      - name: Build Watch App
+        run: make build-watch
+
+      - name: Build Widget Extension
+        run: make build-widget

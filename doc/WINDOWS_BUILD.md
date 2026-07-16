@@ -115,4 +115,4 @@ pwsh scripts/build-windows.ps1 -Command publish -Configuration Release -Runtime 
 - **未集成 Rust DLL**：Rust 侧 `cdylib` crate 可产出 Windows DLL，但当前未实际构建并接入 WPF 项目，Windows 端暂不调用 Rust core。
 - **无测试覆盖**：Windows 项目当前无测试项目（`scripts/build-windows.ps1 -Command test` 已预留，但找不到 `*Test*.csproj` 会跳过）。
 - **无 MSIX 打包**：当前仅以 zip 方式发布，未提供 MSIX 应用包安装方案。
-- **仅支持 win-x64**：发布默认且仅验证 win-x64，未覆盖 win-arm64 架构。
+- **支持 win-x64 与 win-arm64**：通过 `RuntimeIdentifiers` 配置两种架构，使用 `build-windows.ps1 -Runtime win-arm64` 指定目标架构（默认 win-x64）。

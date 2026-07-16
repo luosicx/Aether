@@ -87,17 +87,18 @@ Watch App、Widget Extension 与主 App 通过 App Group 共享 SwiftData 存储
 - 或先构建主 App（`make build-ios`），再构建 Watch/Widget
 - 或在 Xcode 中以主 App scheme 运行（Watch/Widget 作为依赖被一起编译）
 
-### 4.2 独立 target，不嵌入主 App
+### 4.2 Watch App 独立 target
 
-Watch App 与 Widget Extension 作为**独立 target** 存在于工程中，**未嵌入主 App** 的 Embed 阶段。这意味着：
+Watch App 作为**独立 target** 存在于工程中，watchOS App 不嵌入 iOS App（符合 Apple 规范，watchOS App 通过配对的 iPhone 自动安装）。这意味着：
 
-- 构建产物独立输出，不会自动打包进 `Aether.app`
-- 调试时需单独选择对应 scheme 运行
-- 发布前若需将 Widget 打入主 App，需在主 App target 的 Build Phases → Embed App Extensions 中补充配置
+- Watch App 构建产物独立输出，不会打包进 `Aether.app`
+- 调试时需单独选择 `AetherWatch` scheme 运行
 
-### 4.3 未在 CI 中构建
+> Widget Extension 已嵌入 iOS App（通过 `Aether-iOS` target 的 **Embed App Extensions** Build Phase），构建时会自动拷贝 `AetherWidgets.appex` 到 `Aether.app` 内，无需手动配置。
 
-当前 CI（`.github/workflows/ci.yml`）仅构建并测试主 App（`Aether-iOS` scheme），**Watch 与 Widget 不在 CI 构建矩阵中**。因此：
+### 4.3 CI 自动验证
 
-- Watch/Widget 的构建回归需在本地手动验证
-- 提交涉及 `AetherWatch/` 或 `AetherWidgets/` 的改动时，请本地执行 `make build-watch` / `make build-widget` 确认通过
+CI（`.github/workflows/ci.yml`）中的 `watch-widget-build` job 会自动验证 Watch 与 Widget 的构建（依赖 `rust-apple` job 的 xcframework 产物）。因此：
+
+- 涉及 `AetherWatch/` 或 `AetherWidgets/` 的改动会在 CI 中自动构建验证，构建失败将阻塞 PR 合并
+- 本地开发时仍可使用 `make build-watch` / `make build-widget` 提前验证

@@ -397,6 +397,7 @@
 		A96C6919872E43629B76934E /* RedactorRustTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78DE8551234B487B959A11FD /* RedactorRustTests.swift */; };
 		D63422AAA6284BC68E296D81 /* ChunkerRustTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF31C32D67E245369A38B5F8 /* ChunkerRustTests.swift */; };
 		7AF7F1A93B964C469AFBE281 /* RateLimiterRustTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7DE67C0A3A1463B8F4CFF01 /* RateLimiterRustTests.swift */; };
+		F1A2B3C4D5E6A000000A0001 /* AetherWidgets.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = E23D426313B3F4302BFC7094 /* AetherWidgets.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -408,6 +409,20 @@
 			remoteInfo = "Aether-macOS";
 		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		F1A2B3C4D5E6A000000A0002 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				F1A2B3C4D5E6A000000A0001 /* AetherWidgets.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		026C84A7B07AFEEBDBF03513 /* HealthInsightWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HealthInsightWidget.swift; sourceTree = "<group>"; };
@@ -1821,6 +1836,7 @@
 				F5BBBFFB31EA2269F8DF6FD7 /* Sources */,
 				42466753CF0C4414DE48240D /* Frameworks */,
 				A14B17BC4206CF9CFA748603 /* Resources */,
+				F1A2B3C4D5E6A000000A0002 /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
@@ -2449,6 +2465,7 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALIDATE_PRODUCT = YES;
+				SKIP_INSTALL = YES;
 			};
 			name = Release;
 		};
@@ -2516,6 +2533,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
+				SKIP_INSTALL = YES;
 			};
 			name = Debug;
 		};
