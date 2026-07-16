@@ -811,6 +811,10 @@ jobs:
                   fpath = cls.get("filename")
                   if not fpath:
                       continue
+                  # cargo-llvm-cov 工作目录为 rust/，生成的路径如 aether-core/src/chunk.rs
+                  # 需添加 rust/ 前缀以匹配 SonarCloud 的 sonar.sources（项目根目录为基准）
+                  if not fpath.startswith("rust/"):
+                      fpath = "rust/" + fpath
                   lines = {}
                   lines_el = cls.find("lines")
                   if lines_el is None:
