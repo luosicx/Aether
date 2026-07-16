@@ -116,8 +116,17 @@ pub fn parse_with_tool_accumulation(
                     }
                 }
                 None => {
-                    let id = td.id?;
-                    let name = td.function.as_ref().and_then(|f| f.name.clone())?;
+                    // 与 Swift `guard let id = td.id, let name = ... else { continue }` 对齐：
+                    // 缺少 id 或 name 时跳过该 delta（continue），而非用 `?` 中断整行解析，
+                    // 否则会丢弃同一行已提取的 content（数据丢失回归）。
+                    let id = match td.id {
+                        Some(id) => id,
+                        None => continue,
+                    };
+                    let name = match td.function.as_ref().and_then(|f| f.name.clone()) {
+                        Some(name) => name,
+                        None => continue,
+                    };
                     let kind = td.kind.unwrap_or_else(|| "function".to_string());
                     let arguments = td
                         .function
@@ -231,5 +240,31 @@ mod tests {
             .unwrap();
         assert_eq!(tc[0].id, "a");
         assert_eq!(tc[1].id, "b");
+    }
+
+    /// 回归测试：新 tool_call delta 缺少 id 时不应丢弃同一行的 content。
+    /// 修复前：`td.id?` 中断整行 → 返回 None → content 丢失。
+    /// 修复后：跳过该 delta（continue），content 正常返回。
+    #[test]
+    fn new_tool_call_without_id_preserves_content() {
+        let mut acc: BTreeMap<i64, AccumulatedToolCall> = BTreeMap::new();
+        // content + 新 tool_call（index=0 未见过）但无 id
+        let line = r#"data: {"choices":[{"delta":{"content":"important text","tool_calls":[{"index":0,"type":"function","function":{"name":"fn","arguments":""}}]}}]}"#;
+        let result = parse_with_tool_accumulation(line, &mut acc).unwrap();
+        // content 不应丢失
+        assert_eq!(result.content.as_deref(), Some("important text"));
+        // 缺少 id 的 tool_call 被跳过，accumulated 仍为空
+        assert!(acc.is_empty());
+        assert!(result.tool_calls.is_none());
+    }
+
+    /// 回归测试：新 tool_call delta 缺少 function.name 时不应丢弃同一行的 content。
+    #[test]
+    fn new_tool_call_without_name_preserves_content() {
+        let mut acc: BTreeMap<i64, AccumulatedToolCall> = BTreeMap::new();
+        let line = r#"data: {"choices":[{"delta":{"content":"keep me","tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"arguments":""}}]}}]}"#;
+        let result = parse_with_tool_accumulation(line, &mut acc).unwrap();
+        assert_eq!(result.content.as_deref(), Some("keep me"));
+        assert!(acc.is_empty());
     }
 }
