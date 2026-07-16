@@ -13,4 +13,12 @@
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
     <FileVersion>1.0.0.0</FileVersion>
   </PropertyGroup>
+
+  <!-- Rust core DLL：由 CI 构建并下载到 Native/，构建时复制到输出目录供 P/Invoke 调用。
+       Condition 确保本地无 DLL 时不破坏构建（P/Invoke 侧已做 DllNotFoundException 降级）。 -->
+  <ItemGroup>
+    <None Include="Native\aether_core_ffi.dll" Condition="Exists('Native\aether_core_ffi.dll')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
 </Project>

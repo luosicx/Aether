@@ -112,7 +112,7 @@ pwsh scripts/build-windows.ps1 -Command publish -Configuration Release -Runtime 
 
 ## 6. 已知限制
 
-- **未集成 Rust DLL**：Rust 侧 `cdylib` crate 可产出 Windows DLL，但当前未实际构建并接入 WPF 项目，Windows 端暂不调用 Rust core。
-- **无测试覆盖**：Windows 项目当前无测试项目（`scripts/build-windows.ps1 -Command test` 已预留，但找不到 `*Test*.csproj` 会跳过）。
+- **已集成 Rust DLL（SSE 解析 + 向量数学 + 脱敏）**：通过 `windows/Aether.Windows/Native/` 目录引用 `aether_core_ffi.dll`，CI 在 `windows-build` job 中自动构建并下载到该目录；`AetherNativeBridge` 提供 P/Invoke 桥接（DLL 不存在时安全降级），`AetherApiClient.UseRustSse` 可切换 SSE 解析路径。
+- **已新增 Aether.Windows.Tests xUnit 项目**：`windows/Aether.Windows.Tests/` 提供模型与 API 客户端测试，CI 在 `windows-build` job 中执行 `dotnet test`，`scripts/build-windows.ps1 -Command test` 同样会扫描并运行测试项目。
 - **无 MSIX 打包**：当前仅以 zip 方式发布，未提供 MSIX 应用包安装方案。
 - **支持 win-x64 与 win-arm64**：通过 `RuntimeIdentifiers` 配置两种架构，使用 `build-windows.ps1 -Runtime win-arm64` 指定目标架构（默认 win-x64）。

@@ -1217,6 +1217,39 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      - name: Setup Rust toolchain
+        # 安装 Rust 并添加 x86_64-pc-windows-msvc target，用于构建 aether-core-ffi DLL
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+          key: windows-x86_64-msvc
+
+      - name: Build Rust DLL (aether-core-ffi)
+        # 构建 Windows x64 cdylib 产物，供 WPF 项目 P/Invoke 调用
+        # 产物路径：rust/target/x86_64-pc-windows-msvc/release/aether_core_ffi.dll
+        working-directory: rust
+        run: cargo build -p aether-core-ffi --target x86_64-pc-windows-msvc --release --crate-type cdylib
+
+      - name: Upload Rust DLL artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aether-core-windows-dll
+          path: rust/target/x86_64-pc-windows-msvc/release/aether_core_ffi.dll
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Download Rust DLL into Native/
+        # 下载刚上传的 DLL 到 windows/Aether.Windows/Native/，供 csproj 引用并复制到输出目录
+        uses: actions/download-artifact@v4
+        with:
+          name: aether-core-windows-dll
+          path: windows/Aether.Windows/Native
+
       - name: Restore dependencies
         working-directory: windows/Aether.Windows
         run: dotnet restore
@@ -1224,6 +1257,10 @@ jobs:
       - name: Build (Debug)
         working-directory: windows/Aether.Windows
         run: dotnet build --configuration Debug --no-restore
+
+      - name: Test
+        # 运行 Aether.Windows.Tests xUnit 项目（DLL 已在 Native/ 中可用）
+        run: dotnet test windows/Aether.Windows.Tests/Aether.Windows.Tests.csproj --configuration Debug --logger trx
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v7
