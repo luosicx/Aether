@@ -80,4 +80,5 @@ dependencies {
     testImplementation("androidx.room:room-testing:2.6.1")
     testImplementation("org.robolectric:robolectric:4.12.2")
     testImplementation("io.ktor:ktor-client-mock:2.3.12")
+    testImplementation("androidx.test:core:1.5.0")
 }
