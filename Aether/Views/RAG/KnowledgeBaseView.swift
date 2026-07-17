@@ -141,7 +141,7 @@ struct KnowledgeBaseView: View {
             title: "知识库为空",
             message: "导入 PDF 或文本文件来扩充知识库",
             primaryButtonTitle: "导入文档",
-            primaryAction: { showFileImporter = true }
+            primaryAction: { showPicker = true }
         )
     }
 
