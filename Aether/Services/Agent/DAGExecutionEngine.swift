@@ -126,7 +126,7 @@ final class DAGExecutionEngine {
         }
 
         // 2. 循环调度
-        while !await stateMachine.isAllTerminal() {
+        while !(await stateMachine.isAllTerminal()) {
             // 检测死锁：是否有 pending 节点但都无法执行
             let pendingIDs = await stateMachine.nodeIDs(in: .pending)
             if pendingIDs.isEmpty {
