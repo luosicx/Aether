@@ -41,7 +41,7 @@ final class MCPConfigFileLoader {
 
         guard let project = projectConfig, let user = userConfig else {
             // 优先返回用户级，其次项目级，都为空则返回空配置
-            return user ?? project ?? MCPConfigFile(servers: [], discovery: nil, policy: nil)
+            return userConfig ?? projectConfig ?? MCPConfigFile(servers: [], discovery: nil, policy: nil)
         }
 
         // 合并 servers：用户级覆盖项目级同 ID

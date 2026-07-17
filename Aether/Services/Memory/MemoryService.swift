@@ -127,7 +127,7 @@ final class MemoryService {
             return results
         }
         // 回退到 SwiftData 暴力扫描
-        return recallViaSwiftData(queryEmbedding: queryEmbedding, limit: limit)
+        return try recallViaSwiftData(queryEmbedding: queryEmbedding, limit: limit)
     }
 
     /// Task 19 阶段 1: 通过 VectorStore 做 ANN 查询，再从 SwiftData 加载完整 Memory 实例。
