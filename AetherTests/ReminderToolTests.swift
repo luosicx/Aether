@@ -155,9 +155,9 @@ final class ReminderToolTests: XCTestCase {
     /// （实现用 as? String 向下转型，Int 不匹配则 parsedDate 保持 nil，不设置 dueDate）
     func testExecuteDateNotStringIsIgnored() async throws {
         // date 为 Int 类型，as? String 返回 nil，不触发日期解析错误
-        // 将进入权限请求阶段，模拟器可能挂起或返回权限错误
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil,
-                      "跳过：模拟器环境下 EventKit 权限请求挂起")
+        // 将进入权限请求阶段，模拟器/CI 可能挂起或返回权限错误
+        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
+                      "跳过：模拟器/CI 环境下 EventKit 权限请求挂起")
         var result = ""
         do {
             result = try await tool.execute(arguments: ["title": "测试", "date": 20260115])

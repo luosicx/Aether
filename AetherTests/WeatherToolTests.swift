@@ -410,6 +410,10 @@ final class WeatherToolTests: XCTestCase {
 
     /// execute 空字符串城市名应走定位流程或返回定位相关提示（不查 geocoding）
     func testExecuteEmptyStringCityDoesNotGeocode() async throws {
+        // 空字符串 city 会走 LocationTool → CLLocationManager.requestWhenInUseAuthorization()
+        // CI 环境下系统权限对话框无人交互会挂起
+        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
+                      "跳过：模拟器/CI 环境下定位权限请求对话框无人交互会挂起")
         URLProtocol.registerClass(MockURLProtocol.self)
         defer { URLProtocol.unregisterClass(MockURLProtocol.self) }
 
@@ -454,6 +458,10 @@ final class WeatherToolTests: XCTestCase {
 
     /// execute city 参数非 String 类型应走定位流程
     func testExecuteNonStringCityFallsBackToLocation() async throws {
+        // 非 String city 会走 LocationTool → CLLocationManager.requestWhenInUseAuthorization()
+        // CI 环境下系统权限对话框无人交互会挂起
+        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
+                      "跳过：模拟器/CI 环境下定位权限请求对话框无人交互会挂起")
         URLProtocol.registerClass(MockURLProtocol.self)
         defer { URLProtocol.unregisterClass(MockURLProtocol.self) }
 
