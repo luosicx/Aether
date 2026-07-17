@@ -24,6 +24,10 @@ final class AgentTask {
     var updatedAt: Date
     /// 关联的会话 ID（可选）
     var conversationID: UUID?
+    /// Task 20: 最近一次检查点时间戳（CheckpointManager 写入）
+    var checkpointAt: Date?
+    /// Task 20: 检查点中已完成的子任务 ID 集合（JSON 编码存储，幂等恢复用）
+    var completedNodeIDs: [UUID]
 
     /// 创建 AgentTask 实例
     /// - Parameters:
@@ -37,6 +41,8 @@ final class AgentTask {
         self.createdAt = Date()
         self.updatedAt = Date()
         self.conversationID = conversationID
+        self.checkpointAt = nil
+        self.completedNodeIDs = []
     }
 
     // MARK: - 状态变更辅助方法
@@ -105,9 +111,49 @@ final class AgentTask {
             .first
     }
 
+    /// Task 20: 返回所有当前可执行的子任务（pending 且依赖全部为 completed/skipped）。
+    ///
+    /// 用于 DAGExecutionEngine 并行调度：一次返回所有依赖已就绪的 pending 节点，
+    /// 上层可并行提交执行。`skipped` 节点视作"已完成"以放行后续依赖。
+    /// - Returns: 可执行子任务数组（按 order 升序），可能为空
+    func nextExecutableSubTasks() -> [SubTask] {
+        let unblockedStatuses: Set<SubTaskStatus> = [.completed, .skipped]
+        let unblockedIDs = Set(subTasks.filter { unblockedStatuses.contains($0.status) }.map(\.id))
+        return subTasks
+            .filter { $0.status == .pending }
+            .filter { subTask in
+                Set(subTask.dependencies).isSubset(of: unblockedIDs)
+            }
+            .sorted { $0.order < $1.order }
+    }
+
+    /// Task 20: 记录检查点：更新 checkpointAt 与已完成节点 ID 集合。
+    /// - Parameter completedIDs: 截至当前已完成的子任务 ID 集合
+    func recordCheckpoint(completedIDs: [UUID]) {
+        self.checkpointAt = Date()
+        self.completedNodeIDs = completedIDs
+        self.updatedAt = Date()
+    }
+
+    /// Task 20: 是否存在 failed 节点
+    var hasFailedSubTask: Bool {
+        subTasks.contains { $0.status == .failed }
+    }
+
+    /// Task 20: 已完成（含 skipped）子任务数
+    var completedCount: Int {
+        subTasks.filter { $0.status == .completed || $0.status == .skipped }.count
+    }
+
+    /// Task 20: 总进度比例（0.0 ~ 1.0），子任务为空时返回 0
+    var progressRatio: Double {
+        guard !subTasks.isEmpty else { return 0 }
+        return Double(completedCount) / Double(subTasks.count)
+    }
+
     /// 是否所有子任务都已完成
     var isAllSubTasksCompleted: Bool {
-        !subTasks.isEmpty && subTasks.allSatisfy { $0.status == .completed }
+        !subTasks.isEmpty && subTasks.allSatisfy { $0.status == .completed || $0.status == .skipped }
     }
 }
 
@@ -131,6 +177,12 @@ struct SubTask: Codable, Identifiable, Hashable {
     var result: String?
     /// 执行顺序，数值越小越先执行
     var order: Int
+    /// Task 20: 是否可与其他无依赖节点并行执行。
+    /// `parallel: true` 表示同层兄弟节点之间无相互依赖，可并行调度；
+    /// `parallel: false`（默认）表示同层兄弟节点默认串行依赖前一个。
+    var parallel: Bool
+    /// Task 20: 节点深度（由 HierarchicalDecomposer 写入，根任务分解得到的为 1，再分解为 2，以此类推）
+    var depth: Int
 
     /// 创建 SubTask 实例
     /// - Parameters:
@@ -139,7 +191,9 @@ struct SubTask: Codable, Identifiable, Hashable {
     ///   - dependencies: 依赖的子任务 ID 列表，默认空数组
     ///   - toolName: 使用的工具名，默认 nil
     ///   - order: 执行顺序，默认 0
-    init(title: String, description: String = "", dependencies: [UUID] = [], toolName: String? = nil, order: Int = 0) {
+    ///   - parallel: 是否可并行执行，默认 false
+    ///   - depth: 节点深度，默认 1
+    init(title: String, description: String = "", dependencies: [UUID] = [], toolName: String? = nil, order: Int = 0, parallel: Bool = false, depth: Int = 1) {
         self.id = UUID()
         self.title = title
         self.description = description
@@ -148,15 +202,17 @@ struct SubTask: Codable, Identifiable, Hashable {
         self.toolName = toolName
         self.result = nil
         self.order = order
+        self.parallel = parallel
+        self.depth = depth
     }
 
     /// 用于 LLM 返回的 JSON 解码：id 可选以便 LLM 不返回 id 时自动生成
     /// - SeeAlso: `GoalDecomposer.parseSubTasks(from:)`
     enum CodingKeys: String, CodingKey {
-        case id, title, description, status, dependencies, toolName, result, order
+        case id, title, description, status, dependencies, toolName, result, order, parallel, depth
     }
 
-    /// 自定义解码：id 缺失时自动生成新 UUID；status 缺失时默认 .pending
+    /// 自定义解码：id 缺失时自动生成新 UUID；status 缺失时默认 .pending；parallel/depth 缺失时使用默认值
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
@@ -167,6 +223,23 @@ struct SubTask: Codable, Identifiable, Hashable {
         self.toolName = try c.decodeIfPresent(String.self, forKey: .toolName)
         self.result = try c.decodeIfPresent(String.self, forKey: .result)
         self.order = try c.decodeIfPresent(Int.self, forKey: .order) ?? 0
+        self.parallel = try c.decodeIfPresent(Bool.self, forKey: .parallel) ?? false
+        self.depth = try c.decodeIfPresent(Int.self, forKey: .depth) ?? 1
+    }
+
+    /// 自定义编码：包含新增的 parallel/depth 字段
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(title, forKey: .title)
+        try c.encode(description, forKey: .description)
+        try c.encode(status, forKey: .status)
+        try c.encode(dependencies, forKey: .dependencies)
+        try c.encodeIfPresent(toolName, forKey: .toolName)
+        try c.encodeIfPresent(result, forKey: .result)
+        try c.encode(order, forKey: .order)
+        try c.encode(parallel, forKey: .parallel)
+        try c.encode(depth, forKey: .depth)
     }
 }
 

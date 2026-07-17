@@ -233,7 +233,7 @@ final class MemoryServiceTests: XCTestCase {
         let memory = try await service.remember(content: "待删除记忆")
         XCTAssertEqual(try service.getAllMemories().count, 1)
 
-        try service.delete(memory: memory)
+        try await service.delete(memory: memory)
 
         XCTAssertEqual(try service.getAllMemories().count, 0, "删除后应为空")
     }
@@ -244,7 +244,7 @@ final class MemoryServiceTests: XCTestCase {
         _ = try await service.remember(content: "记忆2")
         XCTAssertEqual(try service.getAllMemories().count, 2)
 
-        try service.delete(memory: m1)
+        try await service.delete(memory: m1)
 
         let remaining = try service.getAllMemories()
         XCTAssertEqual(remaining.count, 1, "删除 1 条后应剩 1 条")

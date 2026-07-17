@@ -24,6 +24,10 @@ struct MCPSettingsView: View {
     @State private var pendingDeleteConfig: MCPConfig?
     /// 删除确认弹窗开关
     @State private var showDeleteConfirm = false
+    /// 权限审批弹窗开关（公网 Server 首次连接时弹窗）
+    @State private var showPermissionPrompt = false
+    /// 待审批的 Server 信息（弹窗显示用）
+    @State private var pendingPermissionInfo: PermissionPromptInfo?
 
     /// UserDefaults 存储键
     private let storageKey = "MCPConfigs"
@@ -61,6 +65,13 @@ struct MCPSettingsView: View {
                     .font(.captionAI)
             }
 
+            // 已连接的 Server（运行时状态，需 clientManager）
+            if let manager = clientManager {
+                connectedServersSection(manager: manager)
+                candidateServersSection(manager: manager)
+                rejectedServersSection(manager: manager)
+            }
+
             // 添加按钮
             Section {
                 Button {
@@ -93,6 +104,27 @@ struct MCPSettingsView: View {
                 }
             }
         }
+        .sheet(isPresented: $showPermissionPrompt) {
+            if let info = pendingPermissionInfo {
+                PermissionPromptView(
+                    info: info,
+                    onApprove: {
+                        if let id = pendingPermissionInfo?.serverID {
+                            Task { await clientManager?.approveCandidate(serverID: id) }
+                        }
+                        showPermissionPrompt = false
+                        pendingPermissionInfo = nil
+                    },
+                    onReject: {
+                        if let id = pendingPermissionInfo?.serverID {
+                            clientManager?.rejectCandidate(serverID: id)
+                        }
+                        showPermissionPrompt = false
+                        pendingPermissionInfo = nil
+                    }
+                )
+            }
+        }
         .confirmationDialog(
             pendingDeleteConfig.map {
                 String(format: NSLocalizedString("确认删除「%@」？删除后无法恢复。", comment: ""), $0.name)
@@ -109,6 +141,112 @@ struct MCPSettingsView: View {
             .accessibilityIdentifier("confirmDeleteServerButton")
             Button("取消", role: .cancel) {
                 pendingDeleteConfig = nil
+            }
+        }
+    }
+
+    // MARK: - 三组 Server 区段
+
+    /// 已连接 Server 区段
+    @ViewBuilder
+    private func connectedServersSection(manager: MCPClientManager) -> some View {
+        let connected = manager.getConnectedServers()
+        if !connected.isEmpty {
+            Section {
+                ForEach(connected) { info in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(info.name)
+                                .font(.body)
+                                .fontWeight(.medium)
+                            Text("\(info.tools.count) 个工具")
+                                .font(.captionAI)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button {
+                            Task { await manager.disconnect(serverID: info.id) }
+                        } label: {
+                            Image(systemName: "stop.circle")
+                                .foregroundStyle(.red)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("disconnectButton_\(info.id)")
+                    }
+                }
+            } header: {
+                Text("已连接", comment: "")
+            }
+        }
+    }
+
+    /// 候选 Server 区段（待审批）
+    @ViewBuilder
+    private func candidateServersSection(manager: MCPClientManager) -> some View {
+        let candidates = manager.getCandidateServers()
+        if !candidates.isEmpty {
+            Section {
+                ForEach(candidates, id: \.id) { server in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(server.name)
+                                .font(.body)
+                                .fontWeight(.medium)
+                            let boundary = manager.getCandidateTrustBoundary(serverID: server.id) ?? .lan
+                            HStack(spacing: 4) {
+                                Text(boundary.displayName)
+                                    .font(.captionAI)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(boundary.riskColor.opacity(0.2))
+                                    .clipShape(Capsule())
+                                Text("风险：\(boundary.riskLevel)")
+                                    .font(.captionAI)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        Spacer()
+                        Button("批准") {
+                            Task { await manager.approveCandidate(serverID: server.id) }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .accessibilityIdentifier("approveButton_\(server.id)")
+                        Button("拒绝") {
+                            manager.rejectCandidate(serverID: server.id)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.red)
+                        .accessibilityIdentifier("rejectButton_\(server.id)")
+                    }
+                }
+            } header: {
+                Text("候选 Server（待审批）", comment: "")
+            } footer: {
+                Text("公网 Server 首次连接需用户确认。", comment: "")
+                    .font(.captionAI)
+            }
+        }
+    }
+
+    /// 已拒绝 Server 区段
+    @ViewBuilder
+    private func rejectedServersSection(manager: MCPClientManager) -> some View {
+        let rejected = manager.getRejectedServerIDs()
+        if !rejected.isEmpty {
+            Section {
+                ForEach(rejected, id: \.self) { serverID in
+                    HStack {
+                        Text(serverID)
+                            .font(.body)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Image(systemName: "hand.raised.slash")
+                            .foregroundStyle(.red)
+                    }
+                    .accessibilityIdentifier("rejectedServerRow_\(serverID)")
+                }
+            } header: {
+                Text("已拒绝", comment: "")
             }
         }
     }

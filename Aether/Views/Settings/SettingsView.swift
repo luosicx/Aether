@@ -189,6 +189,8 @@ struct SettingsView: View {
                 avatarSection
                 bubbleStyleSection
                 fontSizeSection
+                // Task 19 阶段 4: 记忆管理（导出/导入/清空/加密）
+                MemorySettingsView()
                 icloudSection
                 debugSection
                 aboutSection
@@ -292,6 +294,8 @@ struct SettingsView: View {
             avatarSection
             bubbleStyleSection
             fontSizeSection
+            // Task 19 阶段 4: 记忆管理（导出/导入/清空/加密）
+            MemorySettingsView()
         case .health:
             #if os(iOS)
             healthSection

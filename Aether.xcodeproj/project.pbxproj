@@ -9,6 +9,31 @@
 /* Begin PBXBuildFile section */
 		006B4A33C57A283EBA285F16 /* SystemControlTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = A25DCD40D09E1716B5899628 /* SystemControlTool.swift */; };
 		00ABA2F53753AF032C09B19F /* SettingsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD2E2E7C3A85C598FF9D1543 /* SettingsViewModel.swift */; };
+		MEM1000000000000000001 /* VectorStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = MEM0000000000000000001 /* VectorStore.swift */; };
+		MEM2000000000000000001 /* VectorStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = MEM0000000000000000001 /* VectorStore.swift */; };
+		MEM1000000000000000002 /* SQLiteVecStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = MEM0000000000000000002 /* SQLiteVecStore.swift */; };
+		MEM2000000000000000002 /* SQLiteVecStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = MEM0000000000000000002 /* SQLiteVecStore.swift */; };
+		MEM1000000000000000003 /* BruteForceVectorStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = MEM0000000000000000003 /* BruteForceVectorStore.swift */; };
+		MEM2000000000000000003 /* BruteForceVectorStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = MEM0000000000000000003 /* BruteForceVectorStore.swift */; };
+		MEM1000000000000000004 /* VectorStoreFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = MEM0000000000000000004 /* VectorStoreFactory.swift */; };
+		MEM2000000000000000004 /* VectorStoreFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = MEM0000000000000000004 /* VectorStoreFactory.swift */; };
+		MEM1000000000000000005 /* RecallEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = MEM0000000000000000005 /* RecallEngine.swift */; };
+		MEM2000000000000000005 /* RecallEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = MEM0000000000000000005 /* RecallEngine.swift */; };
+		MEM1000000000000000006 /* AgingCompactor.swift in Sources */ = {isa = PBXBuildFile; fileRef = MEM0000000000000000006 /* AgingCompactor.swift */; };
+		MEM2000000000000000006 /* AgingCompactor.swift in Sources */ = {isa = PBXBuildFile; fileRef = MEM0000000000000000006 /* AgingCompactor.swift */; };
+		MEM1000000000000000007 /* EncryptionLayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = MEM0000000000000000007 /* EncryptionLayer.swift */; };
+		MEM2000000000000000007 /* EncryptionLayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = MEM0000000000000000007 /* EncryptionLayer.swift */; };
+		MEM1000000000000000008 /* ExportImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = MEM0000000000000000008 /* ExportImporter.swift */; };
+		MEM2000000000000000008 /* ExportImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = MEM0000000000000000008 /* ExportImporter.swift */; };
+		MEM1000000000000000009 /* MemorySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = MEM0000000000000000009 /* MemorySettingsView.swift */; };
+		MEM2000000000000000009 /* MemorySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = MEM0000000000000000009 /* MemorySettingsView.swift */; };
+		MEM1000000000000000010 /* BruteForceVectorStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = MEM0000000000000000010 /* BruteForceVectorStoreTests.swift */; };
+		MEM1000000000000000011 /* SQLiteVecStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = MEM0000000000000000011 /* SQLiteVecStoreTests.swift */; };
+		MEM1000000000000000012 /* VectorStoreFactoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = MEM0000000000000000012 /* VectorStoreFactoryTests.swift */; };
+		MEM1000000000000000013 /* RecallEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = MEM0000000000000000013 /* RecallEngineTests.swift */; };
+		MEM1000000000000000014 /* AgingCompactorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = MEM0000000000000000014 /* AgingCompactorTests.swift */; };
+		MEM1000000000000000015 /* EncryptionLayerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = MEM0000000000000000015 /* EncryptionLayerTests.swift */; };
+		MEM1000000000000000016 /* ExportImporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = MEM0000000000000000016 /* ExportImporterTests.swift */; };
 		01816DD644C823C301E3482E /* SmartRouterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C42CB93D5F359C823B79BD26 /* SmartRouterTests.swift */; };
 		02A8520E1CEAAA09DECFD1AC /* InputAutomationTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12A0EB0900AC70CC80392CA8 /* InputAutomationTool.swift */; };
 		02C6A61415DA142F98A1B2B3 /* PrivacyPolicyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CED557122621DA94FAFFDB35 /* PrivacyPolicyView.swift */; };
@@ -408,6 +433,55 @@
 		TEST000000000EXP0RT000001 /* ConversationExporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TEST000000000EXP0RT000002 /* ConversationExporterTests.swift */; };
 		TEST00000000ICONS000000001 /* AetherIconsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TEST00000000ICONS000000002 /* AetherIconsTests.swift */; };
 		TEST00000000VLIST000000001 /* VirtualizedMessageListTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TEST00000000VLIST000000002 /* VirtualizedMessageListTests.swift */; };
+		ABCDEF100000000000000020 /* MCPSecurity.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000020 /* MCPSecurity.swift */; };
+		ABCDEF100000000000000021 /* MCPConfigFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000021 /* MCPConfigFile.swift */; };
+		ABCDEF100000000000000022 /* MCPConfigFileLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000022 /* MCPConfigFileLoader.swift */; };
+		ABCDEF100000000000000023 /* MCPDiscoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000023 /* MCPDiscoveryService.swift */; };
+		ABCDEF100000000000000024 /* MCPServerGrouping.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000024 /* MCPServerGrouping.swift */; };
+		ABCDEF100000000000000025 /* TrustBoundary.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000025 /* TrustBoundary.swift */; };
+		ABCDEF100000000000000026 /* PermissionPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000026 /* PermissionPromptView.swift */; };
+		ABCDEF200000000000000020 /* MCPSecurity.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000020 /* MCPSecurity.swift */; };
+		ABCDEF200000000000000021 /* MCPConfigFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000021 /* MCPConfigFile.swift */; };
+		ABCDEF200000000000000022 /* MCPConfigFileLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000022 /* MCPConfigFileLoader.swift */; };
+		ABCDEF200000000000000023 /* MCPDiscoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000023 /* MCPDiscoveryService.swift */; };
+		ABCDEF200000000000000024 /* MCPServerGrouping.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000024 /* MCPServerGrouping.swift */; };
+		ABCDEF200000000000000025 /* TrustBoundary.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000025 /* TrustBoundary.swift */; };
+		ABCDEF200000000000000026 /* PermissionPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000026 /* PermissionPromptView.swift */; };
+		ABCDEF000000000000000030 /* MCPSecurityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000030 /* MCPSecurityTests.swift */; };
+		ABCDEF000000000000000031 /* MCPConfigFileTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000031 /* MCPConfigFileTests.swift */; };
+		ABCDEF000000000000000032 /* MCPConfigFileLoaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000032 /* MCPConfigFileLoaderTests.swift */; };
+		ABCDEF000000000000000033 /* MCPClientManagerConfigTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000033 /* MCPClientManagerConfigTests.swift */; };
+		ABCDEF000000000000000034 /* MCPDiscoveryServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000034 /* MCPDiscoveryServiceTests.swift */; };
+		ABCDEF000000000000000035 /* PermissionPromptViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000035 /* PermissionPromptViewTests.swift */; };
+		ABCDEF000000000000000036 /* MCPSettingsViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000036 /* MCPSettingsViewTests.swift */; };
+		ABCDEF000000000000000037 /* TrustBoundaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000037 /* TrustBoundaryTests.swift */; };
+		AGT1B0103001 /* HeuristicRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100B00103 /* HeuristicRules.swift */; };
+		AGT1B0103002 /* HeuristicRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100B00103 /* HeuristicRules.swift */; };
+		AGT1B0104001 /* HierarchicalDecomposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100B00104 /* HierarchicalDecomposer.swift */; };
+		AGT1B0104002 /* HierarchicalDecomposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100B00104 /* HierarchicalDecomposer.swift */; };
+		AGT1B0105001 /* NodeStateMachine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100B00105 /* NodeStateMachine.swift */; };
+		AGT1B0105002 /* NodeStateMachine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100B00105 /* NodeStateMachine.swift */; };
+		AGT1B0106001 /* ToolExecutionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100B00106 /* ToolExecutionCoordinator.swift */; };
+		AGT1B0106002 /* ToolExecutionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100B00106 /* ToolExecutionCoordinator.swift */; };
+		AGT1B0107001 /* RetryPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100B00107 /* RetryPolicy.swift */; };
+		AGT1B0107002 /* RetryPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100B00107 /* RetryPolicy.swift */; };
+		AGT1B0108001 /* CheckpointManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100B00108 /* CheckpointManager.swift */; };
+		AGT1B0108002 /* CheckpointManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100B00108 /* CheckpointManager.swift */; };
+		AGT1B0109001 /* DAGExecutionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100B00109 /* DAGExecutionEngine.swift */; };
+		AGT1B0109002 /* DAGExecutionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100B00109 /* DAGExecutionEngine.swift */; };
+		AGT1B010A001 /* DAGVisualizationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100B0010A /* DAGVisualizationView.swift */; };
+		AGT1B010A002 /* DAGVisualizationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100B0010A /* DAGVisualizationView.swift */; };
+		AGT1B010B001 /* InterventionPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100B0010B /* InterventionPanel.swift */; };
+		AGT1B010B002 /* InterventionPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100B0010B /* InterventionPanel.swift */; };
+		AGT1C0102001 /* HeuristicRulesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100C00102 /* HeuristicRulesTests.swift */; };
+		AGT1C0103001 /* HierarchicalDecomposerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100C00103 /* HierarchicalDecomposerTests.swift */; };
+		AGT1C0104001 /* NodeStateMachineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100C00104 /* NodeStateMachineTests.swift */; };
+		AGT1C0105001 /* DAGExecutionEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100C00105 /* DAGExecutionEngineTests.swift */; };
+		AGT1C0106001 /* RetryPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100C00106 /* RetryPolicyTests.swift */; };
+		AGT1C0107001 /* CheckpointManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100C00107 /* CheckpointManagerTests.swift */; };
+		AGT1C0108001 /* DAGVisualizationViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100C00108 /* DAGVisualizationViewTests.swift */; };
+		AGT1C0109001 /* InterventionPanelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100C00109 /* InterventionPanelTests.swift */; };
+		AGT1C010A001 /* AgentPerformanceBaselineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100C0010A /* AgentPerformanceBaselineTests.swift */; };
 
 /* End PBXBuildFile section */
 
@@ -468,6 +542,22 @@
 		0FA091731437B31A9F1F43D0 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = "<group>"; };
 		11111111111111111111A002 /* Memory.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Memory.swift; sourceTree = "<group>"; };
 		11111111111111111111A004 /* MemoryService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MemoryService.swift; sourceTree = "<group>"; };
+		MEM0000000000000000001 /* VectorStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VectorStore.swift; sourceTree = "<group>"; };
+		MEM0000000000000000002 /* SQLiteVecStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SQLiteVecStore.swift; sourceTree = "<group>"; };
+		MEM0000000000000000003 /* BruteForceVectorStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BruteForceVectorStore.swift; sourceTree = "<group>"; };
+		MEM0000000000000000004 /* VectorStoreFactory.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VectorStoreFactory.swift; sourceTree = "<group>"; };
+		MEM0000000000000000005 /* RecallEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecallEngine.swift; sourceTree = "<group>"; };
+		MEM0000000000000000006 /* AgingCompactor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AgingCompactor.swift; sourceTree = "<group>"; };
+		MEM0000000000000000007 /* EncryptionLayer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EncryptionLayer.swift; sourceTree = "<group>"; };
+		MEM0000000000000000008 /* ExportImporter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExportImporter.swift; sourceTree = "<group>"; };
+		MEM0000000000000000009 /* MemorySettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MemorySettingsView.swift; sourceTree = "<group>"; };
+		MEM0000000000000000010 /* BruteForceVectorStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BruteForceVectorStoreTests.swift; sourceTree = "<group>"; };
+		MEM0000000000000000011 /* SQLiteVecStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SQLiteVecStoreTests.swift; sourceTree = "<group>"; };
+		MEM0000000000000000012 /* VectorStoreFactoryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VectorStoreFactoryTests.swift; sourceTree = "<group>"; };
+		MEM0000000000000000013 /* RecallEngineTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecallEngineTests.swift; sourceTree = "<group>"; };
+		MEM0000000000000000014 /* AgingCompactorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AgingCompactorTests.swift; sourceTree = "<group>"; };
+		MEM0000000000000000015 /* EncryptionLayerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EncryptionLayerTests.swift; sourceTree = "<group>"; };
+		MEM0000000000000000016 /* ExportImporterTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ExportImporterTests.swift; sourceTree = "<group>"; };
 		11111111111111111111A007 /* MemoryServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MemoryServiceTests.swift; sourceTree = "<group>"; };
 		11111111111111111111A00A /* PreferenceExtractor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PreferenceExtractor.swift; sourceTree = "<group>"; };
 		11111111111111111111A00C /* PreferenceExtractorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PreferenceExtractorTests.swift; sourceTree = "<group>"; };
@@ -789,6 +879,39 @@
 		TEST000000000EXP0RT000002 /* ConversationExporterTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ConversationExporterTests.swift; sourceTree = "<group>"; };
 		TEST00000000ICONS000000002 /* AetherIconsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AetherIconsTests.swift; sourceTree = "<group>"; };
 		TEST00000000VLIST000000002 /* VirtualizedMessageListTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VirtualizedMessageListTests.swift; sourceTree = "<group>"; };
+		ABCDEF000000000000000020 /* MCPSecurity.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MCPSecurity.swift; sourceTree = "<group>"; };
+		ABCDEF000000000000000021 /* MCPConfigFile.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MCPConfigFile.swift; sourceTree = "<group>"; };
+		ABCDEF000000000000000022 /* MCPConfigFileLoader.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MCPConfigFileLoader.swift; sourceTree = "<group>"; };
+		ABCDEF000000000000000023 /* MCPDiscoveryService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MCPDiscoveryService.swift; sourceTree = "<group>"; };
+		ABCDEF000000000000000024 /* MCPServerGrouping.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MCPServerGrouping.swift; sourceTree = "<group>"; };
+		ABCDEF000000000000000025 /* TrustBoundary.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TrustBoundary.swift; sourceTree = "<group>"; };
+		ABCDEF000000000000000026 /* PermissionPromptView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PermissionPromptView.swift; sourceTree = "<group>"; };
+		ABCDEF000000000000000030 /* MCPSecurityTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MCPSecurityTests.swift; sourceTree = "<group>"; };
+		ABCDEF000000000000000031 /* MCPConfigFileTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MCPConfigFileTests.swift; sourceTree = "<group>"; };
+		ABCDEF000000000000000032 /* MCPConfigFileLoaderTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MCPConfigFileLoaderTests.swift; sourceTree = "<group>"; };
+		ABCDEF000000000000000033 /* MCPClientManagerConfigTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MCPClientManagerConfigTests.swift; sourceTree = "<group>"; };
+		ABCDEF000000000000000034 /* MCPDiscoveryServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MCPDiscoveryServiceTests.swift; sourceTree = "<group>"; };
+		ABCDEF000000000000000035 /* PermissionPromptViewTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PermissionPromptViewTests.swift; sourceTree = "<group>"; };
+		ABCDEF000000000000000036 /* MCPSettingsViewTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MCPSettingsViewTests.swift; sourceTree = "<group>"; };
+		ABCDEF000000000000000037 /* TrustBoundaryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TrustBoundaryTests.swift; sourceTree = "<group>"; };
+		9A1B2C3D4E5F607100B00103 /* HeuristicRules.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HeuristicRules.swift; sourceTree = "<group>"; };
+		9A1B2C3D4E5F607100B00104 /* HierarchicalDecomposer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HierarchicalDecomposer.swift; sourceTree = "<group>"; };
+		9A1B2C3D4E5F607100B00105 /* NodeStateMachine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NodeStateMachine.swift; sourceTree = "<group>"; };
+		9A1B2C3D4E5F607100B00106 /* ToolExecutionCoordinator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ToolExecutionCoordinator.swift; sourceTree = "<group>"; };
+		9A1B2C3D4E5F607100B00107 /* RetryPolicy.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RetryPolicy.swift; sourceTree = "<group>"; };
+		9A1B2C3D4E5F607100B00108 /* CheckpointManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CheckpointManager.swift; sourceTree = "<group>"; };
+		9A1B2C3D4E5F607100B00109 /* DAGExecutionEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DAGExecutionEngine.swift; sourceTree = "<group>"; };
+		9A1B2C3D4E5F607100B0010A /* DAGVisualizationView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DAGVisualizationView.swift; sourceTree = "<group>"; };
+		9A1B2C3D4E5F607100B0010B /* InterventionPanel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InterventionPanel.swift; sourceTree = "<group>"; };
+		9A1B2C3D4E5F607100C00102 /* HeuristicRulesTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HeuristicRulesTests.swift; sourceTree = "<group>"; };
+		9A1B2C3D4E5F607100C00103 /* HierarchicalDecomposerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HierarchicalDecomposerTests.swift; sourceTree = "<group>"; };
+		9A1B2C3D4E5F607100C00104 /* NodeStateMachineTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NodeStateMachineTests.swift; sourceTree = "<group>"; };
+		9A1B2C3D4E5F607100C00105 /* DAGExecutionEngineTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DAGExecutionEngineTests.swift; sourceTree = "<group>"; };
+		9A1B2C3D4E5F607100C00106 /* RetryPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RetryPolicyTests.swift; sourceTree = "<group>"; };
+		9A1B2C3D4E5F607100C00107 /* CheckpointManagerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CheckpointManagerTests.swift; sourceTree = "<group>"; };
+		9A1B2C3D4E5F607100C00108 /* DAGVisualizationViewTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DAGVisualizationViewTests.swift; sourceTree = "<group>"; };
+		9A1B2C3D4E5F607100C00109 /* InterventionPanelTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InterventionPanelTests.swift; sourceTree = "<group>"; };
+		9A1B2C3D4E5F607100C0010A /* AgentPerformanceBaselineTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AgentPerformanceBaselineTests.swift; sourceTree = "<group>"; };
 
 /* End PBXFileReference section */
 
@@ -947,6 +1070,14 @@
 				11111111111111111111A00A /* PreferenceExtractor.swift */,
 				11111111111111111111A0D2 /* ContextWindowManager.swift */,
 				11111111111111111111A0D6 /* SemanticMemoryStore.swift */,
+				MEM0000000000000000001 /* VectorStore.swift */,
+				MEM0000000000000000002 /* SQLiteVecStore.swift */,
+				MEM0000000000000000003 /* BruteForceVectorStore.swift */,
+				MEM0000000000000000004 /* VectorStoreFactory.swift */,
+				MEM0000000000000000005 /* RecallEngine.swift */,
+				MEM0000000000000000006 /* AgingCompactor.swift */,
+				MEM0000000000000000007 /* EncryptionLayer.swift */,
+				MEM0000000000000000008 /* ExportImporter.swift */,
 			);
 			path = Memory;
 			sourceTree = "<group>";
@@ -958,6 +1089,13 @@
 				11111111111111111111A00C /* PreferenceExtractorTests.swift */,
 				11111111111111111111A0D4 /* ContextWindowManagerTests.swift */,
 				11111111111111111111A0D8 /* SemanticMemoryStoreTests.swift */,
+				MEM0000000000000000010 /* BruteForceVectorStoreTests.swift */,
+				MEM0000000000000000011 /* SQLiteVecStoreTests.swift */,
+				MEM0000000000000000012 /* VectorStoreFactoryTests.swift */,
+				MEM0000000000000000013 /* RecallEngineTests.swift */,
+				MEM0000000000000000014 /* AgingCompactorTests.swift */,
+				MEM0000000000000000015 /* EncryptionLayerTests.swift */,
+				MEM0000000000000000016 /* ExportImporterTests.swift */,
 			);
 			path = Memory;
 			sourceTree = "<group>";
@@ -1329,6 +1467,22 @@
 				9A1B2C3D4E5F607100B00001 /* GoalDecomposer.swift */,
 				9A1B2C3D4E5F607100B00100 /* AgentRole.swift */,
 				9A1B2C3D4E5F607100B00102 /* AgentOrchestrator.swift */,
+				9A1B2C3D4E5F607100B00103 /* HeuristicRules.swift */,
+				9A1B2C3D4E5F607100B00104 /* HierarchicalDecomposer.swift */,
+				9A1B2C3D4E5F607100B00105 /* NodeStateMachine.swift */,
+				9A1B2C3D4E5F607100B00106 /* ToolExecutionCoordinator.swift */,
+				9A1B2C3D4E5F607100B00107 /* RetryPolicy.swift */,
+				9A1B2C3D4E5F607100B00108 /* CheckpointManager.swift */,
+				9A1B2C3D4E5F607100B00109 /* DAGExecutionEngine.swift */,
+			);
+			path = Agent;
+			sourceTree = "<group>";
+		};
+		9A1B2C3D4E5F607100B00004 /* Agent */ = {
+			isa = PBXGroup;
+			children = (
+				9A1B2C3D4E5F607100B0010A /* DAGVisualizationView.swift */,
+				9A1B2C3D4E5F607100B0010B /* InterventionPanel.swift */,
 			);
 			path = Agent;
 			sourceTree = "<group>";
@@ -1338,6 +1492,15 @@
 			children = (
 				9A1B2C3D4E5F607100C00001 /* GoalDecomposerTests.swift */,
 				9A1B2C3D4E5F607100C00100 /* AgentOrchestratorTests.swift */,
+				9A1B2C3D4E5F607100C00102 /* HeuristicRulesTests.swift */,
+				9A1B2C3D4E5F607100C00103 /* HierarchicalDecomposerTests.swift */,
+				9A1B2C3D4E5F607100C00104 /* NodeStateMachineTests.swift */,
+				9A1B2C3D4E5F607100C00105 /* DAGExecutionEngineTests.swift */,
+				9A1B2C3D4E5F607100C00106 /* RetryPolicyTests.swift */,
+				9A1B2C3D4E5F607100C00107 /* CheckpointManagerTests.swift */,
+				9A1B2C3D4E5F607100C00108 /* DAGVisualizationViewTests.swift */,
+				9A1B2C3D4E5F607100C00109 /* InterventionPanelTests.swift */,
+				9A1B2C3D4E5F607100C0010A /* AgentPerformanceBaselineTests.swift */,
 			);
 			path = Agent;
 			sourceTree = "<group>";
@@ -1510,6 +1673,12 @@
 				ABCDEF000000000000000007 /* MCPToolAdapter.swift */,
 				ABCDEF000000000000000010 /* MCPResourceService.swift */,
 				ABCDEF000000000000000012 /* MCPPromptService.swift */,
+				ABCDEF000000000000000020 /* MCPSecurity.swift */,
+				ABCDEF000000000000000021 /* MCPConfigFile.swift */,
+				ABCDEF000000000000000022 /* MCPConfigFileLoader.swift */,
+				ABCDEF000000000000000023 /* MCPDiscoveryService.swift */,
+				ABCDEF000000000000000024 /* MCPServerGrouping.swift */,
+				ABCDEF000000000000000025 /* TrustBoundary.swift */,
 			);
 			path = MCP;
 			sourceTree = "<group>";
@@ -1520,6 +1689,14 @@
 				ABCDEF00000000000000000A /* MCPClientTests.swift */,
 				ABCDEF00000000000000000C /* ToolRegistryDynamicTests.swift */,
 				ABCDEF000000000000000016 /* MCPResourcePromptTests.swift */,
+				ABCDEF000000000000000030 /* MCPSecurityTests.swift */,
+				ABCDEF000000000000000031 /* MCPConfigFileTests.swift */,
+				ABCDEF000000000000000032 /* MCPConfigFileLoaderTests.swift */,
+				ABCDEF000000000000000033 /* MCPClientManagerConfigTests.swift */,
+				ABCDEF000000000000000034 /* MCPDiscoveryServiceTests.swift */,
+				ABCDEF000000000000000035 /* PermissionPromptViewTests.swift */,
+				ABCDEF000000000000000036 /* MCPSettingsViewTests.swift */,
+				ABCDEF000000000000000037 /* TrustBoundaryTests.swift */,
 			);
 			path = MCP;
 			sourceTree = "<group>";
@@ -1543,6 +1720,8 @@
 				9709389506726B84400839BF /* PresetPrompts.swift */,
 				PLUG1N00000000000000000B /* PluginSettingsView.swift */,
 				ABCDEF000000000000000014 /* MCPSettingsView.swift */,
+				ABCDEF000000000000000026 /* PermissionPromptView.swift */,
+				MEM0000000000000000009 /* MemorySettingsView.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -1610,6 +1789,7 @@
 				0A5B195AF37077D1B54E647A /* Components */,
 				4773156FB406454A7FB621F7 /* OnDevice */,
 				DEADBEEF0011223344550A03 /* MenuBarExtra */,
+				9A1B2C3D4E5F607100B00004 /* Agent */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -2134,10 +2314,28 @@
 				0E7FB47BB7E2BBF55E820BA9 /* PreferenceExtractor.swift in Sources */,
 				1604D7BC370441D86C7F38E7 /* ContextWindowManager.swift in Sources */,
 				28265D12885665D6CE364A85 /* SemanticMemoryStore.swift in Sources */,
+				MEM2000000000000000001 /* VectorStore.swift in Sources */,
+				MEM2000000000000000002 /* SQLiteVecStore.swift in Sources */,
+				MEM2000000000000000003 /* BruteForceVectorStore.swift in Sources */,
+				MEM2000000000000000004 /* VectorStoreFactory.swift in Sources */,
+				MEM2000000000000000005 /* RecallEngine.swift in Sources */,
+				MEM2000000000000000006 /* AgingCompactor.swift in Sources */,
+				MEM2000000000000000007 /* EncryptionLayer.swift in Sources */,
+				MEM2000000000000000008 /* ExportImporter.swift in Sources */,
+				MEM2000000000000000009 /* MemorySettingsView.swift in Sources */,
 				24297D415CB2CDDC25993465 /* AgentTask.swift in Sources */,
 				A13442DE3D3AF4EF7F57D3D5 /* GoalDecomposer.swift in Sources */,
 				97EF9C72A302D68D58A69551 /* AgentRole.swift in Sources */,
 				7F0EC1444D5447B05886677D /* AgentOrchestrator.swift in Sources */,
+				AGT1B0103001 /* HeuristicRules.swift in Sources */,
+				AGT1B0104001 /* HierarchicalDecomposer.swift in Sources */,
+				AGT1B0105001 /* NodeStateMachine.swift in Sources */,
+				AGT1B0106001 /* ToolExecutionCoordinator.swift in Sources */,
+				AGT1B0107001 /* RetryPolicy.swift in Sources */,
+				AGT1B0108001 /* CheckpointManager.swift in Sources */,
+				AGT1B0109001 /* DAGExecutionEngine.swift in Sources */,
+				AGT1B010A001 /* DAGVisualizationView.swift in Sources */,
+				AGT1B010B001 /* InterventionPanel.swift in Sources */,
 				2D892202E710EBF0C8CE9D85 /* DraggableConversation.swift in Sources */,
 				05203638394C52C63F1354D5 /* MCPClient.swift in Sources */,
 				125648899EA29454D6A910E3 /* MCPClientManager.swift in Sources */,
@@ -2145,6 +2343,13 @@
 				D9331DF858F663D3B0518712 /* MenuBarPanel.swift in Sources */,
 				154FB387A185695183B21C62 /* PluginSettingsView.swift in Sources */,
 				703BD3BE556B4118BFFDC9AE /* MCPSettingsView.swift in Sources */,
+				ABCDEF100000000000000020 /* MCPSecurity.swift in Sources */,
+				ABCDEF100000000000000021 /* MCPConfigFile.swift in Sources */,
+				ABCDEF100000000000000022 /* MCPConfigFileLoader.swift in Sources */,
+				ABCDEF100000000000000023 /* MCPDiscoveryService.swift in Sources */,
+				ABCDEF100000000000000024 /* MCPServerGrouping.swift in Sources */,
+				ABCDEF100000000000000025 /* TrustBoundary.swift in Sources */,
+				ABCDEF100000000000000026 /* PermissionPromptView.swift in Sources */,
 				1569A019A45AD4AED4B1B8FD /* ConversationTreeView.swift in Sources */,
 				5C75082B2C29124111649D2F /* LinkPreviewCard.swift in Sources */,
 				98B2DA259DA5C0ECFB5FBA0F /* RichMessageCard.swift in Sources */,
@@ -2274,11 +2479,35 @@
 				11111111111111111111A00B /* PreferenceExtractorTests.swift in Sources */,
 				11111111111111111111A0D3 /* ContextWindowManagerTests.swift in Sources */,
 				11111111111111111111A0D7 /* SemanticMemoryStoreTests.swift in Sources */,
+				MEM1000000000000000010 /* BruteForceVectorStoreTests.swift in Sources */,
+				MEM1000000000000000011 /* SQLiteVecStoreTests.swift in Sources */,
+				MEM1000000000000000012 /* VectorStoreFactoryTests.swift in Sources */,
+				MEM1000000000000000013 /* RecallEngineTests.swift in Sources */,
+				MEM1000000000000000014 /* AgingCompactorTests.swift in Sources */,
+				MEM1000000000000000015 /* EncryptionLayerTests.swift in Sources */,
+				MEM1000000000000000016 /* ExportImporterTests.swift in Sources */,
 				9A1B2C3D4E5F607100C00002 /* GoalDecomposerTests.swift in Sources */,
 				9A1B2C3D4E5F607100C00101 /* AgentOrchestratorTests.swift in Sources */,
+				AGT1C0102001 /* HeuristicRulesTests.swift in Sources */,
+				AGT1C0103001 /* HierarchicalDecomposerTests.swift in Sources */,
+				AGT1C0104001 /* NodeStateMachineTests.swift in Sources */,
+				AGT1C0105001 /* DAGExecutionEngineTests.swift in Sources */,
+				AGT1C0106001 /* RetryPolicyTests.swift in Sources */,
+				AGT1C0107001 /* CheckpointManagerTests.swift in Sources */,
+				AGT1C0108001 /* DAGVisualizationViewTests.swift in Sources */,
+				AGT1C0109001 /* InterventionPanelTests.swift in Sources */,
+				AGT1C010A001 /* AgentPerformanceBaselineTests.swift in Sources */,
 				A1E2F3A4B5C6D7E8F9A0B1CB /* DesignSystemTests.swift in Sources */,
 				ABCDEF00000000000000000B /* MCPClientTests.swift in Sources */,
 				ABCDEF00000000000000000D /* ToolRegistryDynamicTests.swift in Sources */,
+				ABCDEF000000000000000030 /* MCPSecurityTests.swift in Sources */,
+				ABCDEF000000000000000031 /* MCPConfigFileTests.swift in Sources */,
+				ABCDEF000000000000000032 /* MCPConfigFileLoaderTests.swift in Sources */,
+				ABCDEF000000000000000033 /* MCPClientManagerConfigTests.swift in Sources */,
+				ABCDEF000000000000000034 /* MCPDiscoveryServiceTests.swift in Sources */,
+				ABCDEF000000000000000035 /* PermissionPromptViewTests.swift in Sources */,
+				ABCDEF000000000000000036 /* MCPSettingsViewTests.swift in Sources */,
+				ABCDEF000000000000000037 /* TrustBoundaryTests.swift in Sources */,
 				PLUG1N00000000000000000E /* PluginManagerTests.swift in Sources */,
 				PLUG1N00000000000000010 /* PluginSandboxTests.swift in Sources */,
 				T21A000000000000000002A /* ForkTests.swift in Sources */,
@@ -2394,15 +2623,40 @@
 				E4238B9C3A30CC010C1B34B0 /* PreferenceExtractor.swift in Sources */,
 				CB1196923495E58FAA38F122 /* ContextWindowManager.swift in Sources */,
 				D996896814E647DA27309347 /* SemanticMemoryStore.swift in Sources */,
+				MEM1000000000000000001 /* VectorStore.swift in Sources */,
+				MEM1000000000000000002 /* SQLiteVecStore.swift in Sources */,
+				MEM1000000000000000003 /* BruteForceVectorStore.swift in Sources */,
+				MEM1000000000000000004 /* VectorStoreFactory.swift in Sources */,
+				MEM1000000000000000005 /* RecallEngine.swift in Sources */,
+				MEM1000000000000000006 /* AgingCompactor.swift in Sources */,
+				MEM1000000000000000007 /* EncryptionLayer.swift in Sources */,
+				MEM1000000000000000008 /* ExportImporter.swift in Sources */,
+				MEM1000000000000000009 /* MemorySettingsView.swift in Sources */,
 				5FC3F40665E688E961AB33E0 /* AgentTask.swift in Sources */,
 				B5BDF8038CFF0C147F17C3F7 /* GoalDecomposer.swift in Sources */,
 				DC13F2BCC3F2B748DE11E3D1 /* AgentRole.swift in Sources */,
 				6D9DCAA5FE25FC0FA8639721 /* AgentOrchestrator.swift in Sources */,
+				AGT1B0103002 /* HeuristicRules.swift in Sources */,
+				AGT1B0104002 /* HierarchicalDecomposer.swift in Sources */,
+				AGT1B0105002 /* NodeStateMachine.swift in Sources */,
+				AGT1B0106002 /* ToolExecutionCoordinator.swift in Sources */,
+				AGT1B0107002 /* RetryPolicy.swift in Sources */,
+				AGT1B0108002 /* CheckpointManager.swift in Sources */,
+				AGT1B0109002 /* DAGExecutionEngine.swift in Sources */,
+				AGT1B010A002 /* DAGVisualizationView.swift in Sources */,
+				AGT1B010B002 /* InterventionPanel.swift in Sources */,
 				B2D15EE85C6B5C1091EBED44 /* MCPClient.swift in Sources */,
 				2BAE3DD58F96FCB8CE24AD53 /* MCPClientManager.swift in Sources */,
 				70E5AB4057BEB51832F6469F /* MCPToolAdapter.swift in Sources */,
 				B9C3FE0184B3CFCCB870BBD7 /* PluginSettingsView.swift in Sources */,
 				76F664477EA39935332FEE49 /* MCPSettingsView.swift in Sources */,
+				ABCDEF200000000000000020 /* MCPSecurity.swift in Sources */,
+				ABCDEF200000000000000021 /* MCPConfigFile.swift in Sources */,
+				ABCDEF200000000000000022 /* MCPConfigFileLoader.swift in Sources */,
+				ABCDEF200000000000000023 /* MCPDiscoveryService.swift in Sources */,
+				ABCDEF200000000000000024 /* MCPServerGrouping.swift in Sources */,
+				ABCDEF200000000000000025 /* TrustBoundary.swift in Sources */,
+				ABCDEF200000000000000026 /* PermissionPromptView.swift in Sources */,
 				D245C161D31006D8B6EFFD82 /* ConversationTreeView.swift in Sources */,
 				6775F2AD5D4A52B75C4C4C19 /* LinkPreviewCard.swift in Sources */,
 				809BC118D4C921627AC929DF /* RichMessageCard.swift in Sources */,

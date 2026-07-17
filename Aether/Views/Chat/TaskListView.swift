@@ -45,9 +45,22 @@ struct TaskListView: View {
 ///
 /// 读取 AgentTask 显示目标，展示子任务列表和执行状态，
 /// 使用不同颜色标识 pending / inProgress / completed / failed。
+///
+/// Task 20 阶段 4: 集成 DAGVisualizationView 展示 DAG 可视化，
+/// 并在出现 failed 节点时浮现 InterventionPanel 供用户干预。
 struct AgentTaskProgressView: View {
     /// 展示的 AgentTask
     let task: AgentTask
+
+    /// Task 20: 跳过失败节点回调（由 AgentOrchestrator.skipFailedNode 注入）
+    var onSkipNode: ((UUID) async -> Void)? = nil
+    /// Task 20: 重试失败节点回调（由 AgentOrchestrator.retryFailedNode 注入）
+    var onRetryNode: ((UUID) async -> Void)? = nil
+    /// Task 20: 取消整个任务回调（由 AgentOrchestrator.cancelTaskIntervention 注入）
+    var onCancelTask: (() async -> Void)? = nil
+
+    /// Task 20: 是否显示 DAG 可视化（默认 false，由上层开启）
+    var showsDAGVisualization: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.md) {
@@ -60,6 +73,17 @@ struct AgentTaskProgressView: View {
                 Text(task.goal)
                     .font(.headlineAI)
                     .foregroundColor(.textPrimary)
+                Spacer()
+                if showsDAGVisualization && !task.subTasks.isEmpty {
+                    Text("\(task.completedCount)/\(task.subTasks.count)")
+                        .font(.captionAI)
+                        .foregroundColor(.textSecondary)
+                }
+            }
+
+            // Task 20: DAG 可视化视图（可选）
+            if showsDAGVisualization && !task.subTasks.isEmpty {
+                DAGVisualizationView(task: task)
             }
 
             // 子任务列表
@@ -67,6 +91,17 @@ struct AgentTaskProgressView: View {
                 ForEach(task.subTasks) { subTask in
                     SubTaskRow(subTask: subTask)
                 }
+            }
+
+            // Task 20: failed 节点干预面板（仅当存在 failed 节点且提供回调时显示）
+            if task.hasFailedSubTask, let failedNode = task.subTasks.first(where: { $0.status == .failed }),
+               onSkipNode != nil, onRetryNode != nil, onCancelTask != nil {
+                InterventionPanel(
+                    failedNode: failedNode,
+                    onSkip: { await onSkipNode?(failedNode.id) },
+                    onRetry: { await onRetryNode?(failedNode.id) },
+                    onCancel: { await onCancelTask?() }
+                )
             }
         }
         .padding(Spacing.lg)

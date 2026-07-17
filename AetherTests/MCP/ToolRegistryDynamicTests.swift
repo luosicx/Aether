@@ -107,11 +107,13 @@ final class ToolRegistryDynamicTests: XCTestCase {
     // MARK: - MCPToolAdapter
 
     /// MCPToolAdapter 应正确映射 definition（name/description/parameters）
+    /// 工具名应加 Server 前缀（Stage 4 安全加固）
     func testMCPToolAdapterDefinitionMapping() {
         let client = StubToolCallClient(contents: [])
         let tool = MCPTool(name: "mcp_tool_def", description: "MCP 测试工具", inputSchema: ["type": "object"])
-        let adapter = MCPToolAdapter(tool: tool, client: client)
-        XCTAssertEqual(adapter.definition.name, "mcp_tool_def")
+        let adapter = MCPToolAdapter(tool: tool, client: client, serverID: "srv1")
+        // 工具名加 Server 前缀：srv1__mcp_tool_def
+        XCTAssertEqual(adapter.definition.name, "srv1__mcp_tool_def")
         XCTAssertEqual(adapter.definition.description, "MCP 测试工具")
         XCTAssertEqual(adapter.definition.parameters["type"] as? String, "object")
     }
@@ -123,7 +125,7 @@ final class ToolRegistryDynamicTests: XCTestCase {
             MCPToolCallResult.Content(type: "text", text: "line2", data: nil, mimeType: nil)
         ])
         let tool = MCPTool(name: "mcp_tool_exec", description: "执行", inputSchema: [:])
-        let adapter = MCPToolAdapter(tool: tool, client: client)
+        let adapter = MCPToolAdapter(tool: tool, client: client, serverID: "srv2")
         let result = try await adapter.execute(arguments: ["q": "hello"])
         XCTAssertEqual(result, "line1\nline2", "应拼接多个 text 内容块")
     }
@@ -133,7 +135,8 @@ final class ToolRegistryDynamicTests: XCTestCase {
         let client = StubToolCallClient(contents: [
             MCPToolCallResult.Content(type: "text", text: "only", data: nil, mimeType: nil)
         ])
-        let adapter = MCPToolAdapter(tool: MCPTool(name: "t", description: "d", inputSchema: [:]), client: client)
+        let adapter = MCPToolAdapter(tool: MCPTool(name: "t", description: "d", inputSchema: [:]),
+                                     client: client, serverID: "srv3")
         let executeResult = try await adapter.execute(arguments: [:])
         XCTAssertEqual(executeResult, "only")
     }
@@ -141,6 +144,7 @@ final class ToolRegistryDynamicTests: XCTestCase {
     // MARK: - MCPClientManager 自动注册/注销集成
 
     /// 连接成功后应自动将 MCP 工具注册到 ToolRegistry；断开后自动注销
+    /// 工具名加 Server 前缀（Stage 4 安全加固）：autoreg_server__mcp_autoreg_a
     func testManagerAutoRegistersAndUnregistersTools() async throws {
         let manager = MCPClientManager(clientFactory: { config in
             MockMCPClient(config: config, tools: [
@@ -148,22 +152,23 @@ final class ToolRegistryDynamicTests: XCTestCase {
                 MCPTool(name: "mcp_autoreg_b", description: "B", inputSchema: ["type": "object"])
             ])
         })
-        let config = MCPConfig(id: "autoreg-server", name: "AutoReg",
+        // 使用下划线而非连字符的 Server ID（避免被 sanitize 移除）
+        let config = MCPConfig(id: "autoreg_server", name: "AutoReg",
                                transport: .sse(url: "http://localhost/sse", headers: nil), enabled: true)
 
-        XCTAssertNil(registry.getTool(named: "mcp_autoreg_a"), "连接前工具不应注册")
-        XCTAssertNil(registry.getTool(named: "mcp_autoreg_b"))
+        XCTAssertNil(registry.getTool(named: "autoreg_server__mcp_autoreg_a"), "连接前工具不应注册")
+        XCTAssertNil(registry.getTool(named: "autoreg_server__mcp_autoreg_b"))
 
         try await manager.connect(config: config)
 
-        XCTAssertNotNil(registry.getTool(named: "mcp_autoreg_a"), "连接后应自动注册工具 A")
-        XCTAssertNotNil(registry.getTool(named: "mcp_autoreg_b"), "连接后应自动注册工具 B")
-        XCTAssertTrue(registry.getToolNames().contains("mcp_autoreg_a"))
+        XCTAssertNotNil(registry.getTool(named: "autoreg_server__mcp_autoreg_a"), "连接后应自动注册工具 A")
+        XCTAssertNotNil(registry.getTool(named: "autoreg_server__mcp_autoreg_b"), "连接后应自动注册工具 B")
+        XCTAssertTrue(registry.getToolNames().contains("autoreg_server__mcp_autoreg_a"))
 
-        await manager.disconnect(serverID: "autoreg-server")
+        await manager.disconnect(serverID: "autoreg_server")
 
-        XCTAssertNil(registry.getTool(named: "mcp_autoreg_a"), "断开后应自动注销工具 A")
-        XCTAssertNil(registry.getTool(named: "mcp_autoreg_b"), "断开后应自动注销工具 B")
+        XCTAssertNil(registry.getTool(named: "autoreg_server__mcp_autoreg_a"), "断开后应自动注销工具 A")
+        XCTAssertNil(registry.getTool(named: "autoreg_server__mcp_autoreg_b"), "断开后应自动注销工具 B")
     }
 
     /// disconnectAll 应注销所有 Server 注册的工具
@@ -173,17 +178,17 @@ final class ToolRegistryDynamicTests: XCTestCase {
                 MCPTool(name: "mcp_all_\(config.id)", description: "T", inputSchema: [:])
             ])
         })
-        try await manager.connect(config: MCPConfig(id: "all-srv-1", name: "S1",
+        try await manager.connect(config: MCPConfig(id: "all_srv_1", name: "S1",
             transport: .sse(url: "http://1", headers: nil), enabled: true))
-        try await manager.connect(config: MCPConfig(id: "all-srv-2", name: "S2",
+        try await manager.connect(config: MCPConfig(id: "all_srv_2", name: "S2",
             transport: .sse(url: "http://2", headers: nil), enabled: true))
-        XCTAssertNotNil(registry.getTool(named: "mcp_all_all-srv-1"))
-        XCTAssertNotNil(registry.getTool(named: "mcp_all_all-srv-2"))
+        XCTAssertNotNil(registry.getTool(named: "all_srv_1__mcp_all_all_srv_1"))
+        XCTAssertNotNil(registry.getTool(named: "all_srv_2__mcp_all_all_srv_2"))
 
         await manager.disconnectAll()
 
-        XCTAssertNil(registry.getTool(named: "mcp_all_all-srv-1"), "disconnectAll 后应全部注销")
-        XCTAssertNil(registry.getTool(named: "mcp_all_all-srv-2"))
+        XCTAssertNil(registry.getTool(named: "all_srv_1__mcp_all_all_srv_1"), "disconnectAll 后应全部注销")
+        XCTAssertNil(registry.getTool(named: "all_srv_2__mcp_all_all_srv_2"))
     }
 }
 
