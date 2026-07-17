@@ -21,6 +21,8 @@ public struct MCPConfigFile: Codable, Sendable, Equatable {
         case policy
     }
 
+    // swiftlint:disable:next unneeded_synthesized_initializer
+    // public init 需要 public 修饰，合成 init 为 internal
     public init(servers: [Server], discovery: Discovery?, policy: Policy?) {
         self.servers = servers
         self.discovery = discovery
@@ -124,6 +126,8 @@ public struct MCPConfigFile: Codable, Sendable, Equatable {
             case scanIntervalSec
         }
 
+        // swiftlint:disable:next unneeded_synthesized_initializer
+        // public init 需要 public 修饰，合成 init 为 internal
         public init(zeroconf: Bool, zeroconfType: String, scanIntervalSec: Int) {
             self.zeroconf = zeroconf
             self.zeroconfType = zeroconfType
@@ -155,6 +159,8 @@ public struct MCPConfigFile: Codable, Sendable, Equatable {
             case whitelist
         }
 
+        // swiftlint:disable:next unneeded_synthesized_initializer
+        // public init 需要 public 修饰，合成 init 为 internal
         public init(defaultTrust: TrustBoundary, blacklist: [String]?, whitelist: [String]?) {
             self.defaultTrust = defaultTrust
             self.blacklist = blacklist

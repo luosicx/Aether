@@ -253,7 +253,7 @@ final class DAGExecutionEngine {
         var progressed = false
         for sub in task.subTasks where sub.status == .pending {
             // 若依赖中包含 failed 节点，标记为 skipped
-            if !Set(sub.dependencies).intersection(failedIDs).isEmpty {
+            if !Set(sub.dependencies).isDisjoint(with: failedIDs) {
                 _ = task.updateSubTaskStatus(id: sub.id, status: .skipped, result: "依赖节点失败，自动跳过")
                 try? await stateMachine.markSkipped(sub.id)
                 progressed = true
