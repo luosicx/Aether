@@ -715,6 +715,9 @@ jobs:
       - name: Aggregate platform test results
         run: |
           echo "=== Platform Test Results ==="
+          # GitHub Actions 表达式在 yaml 解析时求值，无法在 bash 循环里动态索引 needs[]。
+          # 改用 toJSON(needs) 一次性输出所有 job 结果，再用 jq 解析。
+          echo '${{ toJSON(needs) }}' > /tmp/needs.json
           echo "unit-tests (iOS):        ${{ needs.unit-tests.result }}"
           echo "unit-tests-macos:        ${{ needs.unit-tests-macos.result }}"
           echo "ui-tests:                ${{ needs.ui-tests.result }}"
@@ -728,14 +731,8 @@ jobs:
           echo "Coverage pass: '${{ needs.unit-tests.outputs.coverage_pass }}'"
           echo "Coverage pct: '${{ needs.unit-tests.outputs.coverage_pct }}'"
           # 任一上游测试 job 失败（非 success/skipped）均阻塞合并
-          FAILED_JOBS=""
-          for job in unit-tests unit-tests-macos ui-tests android-build windows-build rust security-tests security-tests-macos; do
-            RESULT="${{ needs[format('{0}', job)].result }}"
-            echo "Checking $job: $RESULT"
-            if [ "$RESULT" != "success" ] && [ "$RESULT" != "skipped" ]; then
-              FAILED_JOBS="$FAILED_JOBS $job"
-            fi
-          done
+          # 用 jq 从 needs JSON 中提取非 success/skipped 的 job 名
+          FAILED_JOBS=$(jq -r 'to_entries[] | select(.value.result != "success" and .value.result != "skipped") | .key' /tmp/needs.json | tr '\n' ' ')
           if [ -n "$FAILED_JOBS" ]; then
             echo "FAIL: Upstream test jobs did not succeed:$FAILED_JOBS"
             exit 1

@@ -50,9 +50,9 @@ final class LanguageManagerTests: XCTestCase {
 
     func testAllCasesCountAndUniqueIds() {
         let allCases = LanguageManager.AppLanguage.allCases
-        XCTAssertEqual(allCases.count, 4, "AppLanguage 应有 4 个 case")
+        XCTAssertEqual(allCases.count, 9, "AppLanguage 应有 9 个 case")
         let ids = allCases.map { $0.id }
-        XCTAssertEqual(Set(ids).count, 4, "各 case 的 id 不应重复")
+        XCTAssertEqual(Set(ids).count, 9, "各 case 的 id 不应重复")
     }
 
     // MARK: - displayName 和 icon 对每个 case 返回非空字符串
