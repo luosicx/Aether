@@ -127,6 +127,11 @@
 		4D148DB668F36FE54D0EF1E2 /* FeedbackService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E27FA6BB882FAC9DB53C2BBC /* FeedbackService.swift */; };
 		7E15001A000000000000A001 /* ConversationExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E15003C000000000000C003 /* ConversationExporter.swift */; };
 		7E15002B000000000000B002 /* ConversationExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E15003C000000000000C003 /* ConversationExporter.swift */; };
+		3A8EB7D55D687BA61D45BBFE /* Logger+Modules.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D0132A3B5D9777CCAF8D73E /* Logger+Modules.swift */; };
+		FD5DDD17B5DDC7F6B77D72EE /* Logger+Modules.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D0132A3B5D9777CCAF8D73E /* Logger+Modules.swift */; };
+		47E525B5CB95C2CA68E5ABFF /* VirtualizedMessageList.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67113766E5929AA320FA14D0 /* VirtualizedMessageList.swift */; };
+		178DFE090266E25016331274 /* VirtualizedMessageList.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67113766E5929AA320FA14D0 /* VirtualizedMessageList.swift */; };
+		72EBEEF09542BB20EA7E70B6 /* RustFFIBoundaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BB838A150A356F159E42C39 /* RustFFIBoundaryTests.swift */; };
 		4D467C32B0D0798F9AA14A5F /* ConversationListVM.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42A16870D042FAF3B85C9984 /* ConversationListVM.swift */; };
 		4D4B7B5B03F494B83AD34ACC /* FeedbackServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F1C63B538D08AA782CFD591 /* FeedbackServiceTests.swift */; };
 		4D8B415C25C0FA3C96A8D4F4 /* RAGService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAF92749FCE229D0E7C27266 /* RAGService.swift */; };
@@ -709,6 +714,9 @@
 		E23D426313B3F4302BFC7094 /* AetherWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = AetherWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		E27FA6BB882FAC9DB53C2BBC /* FeedbackService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FeedbackService.swift; sourceTree = "<group>"; };
 		7E15003C000000000000C003 /* ConversationExporter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ConversationExporter.swift; sourceTree = "<group>"; };
+		0D0132A3B5D9777CCAF8D73E /* Logger+Modules.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Logger+Modules.swift; sourceTree = "<group>"; };
+		67113766E5929AA320FA14D0 /* VirtualizedMessageList.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VirtualizedMessageList.swift; sourceTree = "<group>"; };
+		1BB838A150A356F159E42C39 /* RustFFIBoundaryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RustFFIBoundaryTests.swift; sourceTree = "<group>"; };
 		E2D3C4B5A697886950414243 /* MultiWindowUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MultiWindowUITests.swift; sourceTree = "<group>"; };
 		E3F4A5B6C7D8E9F0A1B2C3D4 /* LanguageManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LanguageManager.swift; sourceTree = "<group>"; };
 		E42EAA429A0EACAC0015EDBF /* LogUploaderTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LogUploaderTests.swift; sourceTree = "<group>"; };
@@ -1022,6 +1030,7 @@
 				08C042865F8B84CA2740C947 /* ChatView.swift */,
 				EE000000000000000000E001 /* ChatInputBar.swift */,
 				FF000000000000000000F001 /* MessageListView.swift */,
+			67113766E5929AA320FA14D0 /* VirtualizedMessageList.swift */,
 				E1F2A3B4C5D6E7F8A9B0C1D4 /* ErrorOverlay.swift */,
 				BAEAA99571B9AD360158318A /* MessageBubble.swift */,
 				BB000000000000000000C002 /* BubbleStyle.swift */,
@@ -1380,6 +1389,7 @@
 				05901B8A22C088927620C3AE /* IntentChatServiceTests.swift */,
 				F1E2D3C4B5A6004400000001 /* AppIntentsTests.swift */,
 				AC151E116BE21C45FA647F83 /* SpotlightIndexerTests.swift */,
+			1BB838A150A356F159E42C39 /* RustFFIBoundaryTests.swift */,
 				A1B2C3D4E5F6071809AB /* TypingIndicatorTests.swift */,
 				DBAF89876FA8A4418CBCB346 /* ConversationActivityTests.swift */,
 				474F61C8B2680E12DBB6AAE2 /* PerformanceMonitorTests.swift */,
@@ -2058,6 +2068,8 @@
 				BDD22AA8182F2A2EBAA08D41 /* PrivacyPolicyView.swift in Sources */,
 				4D148DB668F36FE54D0EF1E2 /* FeedbackService.swift in Sources */,
 				7E15001A000000000000A001 /* ConversationExporter.swift in Sources */,
+				3A8EB7D55D687BA61D45BBFE /* Logger+Modules.swift in Sources */,
+				47E525B5CB95C2CA68E5ABFF /* VirtualizedMessageList.swift in Sources */,
 				8F74A42F9416998D788FE30D /* CrashReportService.swift in Sources */,
 				B6F2E7DCB46D0553F32217EF /* MarkdownText.swift in Sources */,
 				2374645F18C598CC27BA9502 /* CodeBlockView.swift in Sources */,
@@ -2178,6 +2190,7 @@
 				F359A39E541ABB4A3FE1ECE9 /* IntentChatServiceTests.swift in Sources */,
 				F1E2D3C4B5A6004400000002 /* AppIntentsTests.swift in Sources */,
 				A8F4CE84048D5E2204EA8B51 /* SpotlightIndexerTests.swift in Sources */,
+				72EBEEF09542BB20EA7E70B6 /* RustFFIBoundaryTests.swift in Sources */,
 				A1B2C3D4E5F6071809AC /* TypingIndicatorTests.swift in Sources */,
 				E49054BD6E7DB30DF55601FD /* ConversationActivityTests.swift in Sources */,
 				DE80B9A0E0B534004C761FD9 /* PerformanceMonitorTests.swift in Sources */,
@@ -2323,6 +2336,8 @@
 				02C6A61415DA142F98A1B2B3 /* PrivacyPolicyView.swift in Sources */,
 				860916F6BC022204B51AB08F /* FeedbackService.swift in Sources */,
 				7E15002B000000000000B002 /* ConversationExporter.swift in Sources */,
+				FD5DDD17B5DDC7F6B77D72EE /* Logger+Modules.swift in Sources */,
+				178DFE090266E25016331274 /* VirtualizedMessageList.swift in Sources */,
 				D31B3912506F72A18B5EFDC6 /* CrashReportService.swift in Sources */,
 				CDC41288A033779CF19E179F /* MarkdownText.swift in Sources */,
 				0B7EE1AA0D1FC49B4B9A62D4 /* CodeBlockView.swift in Sources */,

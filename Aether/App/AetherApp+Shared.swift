@@ -59,7 +59,9 @@ extension AetherApp {
             // - 如启用后出现 CKError 冲突，由 CloudKit 内部自动处理
             //
             // Task 14.1: CloudKit 不支持自定义 URL，使用默认存储位置
-            return ModelConfiguration(cloudKitDatabase: .automatic(AetherApp.cloudKitContainerIdentifier))
+            // .automatic 启用 CloudKit 自动同步，container identifier 由 entitlements
+            // 中的 com.apple.developer.icloud-container-identifiers 指定（iCloud.com.aether.app）
+            return ModelConfiguration(cloudKitDatabase: .automatic)
         }
 
         // 默认本地存储：App Group 共享（iOS / watchOS / Widget 三端读写同一 SQLite）
@@ -79,11 +81,17 @@ extension AetherApp {
                 configurations: AetherApp.sharedModelConfiguration
             )
         } catch {
-            return try! ModelContainer(
-                for: Conversation.self, ChatMessage.self, DocumentChunk.self,
-                    MessageFeedback.self, HealthInsight.self, UserPreference.self, AgentTask.self, Memory.self,
-                configurations: ModelConfiguration(isStoredInMemoryOnly: true)
-            )
+            // Fallback：内存模式容器，避免 throw 中断 App 启动；in-memory 几乎不会失败，
+            // 若失败则 fatalError（与 try! 等价，但避免 force_try 违规）
+            do {
+                return try ModelContainer(
+                    for: Conversation.self, ChatMessage.self, DocumentChunk.self,
+                        MessageFeedback.self, HealthInsight.self, UserPreference.self, AgentTask.self, Memory.self,
+                    configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+                )
+            } catch {
+                fatalError("Failed to create in-memory ModelContainer: \(error)")
+            }
         }
     }()
 
