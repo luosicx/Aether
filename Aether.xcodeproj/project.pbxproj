@@ -714,7 +714,7 @@
 		E23D426313B3F4302BFC7094 /* AetherWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = AetherWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		E27FA6BB882FAC9DB53C2BBC /* FeedbackService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FeedbackService.swift; sourceTree = "<group>"; };
 		7E15003C000000000000C003 /* ConversationExporter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ConversationExporter.swift; sourceTree = "<group>"; };
-		0D0132A3B5D9777CCAF8D73E /* Logger+Modules.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Logger+Modules.swift; sourceTree = "<group>"; };
+		0D0132A3B5D9777CCAF8D73E /* Logger+Modules.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "Logger+Modules.swift"; path = "Logger+Modules.swift"; sourceTree = "<group>"; };
 		67113766E5929AA320FA14D0 /* VirtualizedMessageList.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VirtualizedMessageList.swift; sourceTree = "<group>"; };
 		1BB838A150A356F159E42C39 /* RustFFIBoundaryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RustFFIBoundaryTests.swift; sourceTree = "<group>"; };
 		E2D3C4B5A697886950414243 /* MultiWindowUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MultiWindowUITests.swift; sourceTree = "<group>"; };

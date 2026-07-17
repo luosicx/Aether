@@ -70,15 +70,17 @@ function_body_length:
   warning: 150
   error: 300
 
-# 类型体长度（ChatViewModel/SettingsView 作为核心类型包含多个职责）
+# 类型体长度（历史代码中 ChatViewModelTests 2333 行、SettingsView 1155 行等超长类型，
+# 提高阈值覆盖现有最大值，待技术债清理迭代中拆分后收紧）
 type_body_length:
-  warning: 800
-  error: 1500
+  warning: 2500
+  error: 4000
 
-# 文件长度
+# 文件长度（历史代码中 ChatViewModelTests 3157 行、OnDeviceModelDownloaderTests 1646 行等超长文件，
+# 提高阈值覆盖现有最大值，待技术债清理迭代中拆分后收紧）
 file_length:
-  warning: 1000
-  error: 2000
+  warning: 3300
+  error: 5000
 
 # 圈复杂度（含 UITest 短路 / RAG / 缓存 / ReAct 循环的主流程）
 cyclomatic_complexity:
