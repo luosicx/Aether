@@ -6,6 +6,7 @@ import AetherDesign
 import AetherUI
 @testable import Aether
 
+@MainActor
 final class VirtualizedMessageListTests: XCTestCase {
 
     // MARK: - 辅助方法
@@ -39,8 +40,8 @@ final class VirtualizedMessageListTests: XCTestCase {
         // MessageSnapshot.hash(into:) 仅 combine id，故同 id 哈希值一致
         var hasherA = Hasher()
         var hasherB = Hasher()
-        snapshotA.hash(into: hasherA)
-        snapshotB.hash(into: hasherB)
+        snapshotA.hash(into: &hasherA)
+        snapshotB.hash(into: &hasherB)
         XCTAssertEqual(hasherA.finalize(), hasherB.finalize())
     }
 
@@ -59,8 +60,8 @@ final class VirtualizedMessageListTests: XCTestCase {
         let snapshotB = makeSnapshot(id: UUID(), content: "same")
         var hasherA = Hasher()
         var hasherB = Hasher()
-        snapshotA.hash(into: hasherA)
-        snapshotB.hash(into: hasherB)
+        snapshotA.hash(into: &hasherA)
+        snapshotB.hash(into: &hasherB)
         // id 不同，哈希值（极大概率）不同
         XCTAssertNotEqual(hasherA.finalize(), hasherB.finalize())
     }
