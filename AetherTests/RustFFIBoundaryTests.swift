@@ -26,9 +26,9 @@ final class RustFFIBoundaryTests: XCTestCase {
         try super.setUpWithError()
         // 检查 xcframework 是否存在于仓库内（兼容从仓库根目录运行的场景）。
         let candidates = [
-            xcframeworkPath,                                  // 仓库根目录运行
-            "../" + xcframeworkPath,                          // 测试 bundle 子目录运行
-            "../../" + xcframeworkPath,                       // 更深层级
+            Self.xcframeworkPath,                                  // 仓库根目录运行
+            "../" + Self.xcframeworkPath,                          // 测试 bundle 子目录运行
+            "../../" + Self.xcframeworkPath,                       // 更深层级
         ]
         let exists = candidates.contains { FileManager.default.fileExists(atPath: $0) }
         try XCTSkipIf(!exists, "aether_core.xcframework 未在本地配置，跳过 Rust FFI 边界测试")
