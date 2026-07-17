@@ -405,6 +405,10 @@
 		D63422AAA6284BC68E296D81 /* ChunkerRustTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF31C32D67E245369A38B5F8 /* ChunkerRustTests.swift */; };
 		7AF7F1A93B964C469AFBE281 /* RateLimiterRustTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7DE67C0A3A1463B8F4CFF01 /* RateLimiterRustTests.swift */; };
 		F1A2B3C4D5E6A000000A0001 /* AetherWidgets.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = E23D426313B3F4302BFC7094 /* AetherWidgets.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		TEST000000000EXP0RT000001 /* ConversationExporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TEST000000000EXP0RT000002 /* ConversationExporterTests.swift */; };
+		TEST00000000ICONS000000001 /* AetherIconsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TEST00000000ICONS000000002 /* AetherIconsTests.swift */; };
+		TEST00000000VLIST000000001 /* VirtualizedMessageListTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TEST00000000VLIST000000002 /* VirtualizedMessageListTests.swift */; };
+
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -782,6 +786,10 @@
 		78DE8551234B487B959A11FD /* RedactorRustTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RedactorRustTests.swift; sourceTree = "<group>"; };
 		FF31C32D67E245369A38B5F8 /* ChunkerRustTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChunkerRustTests.swift; sourceTree = "<group>"; };
 		F7DE67C0A3A1463B8F4CFF01 /* RateLimiterRustTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RateLimiterRustTests.swift; sourceTree = "<group>"; };
+		TEST000000000EXP0RT000002 /* ConversationExporterTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ConversationExporterTests.swift; sourceTree = "<group>"; };
+		TEST00000000ICONS000000002 /* AetherIconsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AetherIconsTests.swift; sourceTree = "<group>"; };
+		TEST00000000VLIST000000002 /* VirtualizedMessageListTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VirtualizedMessageListTests.swift; sourceTree = "<group>"; };
+
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1337,6 +1345,7 @@
 		9E413D506636FFF037B30950 /* AetherTests */ = {
 			isa = PBXGroup;
 			children = (
+				TEST000000000EXP0RTGRP0001 /* Export */,
 				11111111111111111111A008 /* Memory */,
 				4D30DAE5AECC4BD4EF0EB6BB /* CalculatorToolTests.swift */,
 				C2A5FBBDA8F167C8FCBDAC1D /* DateTimeToolTests.swift */,
@@ -1468,6 +1477,7 @@
 		A1E2F3A4B5C6D7E8F9A0B1D0 /* DesignSystem */ = {
 			isa = PBXGroup;
 			children = (
+				TEST00000000ICONS000000002 /* AetherIconsTests.swift */,
 				A1E2F3A4B5C6D7E8F9A0B1CA /* DesignSystemTests.swift */,
 				25A1B2C3D4E5F6000100A007 /* ThemeManagerTests.swift */,
 			);
@@ -1768,11 +1778,21 @@
 		T22A00000000000000GRP1 /* Chat */ = {
 			isa = PBXGroup;
 			children = (
+				TEST00000000VLIST000000002 /* VirtualizedMessageListTests.swift */,
 				T22A000000000000000004B /* RichMessageTests.swift */,
 			);
 			path = Chat;
 			sourceTree = "<group>";
 		};
+		TEST000000000EXP0RTGRP0001 /* Export */ = {
+			isa = PBXGroup;
+			children = (
+				TEST000000000EXP0RT000002 /* ConversationExporterTests.swift */,
+			);
+			path = Export;
+			sourceTree = "<group>";
+		};
+
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -2146,6 +2166,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				TEST000000000EXP0RT000001 /* ConversationExporterTests.swift in Sources */,
+				TEST00000000ICONS000000001 /* AetherIconsTests.swift in Sources */,
+				TEST00000000VLIST000000001 /* VirtualizedMessageListTests.swift in Sources */,
 				A1B2C3D4E5F6071809AB1006 /* PromptInjectionDetectorTests.swift in Sources */,
 				1C9D09486B61155EFC1FAE51 /* CalculatorToolTests.swift in Sources */,
 				F94B28644AA129C267942AE1 /* DateTimeToolTests.swift in Sources */,
