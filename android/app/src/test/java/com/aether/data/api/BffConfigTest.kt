@@ -6,6 +6,7 @@ import com.aether.app.BuildConfig
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -13,9 +14,25 @@ import org.robolectric.RobolectricTestRunner
 /**
  * BffConfig 与 BffConfigStore 测试。
  * 使用 Robolectric 提供 Android Context（DataStore 需要）。
+ *
+ * 注意：依赖 EncryptedSharedPreferences 的用例（storeSetAndGetBaseUrl /
+ * storeSetAndGetUserToken）在 Robolectric（本地与 CI）环境下因 AndroidKeyStore
+ * 不可用而跳过；该路径的覆盖由 iOS/macOS Keychain 测试保障。
  */
 @RunWith(RobolectricTestRunner::class)
 class BffConfigTest {
+
+    companion object {
+        // Robolectric 不提供 AndroidKeyStore Provider，EncryptedSharedPreferences 创建必失败。
+        private val canUseAndroidKeyStore: Boolean by lazy {
+            try {
+                java.security.KeyStore.getInstance("AndroidKeyStore")
+                true
+            } catch (_: Throwable) {
+                false
+            }
+        }
+    }
 
     @Test
     fun bffConfigDefaultsFromBuildConfig() {
@@ -33,6 +50,7 @@ class BffConfigTest {
 
     @Test
     fun storeSetAndGetBaseUrl() = runTest {
+        assumeTrue("Skip: AndroidKeyStore not available under Robolectric", canUseAndroidKeyStore)
         val context = ApplicationProvider.getApplicationContext<Context>()
         val store = BffConfigStore(context)
         store.setBaseUrl("https://test.example.com")
@@ -42,6 +60,7 @@ class BffConfigTest {
 
     @Test
     fun storeSetAndGetUserToken() = runTest {
+        assumeTrue("Skip: AndroidKeyStore not available under Robolectric", canUseAndroidKeyStore)
         val context = ApplicationProvider.getApplicationContext<Context>()
         val store = BffConfigStore(context)
         store.setUserToken("token-abc")

@@ -1,5 +1,7 @@
 # Aether（以太）
 
+<!-- doc-stats: i18n=888 tools=26 tests=2297 -->
+
 > 一个原生 SwiftUI AI 对话助手，支持 iOS / iPad / macOS 三端，采用**液态玻璃 + 深空主题**视觉语言。基于多 LLM Provider（DeepSeek / Qwen / BFF 代理 / 端侧 MLX），覆盖流式对话、RAG 知识库、ReAct 工具调用、语义缓存、端侧离线推理、语音合成与识别、健康洞察、灵动岛 Live Activity、Watch App、桌面 Widget、DeepLink 等能力。底层引入 Rust 核心引擎（aether-core-ffi，xcframework 分发），提供跨平台统一的高性能算法（SHA-256 哈希、Token 计数、文档分块、向量相似度、SSE 解析、WASM 沙箱、Candle 推理、令牌桶限流、敏感信息脱敏）。支持 8 种语言（简中 / 繁中 / 英 / 日 / 韩 / 法 / 德 / 西）。
 
 ## 截图
@@ -15,7 +17,7 @@
 ## 功能特性
 
 - **流式对话**：基于 SSE 打字机效果，支持 DeepSeek / Qwen / BFF 代理 / 端侧 MLX 四种 Provider，逐 chunk 实时输出。
-- **ReAct 工具调用**：14 个跨平台工具 + 11 个 macOS 独有工具，基于 function calling 循环执行，最大 5 轮，单工具超时 15s 不中断。
+- **ReAct 工具调用**：15 个跨平台工具 + 11 个 macOS 独有工具，基于 function calling 循环执行，最大 5 轮，单工具超时 15s 不中断。
 - **RAG 知识库**：本地文档导入（PDF / 文本）→ 分块 → 嵌入 → 余弦相似度 topK 检索 → `[1][2]` 编号注入 prompt。
 - **语义缓存**：基于 embedding 余弦相似度（阈值 0.92）匹配历史 query，命中跳过 LLM 请求，减少重复调用。
 - **端侧推理**：MLX 离线模式，设备本地运行 Llama-3.2-1B-Instruct Q4_K_M 量化模型，断网自动切换。
@@ -89,7 +91,7 @@ Aether/                     # 主 App（iOS / iPad / macOS）
 AetherWatch/                # watchOS App（TabView：快速对话 / 健康洞察 / 设置）
 AetherWidgets/              # Widget Extension（QuickChat / HealthInsight / RecentConversations）
 CloudflareWorkers/          # BFF 代理层（worker.js + wrangler.toml）
-AetherTests/                # 单元测试（73 文件 / 248 用例）
+AetherTests/                # 单元测试（123 文件 / 2297 用例）
 AetherUITests/              # UI 测试（2 文件 / 13 用例）
 ```
 

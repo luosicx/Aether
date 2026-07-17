@@ -7,6 +7,7 @@ import ActivityKit
 import AetherServices
 import AetherDesign
 import AetherUI
+import os
 
 /// Task 2.5: iOS 专属 App 入口。配置 BGTaskScheduler、Live Activity、WatchConnectivity。
 @main
@@ -90,15 +91,15 @@ struct AetherApp: App {
         do {
             try BGTaskScheduler.shared.submit(request)
         } catch {
-            print("调度每日刷新任务失败: \(error)")
+            Logger.app.error("调度每日刷新任务失败: \(error.localizedDescription, privacy: .public)")
         }
     }
 
     nonisolated static func handleDailyRefresh(task: BGAppRefreshTask) {
         task.expirationHandler = {
-            print("每日刷新任务即将过期")
+            Logger.app.warning("每日刷新任务即将过期")
         }
-        print("每日刷新后台任务执行中...")
+        Logger.app.info("每日刷新后台任务执行中...")
         task.setTaskCompleted(success: true)
         scheduleDailyRefresh()
     }
@@ -110,13 +111,13 @@ struct AetherApp: App {
         do {
             try BGTaskScheduler.shared.submit(request)
         } catch {
-            print("调度遥测上报任务失败: \(error)")
+            Logger.app.error("调度遥测上报任务失败: \(error.localizedDescription, privacy: .public)")
         }
     }
 
     nonisolated static func handleTelemetryUpload(task: BGAppRefreshTask) {
         task.expirationHandler = {
-            print("遥测上报任务即将过期")
+            Logger.app.warning("遥测上报任务即将过期")
         }
         Task {
             await LogUploader.shared.uploadIfNeeded()
@@ -139,13 +140,13 @@ struct AetherApp: App {
         do {
             try BGTaskScheduler.shared.submit(request)
         } catch {
-            print("调度健康洞察任务失败: \(error)")
+            Logger.app.error("调度健康洞察任务失败: \(error.localizedDescription, privacy: .public)")
         }
     }
 
     nonisolated static func handleHealthInsight(task: BGAppRefreshTask) {
         task.expirationHandler = {
-            print("健康洞察任务即将过期")
+            Logger.app.warning("健康洞察任务即将过期")
             task.setTaskCompleted(success: false)
         }
         Task {
@@ -160,7 +161,7 @@ struct AetherApp: App {
                 generator.sendInsightNotification(insight)
                 task.setTaskCompleted(success: true)
             } catch {
-                print("健康洞察生成失败: \(error)")
+                Logger.app.error("健康洞察生成失败: \(error.localizedDescription, privacy: .public)")
                 task.setTaskCompleted(success: false)
             }
             scheduleHealthInsight()

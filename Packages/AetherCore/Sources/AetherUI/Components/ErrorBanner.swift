@@ -57,6 +57,6 @@ public struct ErrorBanner: View {
         .shadow(color: .black.opacity(0.08), radius: 8, y: 2)
         .frame(maxWidth: .infinity)  // 水平占满，但高度只包裹内容
         .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: message)
+        .animation(reduceMotion ? nil : AnimationTokens.messageAppear, value: message)
     }
 }

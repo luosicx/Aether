@@ -125,6 +125,13 @@
 		4B89788521C61AB00BE625D4 /* TerminalCommandTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05219D01EA46579E5C0F8054 /* TerminalCommandTool.swift */; };
 		4CC765D846430FFDDAB647F7 /* AppleScriptTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC997A98E79CCAA20802D0F8 /* AppleScriptTool.swift */; };
 		4D148DB668F36FE54D0EF1E2 /* FeedbackService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E27FA6BB882FAC9DB53C2BBC /* FeedbackService.swift */; };
+		7E15001A000000000000A001 /* ConversationExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E15003C000000000000C003 /* ConversationExporter.swift */; };
+		7E15002B000000000000B002 /* ConversationExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E15003C000000000000C003 /* ConversationExporter.swift */; };
+		3A8EB7D55D687BA61D45BBFE /* Logger+Modules.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D0132A3B5D9777CCAF8D73E /* Logger+Modules.swift */; };
+		FD5DDD17B5DDC7F6B77D72EE /* Logger+Modules.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D0132A3B5D9777CCAF8D73E /* Logger+Modules.swift */; };
+		47E525B5CB95C2CA68E5ABFF /* VirtualizedMessageList.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67113766E5929AA320FA14D0 /* VirtualizedMessageList.swift */; };
+		178DFE090266E25016331274 /* VirtualizedMessageList.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67113766E5929AA320FA14D0 /* VirtualizedMessageList.swift */; };
+		72EBEEF09542BB20EA7E70B6 /* RustFFIBoundaryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BB838A150A356F159E42C39 /* RustFFIBoundaryTests.swift */; };
 		4D467C32B0D0798F9AA14A5F /* ConversationListVM.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42A16870D042FAF3B85C9984 /* ConversationListVM.swift */; };
 		4D4B7B5B03F494B83AD34ACC /* FeedbackServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F1C63B538D08AA782CFD591 /* FeedbackServiceTests.swift */; };
 		4D8B415C25C0FA3C96A8D4F4 /* RAGService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAF92749FCE229D0E7C27266 /* RAGService.swift */; };
@@ -398,6 +405,10 @@
 		D63422AAA6284BC68E296D81 /* ChunkerRustTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF31C32D67E245369A38B5F8 /* ChunkerRustTests.swift */; };
 		7AF7F1A93B964C469AFBE281 /* RateLimiterRustTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7DE67C0A3A1463B8F4CFF01 /* RateLimiterRustTests.swift */; };
 		F1A2B3C4D5E6A000000A0001 /* AetherWidgets.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = E23D426313B3F4302BFC7094 /* AetherWidgets.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		TEST000000000EXP0RT000001 /* ConversationExporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TEST000000000EXP0RT000002 /* ConversationExporterTests.swift */; };
+		TEST00000000ICONS000000001 /* AetherIconsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TEST00000000ICONS000000002 /* AetherIconsTests.swift */; };
+		TEST00000000VLIST000000001 /* VirtualizedMessageListTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TEST00000000VLIST000000002 /* VirtualizedMessageListTests.swift */; };
+
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -706,6 +717,10 @@
 		E209B4B4DD2C30ADD6CEBA4A /* TypographyTokens.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TypographyTokens.swift; sourceTree = "<group>"; };
 		E23D426313B3F4302BFC7094 /* AetherWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = AetherWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		E27FA6BB882FAC9DB53C2BBC /* FeedbackService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FeedbackService.swift; sourceTree = "<group>"; };
+		7E15003C000000000000C003 /* ConversationExporter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ConversationExporter.swift; sourceTree = "<group>"; };
+		0D0132A3B5D9777CCAF8D73E /* Logger+Modules.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = "Logger+Modules.swift"; path = "Logger+Modules.swift"; sourceTree = "<group>"; };
+		67113766E5929AA320FA14D0 /* VirtualizedMessageList.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VirtualizedMessageList.swift; sourceTree = "<group>"; };
+		1BB838A150A356F159E42C39 /* RustFFIBoundaryTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RustFFIBoundaryTests.swift; sourceTree = "<group>"; };
 		E2D3C4B5A697886950414243 /* MultiWindowUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MultiWindowUITests.swift; sourceTree = "<group>"; };
 		E3F4A5B6C7D8E9F0A1B2C3D4 /* LanguageManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LanguageManager.swift; sourceTree = "<group>"; };
 		E42EAA429A0EACAC0015EDBF /* LogUploaderTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LogUploaderTests.swift; sourceTree = "<group>"; };
@@ -771,6 +786,10 @@
 		78DE8551234B487B959A11FD /* RedactorRustTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RedactorRustTests.swift; sourceTree = "<group>"; };
 		FF31C32D67E245369A38B5F8 /* ChunkerRustTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChunkerRustTests.swift; sourceTree = "<group>"; };
 		F7DE67C0A3A1463B8F4CFF01 /* RateLimiterRustTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RateLimiterRustTests.swift; sourceTree = "<group>"; };
+		TEST000000000EXP0RT000002 /* ConversationExporterTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ConversationExporterTests.swift; sourceTree = "<group>"; };
+		TEST00000000ICONS000000002 /* AetherIconsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AetherIconsTests.swift; sourceTree = "<group>"; };
+		TEST00000000VLIST000000002 /* VirtualizedMessageListTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VirtualizedMessageListTests.swift; sourceTree = "<group>"; };
+
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -878,6 +897,14 @@
 				E27FA6BB882FAC9DB53C2BBC /* FeedbackService.swift */,
 			);
 			path = Feedback;
+			sourceTree = "<group>";
+		};
+		7E15004D000000000000D004 /* Export */ = {
+			isa = PBXGroup;
+			children = (
+				7E15003C000000000000C003 /* ConversationExporter.swift */,
+			);
+			path = Export;
 			sourceTree = "<group>";
 		};
 		0A12A65B3A7A9D61AF95383F /* Search */ = {
@@ -993,6 +1020,7 @@
 				2E5F9E8896772C1FC9036608 /* Performance */,
 				09BC29E459BEE2ACF9F29957 /* Feedback */,
 				C1BF41DA3447C8E450F8C8DF /* Crash */,
+				0D0132A3B5D9777CCAF8D740 /* Log */,
 				F5E6A7B8C9D0E1F2A3B4C5D6 /* Language */,
 				11111111111111111111A005 /* Memory */,
 				9A1B2C3D4E5F607100B00003 /* Agent */,
@@ -1000,6 +1028,7 @@
 				PLUG1N000000000000000013 /* Plugin */,
 				BB000000000000000000D010 /* Theme */,
 				F62BF6DCF3ED8FCD3AE58E39 /* Repositories */,
+				7E15004D000000000000D004 /* Export */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -1010,6 +1039,7 @@
 				08C042865F8B84CA2740C947 /* ChatView.swift */,
 				EE000000000000000000E001 /* ChatInputBar.swift */,
 				FF000000000000000000F001 /* MessageListView.swift */,
+			67113766E5929AA320FA14D0 /* VirtualizedMessageList.swift */,
 				E1F2A3B4C5D6E7F8A9B0C1D4 /* ErrorOverlay.swift */,
 				BAEAA99571B9AD360158318A /* MessageBubble.swift */,
 				BB000000000000000000C002 /* BubbleStyle.swift */,
@@ -1315,6 +1345,7 @@
 		9E413D506636FFF037B30950 /* AetherTests */ = {
 			isa = PBXGroup;
 			children = (
+				TEST000000000EXP0RTGRP0001 /* Export */,
 				11111111111111111111A008 /* Memory */,
 				4D30DAE5AECC4BD4EF0EB6BB /* CalculatorToolTests.swift */,
 				C2A5FBBDA8F167C8FCBDAC1D /* DateTimeToolTests.swift */,
@@ -1368,6 +1399,7 @@
 				05901B8A22C088927620C3AE /* IntentChatServiceTests.swift */,
 				F1E2D3C4B5A6004400000001 /* AppIntentsTests.swift */,
 				AC151E116BE21C45FA647F83 /* SpotlightIndexerTests.swift */,
+			1BB838A150A356F159E42C39 /* RustFFIBoundaryTests.swift */,
 				A1B2C3D4E5F6071809AB /* TypingIndicatorTests.swift */,
 				DBAF89876FA8A4418CBCB346 /* ConversationActivityTests.swift */,
 				474F61C8B2680E12DBB6AAE2 /* PerformanceMonitorTests.swift */,
@@ -1445,6 +1477,7 @@
 		A1E2F3A4B5C6D7E8F9A0B1D0 /* DesignSystem */ = {
 			isa = PBXGroup;
 			children = (
+				TEST00000000ICONS000000002 /* AetherIconsTests.swift */,
 				A1E2F3A4B5C6D7E8F9A0B1CA /* DesignSystemTests.swift */,
 				25A1B2C3D4E5F6000100A007 /* ThemeManagerTests.swift */,
 			);
@@ -1557,6 +1590,14 @@
 				B856664315F8EE667D0C4F6A /* CrashReportService.swift */,
 			);
 			path = Crash;
+			sourceTree = "<group>";
+		};
+		0D0132A3B5D9777CCAF8D740 /* Log */ = {
+			isa = PBXGroup;
+			children = (
+				0D0132A3B5D9777CCAF8D73E /* Logger+Modules.swift */,
+			);
+			path = Log;
 			sourceTree = "<group>";
 		};
 		C204ADAE35CA296E8E13DDC3 /* Views */ = {
@@ -1737,11 +1778,21 @@
 		T22A00000000000000GRP1 /* Chat */ = {
 			isa = PBXGroup;
 			children = (
+				TEST00000000VLIST000000002 /* VirtualizedMessageListTests.swift */,
 				T22A000000000000000004B /* RichMessageTests.swift */,
 			);
 			path = Chat;
 			sourceTree = "<group>";
 		};
+		TEST000000000EXP0RTGRP0001 /* Export */ = {
+			isa = PBXGroup;
+			children = (
+				TEST000000000EXP0RT000002 /* ConversationExporterTests.swift */,
+			);
+			path = Export;
+			sourceTree = "<group>";
+		};
+
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -2045,6 +2096,9 @@
 				5E3FBD7A414BF27AED9E65EF /* SpotlightIndexer.swift in Sources */,
 				BDD22AA8182F2A2EBAA08D41 /* PrivacyPolicyView.swift in Sources */,
 				4D148DB668F36FE54D0EF1E2 /* FeedbackService.swift in Sources */,
+				7E15001A000000000000A001 /* ConversationExporter.swift in Sources */,
+				3A8EB7D55D687BA61D45BBFE /* Logger+Modules.swift in Sources */,
+				47E525B5CB95C2CA68E5ABFF /* VirtualizedMessageList.swift in Sources */,
 				8F74A42F9416998D788FE30D /* CrashReportService.swift in Sources */,
 				B6F2E7DCB46D0553F32217EF /* MarkdownText.swift in Sources */,
 				2374645F18C598CC27BA9502 /* CodeBlockView.swift in Sources */,
@@ -2112,6 +2166,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				TEST000000000EXP0RT000001 /* ConversationExporterTests.swift in Sources */,
+				TEST00000000ICONS000000001 /* AetherIconsTests.swift in Sources */,
+				TEST00000000VLIST000000001 /* VirtualizedMessageListTests.swift in Sources */,
 				A1B2C3D4E5F6071809AB1006 /* PromptInjectionDetectorTests.swift in Sources */,
 				1C9D09486B61155EFC1FAE51 /* CalculatorToolTests.swift in Sources */,
 				F94B28644AA129C267942AE1 /* DateTimeToolTests.swift in Sources */,
@@ -2165,6 +2222,7 @@
 				F359A39E541ABB4A3FE1ECE9 /* IntentChatServiceTests.swift in Sources */,
 				F1E2D3C4B5A6004400000002 /* AppIntentsTests.swift in Sources */,
 				A8F4CE84048D5E2204EA8B51 /* SpotlightIndexerTests.swift in Sources */,
+				72EBEEF09542BB20EA7E70B6 /* RustFFIBoundaryTests.swift in Sources */,
 				A1B2C3D4E5F6071809AC /* TypingIndicatorTests.swift in Sources */,
 				E49054BD6E7DB30DF55601FD /* ConversationActivityTests.swift in Sources */,
 				DE80B9A0E0B534004C761FD9 /* PerformanceMonitorTests.swift in Sources */,
@@ -2309,6 +2367,9 @@
 				4A7216970A0FBFCA5FFFA886 /* SpotlightIndexer.swift in Sources */,
 				02C6A61415DA142F98A1B2B3 /* PrivacyPolicyView.swift in Sources */,
 				860916F6BC022204B51AB08F /* FeedbackService.swift in Sources */,
+				7E15002B000000000000B002 /* ConversationExporter.swift in Sources */,
+				FD5DDD17B5DDC7F6B77D72EE /* Logger+Modules.swift in Sources */,
+				178DFE090266E25016331274 /* VirtualizedMessageList.swift in Sources */,
 				D31B3912506F72A18B5EFDC6 /* CrashReportService.swift in Sources */,
 				CDC41288A033779CF19E179F /* MarkdownText.swift in Sources */,
 				0B7EE1AA0D1FC49B4B9A62D4 /* CodeBlockView.swift in Sources */,

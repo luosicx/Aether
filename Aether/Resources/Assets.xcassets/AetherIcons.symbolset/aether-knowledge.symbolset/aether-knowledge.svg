@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Placeholder - 需设计资源：知识库（Knowledge Base） -->
+<svg width="330" height="330" viewBox="0 0 330 330" xmlns="http://www.w3.org/2000/svg">
+  <g id="aether-knowledge-placeholder">
+    <path d="M165 70 L255 110 V220 L165 260 L75 220 V110 Z"
+          fill="none" stroke="currentColor" stroke-width="12" stroke-linejoin="round"/>
+    <path d="M75 110 L165 150 L255 110 M165 150 V260"
+          fill="none" stroke="currentColor" stroke-width="12" stroke-linejoin="round"/>
+  </g>
+</svg>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Placeholder - 需设计资源：快捷指令（Shortcut） -->
+<svg width="330" height="330" viewBox="0 0 330 330" xmlns="http://www.w3.org/2000/svg">
+  <g id="aether-shortcut-placeholder">
+    <rect x="70" y="70" width="190" height="190" rx="44"
+          fill="none" stroke="currentColor" stroke-width="14"/>
+    <path d="M130 230 V170 Q130 140 160 140 H210"
+          fill="none" stroke="currentColor" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M180 110 L225 140 L180 170"
+          fill="none" stroke="currentColor" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

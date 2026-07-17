@@ -1,5 +1,6 @@
 import Foundation
 import AetherFoundation
+import os
 
 // MARK: - MCP 错误类型
 
@@ -168,6 +169,8 @@ final class StdioTransport: @unchecked Sendable, MCPTransport {
 /// 3. 客户端 POST JSON-RPC 请求到该 URL
 /// 4. Server 通过 SSE 流返回 JSON-RPC 响应
 final class SSETransport: @unchecked Sendable, MCPTransport {
+    private static let logger = Logger(subsystem: "com.aether.app", category: "MCPSecurity")
+
     /// SSE 端点 URL
     private let url: URL
     /// 自定义请求头（如 Authorization）
@@ -310,7 +313,8 @@ final class SSETransport: @unchecked Sendable, MCPTransport {
                   endpointScheme.lowercased() == sseScheme.lowercased(),
                   endpointHost.lowercased() == sseHost.lowercased(),
                   (url.port ?? self.url.port) == (self.url.port ?? url.port) else {
-                // 拒绝跨域 endpoint
+                // 拒绝跨域 endpoint，记录安全告警日志
+                Self.logger.warning("检测到 MCP endpoint 劫持尝试：SSE=\(self.url.absoluteString, privacy: .public), endpoint=\(data, privacy: .public)")
                 return
             }
             lock.lock()

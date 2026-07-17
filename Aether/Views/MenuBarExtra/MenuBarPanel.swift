@@ -49,7 +49,8 @@ struct MenuBarPanel: View {
                                 openConversation(conv)
                             } label: {
                                 HStack(spacing: Spacing.sm) {
-                                    Image(systemName: "bubble.left")
+                                    // Task 17：使用 AetherIcons.bubble 兜底渲染
+                                    AetherIcon.bubble.systemImage
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                     Text(conv.title)
@@ -85,7 +86,8 @@ struct MenuBarPanel: View {
     /// 空状态视图——无最近对话时展示
     private var emptyState: some View {
         VStack(spacing: Spacing.md) {
-            Image(systemName: "bubble.left.and.bubble.right")
+            // Task 17：使用 AetherIcons.bubble 兜底渲染
+            AetherIcon.bubble.systemImage
                 .font(.title)
                 .foregroundStyle(.secondary)
             Text("暂无最近对话", comment: "")

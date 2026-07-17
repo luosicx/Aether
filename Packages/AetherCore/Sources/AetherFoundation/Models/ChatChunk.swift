@@ -319,9 +319,9 @@ public enum LLMError: Error, Sendable, LocalizedError {
     public var userMessage: String {
         switch self {
         case .networkError:
-            return NSLocalizedString("网络连接失败，请检查网络", comment: "")
+            return NSLocalizedString("网络连接失败，请检查网络后重试", comment: "")
         case .apiKeyMissing:
-            return NSLocalizedString("请先在设置中配置 API Key", comment: "")
+            return NSLocalizedString("API Key 未配置，请前往设置页面配置", comment: "")
         case .apiKeyInvalid:
             return NSLocalizedString("API Key 无效，请检查设置", comment: "")
         case .apiError(let code, _):
@@ -333,9 +333,9 @@ public enum LLMError: Error, Sendable, LocalizedError {
             default: return String(format: NSLocalizedString("服务异常（%d），请稍后再试", comment: ""), code)
             }
         case .timeout:
-            return NSLocalizedString("请求超时，请重试", comment: "")
+            return NSLocalizedString("请求超时，请检查网络连接后重试", comment: "")
         case .unknown:
-            return NSLocalizedString("未知错误，请重试", comment: "")
+            return NSLocalizedString("发生未知错误，请稍后重试或联系支持", comment: "")
         case .rateLimited(let retryAfter):
             return String(format: NSLocalizedString("请求过于频繁，请 %d 秒后重试", comment: ""), Int(retryAfter))
         case .llmErrorOccurred(let message):

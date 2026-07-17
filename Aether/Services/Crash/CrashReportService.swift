@@ -1,4 +1,5 @@
 import Foundation
+import os
 #if canImport(Bugly)
 import Bugly
 #endif
@@ -6,7 +7,9 @@ import Bugly
 /// Day 20: 崩溃监控服务，封装 Bugly 初始化与上报。
 /// - Note: Bugly SDK 不通过 SPM 集成，用 `#if canImport(Bugly)` 条件编译保护，
 ///   模拟器或未集成 Bugly 时走占位分支，不影响 App 正常运行。
-final class CrashReportService {
+/// - Task 8: 标记 `@unchecked Sendable`，单例从 NotificationCenter 后台队列与
+///   @MainActor 上下文均会访问；类本身无可变实例状态，Bugly SDK 内部线程安全。
+final class CrashReportService: @unchecked Sendable {
     /// 单例
     static let shared = CrashReportService()
     private init() {}
@@ -18,10 +21,10 @@ final class CrashReportService {
         let config = BuglyConfig()
         config.appKey = appKey
         Bugly.start(withAppKey: appKey)
-        print("[CrashReport] Bugly initialized")
+        Logger.crash.info("Bugly initialized")
         #else
         // Bugly SDK 未集成时占位（不影响 App 正常运行）
-        print("[CrashReport] Bugly not integrated, crash reporting disabled")
+        Logger.crash.warning("Bugly not integrated, crash reporting disabled")
         #endif
     }
 
@@ -31,7 +34,7 @@ final class CrashReportService {
         #if canImport(Bugly)
         Bugly.setUserIdentifier(id)
         #else
-        print("[CrashReport] setUserId: \(id) (placeholder)")
+        Logger.crash.info("setUserId: \(id) (placeholder)")
         #endif
     }
 
@@ -43,7 +46,7 @@ final class CrashReportService {
         #if canImport(Bugly)
         Bugly.setUserValue(value, forKey: key)
         #else
-        print("[CrashReport] setCustomKey: \(key)=\(value) (placeholder)")
+        Logger.crash.info("setCustomKey: \(key)=\(value) (placeholder)")
         #endif
     }
 
@@ -53,7 +56,7 @@ final class CrashReportService {
         #if canImport(Bugly)
         Bugly.reportException(error)
         #else
-        print("[CrashReport] Exception: \(error.localizedDescription) (placeholder)")
+        Logger.crash.error("Exception: \(error.localizedDescription, privacy: .public) (placeholder)")
         #endif
     }
 }

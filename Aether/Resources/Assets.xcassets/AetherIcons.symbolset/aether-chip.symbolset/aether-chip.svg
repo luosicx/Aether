@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Placeholder - 需设计资源：端侧模型芯片（On-Device Chip） -->
+<svg width="330" height="330" viewBox="0 0 330 330" xmlns="http://www.w3.org/2000/svg">
+  <g id="aether-chip-placeholder">
+    <rect x="95" y="95" width="140" height="140" rx="16"
+          fill="none" stroke="currentColor" stroke-width="12"/>
+    <rect x="135" y="135" width="60" height="60" rx="6"
+          fill="none" stroke="currentColor" stroke-width="10"/>
+    <g stroke="currentColor" stroke-width="10" stroke-linecap="round">
+      <line x1="130" y1="60" x2="130" y2="95"/>
+      <line x1="165" y1="60" x2="165" y2="95"/>
+      <line x1="200" y1="60" x2="200" y2="95"/>
+      <line x1="130" y1="235" x2="130" y2="270"/>
+      <line x1="165" y1="235" x2="165" y2="270"/>
+      <line x1="200" y1="235" x2="200" y2="270"/>
+      <line x1="60" y1="130" x2="95" y2="130"/>
+      <line x1="60" y1="165" x2="95" y2="165"/>
+      <line x1="60" y1="200" x2="95" y2="200"/>
+      <line x1="235" y1="130" x2="270" y2="130"/>
+      <line x1="235" y1="165" x2="270" y2="165"/>
+      <line x1="235" y1="200" x2="270" y2="200"/>
+    </g>
+  </g>
+</svg>

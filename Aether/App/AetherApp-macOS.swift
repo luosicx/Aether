@@ -36,6 +36,11 @@ struct AetherApp: App {
                     NotificationCenter.default.post(name: .newConversationRequested, object: nil)
                 }
                 .keyboardShortcut("n", modifiers: .command)
+                // 优化：⌘T 新建对话（补充快捷键）
+                Button("新建标签页") {
+                    NotificationCenter.default.post(name: .newConversationRequested, object: nil)
+                }
+                .keyboardShortcut("t", modifiers: .command)
                 // Task 20: macOS 新建窗口 (Cmd+Shift+N)
                 Button("新建窗口") {
                     NotificationCenter.default.post(name: .newWindowRequested, object: nil)

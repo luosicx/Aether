@@ -594,6 +594,137 @@ final class MCPClientTests: XCTestCase {
         XCTAssertNil(nilClient, "不存在的 Server 应返回 nil")
     }
 
+    // MARK: - 5. SSE 安全测试（endpoint 劫持防护）
+
+    /// 测试用 URLProtocol：拦截 URLSession 请求，返回预设 SSE 响应。
+    /// 避免真实网络请求，确保测试稳定。
+    private final class MockSSEURLProtocol: URLProtocol {
+        /// 预设 SSE 响应体
+        static var responseData: Data = Data()
+        /// 预设 HTTP 状态码
+        static var statusCode: Int = 200
+        /// 预设响应头
+        static var responseHeaders: [String: String] = [
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache"
+        ]
+
+        override class func canInit(with request: URLRequest) -> Bool { true }
+        override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+        override func startLoading() {
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: MockSSEURLProtocol.statusCode,
+                httpVersion: "HTTP/1.1",
+                headerFields: MockSSEURLProtocol.responseHeaders
+            )!
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: MockSSEURLProtocol.responseData)
+            client?.urlProtocolDidFinishLoading(self)
+        }
+
+        override func stopLoading() {}
+
+        /// 重置静态状态（测试间隔离）
+        static func reset() {
+            responseData = Data()
+            statusCode = 200
+            responseHeaders = ["Content-Type": "text/event-stream", "Cache-Control": "no-cache"]
+        }
+    }
+
+    /// SSE 解析时应拒绝跨域 endpoint 事件（防劫持），且不影响正常 message 事件传递。
+    ///
+    /// 验证点：
+    /// 1. 恶意 `event: endpoint`（跨域 URL）不被设置为 POST 端点
+    /// 2. `endpoint` 事件不传递给消息流（上层仅收到 `message` 事件）
+    /// 3. `send()` 因 postEndpoint 为 nil 而抛出 connectionFailed 错误
+    func testSSEEndpointHijackIsRejected() async throws {
+        // SSE 连接 URL（localhost:9999）
+        let sseURL = "http://localhost:9999/sse"
+        // 恶意 endpoint URL（evil.com，与 SSE 连接不同源，触发劫持检测）
+        let evilEndpoint = "http://evil.com/api"
+
+        // 构造 SSE 响应：先发送恶意 endpoint 事件，再发送一条正常 message 事件。
+        // 事件之间用空行分隔，末尾空行确保最后一个事件被处理。
+        let sseResponse = """
+        event: endpoint
+        data: \(evilEndpoint)
+
+        event: message
+        data: {"jsonrpc":"2.0","id":1,"result":{"tools":[]}}
+
+        """
+
+        // 配置 Mock URLSession（通过 URLProtocol 拦截所有请求，无需真实网络）
+        MockSSEURLProtocol.reset()
+        MockSSEURLProtocol.responseData = sseResponse.data(using: .utf8)!
+        let urlSessionConfig = URLSessionConfiguration.ephemeral
+        urlSessionConfig.protocolClasses = [MockSSEURLProtocol.self]
+        let session = URLSession(configuration: urlSessionConfig)
+
+        // 创建 SSETransport，注入 Mock session
+        let transport = SSETransport(urlString: sseURL, headers: nil, session: session)
+
+        // 先启动消息流（设置 continuation），再连接。
+        // 否则 connect() 启动的读取 Task 会在 continuation 为 nil 时丢弃 message 事件。
+        let messageStream = transport.messages()
+        try await transport.connect()
+
+        // 收集消息（流会在 SSE 响应读取完毕后自动结束）
+        let messages = await collectSSEMessages(from: messageStream, timeoutSeconds: 5)
+
+        // 断言 1：endpoint 事件不应出现在消息流中，只有 message 事件被传递给上层
+        XCTAssertEqual(messages.count, 1, "应仅收到 1 条 message 事件，endpoint 事件不应传递给上层")
+        guard let firstMessage = messages.first else {
+            return XCTFail("未收到任何消息，SSE 流可能超时或异常")
+        }
+        let json = try JSONSerialization.jsonObject(with: firstMessage) as? [String: Any]
+        XCTAssertEqual(json?["jsonrpc"] as? String, "2.0", "消息内容应为 JSON-RPC 响应")
+        XCTAssertEqual(json?["id"] as? Int, 1, "消息 id 应为 1")
+
+        // 断言 2：恶意 endpoint 被拒绝后 postEndpoint 为 nil，send() 应抛出 connectionFailed
+        do {
+            _ = try await transport.send(Data("{}".utf8))
+            XCTFail("恶意 endpoint 应被拒绝，send() 应抛出 connectionFailed 错误")
+        } catch let error as MCPError {
+            if case .connectionFailed = error {
+                // 预期：postEndpoint 未设置，send() 抛出 "SSE POST 端点未就绪"
+            } else {
+                XCTFail("应为 connectionFailed 错误，实际: \(error)")
+            }
+        } catch {
+            XCTFail("应为 MCPError，实际: \(error)")
+        }
+
+        await transport.disconnect()
+    }
+
+    /// 从 AsyncStream 收集所有消息，带超时保护（防止测试挂起）。
+    /// 流正常结束后返回所有消息；超时则返回已收集的消息。
+    private func collectSSEMessages(from stream: AsyncStream<Data>, timeoutSeconds: TimeInterval = 5) async -> [Data] {
+        await withTaskGroup(of: [Data].self) { group in
+            // 消息收集任务：流结束时返回所有消息
+            group.addTask {
+                var messages: [Data] = []
+                for await data in stream {
+                    messages.append(data)
+                }
+                return messages
+            }
+            // 超时看门狗任务：到达超时时间返回空数组
+            group.addTask {
+                try? await Task.sleep(nanoseconds: UInt64(timeoutSeconds * 1_000_000_000))
+                return []
+            }
+            // 等待先完成的任务，取消另一个
+            let result = await group.next() ?? []
+            group.cancelAll()
+            return result
+        }
+    }
+
     // MARK: - 辅助方法
 
     /// 创建测试用 MCPConfig

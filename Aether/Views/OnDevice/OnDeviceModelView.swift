@@ -60,8 +60,8 @@ struct OnDeviceModelView: View {
                 if downloadedModelIds.isEmpty {
                     EmptyStateView(
                         systemImage: "cpu",
-                        title: "尚未下载端侧模型",
-                        message: "下载端侧模型以在无网络时使用 AI 推理"
+                        title: "无本地模型",
+                        message: "下载端侧模型以离线使用 AI 推理"
                     )
                     .frame(height: 240)
                     .listRowBackground(Color.clear)

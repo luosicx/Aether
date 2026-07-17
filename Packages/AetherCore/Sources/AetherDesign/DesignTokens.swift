@@ -34,8 +34,16 @@ public enum CornerRadius {
 public enum AnimationTokens {
     /// 页面转场 0.25s
     public static let transition: Animation = .easeInOut(duration: 0.25)
-    /// 消息进入 0.2s
+    /// 消息气泡进出场（spring 0.3s）
+    public static let messageBubble: Animation = .spring(duration: 0.3)
+    /// 消息进入 0.2s（保留用于轻量淡入场景）
     public static let messageAppear: Animation = .easeOut(duration: 0.2)
+    /// 主题切换过渡 0.4s
+    public static let themeTransition: Animation = .easeInOut(duration: 0.4)
+    /// sheet 过渡（spring 0.35s）
+    public static let sheetPresentation: Animation = .spring(duration: 0.35)
+    /// 列表项过渡 0.25s
+    public static let listItemTransition: Animation = .easeInOut(duration: 0.25)
     /// 按钮按下 0.1s
     public static let buttonPress: Animation = .easeInOut(duration: 0.1)
     /// 骨架屏呼吸 0.8s

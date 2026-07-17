@@ -1,7 +1,13 @@
 import SwiftUI
 import SwiftData
+import UniformTypeIdentifiers
 import AetherDesign
 import AetherUI
+#if os(iOS)
+import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
 struct ConversationList: View {
     @Bindable var conversationListVM: ConversationListVM
@@ -24,6 +30,13 @@ struct ConversationList: View {
     @State private var isEditMode = false
     @State private var selectedConversations: Set<UUID> = []
     @State private var showBatchDeleteConfirm = false
+    /// Task 15: 导出目标（驱动单个 fileExporter），nil 表示未导出
+    @State private var exportTarget: ExportTarget?
+    /// Task 15: PDF 生成中（异步），避免重复触发
+    @State private var isGeneratingPDF = false
+    /// Task 15: 分享链接 sheet
+    @State private var showShareLinkSheet = false
+    @State private var shareLinkConversation: Conversation?
 
     /// Day 9: 按搜索关键词过滤会话（标题包含匹配，不区分大小写）
     private var filteredConversations: [Conversation] {
@@ -37,14 +50,38 @@ struct ConversationList: View {
         !filteredConversations.isEmpty && filteredConversations.allSatisfy { selectedConversations.contains($0.id) }
     }
 
+    /// Task 15: fileExporter 使用的导出文档（依据 exportTarget 计算）
+    private var exportDocument: ConversationExportDocument? {
+        guard let target = exportTarget else { return nil }
+        switch target {
+        case .markdown(_, let text): return ConversationExportDocument(text: text)
+        case .pdf(_, let data): return ConversationExportDocument(pdf: data)
+        }
+    }
+
+    /// Task 15: fileExporter 使用的内容类型
+    private var exportContentType: UTType {
+        if case .pdf = exportTarget { return .pdf }
+        return .plainText
+    }
+
+    /// Task 15: fileExporter 默认文件名（使用会话标题）
+    private var exportDefaultFilename: String? {
+        switch exportTarget {
+        case .markdown(let conv, _), .pdf(let conv, _): return conv.title
+        default: return nil
+        }
+    }
+
     var body: some View {
         NavigationStack {
             Group {
                 if conversationListVM.conversations.isEmpty {
+                    // Task 17：使用 AetherIcons.bubble 兜底 SF Symbol
                     EmptyStateView(
-                        systemImage: "scroll",
-                        title: "还没有对话",
-                        message: "点击右上角新建对话开始聊天",
+                        systemImage: AetherIcon.bubble.fallbackSystemName,
+                        title: "开始新对话",
+                        message: "点击右上角 + 按钮创建新会话",
                         primaryButtonTitle: "新建对话",
                         primaryAction: { onCreate() }
                     )
@@ -129,6 +166,42 @@ struct ConversationList: View {
                                 .accessibilityLabel(conversation.isPinned ? "取消置顶" : "置顶")
                                 .accessibilityHint(conversation.isPinned ? "取消置顶此会话" : "将此会话置顶")
                                 .accessibilityIdentifier("togglePinContextMenuButton")
+                                // Task 15: 导出子菜单（Markdown / PDF / 分享链接）
+                                Divider()
+                                Menu {
+                                    Button {
+                                        exportAsMarkdown(conversation)
+                                    } label: {
+                                        Label("导出为 Markdown", systemImage: "doc.richtext")
+                                    }
+                                    .accessibilityLabel("导出为 Markdown")
+                                    .accessibilityHint("将此会话导出为 Markdown 文件")
+                                    .accessibilityIdentifier("exportMarkdownContextMenuButton")
+                                    Button {
+                                        exportAsPDF(conversation)
+                                    } label: {
+                                        Label("导出为 PDF", systemImage: "doc.pdf")
+                                    }
+                                    .disabled(isGeneratingPDF)
+                                    .accessibilityLabel("导出为 PDF")
+                                    .accessibilityHint("将此会话导出为 PDF 文件")
+                                    .accessibilityIdentifier("exportPDFContextMenuButton")
+                                    Button {
+                                        shareLinkConversation = conversation
+                                        showShareLinkSheet = true
+                                    } label: {
+                                        Label("分享链接", systemImage: "link")
+                                    }
+                                    .accessibilityLabel("分享链接")
+                                    .accessibilityHint("生成此会话的 DeepLink 分享链接")
+                                    .accessibilityIdentifier("shareLinkContextMenuButton")
+                                } label: {
+                                    Label("导出", systemImage: "square.and.arrow.up")
+                                }
+                                .accessibilityLabel("导出")
+                                .accessibilityHint("导出或分享此会话")
+                                .accessibilityIdentifier("exportContextMenuMenu")
+                                Divider()
                                 Button(role: .destructive) {
                                     conversationListVM.deleteConversation(conversation)
                                 } label: {
@@ -312,7 +385,55 @@ struct ConversationList: View {
             } message: {
                 Text(String(format: NSLocalizedString("确定删除选中的 %d 个对话？删除后无法恢复。", comment: ""), selectedConversations.count))
             }
+            // Task 15: 导出文件保存面板（Markdown / PDF 共用单个 fileExporter）
+            .fileExporter(
+                isPresented: Binding(
+                    get: { exportTarget != nil },
+                    set: { presented in if !presented { exportTarget = nil } }
+                ),
+                document: exportDocument,
+                contentType: exportContentType,
+                defaultFilename: exportDefaultFilename
+            ) { result in
+                if case .failure = result {
+                    exportTarget = nil
+                }
+            }
+            // Task 15: 分享链接 sheet
+            .sheet(isPresented: $showShareLinkSheet) {
+                if let conv = shareLinkConversation {
+                    ShareLinkSheet(conversation: conv)
+                }
+            }
         }
+    }
+
+    // MARK: - Task 15: 导出动作
+    /// 导出为 Markdown：同步生成后触发 fileExporter
+    private func exportAsMarkdown(_ conversation: Conversation) {
+        let exporter = ConversationExporter()
+        let text = exporter.exportAsMarkdown(conversation: conversation)
+        exportTarget = .markdown(conversation, text)
+    }
+
+    /// 导出为 PDF：异步生成 PDF Data，完成后触发 fileExporter
+    private func exportAsPDF(_ conversation: Conversation) {
+        guard !isGeneratingPDF else { return }
+        isGeneratingPDF = true
+        let exporter = ConversationExporter()
+        Task {
+            let data = await exporter.exportAsPDF(conversation: conversation)
+            isGeneratingPDF = false
+            if let data = data {
+                exportTarget = .pdf(conversation, data)
+            }
+        }
+    }
+
+    /// Task 15: 导出目标枚举，驱动 fileExporter 的文档与内容类型
+    private enum ExportTarget {
+        case markdown(Conversation, String)
+        case pdf(Conversation, Data)
     }
 
     #if os(macOS)
@@ -347,4 +468,114 @@ struct ConversationList: View {
         return true
     }
     #endif
+}
+
+// MARK: - Task 15: 分享链接 Sheet
+/// 展示会话 DeepLink，支持系统分享与拷贝到剪贴板
+private struct ShareLinkSheet: View {
+    let conversation: Conversation
+    @Environment(\.dismiss) private var dismiss
+
+    private var shareURL: URL? {
+        ConversationExporter().exportAsShareLink(conversation: conversation)
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 20) {
+                Image(systemName: "link")
+                    .font(.system(size: 40))
+                    .foregroundStyle(.tint)
+                    .accessibilityHidden(true)
+                Text("对话分享链接")
+                    .font(.headline)
+                if let url = shareURL {
+                    Text(url.absoluteString)
+                        .font(.system(.body, design: .monospaced))
+                        .textSelection(.enabled)
+                        .padding(12)
+                        .frame(maxWidth: .infinity)
+                        .background(.regularMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .accessibilityLabel("分享链接地址")
+                        .accessibilityValue(url.absoluteString)
+                    ShareLink(item: url) {
+                        Label("分享…", systemImage: "square.and.arrow.up")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .accessibilityLabel("分享链接")
+                    .accessibilityHint("通过系统分享面板分享此链接")
+                    Button {
+                        copyToClipboard(url.absoluteString)
+                    } label: {
+                        Label("拷贝链接", systemImage: "doc.on.doc")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityLabel("拷贝链接")
+                    .accessibilityHint("将链接复制到剪贴板")
+                } else {
+                    Text("无法生成分享链接")
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            .padding(20)
+            #if os(iOS)
+            .navigationBarTitleDisplayMode(.inline)
+            #endif
+            .navigationTitle("分享链接")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("关闭") { dismiss() }
+                        .accessibilityLabel("关闭")
+                }
+            }
+        }
+    }
+
+    /// 跨平台拷贝文本到系统剪贴板
+    private func copyToClipboard(_ text: String) {
+        #if os(iOS)
+        UIPasteboard.general.string = text
+        #else
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        #endif
+    }
+}
+
+// MARK: - Task 15: 导出文件 Document
+/// 支持 Markdown 纯文本与 PDF 数据的 FileDocument，供 fileExporter 保存
+struct ConversationExportDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.plainText, .pdf] }
+
+    private let textContent: String?
+    private let pdfData: Data?
+
+    init(text: String) {
+        textContent = text
+        pdfData = nil
+    }
+    init(pdf: Data) {
+        textContent = nil
+        pdfData = pdf
+    }
+    init(configuration: ReadConfiguration) throws {
+        if configuration.contentType == .pdf, let data = configuration.file.regularFileContents {
+            pdfData = data
+            textContent = nil
+        } else {
+            pdfData = nil
+            textContent = String(data: configuration.file.regularFileContents ?? Data(), encoding: .utf8) ?? ""
+        }
+    }
+
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        if let pdf = pdfData {
+            return FileWrapper(regularFileWithContents: pdf)
+        }
+        return FileWrapper(regularFileWithContents: Data((textContent ?? "").utf8))
+    }
 }

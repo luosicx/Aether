@@ -23,6 +23,7 @@
 #   DESTINATION   覆盖默认 destination
 #   CONFIG        覆盖 configuration (Debug/Release, 默认 Debug)
 #   DEVELOPER_DIR 覆盖自动检测的 Xcode 开发者目录
+#   STRICT_CONCURRENCY  覆盖 SWIFT_STRICT_CONCURRENCY (complete/minimal, 默认 complete)
 
 set -euo pipefail
 
@@ -31,6 +32,10 @@ cd "$(dirname "$0")/.."
 
 PROJECT="Aether.xcodeproj"
 DERIVED_DATA_PATH="build/DerivedData"
+
+# Task 8: 默认启用 SWIFT_STRICT_CONCURRENCY=complete，与 CI 保持一致。
+# 通过 STRICT_CONCURRENCY 环境变量可覆盖（如 STRICT_CONCURRENCY=minimal 用于本地调试）。
+STRICT_CONCURRENCY="${STRICT_CONCURRENCY:-complete}"
 
 # 颜色定义
 GREEN='\033[0;32m'
@@ -136,7 +141,8 @@ run_build() {
         -destination "$destination" \
         -configuration "$CONFIG" \
         -derivedDataPath "$DERIVED_DATA_PATH" \
-        CODE_SIGNING_ALLOWED=NO
+        CODE_SIGNING_ALLOWED=NO \
+        SWIFT_STRICT_CONCURRENCY="$STRICT_CONCURRENCY"
     log_success "BUILD SUCCEEDED: $scheme"
 }
 
@@ -161,6 +167,7 @@ run_test() {
         -configuration "$CONFIG" \
         -derivedDataPath "$DERIVED_DATA_PATH" \
         CODE_SIGNING_ALLOWED=NO \
+        SWIFT_STRICT_CONCURRENCY="$STRICT_CONCURRENCY" \
         "$@"
     log_success "TEST SUCCEEDED: $scheme"
 }
@@ -244,11 +251,13 @@ print_usage() {
   DESTINATION   覆盖默认 destination
   CONFIG        覆盖 configuration (Debug/Release, 默认 Debug)
   DEVELOPER_DIR 覆盖自动检测的 Xcode 开发者目录
+  STRICT_CONCURRENCY  覆盖 SWIFT_STRICT_CONCURRENCY (complete/minimal, 默认 complete)
 
 示例:
   ./scripts/build.sh build-ios
   ./scripts/build.sh build-macos
   CONFIG=Release ./scripts/build.sh build-ios
+  STRICT_CONCURRENCY=minimal ./scripts/build.sh build-ios
   DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer ./scripts/build.sh build-ios
 EOF
 }

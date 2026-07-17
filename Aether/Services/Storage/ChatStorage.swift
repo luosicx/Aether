@@ -1,6 +1,7 @@
 import AetherServices
 import Foundation
 import SwiftData
+import os
 
 /// 会话与消息持久化服务，封装 SwiftData ModelContext 操作。@MainActor 隔离。
 /// Task 1.7: 通过注入 ConversationIndexer 协议解耦对 SpotlightIndexer 的直接依赖。
@@ -26,7 +27,7 @@ final class ChatStorage {
         do {
             try modelContext.save()
         } catch {
-            print("ChatStorage save failed (\(context)): \(error)")
+            Logger.storage.error("ChatStorage save failed (\(context, privacy: .public)): \(error.localizedDescription, privacy: .public)")
             assertionFailure("ChatStorage save failed (\(context)): \(error)")
         }
     }
