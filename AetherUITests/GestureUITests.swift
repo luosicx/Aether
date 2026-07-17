@@ -40,38 +40,51 @@ final class GestureUITests: XCTestCase {
         app.launch()
 
         // 打开会话列表，新建一个对话
+        // CI 模拟器导航存在时序延迟，按钮点击前需 waitForExistence 确保可交互
+        XCTAssertTrue(app.buttons["conversationListButton"].waitForExistence(timeout: 8), "应存在会话列表按钮")
         app.buttons["conversationListButton"].tap()
+        XCTAssertTrue(app.buttons["newConversationButton"].firstMatch.waitForExistence(timeout: 8), "应存在新建对话按钮")
         app.buttons["newConversationButton"].firstMatch.tap()
-        XCTAssertTrue(app.staticTexts["新对话"].waitForExistence(timeout: 3), "应创建新对话")
+        XCTAssertTrue(app.staticTexts["新对话"].waitForExistence(timeout: 8), "应创建新对话")
 
         // 返回会话列表
+        XCTAssertTrue(app.buttons["conversationListButton"].waitForExistence(timeout: 8), "返回时应存在会话列表按钮")
         app.buttons["conversationListButton"].tap()
 
         // 定位会话行
         let row = app.cells.containing(.staticText, identifier: "新对话").firstMatch
-        XCTAssertTrue(row.waitForExistence(timeout: 3), "应存在新对话行")
+        XCTAssertTrue(row.waitForExistence(timeout: 8), "应存在新对话行")
 
         // 左滑会话行——reveals trailing swipe actions
         row.swipeLeft()
 
         // 滑动后应出现删除按钮（swipeDeleteConversationButton）
         let deleteButton = app.descendants(matching: .any).matching(identifier: "swipeDeleteConversationButton").firstMatch
-        let deleteAppeared = deleteButton.waitForExistence(timeout: 3)
+        let deleteAppeared = deleteButton.waitForExistence(timeout: 8)
 
         if deleteAppeared {
             // 点击删除按钮，应弹出确认 alert
             deleteButton.tap()
-            XCTAssertTrue(app.alerts.firstMatch.waitForExistence(timeout: 5), "点击删除应弹出确认 alert")
+            XCTAssertTrue(app.alerts.firstMatch.waitForExistence(timeout: 8), "点击删除应弹出确认 alert")
 
             // alert 应包含「删除」按钮
             let confirmDelete = app.alerts.firstMatch.buttons["删除"]
-            if confirmDelete.waitForExistence(timeout: 3) {
+            if confirmDelete.waitForExistence(timeout: 5) {
                 confirmDelete.tap()
-                // 等待 alert 消失
-                _ = app.alerts.firstMatch.waitForNonExistence(timeout: 5)
+            } else {
+                // 兜底：点第二个按钮（destructive 按钮通常在第二位）
+                app.alerts.firstMatch.buttons.element(boundBy: 1).tap()
             }
-            // 验证会话已被删除（新对话行应消失）
-            _ = app.cells.containing(.staticText, identifier: "新对话").firstMatch.waitForNonExistence(timeout: 5)
+            // 等待 alert 消失：增加超时 + 重试点击，部分模拟器版本 alert 关闭有视觉延迟
+            var alertDismissed = app.alerts.firstMatch.waitForNonExistence(timeout: 8)
+            if !alertDismissed {
+                // 重试：再次点击删除按钮（alert 可能未接收首次点击），再等待关闭
+                let retryDelete = app.alerts.firstMatch.buttons["删除"]
+                if retryDelete.exists { retryDelete.tap() }
+                alertDismissed = app.alerts.firstMatch.waitForNonExistence(timeout: 8)
+            }
+            // 验证会话已被删除（新对话行应消失）——增加超时以覆盖删除动画
+            _ = app.cells.containing(.staticText, identifier: "新对话").firstMatch.waitForNonExistence(timeout: 10)
             XCTAssertFalse(app.cells.containing(.staticText, identifier: "新对话").firstMatch.exists,
                           "确认删除后会话行应消失")
         } else {
@@ -158,30 +171,38 @@ final class GestureUITests: XCTestCase {
         app.launch()
 
         // 打开会话列表，新建两个对话
+        // CI 模拟器导航存在时序延迟，所有按钮点击前需 waitForExistence 确保可交互
+        XCTAssertTrue(app.buttons["conversationListButton"].waitForExistence(timeout: 8), "应存在会话列表按钮")
         app.buttons["conversationListButton"].tap()
+
+        XCTAssertTrue(app.buttons["newConversationButton"].firstMatch.waitForExistence(timeout: 8), "应存在新建对话按钮")
         app.buttons["newConversationButton"].firstMatch.tap()
-        XCTAssertTrue(app.staticTexts["新对话"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["新对话"].waitForExistence(timeout: 8), "应创建第一个新对话")
 
         // 返回列表再新建一个
+        XCTAssertTrue(app.buttons["conversationListButton"].waitForExistence(timeout: 8), "返回列表时应存在会话列表按钮")
         app.buttons["conversationListButton"].tap()
+
+        XCTAssertTrue(app.buttons["newConversationButton"].firstMatch.waitForExistence(timeout: 8), "应再次存在新建对话按钮")
         app.buttons["newConversationButton"].firstMatch.tap()
-        XCTAssertTrue(app.staticTexts["新对话"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["新对话"].waitForExistence(timeout: 8), "应创建第二个新对话")
 
         // 返回列表
+        XCTAssertTrue(app.buttons["conversationListButton"].waitForExistence(timeout: 8), "再次返回列表时应存在会话列表按钮")
         app.buttons["conversationListButton"].tap()
 
         // 点击「编辑」按钮进入编辑模式
         let editButton = app.buttons["editConversationsButton"]
-        XCTAssertTrue(editButton.waitForExistence(timeout: 3), "应存在编辑按钮")
+        XCTAssertTrue(editButton.waitForExistence(timeout: 8), "应存在编辑按钮")
         editButton.tap()
 
         // 验证进入编辑模式——按钮文案变为「完成」
         let doneButton = app.buttons["完成"]
-        XCTAssertTrue(doneButton.waitForExistence(timeout: 3), "进入编辑模式后应显示「完成」按钮")
+        XCTAssertTrue(doneButton.waitForExistence(timeout: 8), "进入编辑模式后应显示「完成」按钮")
 
         // 退出编辑模式
         doneButton.tap()
-        _ = app.buttons["editConversationsButton"].waitForExistence(timeout: 3)
+        _ = app.buttons["editConversationsButton"].waitForExistence(timeout: 8)
 
         // 核心验证：编辑模式可进入/退出且不 crash（.onMove 已注册）
         XCTAssertTrue(app.buttons["editConversationsButton"].exists, "退出编辑模式后应恢复「编辑」按钮")

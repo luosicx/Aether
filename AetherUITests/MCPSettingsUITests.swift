@@ -206,7 +206,12 @@ final class MCPSettingsUITests: XCTestCase {
                 sseSegment.tap()
             }
         }
+        // 滚动表单让 URL 输入框可见（键盘可能遮挡下方字段）
         if urlField.waitForExistence(timeout: 3) {
+            if !urlField.isHittable {
+                nameField.swipeUp()
+                _ = urlField.waitForExistence(timeout: 2)
+            }
             urlField.tap()
             urlField.typeText("http://localhost:4000/sse")
         }
@@ -216,27 +221,42 @@ final class MCPSettingsUITests: XCTestCase {
             let window = app.windows.firstMatch
             let topPoint = window.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.05))
             topPoint.tap()
-            _ = app.keyboards.firstMatch.waitForNonExistence(timeout: 3)
+            _ = app.keyboards.firstMatch.waitForNonExistence(timeout: 5)
         }
 
         let saveButton = app.buttons["saveServerButton"]
-        XCTAssertTrue(saveButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(saveButton.waitForExistence(timeout: 8), "应存在保存按钮")
+        // 保存按钮需在名称和 URL 都非空时才启用；若被键盘遮挡或未启用则滚动后重试
+        if !saveButton.isEnabled {
+            nameField.swipeUp()
+            _ = saveButton.waitForExistence(timeout: 3)
+        }
+        // 轮询 isHittable，等待滚动惯性结束
+        let saveHitDeadline = Date().addingTimeInterval(3)
+        while !saveButton.isHittable && Date() < saveHitDeadline {
+            Thread.sleep(forTimeInterval: 0.1)
+        }
         saveButton.tap()
 
         // 验证 Server 已添加
         let serverText = app.staticTexts["待删除 Server"]
-        XCTAssertTrue(serverText.waitForExistence(timeout: 5), "添加后应出现条目")
+        XCTAssertTrue(serverText.waitForExistence(timeout: 8), "添加后应出现条目")
 
         // 左滑删除（Form 中 onDelete 行为）
         let cell = app.cells.containing(.staticText, identifier: "待删除 Server").firstMatch
-        if cell.exists {
+        if cell.waitForExistence(timeout: 5) {
             cell.swipeLeft()
-            let deleteButton = app.buttons["Delete"].firstMatch
-                ?? app.descendants(matching: .any).matching(
-                    NSPredicate(format: "label == %@", "删除")
-                ).firstMatch
-            if deleteButton.waitForExistence(timeout: 3) {
+            // onDelete 触发的系统 Delete 按钮（英文 label "Delete"）
+            let deleteButton = app.descendants(matching: .any).matching(
+                NSPredicate(format: "label == %@", "Delete")
+            ).firstMatch
+            let deleteLabelButton = app.descendants(matching: .any).matching(
+                NSPredicate(format: "label == %@", "删除")
+            ).firstMatch
+            if deleteButton.waitForExistence(timeout: 5) {
                 deleteButton.tap()
+            } else if deleteLabelButton.waitForExistence(timeout: 3) {
+                deleteLabelButton.tap()
             } else {
                 // 兜底：通过行点击进入编辑后无法直接删除，
                 // 改为直接查找删除确认按钮（confirmationDialog 触发）
@@ -244,17 +264,21 @@ final class MCPSettingsUITests: XCTestCase {
             }
         }
 
-        // 处理确认弹窗（confirmationDialog）
-        let confirmDelete = app.buttons["confirmDeleteServerButton"]
-            ?? app.descendants(matching: .any).matching(
-                NSPredicate(format: "label == %@", "删除")
-            ).firstMatch
-        if confirmDelete.waitForExistence(timeout: 3) {
+        // 处理确认弹窗（confirmationDialog）——优先用 accessibilityIdentifier 定位
+        let confirmDelete = app.descendants(matching: .any).matching(
+            NSPredicate(format: "identifier == %@", "confirmDeleteServerButton")
+        ).firstMatch
+        let altConfirmDelete = app.descendants(matching: .any).matching(
+            NSPredicate(format: "label == %@", "删除")
+        ).firstMatch
+        if confirmDelete.waitForExistence(timeout: 5) {
             confirmDelete.tap()
+        } else if altConfirmDelete.waitForExistence(timeout: 3) {
+            altConfirmDelete.tap()
         }
 
-        // 验证 Server 已被删除（条目消失）
-        let deleted = serverText.waitForNonExistence(timeout: 5)
+        // 验证 Server 已被删除（条目消失）——增加超时覆盖动画
+        let deleted = serverText.waitForNonExistence(timeout: 10)
         // 删除验证为非阻塞：部分模拟器版本左滑行为不稳定
         // 核心验证已通过（进入 MCP 配置页 + 添加成功 + 触发删除流程）
         if !deleted {
@@ -262,13 +286,19 @@ final class MCPSettingsUITests: XCTestCase {
             if cell.exists {
                 cell.swipeLeft()
                 let retryDelete = app.descendants(matching: .any).matching(
-                    NSPredicate(format: "label == %@", "删除")
+                    NSPredicate(format: "label == %@", "Delete")
                 ).firstMatch
-                if retryDelete.waitForExistence(timeout: 2) {
+                if retryDelete.waitForExistence(timeout: 3) {
                     retryDelete.tap()
                 }
+                let retryConfirm = app.descendants(matching: .any).matching(
+                    NSPredicate(format: "identifier == %@", "confirmDeleteServerButton")
+                ).firstMatch
+                if retryConfirm.waitForExistence(timeout: 5) {
+                    retryConfirm.tap()
+                }
             }
-            _ = serverText.waitForNonExistence(timeout: 3)
+            _ = serverText.waitForNonExistence(timeout: 5)
         }
         XCTAssertTrue(true, "删除流程已触发，UI 交互验证通过")
     }
