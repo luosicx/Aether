@@ -106,7 +106,7 @@ final class AetherIconsTests: XCTestCase {
                        "FourPointStar.path(in: 100x100) 不应返回空 Path")
     }
 
-    /// 验证不同 rect 尺寸下 Path 的 boundingBox 都落在输入 rect 范围内
+    /// 验证不同 rect 尺寸下 Path 的 boundingRect 都落在输入 rect 范围内
     func testFourPointStarPathBoundingBoxWithinRect() {
         let star = FourPointStar()
         let rects: [CGRect] = [
@@ -117,9 +117,9 @@ final class AetherIconsTests: XCTestCase {
         ]
         for rect in rects {
             let path = star.path(in: rect)
-            let bounds = path.boundingBox
+            let bounds = path.boundingRect
             XCTAssertTrue(rect.contains(bounds),
-                          "boundingBox \(bounds) 应包含在 rect \(rect) 内")
+                          "boundingRect \(bounds) 应包含在 rect \(rect) 内")
         }
     }
 
@@ -128,8 +128,8 @@ final class AetherIconsTests: XCTestCase {
         let star = FourPointStar()
         let rect = CGRect(x: 0, y: 0, width: 0, height: 0)
         let path = star.path(in: rect)
-        let bounds = path.boundingBox
-        // 零尺寸下 boundingBox 面积应为 0
+        let bounds = path.boundingRect
+        // 零尺寸下 boundingRect 面积应为 0
         XCTAssertEqual(bounds.width, 0)
         XCTAssertEqual(bounds.height, 0)
     }
@@ -149,9 +149,9 @@ final class AetherIconsTests: XCTestCase {
         XCTAssertFalse(widePath.isEmpty, "宽矩形 rect 应生成非空 Path")
         XCTAssertFalse(tallPath.isEmpty, "高矩形 rect 应生成非空 Path")
 
-        XCTAssertTrue(squareRect.contains(squarePath.boundingBox))
-        XCTAssertTrue(wideRect.contains(widePath.boundingBox))
-        XCTAssertTrue(tallRect.contains(tallPath.boundingBox))
+        XCTAssertTrue(squareRect.contains(squarePath.boundingRect))
+        XCTAssertTrue(wideRect.contains(widePath.boundingRect))
+        XCTAssertTrue(tallRect.contains(tallPath.boundingRect))
     }
 
     // MARK: - AetherIconRenderer View Smoke Test

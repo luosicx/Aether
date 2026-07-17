@@ -37,8 +37,8 @@ final class VirtualizedMessageListTests: XCTestCase {
         let snapshotA = makeSnapshot(id: id, content: "first")
         let snapshotB = makeSnapshot(id: id, content: "second")
         // MessageSnapshot.hash(into:) 仅 combine id，故同 id 哈希值一致
-        let hasherA = Hasher()
-        let hasherB = Hasher()
+        var hasherA = Hasher()
+        var hasherB = Hasher()
         snapshotA.hash(into: hasherA)
         snapshotB.hash(into: hasherB)
         XCTAssertEqual(hasherA.finalize(), hasherB.finalize())
@@ -57,8 +57,8 @@ final class VirtualizedMessageListTests: XCTestCase {
     func testHashableDifferentIDSameContentHasDifferentHash() {
         let snapshotA = makeSnapshot(id: UUID(), content: "same")
         let snapshotB = makeSnapshot(id: UUID(), content: "same")
-        let hasherA = Hasher()
-        let hasherB = Hasher()
+        var hasherA = Hasher()
+        var hasherB = Hasher()
         snapshotA.hash(into: hasherA)
         snapshotB.hash(into: hasherB)
         // id 不同，哈希值（极大概率）不同
