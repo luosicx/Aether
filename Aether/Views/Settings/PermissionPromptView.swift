@@ -21,24 +21,6 @@ struct PermissionPromptInfo: Equatable, Sendable {
     let toolNames: [String]
     /// 公钥指纹（可选，公网 Server 用于防中间人攻击校验）
     let publicKeyPin: String?
-
-    init(
-        serverID: String,
-        serverName: String,
-        trust: TrustBoundary,
-        transportDescription: String,
-        toolCount: Int,
-        toolNames: [String],
-        publicKeyPin: String?
-    ) {
-        self.serverID = serverID
-        self.serverName = serverName
-        self.trust = trust
-        self.transportDescription = transportDescription
-        self.toolCount = toolCount
-        self.toolNames = toolNames
-        self.publicKeyPin = publicKeyPin
-    }
 }
 
 // MARK: - TrustBoundary 显示扩展
