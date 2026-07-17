@@ -1012,6 +1012,7 @@
 				2E5F9E8896772C1FC9036608 /* Performance */,
 				09BC29E459BEE2ACF9F29957 /* Feedback */,
 				C1BF41DA3447C8E450F8C8DF /* Crash */,
+				0D0132A3B5D9777CCAF8D740 /* Log */,
 				F5E6A7B8C9D0E1F2A3B4C5D6 /* Language */,
 				11111111111111111111A005 /* Memory */,
 				9A1B2C3D4E5F607100B00003 /* Agent */,
@@ -1579,6 +1580,14 @@
 				B856664315F8EE667D0C4F6A /* CrashReportService.swift */,
 			);
 			path = Crash;
+			sourceTree = "<group>";
+		};
+		0D0132A3B5D9777CCAF8D740 /* Log */ = {
+			isa = PBXGroup;
+			children = (
+				0D0132A3B5D9777CCAF8D73E /* Logger+Modules.swift */,
+			);
+			path = Log;
 			sourceTree = "<group>";
 		};
 		C204ADAE35CA296E8E13DDC3 /* Views */ = {
