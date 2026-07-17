@@ -14,6 +14,8 @@
 | macOS Deployment Target | 14+ | macOS 目标平台 |
 | Git | 2.30+ | 提交与 PR |
 | Node.js（可选） | 18+ | 部署 BFF Cloudflare Workers 时使用 |
+| Android（可选） | JDK 17 / Android SDK 34 (Build Tools 34.0.0) / Gradle 8.7 | Gradle 8.7 已随仓库提交 `gradlew`，无需手动安装 |
+| Windows（可选） | .NET 8 SDK / Windows 10+ | 构建 WPF Windows 客户端时使用 |
 
 ### 1.2 获取源码
 
@@ -31,10 +33,38 @@ open Aether.xcodeproj
 
 ### 1.4 首次运行
 
-1. Xcode 顶部 Scheme 选择 `Aether`
+1. Xcode 顶部 Scheme 选择 `Aether-iOS / Aether-macOS / AetherWatch / AetherWidgets`
 2. 目标设备选择 **iPhone 17 模拟器**（iOS 测试）或 **My Mac**（macOS 测试）
 3. 按 `Cmd + R` 运行
 4. App 启动后进入设置填入 DeepSeek API Key（https://platform.deepseek.com 申请）
+
+### 1.5 快捷构建命令
+
+项目根目录的 `Makefile` 封装了全平台构建命令，无需手敲 `xcodebuild` / `gradlew` / `dotnet`：
+
+**构建**
+
+| 平台 | 命令 | 说明 |
+|------|------|------|
+| Apple - iOS | `make build-ios` | 构建 iOS Simulator 版本 |
+| Apple - macOS | `make build-macos` | 构建 macOS 版本 |
+| Apple - Watch | `make build-watch` | 构建 watchOS App |
+| Apple - Widget | `make build-widget` | 构建 Widget Extension |
+| Android | `make build-android` | 构建 Debug APK |
+| Windows | `make build-windows` | 在 Windows 上执行（需 `make` 与 `pwsh`） |
+
+**Rust 与测试**
+
+| 类型 | 命令 |
+|------|------|
+| Rust 单元测试 | `make test-rust` |
+| iOS 测试 | `make test-ios` |
+| macOS 测试 | `make test-macos` |
+| 单元测试 | `make test-unit` |
+
+**清理**：`make clean`
+
+> 各 `make` 目标内部调用 `scripts/build-*.sh` / `scripts/build-*.ps1`，也可直接执行对应脚本。Android 与 Windows 构建详见 `doc/ANDROID_BUILD.md` 与 `doc/WINDOWS_BUILD.md`。
 
 ## 2. 代码规范
 
@@ -206,13 +236,13 @@ Closes #123
    # 4.1 代码质量由 CI SonarQube job 检查（无需本地运行）
 
    # 4.2 运行 UT（2092 用例，0 skip）
-   xcodebuild test -project Aether.xcodeproj -scheme Aether \
+   xcodebuild test -project Aether.xcodeproj -scheme Aether-iOS \
      -destination 'platform=iOS Simulator,name=iPhone 17' \
      -only-testing:AetherTests \
      -configuration Debug CODE_SIGNING_ALLOWED=NO
 
    # 4.3 运行 UIT（30 用例，0 skip）
-   xcodebuild test -project Aether.xcodeproj -scheme Aether \
+   xcodebuild test -project Aether.xcodeproj -scheme Aether-iOS \
      -destination 'platform=iOS Simulator,name=iPhone 17' \
      -only-testing:AetherUITests \
      -configuration Debug CODE_SIGNING_ALLOWED=NO

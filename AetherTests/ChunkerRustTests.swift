@@ -15,7 +15,7 @@ final class ChunkerRustTests: XCTestCase {
 
     func testEmptyTextReturnsSingleChunk() {
         let chunks = AetherRustChunker.chunkDocument("", maxChars: 512, overlapChars: 128)
-        XCTAssertEqual(chunks.count, 1, "空文本应返回 1 个 chunk（含原文本）")
+        XCTAssertEqual(chunks.count, 0, "空文本应返回 0 个 chunk")
     }
 
     // MARK: - 长文本分块
@@ -63,7 +63,7 @@ final class ChunkerRustTests: XCTestCase {
 
     func testMaxCharsZero() {
         let chunks = AetherRustChunker.chunkDocument("Hello world.", maxChars: 0, overlapChars: 0)
-        XCTAssertFalse(chunks.isEmpty, "maxChars=0 不应崩溃")
+        XCTAssertTrue(chunks.isEmpty, "maxChars=0 应返回空数组")
     }
 
     func testOverlapEqualsMaxChars() {

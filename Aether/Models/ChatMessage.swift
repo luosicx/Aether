@@ -1,6 +1,8 @@
 import Foundation
 import SwiftData
+#if canImport(AetherFoundation)
 import AetherFoundation
+#endif
 
 /// 持久化聊天消息，关联 Conversation，支持文本/图片/工具调用
 @Model
@@ -49,6 +51,7 @@ final class ChatMessage {
         self.toolName = toolName
     }
 
+    #if canImport(AetherFoundation)
     /// 转换为发往 LLM 的 APIMessage
     /// 合并 imageData 与 attachedImage 的 base64 到 images 字段，从 toolCallData 反序列化 toolCalls
     /// - Returns: 与 LLM API 直接对应的 APIMessage
@@ -74,4 +77,5 @@ final class ChatMessage {
         guard let calls = try? JSONDecoder().decode([StoredToolCall].self, from: data) else { return nil }
         return calls.map { ToolCallParam(id: $0.id, type: $0.type, function: FunctionCall(name: $0.name, arguments: $0.arguments)) }
     }
+    #endif
 }

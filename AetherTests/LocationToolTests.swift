@@ -104,6 +104,10 @@ final class LocationToolTests: XCTestCase {
     #if os(macOS)
     /// macOS 上定位可能不可用，execute 应优雅返回提示字符串而非崩溃
     func testExecuteOnMacOSDoesNotCrash() async throws {
+        // CI 环境下 CLLocationManager.requestWhenInUseAuthorization() 会触发
+        // 系统权限对话框，无人交互即挂起，跳过避免 CI 卡住
+        try XCTSkipIf(ProcessInfo.processInfo.environment["CI"] != nil,
+                      "跳过：CI 环境下定位权限请求对话框无人交互会挂起")
         let result = try await tool.execute(arguments: [:])
         XCTAssertFalse(result.isEmpty, "macOS 上 execute 应返回非空字符串（成功或错误提示）")
     }

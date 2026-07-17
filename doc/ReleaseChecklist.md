@@ -114,7 +114,7 @@
   ```bash
   xcodebuild build \
     -project Aether.xcodeproj \
-    -scheme Aether \
+    -scheme Aether-iOS \
     -destination 'platform=iOS Simulator,name=iPhone 17' \
     -configuration Debug \
     CODE_SIGNING_ALLOWED=NO
@@ -127,7 +127,7 @@
   ```bash
   xcodebuild build \
     -project Aether.xcodeproj \
-    -scheme Aether \
+    -scheme Aether-macOS \
     -destination 'platform=macOS' \
     -configuration Debug \
     CODE_SIGNING_ALLOWED=NO
@@ -157,7 +157,7 @@
   ```bash
   xcodebuild test \
     -project Aether.xcodeproj \
-    -scheme Aether \
+    -scheme Aether-iOS \
     -destination 'platform=iOS Simulator,name=iPhone 17' \
     -only-testing:AetherTests \
     CODE_SIGNING_ALLOWED=NO 2>&1 | tail -5
@@ -171,7 +171,7 @@
   ```bash
   xcodebuild test \
     -project Aether.xcodeproj \
-    -scheme Aether \
+    -scheme Aether-iOS \
     -destination 'platform=iOS Simulator,name=iPhone 17' \
     -only-testing:AetherUITests \
     CODE_SIGNING_ALLOWED=NO 2>&1 | tail -5

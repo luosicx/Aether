@@ -165,19 +165,33 @@ final class PluginSettingsUITests: XCTestCase {
         let pluginRow = app.descendants(matching: .any).matching(
             NSPredicate(format: "identifier BEGINSWITH %@", "pluginRow_")
         ).firstMatch
-        XCTAssertTrue(pluginRow.waitForExistence(timeout: 5))
+        XCTAssertTrue(pluginRow.waitForExistence(timeout: 8))
 
         // 点击权限 DisclosureGroup 展开
         let disclosure = app.descendants(matching: .any).matching(
             NSPredicate(format: "identifier BEGINSWITH %@", "pluginPermissionsDisclosure_")
         ).firstMatch
-        XCTAssertTrue(disclosure.waitForExistence(timeout: 3), "应存在权限查看控件")
+        XCTAssertTrue(disclosure.waitForExistence(timeout: 8), "应存在权限查看控件")
         disclosure.tap()
 
-        // 验证权限行出现（network 权限）
+        // 验证权限行出现（network 权限）——CI 模拟器 DisclosureGroup 展开动画存在延迟，
+        // 增加超时 + 重试点击 disclosure，并提供 label 兜底匹配
         let networkPerm = app.descendants(matching: .any).matching(
             NSPredicate(format: "identifier CONTAINS %@", "network")
         ).firstMatch
-        XCTAssertTrue(networkPerm.waitForExistence(timeout: 3), "展开后应显示网络权限行")
+        let networkLabel = app.descendants(matching: .any).matching(
+            NSPredicate(format: "label CONTAINS %@", "网络访问")
+        ).firstMatch
+
+        var permAppeared = networkPerm.waitForExistence(timeout: 8)
+            || networkLabel.waitForExistence(timeout: 3)
+
+        // 重试：DisclosureGroup 在部分模拟器版本上首次点击可能未展开，再次点击后等待
+        if !permAppeared {
+            if disclosure.exists { disclosure.tap() }
+            permAppeared = networkPerm.waitForExistence(timeout: 8)
+                || networkLabel.waitForExistence(timeout: 3)
+        }
+        XCTAssertTrue(permAppeared, "展开后应显示网络权限行")
     }
 }

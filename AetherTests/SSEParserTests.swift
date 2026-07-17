@@ -92,13 +92,15 @@ final class SSEParserTests: XCTestCase {
         XCTAssertEqual(accum[0]?.type, "function", "type 为 nil 时应默认为 function")
     }
 
-    /// chunk 无 choices 时返回 nil
+    /// chunk 无 choices 时返回 content/toolCalls 均为 nil 的 ParsedChunk
     @MainActor
-    func testParseWithToolAccumulationNoChoicesReturnsNil() {
+    func testParseWithToolAccumulationNoChoicesReturnsEmptyChunk() {
         var accum: [Int: AccumulatedToolCall] = [:]
         let line = #"data: {"id":"1","choices":[]}"#
         let result = parser.parseWithToolAccumulation(from: line, accumulated: &accum)
-        XCTAssertNil(result, "choices 为空数组时应返回 nil")
+        XCTAssertNotNil(result, "choices 为空数组时返回 content/toolCalls 均为 nil 的 ParsedChunk")
+        XCTAssertNil(result?.content, "content 应为 nil")
+        XCTAssertNil(result?.toolCalls, "toolCalls 应为 nil")
     }
 
     /// content-only chunk（无 tool_calls）应返回 ParsedChunk

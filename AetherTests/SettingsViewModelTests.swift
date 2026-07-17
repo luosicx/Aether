@@ -697,7 +697,7 @@ final class SettingsViewModelTests: XCTestCase {
 
     /// toggleTool 对高危工具也应正常工作
     func testToggleToolForHighRiskTool() {
-        let toolName = "run_terminal_command"
+        let toolName = "run_shortcut"
         let originalEnabled = ToolRegistry.shared.isEnabled(name: toolName)
 
         // 高危工具默认禁用

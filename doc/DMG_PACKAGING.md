@@ -195,7 +195,7 @@ build/dmg/
 | Scheme 不匹配 | 确认 scheme 为 `Aether`：`xcodebuild -list` |
 | 部署目标错误 | 确认 deployment target 为 macOS 14.0 |
 | 平台条件编译缺失 | macOS 独有工具应使用 `#if os(macOS)` 守卫 |
-| 派生数据损坏 | 清理后重试：`xcodebuild clean -scheme Aether` |
+| 派生数据损坏 | 清理后重试：`xcodebuild clean -scheme Aether-macOS` |
 
 ### 5.2 `codesign` 失败
 

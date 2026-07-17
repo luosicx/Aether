@@ -397,6 +397,7 @@
 		A96C6919872E43629B76934E /* RedactorRustTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78DE8551234B487B959A11FD /* RedactorRustTests.swift */; };
 		D63422AAA6284BC68E296D81 /* ChunkerRustTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF31C32D67E245369A38B5F8 /* ChunkerRustTests.swift */; };
 		7AF7F1A93B964C469AFBE281 /* RateLimiterRustTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7DE67C0A3A1463B8F4CFF01 /* RateLimiterRustTests.swift */; };
+		F1A2B3C4D5E6A000000A0001 /* AetherWidgets.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = E23D426313B3F4302BFC7094 /* AetherWidgets.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -407,7 +408,35 @@
 			remoteGlobalIDString = 3E5AA27405E11EA8C5B0C6DB;
 			remoteInfo = "Aether-macOS";
 		};
+		A1B2C3D4E5F6A7B8C9D0E1F2 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7C5EF9114C3CBE2937F8D8FA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E23E24C20D3BDA0C23D4DB83;
+			remoteInfo = "Aether-iOS";
+		};
+		B1C2D3E4F5A6B7C8D9E0F1A2 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7C5EF9114C3CBE2937F8D8FA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E23E24C20D3BDA0C23D4DB83;
+			remoteInfo = "Aether-iOS";
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		F1A2B3C4D5E6A000000A0002 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				F1A2B3C4D5E6A000000A0001 /* AetherWidgets.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		026C84A7B07AFEEBDBF03513 /* HealthInsightWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HealthInsightWidget.swift; sourceTree = "<group>"; };
@@ -418,7 +447,6 @@
 		05219D01EA46579E5C0F8054 /* TerminalCommandTool.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TerminalCommandTool.swift; sourceTree = "<group>"; };
 		05901B8A22C088927620C3AE /* IntentChatServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = IntentChatServiceTests.swift; sourceTree = "<group>"; };
 		06338EAB3D44F558619E23D1 /* LaunchScreen.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LaunchScreen.swift; sourceTree = "<group>"; };
-		0724C7D7F16CF6D4E26B31C8 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		08C042865F8B84CA2740C947 /* ChatView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatView.swift; sourceTree = "<group>"; };
 		0A53D759B12CCF9A30101BEB /* SwitchConversationIntent.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SwitchConversationIntent.swift; sourceTree = "<group>"; };
 		0AF59624B6F92514E3E2971E /* ConversationList.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ConversationList.swift; sourceTree = "<group>"; };
@@ -1498,7 +1526,6 @@
 			isa = PBXGroup;
 			children = (
 				8DEC7FB7EDCBF9E610EA1C1D /* Assets.xcassets */,
-				0724C7D7F16CF6D4E26B31C8 /* Info.plist */,
 				B2C3D4E5F6A7B8C9D0E1F2A3 /* Localizable.xcstrings */,
 				932EDF6C3BAF37E458955B1D /* PrivacyInfo.xcprivacy */,
 			);
@@ -1753,6 +1780,7 @@
 			);
 			dependencies = (
 				80145CE557A8E962C328363A /* PBXTargetDependency */,
+				C1D2E3F4A5B6C7D8E9F0A1B2 /* PBXTargetDependency */,
 			);
 			name = AetherTests;
 			packageProductDependencies = (
@@ -1810,6 +1838,7 @@
 			buildRules = (
 			);
 			dependencies = (
+				D1E2F3A4B5C6D7E8F9A0B1C2 /* PBXTargetDependency */,
 			);
 			name = AetherUITests;
 			productName = AetherUITests;
@@ -1823,6 +1852,7 @@
 				F5BBBFFB31EA2269F8DF6FD7 /* Sources */,
 				42466753CF0C4414DE48240D /* Frameworks */,
 				A14B17BC4206CF9CFA748603 /* Resources */,
+				F1A2B3C4D5E6A000000A0002 /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
@@ -1945,9 +1975,6 @@
 				8CF13E717D61D1637FF87029 /* HealthInsight.swift in Sources */,
 				D195DF25F099CBCAE6A7D571 /* DocumentChunk.swift in Sources */,
 				0F77C6F31E5AD98E37B4FFE2 /* MessageFeedback.swift in Sources */,
-				52830AC65B873752473D1AAB /* ChatChunk.swift in Sources */,
-				D9D9FFDA235F8B780E21097B /* LLMProvider.swift in Sources */,
-				88199CE49623E7EFD2E03C72 /* APIConfig.swift in Sources */,
 				CC74E9DCE8360907A2F360C3 /* AppGroupContainer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -2223,9 +2250,6 @@
 				D7CC48932318EB13EABAB59A /* HealthInsight.swift in Sources */,
 				B1FD28B97E1DFC80DF6D04DA /* DocumentChunk.swift in Sources */,
 				3C9E92BE0322159A79BF0AB2 /* MessageFeedback.swift in Sources */,
-				45E5F10C712E4EF727390CB5 /* ChatChunk.swift in Sources */,
-				599D3D46B298671B77BB2F71 /* LLMProvider.swift in Sources */,
-				42627293504388411664256B /* APIConfig.swift in Sources */,
 				3FB5DC6E3F012B35C7B139CA /* AppGroupContainer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -2340,6 +2364,18 @@
 			target = 3E5AA27405E11EA8C5B0C6DB /* Aether-macOS */;
 			targetProxy = 19570A7C106F8A3D402C4A64 /* PBXContainerItemProxy */;
 		};
+		C1D2E3F4A5B6C7D8E9F0A1B2 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = "Aether-iOS";
+			target = E23E24C20D3BDA0C23D4DB83 /* Aether-iOS */;
+			targetProxy = A1B2C3D4E5F6A7B8C9D0E1F2 /* PBXContainerItemProxy */;
+		};
+		D1E2F3A4B5C6D7E8F9A0B1C2 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = "Aether-iOS";
+			target = E23E24C20D3BDA0C23D4DB83 /* Aether-iOS */;
+			targetProxy = B1C2D3E4F5A6B7C8D9E0F1A2 /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
@@ -2350,9 +2386,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = "Aether/Aether-iOS.entitlements";
-				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "";
 				CODE_SIGN_IDENTITY = "Apple Development";
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = YZD665FDV5;
 				ENABLE_PREVIEWS = YES;
@@ -2453,6 +2487,7 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALIDATE_PRODUCT = YES;
+				SKIP_INSTALL = YES;
 			};
 			name = Release;
 		};
@@ -2463,9 +2498,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = "Aether/Aether-macOS.entitlements";
-				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "";
 				CODE_SIGN_IDENTITY = "-";
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEVELOPMENT_TEAM = YZD665FDV5;
@@ -2475,14 +2508,6 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "以太";
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
-					"-framework",
-					WatchConnectivity,
-				);
-				"OTHER_LDFLAGS[sdk=iphonesimulator*]" = (
-					"-framework",
-					WatchConnectivity,
-				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -Xfrontend -disable-sandbox";
 				PRODUCT_BUNDLE_IDENTIFIER = com.aether.app.macos;
 				PRODUCT_NAME = Aether;
@@ -2530,6 +2555,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
+				SKIP_INSTALL = YES;
 			};
 			name = Debug;
 		};
@@ -2585,9 +2611,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = "Aether/Aether-iOS.entitlements";
-				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "";
 				CODE_SIGN_IDENTITY = "Apple Development";
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = YZD665FDV5;
 				ENABLE_PREVIEWS = YES;
@@ -2724,9 +2748,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = "Aether/Aether-macOS.entitlements";
-				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "";
 				CODE_SIGN_IDENTITY = "-";
-				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEVELOPMENT_TEAM = YZD665FDV5;
@@ -2736,14 +2758,6 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "以太";
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				"OTHER_LDFLAGS[sdk=iphoneos*]" = (
-					"-framework",
-					WatchConnectivity,
-				);
-				"OTHER_LDFLAGS[sdk=iphonesimulator*]" = (
-					"-framework",
-					WatchConnectivity,
-				);
 				OTHER_SWIFT_FLAGS = "$(inherited) -Xfrontend -disable-sandbox";
 				PRODUCT_BUNDLE_IDENTIFIER = com.aether.app.macos;
 				PRODUCT_NAME = Aether;

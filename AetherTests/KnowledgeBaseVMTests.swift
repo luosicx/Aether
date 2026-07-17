@@ -226,7 +226,7 @@ final class KnowledgeBaseVMTests: XCTestCase {
         await vm.importDocument(url: tempURL, modelContext: context)
 
         XCTAssertNotNil(vm.errorMessage, "空文件应设置错误消息")
-        XCTAssertTrue(vm.errorMessage?.contains("无法读取文档内容") ?? false,
+        XCTAssertTrue(vm.errorMessage?.contains(String(format: NSLocalizedString("无法读取文档内容：%@", comment: ""), tempURL.lastPathComponent)) ?? false,
                       "错误消息应包含'无法读取文档内容'，实际：\(vm.errorMessage ?? "nil")")
         XCTAssertFalse(vm.isImporting, "应未进入导入状态")
     }
@@ -239,7 +239,7 @@ final class KnowledgeBaseVMTests: XCTestCase {
         await vm.importDocument(url: nonExistentURL, modelContext: context)
 
         XCTAssertNotNil(vm.errorMessage, "不存在的文件应设置错误消息")
-        XCTAssertTrue(vm.errorMessage?.contains("无法读取文档内容") ?? false,
+        XCTAssertTrue(vm.errorMessage?.contains(String(format: NSLocalizedString("无法读取文档内容：%@", comment: ""), nonExistentURL.lastPathComponent)) ?? false,
                       "错误消息应包含'无法读取文档内容'，实际：\(vm.errorMessage ?? "nil")")
         XCTAssertFalse(vm.isImporting, "应未进入导入状态")
     }
@@ -310,7 +310,7 @@ final class KnowledgeBaseVMTests: XCTestCase {
 
         XCTAssertNotNil(vm.errorMessage, "Qwen 供应商无 API Key 时应设置错误消息")
         XCTAssertTrue(
-            vm.errorMessage?.contains("请先在设置中配置 API Key") == true,
+            vm.errorMessage?.contains(NSLocalizedString("请先在设置中配置 API Key", comment: "")) == true,
             "错误消息应包含'请先在设置中配置 API Key'，实际：\(vm.errorMessage ?? "nil")"
         )
         XCTAssertFalse(vm.isImporting, "apiKey 为空时不应进入导入状态")
@@ -325,7 +325,7 @@ final class KnowledgeBaseVMTests: XCTestCase {
 
         XCTAssertNotNil(vm.errorMessage, "不可读文件应设置错误消息")
         XCTAssertTrue(
-            vm.errorMessage?.contains("无法读取文档内容") == true,
+            vm.errorMessage?.contains(String(format: NSLocalizedString("无法读取文档内容：%@", comment: ""), nonExistentURL.lastPathComponent)) == true,
             "错误消息应包含'无法读取文档内容'（在 apiKey 检查之前），实际：\(vm.errorMessage ?? "nil")"
         )
     }
@@ -345,7 +345,7 @@ final class KnowledgeBaseVMTests: XCTestCase {
 
         XCTAssertNotNil(vm.errorMessage, "非真实 PDF 文件应设置错误消息")
         XCTAssertTrue(
-            vm.errorMessage?.contains("无法读取文档内容") == true,
+            vm.errorMessage?.contains(String(format: NSLocalizedString("无法读取文档内容：%@", comment: ""), tempURL.lastPathComponent)) == true,
             "错误消息应包含'无法读取文档内容'，实际：\(vm.errorMessage ?? "nil")"
         )
         XCTAssertFalse(vm.isImporting, "PDF 解析失败时不应进入导入状态")
@@ -466,7 +466,7 @@ final class KnowledgeBaseVMTests: XCTestCase {
         // .txt 能读取内容，但 Qwen 无 API Key → 应提示 "请先在设置中配置 API Key"
         XCTAssertNotNil(vm.errorMessage, "应设置错误消息")
         XCTAssertTrue(
-            vm.errorMessage?.contains("请先在设置中配置 API Key") == true,
+            vm.errorMessage?.contains(NSLocalizedString("请先在设置中配置 API Key", comment: "")) == true,
             ".txt 文件读取成功但无 API Key 应提示配置 API Key，实际：\(vm.errorMessage ?? "nil")"
         )
     }
@@ -484,7 +484,7 @@ final class KnowledgeBaseVMTests: XCTestCase {
         // .md 走 String(contentsOf:) 路径，读取成功但无 API Key
         XCTAssertNotNil(vm.errorMessage, "应设置错误消息")
         XCTAssertTrue(
-            vm.errorMessage?.contains("请先在设置中配置 API Key") == true,
+            vm.errorMessage?.contains(NSLocalizedString("请先在设置中配置 API Key", comment: "")) == true,
             ".md 文件读取成功但无 API Key 应提示配置 API Key，实际：\(vm.errorMessage ?? "nil")"
         )
     }

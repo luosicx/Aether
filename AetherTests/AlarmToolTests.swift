@@ -257,8 +257,8 @@ final class AlarmToolTests: XCTestCase {
 
     /// 有效时间格式 "08:30" + 默认 label：应返回成功（需 EventKit 权限）
     func testExecuteValidTimeWithDefaultLabel() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil,
-                      "跳过：模拟器环境下 EventKit 权限请求挂起")
+        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
+                      "跳过：模拟器/CI 环境下 EventKit 权限请求挂起")
         let result = try await tool.execute(arguments: ["time": "08:30"])
         XCTAssertTrue(result.contains("已创建闹钟"), "有效时间应创建成功，实际：\(result)")
         XCTAssertTrue(result.contains("08:30"), "结果应含时间")
@@ -267,8 +267,8 @@ final class AlarmToolTests: XCTestCase {
 
     /// 有效时间格式 + 自定义 label：应返回成功且含自定义 label
     func testExecuteValidTimeWithCustomLabel() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil,
-                      "跳过：模拟器环境下 EventKit 权限请求挂起")
+        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
+                      "跳过：模拟器/CI 环境下 EventKit 权限请求挂起")
         let result = try await tool.execute(arguments: ["time": "09:00", "label": "起床"])
         XCTAssertTrue(result.contains("已创建闹钟"), "有效时间应创建成功")
         XCTAssertTrue(result.contains("起床"), "结果应含自定义 label '起床'")
@@ -276,8 +276,8 @@ final class AlarmToolTests: XCTestCase {
 
     /// 有效时间格式 "00:00"（午夜）：应返回成功
     func testExecuteMidnightTime() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil,
-                      "跳过：模拟器环境下 EventKit 权限请求挂起")
+        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
+                      "跳过：模拟器/CI 环境下 EventKit 权限请求挂起")
         let result = try await tool.execute(arguments: ["time": "00:00"])
         XCTAssertTrue(result.contains("已创建闹钟") || result.hasPrefix("错误"),
                       "午夜时间应返回成功或错误，实际：\(result)")
@@ -285,8 +285,8 @@ final class AlarmToolTests: XCTestCase {
 
     /// 有效时间格式 "23:59"（最晚时间）：应返回成功
     func testExecuteLatestTime() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil,
-                      "跳过：模拟器环境下 EventKit 权限请求挂起")
+        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
+                      "跳过：模拟器/CI 环境下 EventKit 权限请求挂起")
         let result = try await tool.execute(arguments: ["time": "23:59"])
         XCTAssertTrue(result.contains("已创建闹钟") || result.hasPrefix("错误"),
                       "最晚时间应返回成功或错误，实际：\(result)")
@@ -325,8 +325,8 @@ final class AlarmToolTests: XCTestCase {
 
     /// time 为单数字小时 "8:30"：通过 as? String，但 DateFormatter 可能解析失败，需权限后校验
     func testExecuteSingleDigitHourTimeFormat() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil,
-                      "跳过：模拟器环境下 EventKit 权限请求挂起")
+        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
+                      "跳过：模拟器/CI 环境下 EventKit 权限请求挂起")
         let result = try await tool.execute(arguments: ["time": "8:30"])
         XCTAssertTrue(result.contains("已创建闹钟") || result.hasPrefix("错误"),
                       "单数字小时时间应返回成功或错误，实际：\(result)")

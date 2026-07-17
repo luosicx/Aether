@@ -30,21 +30,23 @@ struct QuickChatEntry: TimelineEntry {
     let presets: [String]
 }
 
-/// 快速对话 Widget 的 TimelineProvider
-struct QuickChatTimelineProvider: TimelineProvider {
+/// 快速对话 Widget 的 AppIntentTimelineProvider
+struct QuickChatTimelineProvider: AppIntentTimelineProvider {
+    typealias Intent = QuickChatWidgetConfigurationIntent
+    typealias Entry = QuickChatEntry
+
     func placeholder(in context: Context) -> QuickChatEntry {
         QuickChatEntry(date: Date(), presets: QuickChatWidgetConfigurationIntent.defaultPresets)
     }
 
-    func getSnapshot(in context: Context, completion: @escaping (QuickChatEntry) -> Void) {
-        completion(QuickChatEntry(date: Date(), presets: QuickChatWidgetConfigurationIntent.defaultPresets))
+    func snapshot(for configuration: QuickChatWidgetConfigurationIntent, in context: Context) async -> QuickChatEntry {
+        QuickChatEntry(date: Date(), presets: QuickChatWidgetConfigurationIntent.defaultPresets)
     }
 
-    func getTimeline(in context: Context, completion: @escaping (Timeline<QuickChatEntry>) -> Void) {
+    func timeline(for configuration: QuickChatWidgetConfigurationIntent, in context: Context) async -> Timeline<QuickChatEntry> {
         // 预设问题静态展示，无需频繁刷新；每 24 小时更新一次
         let entry = QuickChatEntry(date: Date(), presets: QuickChatWidgetConfigurationIntent.defaultPresets)
-        let timeline = Timeline(entries: [entry], policy: .after(Date().addingTimeInterval(24 * 3600)))
-        completion(timeline)
+        return Timeline(entries: [entry], policy: .after(Date().addingTimeInterval(24 * 3600)))
     }
 }
 

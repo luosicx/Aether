@@ -8,7 +8,7 @@ on:
 
 jobs:
   unit-tests:
-    needs: [rust-apple, rust]
+    needs: [rust-apple, rust, watch-widget-build]
     runs-on: macos-15
     timeout-minutes: 45
     outputs:
@@ -706,33 +706,49 @@ jobs:
   # Note: xcrun xccov view --report 在 Xcode 26.3 上不可用（返回空），
   # coverage_pass 可能为空。仅在显式 coverage_pass=false 时阻塞。
   coverage-summary:
-    needs: [unit-tests, unit-tests-macos, ui-tests, rust]
+    # 统合所有平台测试 job 的结果（iOS / macOS / Android / Windows / Rust / Security）
+    # 任一上游测试失败均会反映到此处，作为 PR 合并的总质量门
+    needs: [unit-tests, unit-tests-macos, ui-tests, android-build, windows-build, rust, security-tests, security-tests-macos]
     runs-on: ubuntu-latest
     if: always()
     steps:
-      - name: Check coverage from unit-tests output
+      - name: Aggregate platform test results
         run: |
+          echo "=== Platform Test Results ==="
+          # GitHub Actions 表达式在 yaml 解析时求值，无法在 bash 循环里动态索引 needs[]。
+          # 改用 toJSON(needs) 一次性输出所有 job 结果，再用 jq 解析。
+          echo '${{ toJSON(needs) }}' > /tmp/needs.json
+          echo "unit-tests (iOS):        ${{ needs.unit-tests.result }}"
+          echo "unit-tests-macos:        ${{ needs.unit-tests-macos.result }}"
+          echo "ui-tests:                ${{ needs.ui-tests.result }}"
+          echo "android-build (test):    ${{ needs.android-build.result }}"
+          echo "windows-build (test):    ${{ needs.windows-build.result }}"
+          echo "rust (core test):         ${{ needs.rust.result }}"
+          echo "security-tests:          ${{ needs.security-tests.result }}"
+          echo "security-tests-macos:    ${{ needs.security-tests-macos.result }}"
+          echo ""
+          echo "=== Coverage Gate ==="
           echo "Coverage pass: '${{ needs.unit-tests.outputs.coverage_pass }}'"
           echo "Coverage pct: '${{ needs.unit-tests.outputs.coverage_pct }}'"
-          # unit-tests 失败时，覆盖率检查已无效，但不阻塞 coverage-summary
-          # （实际测试失败由 unit-tests job 本身报告）
-          if [ "${{ needs.unit-tests.result }}" != "success" ]; then
-            echo "WARNING: unit-tests job did not succeed (result=${{ needs.unit-tests.result }}), skipping coverage gate"
-            echo "Coverage gate skipped due to upstream test job failure."
-            exit 0
+          # 任一上游测试 job 失败（非 success/skipped）均阻塞合并
+          # 用 jq 从 needs JSON 中提取非 success/skipped 的 job 名
+          FAILED_JOBS=$(jq -r 'to_entries[] | select(.value.result != "success" and .value.result != "skipped") | .key' /tmp/needs.json | tr '\n' ' ')
+          if [ -n "$FAILED_JOBS" ]; then
+            echo "FAIL: Upstream test jobs did not succeed:$FAILED_JOBS"
+            exit 1
           fi
-          # 仅在显式 coverage_pass=false 时阻塞（覆盖率确实低于阈值）
+          # 所有测试 job 成功后，检查覆盖率门槛
           if [ "${{ needs.unit-tests.outputs.coverage_pass }}" = "false" ]; then
             echo "FAIL: Coverage ${{ needs.unit-tests.outputs.coverage_pct }}% < 80% threshold (iOS + Rust)"
             echo "Please add tests to improve coverage."
             exit 1
           fi
-          # coverage_pass 为 true 或为空（xccov 不可用）时均通过
-          echo "PASS: Coverage ${{ needs.unit-tests.outputs.coverage_pct }}% ≥ 80% (iOS + Rust, or coverage tool unavailable)"
+          echo "PASS: All platform tests succeeded and coverage ${{ needs.unit-tests.outputs.coverage_pct }}% ≥ 80%"
 
   # Code quality status check: SonarQube static analysis
   code-quality:
-    needs: [coverage-summary, unit-tests-macos, rust]
+    # 依赖 coverage-summary（即所有测试 job 完成）后再运行 SonarQube 分析
+    needs: [coverage-summary]
     runs-on: macos-15
     if: always()
     permissions:
@@ -1146,6 +1162,7 @@ jobs:
 
   # Android 客户端构建验证
   android-build:
+    needs: rust
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -1165,6 +1182,25 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
+      - name: Download Rust .so artifacts
+        # 下载 rust job 构建的 Android .so 产物，放入 jniLibs 供 APK 打包
+        uses: actions/download-artifact@v7
+        with:
+          name: aether-core-android-so
+          path: downloaded-so
+
+      - name: Place .so into jniLibs
+        # 将两个 ABI 的 .so 分别放入对应目录：
+        # arm64-v8a/ → aarch64-linux-android 构建产物
+        # x86_64/   → x86_64-linux-android 构建产物
+        # 用 find 定位：upload-artifact 会剥离公共前缀，下载后路径不含 rust/target/
+        run: |
+          mkdir -p android/app/src/main/jniLibs/arm64-v8a
+          mkdir -p android/app/src/main/jniLibs/x86_64
+          find downloaded-so -name "libaether_core_ffi.so" -path "*aarch64*" -exec cp {} android/app/src/main/jniLibs/arm64-v8a/ \;
+          find downloaded-so -name "libaether_core_ffi.so" -path "*x86_64*" -exec cp {} android/app/src/main/jniLibs/x86_64/ \;
+          ls -R android/app/src/main/jniLibs/
+
       - name: Generate Gradle Wrapper
         working-directory: android
         run: gradle wrapper --gradle-version 8.7
@@ -1172,6 +1208,10 @@ jobs:
       - name: Build Debug APK
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Run unit tests
+        working-directory: android
+        run: ./gradlew testDebugUnitTest --no-daemon --stacktrace
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v7
@@ -1183,6 +1223,7 @@ jobs:
 
   # Windows 客户端构建验证
   windows-build:
+    needs: rust
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
@@ -1193,6 +1234,39 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      - name: Setup Rust toolchain
+        # 安装 Rust 并添加 x86_64-pc-windows-msvc target，用于构建 aether-core-ffi DLL
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+          key: windows-x86_64-msvc
+
+      - name: Build Rust DLL (aether-core-ffi)
+        # 构建 Windows x64 cdylib 产物，供 WPF 项目 P/Invoke 调用
+        # 产物路径：rust/target/x86_64-pc-windows-msvc/release/aether_core_ffi.dll
+        working-directory: rust
+        run: cargo build -p aether-core-ffi --target x86_64-pc-windows-msvc --release
+
+      - name: Upload Rust DLL artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aether-core-windows-dll
+          path: rust/target/x86_64-pc-windows-msvc/release/aether_core_ffi.dll
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Download Rust DLL into Native/
+        # 下载刚上传的 DLL 到 windows/Aether.Windows/Native/，供 csproj 引用并复制到输出目录
+        uses: actions/download-artifact@v4
+        with:
+          name: aether-core-windows-dll
+          path: windows/Aether.Windows/Native
+
       - name: Restore dependencies
         working-directory: windows/Aether.Windows
         run: dotnet restore
@@ -1200,6 +1274,10 @@ jobs:
       - name: Build (Debug)
         working-directory: windows/Aether.Windows
         run: dotnet build --configuration Debug --no-restore
+
+      - name: Test
+        # 运行 Aether.Windows.Tests xUnit 项目（DLL 已在 Native/ 中可用）
+        run: dotnet test windows/Aether.Windows.Tests/Aether.Windows.Tests.csproj --configuration Debug --logger trx
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v7
@@ -1261,12 +1339,37 @@ jobs:
         run: ./scripts/build-wasm.sh
 
       - name: check android targets
-        # 用 cargo check 而非 build：仅验证平台条件代码（jni.rs 等）能编译，
-        # 不触发链接（ubuntu runner 无 Android NDK linker）。
-        # 实际 Android 产物构建由 android-build job 负责（目前未集成 Rust native lib）。
+        # 先用 cargo check 快速验证平台条件代码（jni.rs 等）能编译，
+        # 后续步骤会安装 NDK 并做完整 .so 构建。
         run: |
           cargo check -p aether-core-ffi --target aarch64-linux-android
           cargo check -p aether-core-ffi --target x86_64-linux-android
+
+      - name: Setup Android NDK
+        # 安装 NDK 供 cargo-ndk 链接 .so 产物（arm64-v8a / x86_64）
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'ndk;27.0.12077973'
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk || true
+
+      - name: Build Android .so (aarch64 + x86_64)
+        # cargo-ndk 自动配置 NDK linker，构建两个 ABI 的 cdylib 产物。
+        # Cargo.toml 已声明 crate-type = ["staticlib", "cdylib", "rlib"]，无需 --crate-type 标志。
+        # 产物路径：rust/target/{aarch64,x86_64}-linux-android/release/libaether_core_ffi.so
+        run: |
+          cargo ndk -t arm64-v8a -t x86_64 build -p aether-core-ffi --release
+
+      - name: Upload Android .so artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: aether-core-android-so
+          path: |
+            rust/target/aarch64-linux-android/release/libaether_core_ffi.so
+            rust/target/x86_64-linux-android/release/libaether_core_ffi.so
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Upload Rust coverage report
         if: always()
@@ -1338,3 +1441,33 @@ jobs:
           path: Packages/AetherCore
           if-no-files-found: error
           retention-days: 7
+
+  # Watch/Widget 构建验证：依赖 rust-apple xcframework 产物，
+  # 验证 watchOS App 与 Widget Extension 能正常构建，构建失败阻塞 PR。
+  watch-widget-build:
+    needs: rust-apple
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Download xcframework
+        uses: actions/download-artifact@v7
+        with:
+          name: aether-core-xcframework
+          path: Packages/AetherCore
+
+      - name: Select Xcode (latest)
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: 'latest'
+
+      - name: Build Watch App
+        env:
+          DESTINATION: 'generic/platform=watchOS Simulator'
+        run: make build-watch
+
+      - name: Build Widget Extension
+        env:
+          DESTINATION: 'generic/platform=iOS Simulator'
+        run: make build-widget

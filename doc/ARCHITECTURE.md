@@ -1362,7 +1362,7 @@ stateDiagram-v2
 | 步骤 | 命令 | 版本要求 |
 |------|------|---------|
 | Checkout | `actions/checkout@v4` | GitHub Actions |
-| Build | `xcodebuild build -project Aether.xcodeproj -scheme Aether -destination 'platform=iOS Simulator,name=iPhone 17' -configuration Debug CODE_SIGNING_ALLOWED=NO` | Xcode 16+ / iPhone 17 Simulator |
+| Build | `xcodebuild build -project Aether.xcodeproj -scheme Aether-iOS -destination 'platform=iOS Simulator,name=iPhone 17' -configuration Debug CODE_SIGNING_ALLOWED=NO` | Xcode 16+ / iPhone 17 Simulator |
 | Test (UT + UIT) | `xcodebuild test ... -resultBundlePath TestResults.xcresult CODE_SIGNING_ALLOWED=NO` | Xcode 16+ |
 | Upload artifact | `actions/upload-artifact@v4`（`if: always()`，name: `test-results-xcresult`） | GitHub Actions |
 

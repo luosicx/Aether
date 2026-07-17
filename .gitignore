@@ -36,3 +36,7 @@ scripts/*.json
 
 # Node 依赖（CloudflareWorkers 等）
 node_modules/
+
+# macOS Finder 复制产物（" 2" 后缀重复文件）
+* 2.*
+* 2

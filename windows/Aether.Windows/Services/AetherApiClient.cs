@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using Aether.Windows.Models;
+using Aether.Windows.Native;
 
 namespace Aether.Windows.Services;
 
@@ -14,6 +15,12 @@ public class AetherApiClient
     private readonly HttpClient _http;
     private readonly string _baseUrl;
     private readonly string _token;
+
+    /// <summary>
+    /// 是否使用 Rust native 实现（aether-core-ffi DLL）解析 SSE。
+    /// 默认 false（托管 JsonDocument 路径），DLL 不可用时自动回退到托管路径。
+    /// </summary>
+    public bool UseRustSse { get; set; } = false;
 
     public AetherApiClient(string baseUrl, string token)
     {
@@ -62,6 +69,18 @@ public class AetherApiClient
             ct.ThrowIfCancellationRequested();
             var line = await reader.ReadLineAsync(ct);
             if (line == null) break;
+
+            // Rust 路径：aether_sse_parse_chunk 内部处理 data: 前缀剥离与 [DONE]/ChatChunk 解析。
+            // DLL 不可用时 ParseSseChunk 返回 null（不抛异常）；UseRustSse 默认 false，需确保 DLL 存在再启用。
+            if (UseRustSse)
+            {
+                if (line.Contains("[DONE]")) yield break;
+                var rustContent = AetherNativeBridge.ParseSseChunk(line);
+                if (!string.IsNullOrEmpty(rustContent)) yield return rustContent;
+                continue;
+            }
+
+            // 托管路径（默认）
             if (!line.StartsWith("data: ")) continue;
 
             var data = line.Substring(6).Trim();
