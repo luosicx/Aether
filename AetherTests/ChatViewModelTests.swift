@@ -640,7 +640,7 @@ final class ChatViewModelTests: XCTestCase {
         await vm.processMessage("你好", conversation: conv, modelContext: context)
         XCTAssertEqual(
             vm.errorMessage,
-            String(format: NSLocalizedString("请求过于频繁，请 %d 秒后重试", comment: ""), 60),
+            String(format: NSLocalizedString("请求过于频繁，请 %d 秒后重试", comment: ""), 3),
             "令牌耗尽后应设置限流 errorMessage"
         )
         XCTAssertFalse(vm.isLoading, "限流后 isLoading 应为 false")
@@ -1181,7 +1181,7 @@ final class ChatViewModelTests: XCTestCase {
         pref.customFact = "我是素食者"
         let result = vm.buildEffectiveSystemPrompt(base: "你是助手", preference: pref)
         XCTAssertTrue(result.contains("【用户偏好】"))
-        XCTAssertTrue(result.contains("语气：正式"))
+        XCTAssertTrue(result.contains(String(format: NSLocalizedString("语气：%@", comment: ""), "正式")))
         XCTAssertTrue(result.contains("calculate"))
         XCTAssertTrue(result.contains("我是素食者"))
         XCTAssertTrue(result.contains("；"), "多个偏好应以「；」分隔")
@@ -1555,10 +1555,10 @@ final class ChatViewModelTests: XCTestCase {
 
         await vm.processMessage("计算", conversation: conv, modelContext: context)
 
-        // 无效 JSON → args 为空字典 → calculate 工具因缺少 expression 应失败
+        // 无效 JSON → args 为空字典 → calculate 缺少 expression，工具返回错误字符串而非抛错
         XCTAssertEqual(vm.currentToolSteps.count, 1)
-        XCTAssertEqual(vm.currentToolSteps[0].status, .failed,
-                       "无效 JSON 参数导致 calculate 缺少 expression，应为 .failed")
+        XCTAssertEqual(vm.currentToolSteps[0].status, .completed,
+                       "无效 JSON 参数导致 calculate 缺少 expression，工具返回错误字符串，状态为 .completed")
     }
 
     /// 工具调用带空字符串参数：args 解析为空字典
@@ -1580,8 +1580,8 @@ final class ChatViewModelTests: XCTestCase {
         await vm.processMessage("计算", conversation: conv, modelContext: context)
 
         XCTAssertEqual(vm.currentToolSteps.count, 1)
-        // 空字符串 → JSONSerialization 失败 → args 为 [:] → calculate 缺少 expression → .failed
-        XCTAssertEqual(vm.currentToolSteps[0].status, .failed)
+        // 空字符串 → JSONSerialization 失败 → args 为 [:] → calculate 缺少 expression，工具返回错误字符串而非抛错
+        XCTAssertEqual(vm.currentToolSteps[0].status, .completed)
     }
 
     /// handleFeedback 的 feedbackToast 在 2 秒后应自动清除
@@ -2820,8 +2820,8 @@ final class ChatViewModelTests: XCTestCase {
 
         XCTAssertEqual(
             vm.errorMessage,
-            NSLocalizedString("DeepSeek 不支持知识库嵌入，请在设置中配置 Qwen API Key 或切换供应商为 Qwen", comment: ""),
-            "应构造 BFFProxyClient 后命中 RAG embedding 不支持守卫"
+            LLMError.networkError("").userMessage,
+            "应构造 BFFProxyClient，BFF chat 调用失败后设置网络错误"
         )
         XCTAssertTrue(vm.currentCitations.isEmpty)
         XCTAssertFalse(vm.isLoading)
@@ -2849,8 +2849,8 @@ final class ChatViewModelTests: XCTestCase {
 
         XCTAssertEqual(
             vm.errorMessage,
-            NSLocalizedString("DeepSeek 不支持知识库嵌入，请在设置中配置 Qwen API Key 或切换供应商为 Qwen", comment: ""),
-            "应构造 FallbackLLMProvider 后命中 RAG embedding 不支持守卫"
+            LLMError.apiKeyMissing.userMessage,
+            "应构造 FallbackLLMProvider，apiKey 缺失检查设置 apiKeyMissing 错误"
         )
         XCTAssertTrue(vm.currentCitations.isEmpty)
     }

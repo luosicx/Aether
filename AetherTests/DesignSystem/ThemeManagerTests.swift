@@ -139,7 +139,7 @@ final class ThemeManagerTests: XCTestCase {
 
     /// 验证切换主题后 Color 语义 token 反映新主题的颜色
     func testColorTokensReflectCurrentTheme() {
-        let manager = ThemeManager()
+        let manager = ThemeManager.shared
         // 切换到 deepSpace，验证 Color token 与主题色一致
         manager.switchTheme(.deepSpace)
         XCTAssertEqual(
@@ -202,7 +202,7 @@ final class ThemeManagerTests: XCTestCase {
 
     /// 验证 Color.backgroundPrimary 反映当前主题的背景渐变首色
     func testColorBackgroundPrimaryReflectsTheme() {
-        let manager = ThemeManager()
+        let manager = ThemeManager.shared
         manager.switchTheme(.deepSpace)
         XCTAssertEqual(
             Color.backgroundPrimary,
@@ -220,7 +220,7 @@ final class ThemeManagerTests: XCTestCase {
 
     /// 验证 Color.textTertiary 由当前主题的次要色派生
     func testColorTextTertiaryReflectsTheme() {
-        let manager = ThemeManager()
+        let manager = ThemeManager.shared
         manager.switchTheme(.deepSpace)
         XCTAssertEqual(
             Color.textTertiary,
@@ -238,7 +238,7 @@ final class ThemeManagerTests: XCTestCase {
 
     /// 验证 switchTheme(byName:) 能从 UserPreference.themeName 同步主题
     func testSwitchByNameSyncsFromUserPreferenceThemeName() {
-        let manager = ThemeManager()
+        let manager = ThemeManager.shared
         // 模拟 UserPreference.themeName = "aurora" 的同步
         manager.switchTheme(byName: "aurora")
         XCTAssertEqual(manager.currentTheme, .aurora, "switchTheme(byName:) 应从 themeName 同步")
@@ -253,7 +253,7 @@ final class ThemeManagerTests: XCTestCase {
 
     /// 验证不同主题的 Color token 值互不相同
     func testColorTokensDifferBetweenThemes() {
-        let manager = ThemeManager()
+        let manager = ThemeManager.shared
         manager.switchTheme(.deepSpace)
         let deepSpaceTextPrimary = Color.textPrimary
         let deepSpaceBubbleUser = Color.bubbleUser

@@ -30,12 +30,12 @@ final class SettingsViewTests: XCTestCase {
 
     /// 验证每个 case 的 title 返回预期文案。
     func testTitleExpectedValues() {
-        XCTAssertEqual(SettingsSection.provider.title, "API 与模型")
-        XCTAssertEqual(SettingsSection.inference.title, "推理配置")
-        XCTAssertEqual(SettingsSection.voice.title, "语音朗读")
-        XCTAssertEqual(SettingsSection.features.title, "功能与偏好")
-        XCTAssertEqual(SettingsSection.health.title, "健康")
-        XCTAssertEqual(SettingsSection.about.title, "关于")
+        XCTAssertEqual(SettingsSection.provider.title, String(localized: "API 与模型"))
+        XCTAssertEqual(SettingsSection.inference.title, String(localized: "推理配置"))
+        XCTAssertEqual(SettingsSection.voice.title, String(localized: "语音朗读"))
+        XCTAssertEqual(SettingsSection.features.title, String(localized: "功能与偏好"))
+        XCTAssertEqual(SettingsSection.health.title, String(localized: "健康"))
+        XCTAssertEqual(SettingsSection.about.title, String(localized: "关于"))
     }
 
     /// 验证不同 case 的 title 互不相同（避免复制粘贴导致重复）。

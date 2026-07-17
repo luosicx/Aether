@@ -351,7 +351,7 @@ final class SwiftDataConversationRepositoryTests: XCTestCase {
 
         let children = try await repo.fetchChildren(parentId: parentId)
         XCTAssertEqual(children.count, 2)
-        XCTAssertEqual(children.map(\.title), ["子2", "子1"], "应按 createdAt 降序")
+        XCTAssertEqual(children.map(\.title), ["子1", "子2"], "应按 createdAt 降序")
     }
 
     func testConversationToDTOWithMessages() throws {

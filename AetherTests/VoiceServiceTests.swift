@@ -182,9 +182,12 @@ final class VoiceServiceTests: XCTestCase {
 
     /// didCancel 在试听模式下应清理试听状态，且不触发 onSpeakFinished。
     /// 直接调用 delegate 方法，不依赖真实 AVSpeechSynthesizer 合成流程。
+    /// 使用较长试听文本避免真实合成器在测试期间自然结束，从而防止其 didFinish 回调与手动调用的 didCancel 产生竞态。
     func testDidCancelDuringPreviewCleansPreviewState() {
         let service = VoiceService()
-        service.previewVoice("试听", config: .defaultValue)
+        // 使用足够长的文本，确保真实 AVSpeechSynthesizer 在 2 秒测试窗口内不会自然结束
+        let longPreviewText = String(repeating: "试听文本。", count: 300)
+        service.previewVoice(longPreviewText, config: .defaultValue)
         XCTAssertTrue(service.isPreviewing, "previewVoice 后 isPreviewing 应为 true")
 
         let expectation = XCTestExpectation(description: "onSpeakFinished 不应被调用")
