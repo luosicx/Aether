@@ -4,6 +4,7 @@ import Observation
 import AetherFoundation
 import AetherServices
 import AetherUI
+import os
 #if os(iOS)
 import ActivityKit
 #endif
@@ -128,6 +129,8 @@ final class ChatViewModel {
     let voiceService = VoiceService()
     /// 当前流式输出 Task（可取消）
     private var streamingTask: Task<Void, Never>?
+    /// Task 6: 状态机当前状态（仅内部追踪，不暴露给 View；@ObservationIgnored 避免 View 无效刷新）
+    @ObservationIgnored private(set) var state: ChatState = .idle
     /// ReAct 循环最大轮次
     private let maxReActLoops = 5
     /// Day 8: 单工具执行超时（秒）。超时不中断 ReAct 循环，标记失败后继续下一轮。
@@ -141,8 +144,63 @@ final class ChatViewModel {
     private var liveActivity: Activity<TimerActivityAttributes>?
     #endif
 
+    /// Task 6: processMessage 状态机枚举，标识消息处理流程当前所处的阶段。
+    /// Task 8: 标记 Sendable，便于跨 actor 传递状态快照。
+    enum ChatState: Sendable {
+        /// 空闲，等待用户输入
+        case idle
+        /// 准备中（UITEST 短路 / 构造 LLMProvider / 读取 apiKey / 构建 systemPrompt 与 apiMessages）
+        case preparing
+        /// RAG 知识库检索中
+        case ragRetrieving
+        /// 语义缓存检查中（含 BFF 限流 / API Key 预检 / SmartRouter 路由）
+        case cacheChecking
+        /// LLM 流式输出中
+        case llmStreaming
+        /// ReAct 工具调用循环中
+        case toolCalling
+        /// 收尾（持久化 / LiveActivity / 朗读 / telemetry）
+        case finishing
+        /// 错误状态
+        case error
+    }
+
+    /// Task 6: processMessage 状态机内部上下文，承载 handle* 方法间共享的可变状态。
+    /// 值类型，通过 inout 在各 handler 间传递与更新。
+    private struct ProcessContext {
+        /// 用户输入文本
+        let text: String
+        /// 当前会话
+        let conversation: Conversation
+        /// SwiftData 上下文
+        let modelContext: ModelContext
+        /// LLM 客户端（preparing 阶段构造）
+        var llmClient: LLMProvider
+        /// API Key（preparing 阶段读取）
+        var apiKey: String
+        /// 进入流程时的 selectedProvider 快照
+        var provider: ModelProvider
+        /// 待发送给 LLM 的消息序列（preparing 构建，RAG/工具调用阶段会追加/重置）
+        var apiMessages: [APIMessage]
+        /// 查询向量（RAG 阶段或独立 embed 计算，缓存读写使用）
+        var queryEmbedding: [Float]
+        /// ReAct 循环当前轮次（从 1 开始）
+        var loopCount: Int = 0
+        /// 累积的完整回复文本
+        var fullResponse: String = ""
+        /// LLM 请求配置（cacheChecking 阶段构造）
+        var chatConfig: ChatConfig?
+        /// LLM 请求开始时间（cacheChecking 阶段记录，finishing 阶段计算 latency）
+        var llmStartTime: Date?
+        /// 上一轮流式输出累积的 chunk 文本（供 toolCalling 构造助手消息与 thought）
+        var lastChunkContent: String = ""
+        /// 上一轮流式输出解析出的工具调用（供 toolCalling 执行）
+        var finalToolCalls: [AccumulatedToolCall]?
+    }
+
     /// 单个工具调用步骤的 UI 状态
-    struct ToolStep: Identifiable {
+    /// Task 8: 标记 Sendable，所有成员均为 Sendable 类型，可安全跨 actor 传递。
+    struct ToolStep: Identifiable, Sendable {
         /// 唯一标识
         let id = UUID()
         /// 工具名
@@ -160,7 +218,8 @@ final class ChatViewModel {
     }
 
     /// 工具步骤状态
-    enum ToolStepStatus {
+    /// Task 8: 标记 Sendable，无关联值的简单枚举自动满足 Sendable。
+    enum ToolStepStatus: Sendable {
         case running, completed, failed
     }
 
@@ -437,7 +496,7 @@ final class ChatViewModel {
         // 补充 D：启动灵动岛
         startLiveActivity(query: userInput)
         // 立即持久化用户消息，防止流式中途崩溃丢失
-        do { try modelContext.save() } catch { print("持久化用户消息失败: \(error)") }
+        do { try modelContext.save() } catch { Logger.chat.error("持久化用户消息失败: \(error.localizedDescription, privacy: .public)") }
         streamingTask = Task { [weak self] in
             await self?.processMessage(userInput, conversation: conversation, modelContext: modelContext)
         }
@@ -469,7 +528,7 @@ final class ChatViewModel {
         messages.removeAll { $0.id == assistantMessage.id }
         // 注意：不删除 modelContext 中的 ChatMessage 实体，避免破坏 index；
         //      sendMessage 会重新 save 覆盖状态
-        do { try modelContext.save() } catch { print("重新生成-删除消息后保存失败: \(error)") }
+        do { try modelContext.save() } catch { Logger.chat.error("重新生成-删除消息后保存失败: \(error.localizedDescription, privacy: .public)") }
         // 重发用户消息触发新的 AI 回复
         inputText = userInput
         sendMessage(in: conversation, modelContext: modelContext)
@@ -489,8 +548,51 @@ final class ChatViewModel {
         return try? storage.forkConversation(from: conversation, at: fromMessage.id)
     }
 
-    /// 消息处理主流程：UIT 测试短路 → 读 apiKey → 注入偏好 systemPrompt → 计算 embedding → 缓存命中则跳过 ReAct → ReAct 循环 → 缓存写入 → 调试信息 → 关灵动岛。
+    /// Task 6: 消息处理主流程（状态机编排）。
+    /// 按 preparing → ragRetrieving → cacheChecking → (llmStreaming ↔ toolCalling)* → finishing 状态顺序编排，
+    /// 每个状态调用对应 handle* 方法；函数体仅做状态转换与流程控制，不包含业务逻辑。
     func processMessage(_ text: String, conversation: Conversation, modelContext: ModelContext) async {
+        state = .preparing
+        guard var ctx = await handlePreparing(text: text, conversation: conversation, modelContext: modelContext) else {
+            state = .idle
+            return
+        }
+
+        state = .ragRetrieving
+        await handleRAGRetrieving(&ctx)
+
+        state = .cacheChecking
+        let shouldProceed = await handleCacheChecking(&ctx)
+        guard shouldProceed else {
+            state = .idle
+            return
+        }
+
+        // ReAct 循环：llmStreaming ↔ toolCalling 交替，无 tool_calls 时跳出
+        while ctx.loopCount < maxReActLoops {
+            ctx.loopCount += 1
+            state = .llmStreaming
+            let notCancelled = await handleLLMStreaming(&ctx)
+            guard notCancelled else {
+                state = .idle
+                return
+            }
+            guard let toolCalls = ctx.finalToolCalls, !toolCalls.isEmpty else { break }
+            state = .toolCalling
+            await handleToolCalling(&ctx, toolCalls: toolCalls)
+        }
+
+        state = .finishing
+        await handleFinishing(&ctx)
+        state = .idle
+    }
+
+    // MARK: - Task 6 状态机 handler
+
+    /// SubTask 6.2: 准备阶段——UITEST 短路、构造 LLMProvider、读取 apiKey、
+    /// 构建 systemPrompt（偏好 / 健康 / 语义记忆）与 apiMessages、上下文压缩。
+    /// 返回 nil 表示 UITEST 短路已自行收尾，processMessage 应直接 return。
+    private func handlePreparing(text: String, conversation: Conversation, modelContext: ModelContext) async -> ProcessContext? {
         // UIT 测试模式：短路真实 HTTP/RAG/Tool，注入固定桩回复
         // 说明：避免 UIT 触发真实 HTTP，复用缓存命中的假打字路径驱动 UI 状态机
         if ProcessInfo.processInfo.arguments.contains("UITEST_DISABLE_NETWORK") {
@@ -500,7 +602,7 @@ final class ChatViewModel {
             streamingText = ""
             let chars = Array(stubReply)
             for piece in chars.chunked(into: 4) {
-                if Task.isCancelled { return }
+                if Task.isCancelled { return nil }
                 streamingText += String(piece)
                 try? await Task.sleep(nanoseconds: 8_000_000) // 8ms / 4 chars
             }
@@ -511,9 +613,9 @@ final class ChatViewModel {
             messages.append(assistantMsg)
             streamingText = ""
             isLoading = false
-            do { try modelContext.save() } catch { print("UITest 桩回复保存失败: \(error)") }
+            do { try modelContext.save() } catch { Logger.chat.error("UITest 桩回复保存失败: \(error.localizedDescription, privacy: .public)") }
             endLiveActivity()
-            return
+            return nil
         }
 
         // UIT 测试模式：强制注入 LLM 错误，驱动 ErrorBanner 出现
@@ -523,7 +625,7 @@ final class ChatViewModel {
             isLoading = false
             streamingText = ""
             endLiveActivity()
-            return
+            return nil
         }
 
         // Day 13: 用工厂构造 LLMProvider（生产侧 FallbackLLMProvider 装饰，测试侧注入优先）
@@ -576,19 +678,33 @@ final class ChatViewModel {
         }
         apiMessages.append(contentsOf: conversationMessages.map { $0.toAPIMessage() })
 
+        return ProcessContext(
+            text: text,
+            conversation: conversation,
+            modelContext: modelContext,
+            llmClient: llmClient,
+            apiKey: apiKey,
+            provider: provider,
+            apiMessages: apiMessages,
+            queryEmbedding: []
+        )
+    }
+
+    /// SubTask 6.3: RAG 检索阶段——开启则调用 ragService.buildAugmentedContext 注入 systemPrompt；
+    /// 关闭则按需计算 query embedding（仅非工具模式，缓存用）。
+    private func handleRAGRetrieving(_ ctx: inout ProcessContext) async {
         // Day 6: 计算 query embedding（用于语义缓存查询/写入）
         // - RAG 开启时复用 RAG 的 query embedding，不重复调 embed API
         // - RAG 关闭但工具关闭时单独调一次 embed（缓存需要）
         // - 工具开启时不查缓存也不写缓存，但仍可复用 RAG embedding（无副作用）
         // 说明：RAG 与工具模式分别处理 embedding。RAG 开启时复用 RAG 的 query embedding 避免重复调 embed API；
         //       工具开启时不查不写缓存但可复用 embedding。
-        var queryEmbedding: [Float] = []
         if ragEnabled {
             // DeepSeek 不支持 embedding，未配置 Qwen Key 时降级失败，跳过 RAG 检索避免 404
             if ragEmbeddingProvider == .deepseek {
                 currentCitations = []
                 errorMessage = NSLocalizedString("DeepSeek 不支持知识库嵌入，请在设置中配置 Qwen API Key 或切换供应商为 Qwen", comment: "")
-                queryEmbedding = []
+                ctx.queryEmbedding = []
             } else {
                 do {
                     // RAG embedding 可能降级到 Qwen（DeepSeek 不支持 embedding），需用对应 provider 的 apiKey
@@ -596,14 +712,14 @@ final class ChatViewModel {
                     let ragApiKey = await Task.detached(priority: .userInitiated) {
                         KeychainManager.shared.getAPIKey(for: embProvider) ?? ""
                     }.value
-                    let (context, citations, ragQueryEmbedding) = try await ragService.buildAugmentedContext(query: text, modelContext: modelContext, apiKey: ragApiKey)
+                    let (context, citations, ragQueryEmbedding) = try await ragService.buildAugmentedContext(query: ctx.text, modelContext: ctx.modelContext, apiKey: ragApiKey)
                     if !context.isEmpty {
-                        apiMessages.insert(APIMessage(role: "system", content: context, images: nil, toolCallId: nil, toolName: nil, toolCalls: nil), at: 1)
+                        ctx.apiMessages.insert(APIMessage(role: "system", content: context, images: nil, toolCallId: nil, toolName: nil, toolCalls: nil), at: 1)
                         currentCitations = citations
                     } else {
                         currentCitations = []
                     }
-                    queryEmbedding = ragQueryEmbedding
+                    ctx.queryEmbedding = ragQueryEmbedding
                 } catch {
                     currentCitations = []
                     errorMessage = String(format: NSLocalizedString("知识库检索失败: %@", comment: ""), error.localizedDescription)
@@ -613,35 +729,38 @@ final class ChatViewModel {
             currentCitations = []
             // 仅在非工具模式下需要 embedding（缓存用）；工具模式下不查不写缓存
             if !toolsEnabled {
-                queryEmbedding = (try? await llmClient.embed(texts: [text], apiKey: apiKey)).flatMap { $0.first } ?? []
+                ctx.queryEmbedding = (try? await ctx.llmClient.embed(texts: [ctx.text], apiKey: ctx.apiKey)).flatMap { $0.first } ?? []
             }
         }
+    }
 
-        apiMessages = limitTokens(apiMessages, max: tokenLimit)
-        var loopCount = 0
-        var fullResponse = ""
+    /// SubTask 6.4: 缓存检查阶段——limitTokens 截断、语义缓存命中则假打字收尾、
+    /// BFF 限流 / API Key 预检、SmartRouter 路由与 chatConfig 构造、请求前埋点。
+    /// 返回 true 表示继续进入 LLM 流式；false 表示已自行收尾（缓存命中或预检失败），processMessage 应直接 return。
+    private func handleCacheChecking(_ ctx: inout ProcessContext) async -> Bool {
+        ctx.apiMessages = limitTokens(ctx.apiMessages, max: tokenLimit)
 
         // Day 6: 语义缓存查询（仅非工具模式）
         // 说明：缓存命中直接走假打字 + 收尾 return，避免触发 LLM 请求
-        if !toolsEnabled, !queryEmbedding.isEmpty,
-           let cached = cache.get(query: text, embedding: queryEmbedding) {
+        if !toolsEnabled, !ctx.queryEmbedding.isEmpty,
+           let cached = cache.get(query: ctx.text, embedding: ctx.queryEmbedding) {
             // 缓存命中：以流式效果展示，避免突兀瞬间出现
             let chars = Array(cached)
             for piece in chars.chunked(into: 4) {
-                if Task.isCancelled { return }
+                if Task.isCancelled { return false }
                 streamingText += String(piece)
                 try? await Task.sleep(nanoseconds: 8_000_000) // 8ms / 4 chars
             }
-            fullResponse = cached
+            ctx.fullResponse = cached
             // 跳过 ReAct 循环，直接收尾
-            let assistantMsg = ChatMessage(role: "assistant", content: fullResponse)
-            assistantMsg.conversation = conversation
-            conversation.messages.append(assistantMsg)
+            let assistantMsg = ChatMessage(role: "assistant", content: ctx.fullResponse)
+            assistantMsg.conversation = ctx.conversation
+            ctx.conversation.messages.append(assistantMsg)
             messages.append(assistantMsg)
             streamingText = ""
             isLoading = false
-            do { try modelContext.save() } catch { print("缓存命中回复保存失败: \(error)") }
-            return
+            do { try ctx.modelContext.save() } catch { Logger.chat.error("缓存命中回复保存失败: \(error.localizedDescription, privacy: .public)") }
+            return false
         }
 
         // Day 15: BFF 模式下，缓存未命中且即将调用 chat 前申请限流令牌
@@ -659,15 +778,15 @@ final class ChatViewModel {
                 isLoading = false
                 streamingText = ""
                 endLiveActivity()
-                return
+                return false
             }
-        } else if provider != .onDevice, apiKey.isEmpty {
+        } else if ctx.provider != .onDevice, ctx.apiKey.isEmpty {
             // API Key 空值预检（缓存未命中、非端侧、非 BFF 模式时）：提前给出友好提示
             errorMessage = LLMError.apiKeyMissing.userMessage
             isLoading = false
             streamingText = ""
             endLiveActivity()
-            return
+            return false
         }
 
         // Day 12+13: SmartRouter 决定模型名（按实际使用的 provider 映射到对应 provider 的模型名）
@@ -675,7 +794,7 @@ final class ChatViewModel {
         let requestProvider = effectiveProviderForRequest()
         let effectiveModel: String
         if modelSelectionMode == "auto" {
-            let routed = SmartRouter.route(input: text, toolsEnabled: toolsEnabled, hasImage: pendingImage != nil)
+            let routed = SmartRouter.route(input: ctx.text, toolsEnabled: toolsEnabled, hasImage: pendingImage != nil)
             // SmartRouter 输出 "deepseek-chat" / "deepseek-reasoner"，需按实际 provider 映射
             effectiveModel = mapModelName(routed, for: requestProvider)
         } else {
@@ -684,7 +803,7 @@ final class ChatViewModel {
         }
         let chatConfig = ChatConfig(
             model: effectiveModel,
-            systemPrompt: conversation.systemPrompt,
+            systemPrompt: ctx.conversation.systemPrompt,
             maxTokens: 2048,
             temperature: 0.7
         )
@@ -693,184 +812,201 @@ final class ChatViewModel {
         // Day 14: 发送前埋点 messageSent（provider / model / 估算输入 token 数，粗估 inputText.count / 4）
         let providerName = selectedProvider.displayName
         let modelName = effectiveModel
-        let estimatedInputTokens = text.count / 4
+        let estimatedInputTokens = ctx.text.count / 4
         Task.detached { await TelemetryService.shared.track(.messageSent(provider: providerName, model: modelName, inputTokens: estimatedInputTokens)) }
-        // ReAct 循环：每轮发起一次 chat 请求，若有 tool_calls 则执行工具后继续下一轮，否则结束循环
-        while loopCount < maxReActLoops {
-            loopCount += 1
-            let stream: AsyncStream<ParsedChunk>
-            if toolsEnabled {
-                let tools = ToolRegistry.shared.availableToolDefs
-                stream = llmClient.chat(messages: apiMessages, config: chatConfig, tools: tools, apiKey: apiKey)
-            } else {
-                let raw = llmClient.chat(messages: apiMessages, config: chatConfig, apiKey: apiKey)
-                stream = AsyncStream { cont in
-                    Task {
-                        for await content in raw {
-                            cont.yield(ParsedChunk(content: content, toolCalls: nil))
-                        }
-                        cont.finish()
+
+        ctx.chatConfig = chatConfig
+        ctx.llmStartTime = llmStartTime
+        return true
+    }
+
+    /// SubTask 6.5: LLM 流式输出阶段——构造 chat 请求流（工具 / 纯文本两种模式）、
+    /// 累积 chunkContent（含 100ms throttle）、更新灵动岛状态、解析 finalToolCalls。
+    /// 返回 false 表示 Task 已取消，processMessage 应直接 return（与原内联 return 行为一致，不做清理）。
+    private func handleLLMStreaming(_ ctx: inout ProcessContext) async -> Bool {
+        guard let chatConfig = ctx.chatConfig else { return true }
+        let stream: AsyncStream<ParsedChunk>
+        if toolsEnabled {
+            let tools = ToolRegistry.shared.availableToolDefs
+            stream = ctx.llmClient.chat(messages: ctx.apiMessages, config: chatConfig, tools: tools, apiKey: ctx.apiKey)
+        } else {
+            let raw = ctx.llmClient.chat(messages: ctx.apiMessages, config: chatConfig, apiKey: ctx.apiKey)
+            stream = AsyncStream { cont in
+                Task {
+                    for await content in raw {
+                        cont.yield(ParsedChunk(content: content, toolCalls: nil))
                     }
+                    cont.finish()
                 }
-            }
-            var chunkContent = ""
-            var finalToolCalls: [AccumulatedToolCall]?
-            var hasUpdatedLiveActivity = false
-            // Day 19: 流式 throttle——累积 chunkContent，每 100ms 最多触发一次 streamingText 更新
-            // 避免 chunk 高频到达时 @Observable streamingText 频繁刷新导致 UI 抖动
-            var lastStreamingUIUpdateAt: Date?
-            for await chunk in stream {
-                if Task.isCancelled { return }
-                if let content = chunk.content {
-                    chunkContent += content
-                    // throttle：距上次 UI 更新 >= 100ms 才刷新 streamingText
-                    let now = Date()
-                    let shouldUpdate = lastStreamingUIUpdateAt.map { now.timeIntervalSince($0) >= 0.1 } ?? true
-                    if shouldUpdate {
-                        streamingText = fullResponse + chunkContent
-                        lastStreamingUIUpdateAt = now
-                    }
-                    // 补充 D：收到首字后更新灵动岛状态为「回复中」
-                    if !hasUpdatedLiveActivity {
-                        updateLiveActivity(status: "回复中")
-                        hasUpdatedLiveActivity = true
-                    }
-                }
-                if let calls = chunk.toolCalls {
-                    finalToolCalls = calls
-                }
-            }
-            // Day 19: 流式结束后立即 flush 最终文本，确保末尾内容完整展示
-            streamingText = fullResponse + chunkContent
-            fullResponse += chunkContent
-            if let toolCalls = finalToolCalls, !toolCalls.isEmpty {
-                let toolCallsData: Data? = {
-                    struct StoredToolCall: Codable {
-                        let id: String
-                        let type: String
-                        let name: String
-                        let arguments: String
-                    }
-                    let stored = toolCalls.map { StoredToolCall(id: $0.id, type: $0.type, name: $0.name, arguments: $0.arguments) }
-                    return try? JSONEncoder().encode(stored)
-                }()
-                let assistantMsg = ChatMessage(role: "assistant", content: chunkContent, toolCallData: toolCallsData)
-                assistantMsg.conversation = conversation
-                conversation.messages.append(assistantMsg)
-                messages.append(assistantMsg)
-                do { try modelContext.save() } catch { print("工具调用助手消息保存失败: \(error)") }
-                var toolResults: [APIMessage] = []
-                // Day 8: thought 为 chunkContent（非空时显示思维链）
-                let thought = chunkContent.isEmpty ? nil : chunkContent
-                for tc in toolCalls {
-                    let step = ToolStep(
-                        toolName: tc.name,
-                        status: .running,
-                        result: nil,
-                        thought: thought,
-                        arguments: tc.arguments,
-                        loopIndex: loopCount
-                    )
-                    currentToolSteps.append(step)
-                    let stepIdx = currentToolSteps.count - 1
-                    // Day 14: 记录工具执行开始时间，用于计算 duration
-                    let toolStartTime = Date()
-                    let argsData = tc.arguments.data(using: .utf8) ?? Data()
-                    let parsedArgs = (try? JSONSerialization.jsonObject(with: argsData) as? [String: Any]) ?? [:]
-                    let argsSummary = parsedArgs.keys.sorted().joined(separator: ", ")
-                    var toolAuthorized = false
-                    do {
-                        // Task 4: 调用前检查启用状态与运行时授权
-                        guard ToolRegistry.shared.isEnabled(name: tc.name) else {
-                            throw NSError(domain: "ToolRegistry", code: 3, userInfo: [NSLocalizedDescriptionKey: "工具 \(tc.name) 未启用"])
-                        }
-                        if ToolRegistry.shared.requiresAuthorization(name: tc.name) {
-                            let authResult: ToolAuthorizationResult
-                            if ToolRegistry.shared.defaultDisabledTools.contains(tc.name) {
-                                let details = "工具：\(tc.name)\n参数：\(tc.arguments)"
-                                authResult = await ToolAuthorization.shared.presentConfirmation(toolName: tc.name, details: details)
-                            } else {
-                                let purpose = ToolRegistry.shared.getTool(named: tc.name)?.definition.description ?? ""
-                                authResult = await ToolAuthorization.shared.presentSensitiveAccessConfirmation(toolName: tc.name, purpose: purpose)
-                            }
-                            guard case .authorized = authResult else {
-                                throw NSError(domain: "ToolAuthorization", code: 2, userInfo: [NSLocalizedDescriptionKey: "用户拒绝了 \(tc.name) 工具调用"])
-                            }
-                            toolAuthorized = true
-                        } else {
-                            toolAuthorized = true
-                        }
-                        // Day 8: 单工具超时保护，超时抛错不中断循环
-                        // 说明：withThrowingTaskGroup + 超时 Task 抛错，第一个完成的 Task 胜出；
-                        //       超时后标记 failed 继续下一轮，保证 ReAct 不因单工具卡死而中断。
-                        let result = try await withThrowingTaskGroup(of: String.self) { group in
-                            group.addTask {
-                                try await ToolRegistry.shared.execute(name: tc.name, arguments: parsedArgs)
-                            }
-                            group.addTask {
-                                try await Task.sleep(nanoseconds: UInt64(self.toolTimeout * 1_000_000_000))
-                                throw NSError(domain: "ToolTimeout", code: -1, userInfo: [NSLocalizedDescriptionKey: String(format: NSLocalizedString("工具执行超时（%ds）", comment: ""), Int(self.toolTimeout))])
-                            }
-                            let first = try await group.next() ?? ""
-                            group.cancelAll()
-                            return first
-                        }
-                        currentToolSteps[stepIdx].status = .completed
-                        currentToolSteps[stepIdx].result = result
-                        // Day 14: 工具执行成功埋点
-                        let toolDurationMs = Int(Date().timeIntervalSince(toolStartTime) * 1000)
-                        let toolName = tc.name
-                        Task.detached { await TelemetryService.shared.track(.toolCall(toolName: toolName, success: true, durationMs: toolDurationMs)) }
-                        // Task 7: 记录工具调用审计日志（仅记录参数键，不记录完整内容）
-                        ToolAuditLogger.shared.log(toolName: tc.name, argumentsSummary: argsSummary, authorized: toolAuthorized, timestamp: toolStartTime)
-                        // 补充 D：工具执行成功后发本地通知
-                        NotificationService.shared.sendNotification(
-                            title: NSLocalizedString("工具调用成功", comment: ""),
-                            body: String(format: NSLocalizedString("%@ 已完成：%@", comment: ""), tc.name, result)
-                        )
-                        toolResults.append(APIMessage(role: "tool", content: result, images: nil, toolCallId: tc.id, toolName: tc.name, toolCalls: nil))
-                        let toolMsg = ChatMessage(role: "tool", content: result, toolCallId: tc.id, toolName: tc.name)
-                        toolMsg.conversation = conversation
-                        conversation.messages.append(toolMsg)
-                        messages.append(toolMsg)
-                        do { try modelContext.save() } catch { print("工具结果消息保存失败: \(error)") }
-                    } catch {
-                        // Task 7: 工具调用失败/未授权也记录审计日志
-                        ToolAuditLogger.shared.log(toolName: tc.name, argumentsSummary: argsSummary, authorized: toolAuthorized, timestamp: toolStartTime)
-                        // Day 14: 工具执行失败埋点 + 错误埋点
-                        let toolDurationMs = Int(Date().timeIntervalSince(toolStartTime) * 1000)
-                        let toolName = tc.name
-                        let errorType = String(describing: error)
-                        let errorMsg = String(format: NSLocalizedString("工具 %@ 执行失败: %@", comment: ""), tc.name, error.localizedDescription)
-                        Task.detached { await TelemetryService.shared.track(.toolCall(toolName: toolName, success: false, durationMs: toolDurationMs)) }
-                        Task.detached { await TelemetryService.shared.track(.errorOccurred(errorType: errorType, userMessage: errorMsg)) }
-                        let errMsg = error.localizedDescription
-                        currentToolSteps[stepIdx].status = .failed
-                        currentToolSteps[stepIdx].result = errMsg
-                        // Day 8: 超时/失败时也给 AI 一个 tool message，让它知道该工具失败的原因
-                        toolResults.append(APIMessage(role: "tool", content: String(format: NSLocalizedString("工具执行失败: %@", comment: ""), errMsg), images: nil, toolCallId: tc.id, toolName: tc.name, toolCalls: nil))
-                        let toolMsg = ChatMessage(role: "tool", content: String(format: NSLocalizedString("工具执行失败: %@", comment: ""), errMsg), toolCallId: tc.id, toolName: tc.name)
-                        toolMsg.conversation = conversation
-                        conversation.messages.append(toolMsg)
-                        messages.append(toolMsg)
-                        do { try modelContext.save() } catch { print("工具失败消息保存失败: \(error)") }
-                        errorMessage = String(format: NSLocalizedString("工具 %@ 执行失败: %@", comment: ""), tc.name, errMsg)
-                    }
-                }
-                apiMessages = conversation.messages.map { $0.toAPIMessage() }
-                continue
-            } else {
-                break
             }
         }
-        if loopCount >= maxReActLoops && fullResponse.isEmpty {
+        var chunkContent = ""
+        var finalToolCalls: [AccumulatedToolCall]?
+        var hasUpdatedLiveActivity = false
+        // Day 19: 流式 throttle——累积 chunkContent，每 100ms 最多触发一次 streamingText 更新
+        // 避免 chunk 高频到达时 @Observable streamingText 频繁刷新导致 UI 抖动
+        var lastStreamingUIUpdateAt: Date?
+        for await chunk in stream {
+            if Task.isCancelled { return false }
+            if let content = chunk.content {
+                chunkContent += content
+                // throttle：距上次 UI 更新 >= 100ms 才刷新 streamingText
+                let now = Date()
+                let shouldUpdate = lastStreamingUIUpdateAt.map { now.timeIntervalSince($0) >= 0.1 } ?? true
+                if shouldUpdate {
+                    streamingText = ctx.fullResponse + chunkContent
+                    lastStreamingUIUpdateAt = now
+                }
+                // 补充 D：收到首字后更新灵动岛状态为「回复中」
+                if !hasUpdatedLiveActivity {
+                    updateLiveActivity(status: "回复中")
+                    hasUpdatedLiveActivity = true
+                }
+            }
+            if let calls = chunk.toolCalls {
+                finalToolCalls = calls
+            }
+        }
+        // Day 19: 流式结束后立即 flush 最终文本，确保末尾内容完整展示
+        streamingText = ctx.fullResponse + chunkContent
+        ctx.fullResponse += chunkContent
+        ctx.lastChunkContent = chunkContent
+        ctx.finalToolCalls = finalToolCalls
+        return true
+    }
+
+    /// SubTask 6.6: ReAct 工具调用阶段——编码 toolCalls 持久化助手消息（含 toolCallData）、
+    /// 逐个执行工具（启用检查 / 授权确认 / 超时保护 / 审计日志 / 成功通知 / 失败埋点）、
+    /// 追加 tool 结果消息、重置 apiMessages 为最新会话消息序列供下一轮流式使用。
+    private func handleToolCalling(_ ctx: inout ProcessContext, toolCalls: [AccumulatedToolCall]) async {
+        let chunkContent = ctx.lastChunkContent
+        let toolCallsData: Data? = {
+            struct StoredToolCall: Codable {
+                let id: String
+                let type: String
+                let name: String
+                let arguments: String
+            }
+            let stored = toolCalls.map { StoredToolCall(id: $0.id, type: $0.type, name: $0.name, arguments: $0.arguments) }
+            return try? JSONEncoder().encode(stored)
+        }()
+        let assistantMsg = ChatMessage(role: "assistant", content: chunkContent, toolCallData: toolCallsData)
+        assistantMsg.conversation = ctx.conversation
+        ctx.conversation.messages.append(assistantMsg)
+        messages.append(assistantMsg)
+        do { try ctx.modelContext.save() } catch { Logger.chat.error("工具调用助手消息保存失败: \(error.localizedDescription, privacy: .public)") }
+        // Day 8: thought 为 chunkContent（非空时显示思维链）
+        let thought = chunkContent.isEmpty ? nil : chunkContent
+        for tc in toolCalls {
+            let step = ToolStep(
+                toolName: tc.name,
+                status: .running,
+                result: nil,
+                thought: thought,
+                arguments: tc.arguments,
+                loopIndex: ctx.loopCount
+            )
+            currentToolSteps.append(step)
+            let stepIdx = currentToolSteps.count - 1
+            // Day 14: 记录工具执行开始时间，用于计算 duration
+            let toolStartTime = Date()
+            let argsData = tc.arguments.data(using: .utf8) ?? Data()
+            let parsedArgs = (try? JSONSerialization.jsonObject(with: argsData) as? [String: Any]) ?? [:]
+            let argsSummary = parsedArgs.keys.sorted().joined(separator: ", ")
+            var toolAuthorized = false
+            do {
+                // Task 4: 调用前检查启用状态与运行时授权
+                guard ToolRegistry.shared.isEnabled(name: tc.name) else {
+                    throw NSError(domain: "ToolRegistry", code: 3, userInfo: [NSLocalizedDescriptionKey: "工具 \(tc.name) 未启用"])
+                }
+                if ToolRegistry.shared.requiresAuthorization(name: tc.name) {
+                    let authResult: ToolAuthorizationResult
+                    if ToolRegistry.shared.defaultDisabledTools.contains(tc.name) {
+                        let details = "工具：\(tc.name)\n参数：\(tc.arguments)"
+                        authResult = await ToolAuthorization.shared.presentConfirmation(toolName: tc.name, details: details)
+                    } else {
+                        let purpose = ToolRegistry.shared.getTool(named: tc.name)?.definition.description ?? ""
+                        authResult = await ToolAuthorization.shared.presentSensitiveAccessConfirmation(toolName: tc.name, purpose: purpose)
+                    }
+                    guard case .authorized = authResult else {
+                        throw NSError(domain: "ToolAuthorization", code: 2, userInfo: [NSLocalizedDescriptionKey: "用户拒绝了 \(tc.name) 工具调用"])
+                    }
+                    toolAuthorized = true
+                } else {
+                    toolAuthorized = true
+                }
+                // Day 8: 单工具超时保护，超时抛错不中断循环
+                // 说明：withThrowingTaskGroup + 超时 Task 抛错，第一个完成的 Task 胜出；
+                //       超时后标记 failed 继续下一轮，保证 ReAct 不因单工具卡死而中断。
+                let result = try await withThrowingTaskGroup(of: String.self) { group in
+                    group.addTask {
+                        try await ToolRegistry.shared.execute(name: tc.name, arguments: parsedArgs)
+                    }
+                    group.addTask {
+                        try await Task.sleep(nanoseconds: UInt64(self.toolTimeout * 1_000_000_000))
+                        throw NSError(domain: "ToolTimeout", code: -1, userInfo: [NSLocalizedDescriptionKey: String(format: NSLocalizedString("工具执行超时（%ds）", comment: ""), Int(self.toolTimeout))])
+                    }
+                    let first = try await group.next() ?? ""
+                    group.cancelAll()
+                    return first
+                }
+                currentToolSteps[stepIdx].status = .completed
+                currentToolSteps[stepIdx].result = result
+                // Day 14: 工具执行成功埋点
+                let toolDurationMs = Int(Date().timeIntervalSince(toolStartTime) * 1000)
+                let toolName = tc.name
+                Task.detached { await TelemetryService.shared.track(.toolCall(toolName: toolName, success: true, durationMs: toolDurationMs)) }
+                // Task 7: 记录工具调用审计日志（仅记录参数键，不记录完整内容）
+                ToolAuditLogger.shared.log(toolName: tc.name, argumentsSummary: argsSummary, authorized: toolAuthorized, timestamp: toolStartTime)
+                // 补充 D：工具执行成功后发本地通知
+                NotificationService.shared.sendNotification(
+                    title: NSLocalizedString("工具调用成功", comment: ""),
+                    body: String(format: NSLocalizedString("%@ 已完成：%@", comment: ""), tc.name, result)
+                )
+                let toolMsg = ChatMessage(role: "tool", content: result, toolCallId: tc.id, toolName: tc.name)
+                toolMsg.conversation = ctx.conversation
+                ctx.conversation.messages.append(toolMsg)
+                messages.append(toolMsg)
+                do { try ctx.modelContext.save() } catch { Logger.chat.error("工具结果消息保存失败: \(error.localizedDescription, privacy: .public)") }
+            } catch {
+                // Task 7: 工具调用失败/未授权也记录审计日志
+                ToolAuditLogger.shared.log(toolName: tc.name, argumentsSummary: argsSummary, authorized: toolAuthorized, timestamp: toolStartTime)
+                // Day 14: 工具执行失败埋点 + 错误埋点
+                let toolDurationMs = Int(Date().timeIntervalSince(toolStartTime) * 1000)
+                let toolName = tc.name
+                let errorType = String(describing: error)
+                let errorMsg = String(format: NSLocalizedString("工具 %@ 执行失败: %@", comment: ""), tc.name, error.localizedDescription)
+                Task.detached { await TelemetryService.shared.track(.toolCall(toolName: toolName, success: false, durationMs: toolDurationMs)) }
+                Task.detached { await TelemetryService.shared.track(.errorOccurred(errorType: errorType, userMessage: errorMsg)) }
+                let errMsg = error.localizedDescription
+                currentToolSteps[stepIdx].status = .failed
+                currentToolSteps[stepIdx].result = errMsg
+                // Day 8: 超时/失败时也给 AI 一个 tool message，让它知道该工具失败的原因
+                let failContent = String(format: NSLocalizedString("工具执行失败: %@", comment: ""), errMsg)
+                let toolMsg = ChatMessage(role: "tool", content: failContent, toolCallId: tc.id, toolName: tc.name)
+                toolMsg.conversation = ctx.conversation
+                ctx.conversation.messages.append(toolMsg)
+                messages.append(toolMsg)
+                do { try ctx.modelContext.save() } catch { Logger.chat.error("工具失败消息保存失败: \(error.localizedDescription, privacy: .public)") }
+                errorMessage = String(format: NSLocalizedString("工具 %@ 执行失败: %@", comment: ""), tc.name, errMsg)
+            }
+        }
+        ctx.apiMessages = ctx.conversation.messages.map { $0.toAPIMessage() }
+    }
+
+    /// SubTask 6.7: 收尾阶段——ReAct 超限检查、FallbackLLMProvider 状态读取、
+    /// 埋点（fallbackTriggered / llmResponse）、持久化最终助手消息、语义缓存写入、
+    /// DebugInfo 填充、关闭灵动岛。
+    private func handleFinishing(_ ctx: inout ProcessContext) async {
+        // ReAct 循环超限：所有轮次均有 tool_calls 且无最终文本输出
+        if ctx.loopCount >= maxReActLoops, ctx.fullResponse.isEmpty {
             errorMessage = String(format: NSLocalizedString("工具调用循环超过 %d 轮，已中止", comment: ""), maxReActLoops)
             // Day 14: 循环超限埋点 errorOccurred
             let maxLoops = maxReActLoops
             Task.detached { await TelemetryService.shared.track(.errorOccurred(errorType: "MaxReActLoopsExceeded", userMessage: String(format: NSLocalizedString("工具调用循环超过 %d 轮，已中止", comment: ""), maxLoops))) }
         }
         // Day 13: 循环结束后读取 FallbackLLMProvider 的最终状态（若装饰了 fallback）
-        if let fallback = llmClient as? FallbackLLMProvider {
+        if let fallback = ctx.llmClient as? FallbackLLMProvider {
             self.lastUsedProvider = fallback.lastUsedProvider
             self.didFallbackLastRequest = fallback.didFallback
         }
@@ -881,33 +1017,33 @@ final class ChatViewModel {
             Task.detached { await TelemetryService.shared.track(.fallbackTriggered(from: fromProvider, to: toProvider, reason: "primary_no_output")) }
         }
         // Day 14: LLM 响应后埋点 llmResponse（latencyMs / success / 估算输出 token 数）
-        let latencyMs = Int(Date().timeIntervalSince(llmStartTime) * 1000)
-        let responseSuccess = !fullResponse.isEmpty
-        let estimatedOutputTokens = fullResponse.count / 4
+        let latencyMs = ctx.llmStartTime.map { Int(Date().timeIntervalSince($0) * 1000) } ?? 0
+        let responseSuccess = !ctx.fullResponse.isEmpty
+        let estimatedOutputTokens = ctx.fullResponse.count / 4
         Task.detached { await TelemetryService.shared.track(.llmResponse(latencyMs: latencyMs, success: responseSuccess, outputTokens: estimatedOutputTokens)) }
-        let assistantMsg = ChatMessage(role: "assistant", content: fullResponse)
-        assistantMsg.conversation = conversation
-        conversation.messages.append(assistantMsg)
+        let assistantMsg = ChatMessage(role: "assistant", content: ctx.fullResponse)
+        assistantMsg.conversation = ctx.conversation
+        ctx.conversation.messages.append(assistantMsg)
         messages.append(assistantMsg)
         streamingText = ""
         isLoading = false
-        do { try modelContext.save() } catch { print("最终助手回复保存失败: \(error)") }
+        do { try ctx.modelContext.save() } catch { Logger.chat.error("最终助手回复保存失败: \(error.localizedDescription, privacy: .public)") }
 
         // Day 6: 语义缓存写入（仅非工具模式且响应非空且 embedding 有效）
         // 说明：仅非工具模式且响应非空且 embedding 有效才写缓存，
         //       避免工具调用的中间结果污染缓存。
-        if !toolsEnabled, !fullResponse.isEmpty, !queryEmbedding.isEmpty {
-            cache.set(query: text, embedding: queryEmbedding, response: fullResponse)
+        if !toolsEnabled, !ctx.fullResponse.isEmpty, !ctx.queryEmbedding.isEmpty {
+            cache.set(query: ctx.text, embedding: ctx.queryEmbedding, response: ctx.fullResponse)
         }
 
         // 补充 C：填充调试信息（不持久化，仅当前会话）
-        let promptJSON = (try? JSONSerialization.data(withJSONObject: apiMessages.map { msg in
+        let promptJSON = (try? JSONSerialization.data(withJSONObject: ctx.apiMessages.map { msg in
             ["role": msg.role, "content": msg.content]
         }, options: [.prettyPrinted])).flatMap { String(data: $0, encoding: .utf8) } ?? "无"
         lastDebugInfo = DebugInfo(
             promptJSON: promptJSON,
-            apiResponse: fullResponse.isEmpty ? "无" : fullResponse,
-            embeddingDimension: queryEmbedding.count,
+            apiResponse: ctx.fullResponse.isEmpty ? "无" : ctx.fullResponse,
+            embeddingDimension: ctx.queryEmbedding.count,
             toolCalls: currentToolSteps.map { step in
                 DebugInfo.ToolCallDebug(
                     toolName: step.toolName,

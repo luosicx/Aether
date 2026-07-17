@@ -223,6 +223,33 @@ actor MLXInferenceEngine {
         }
     }
 
+    /// 流式生成文本（OnDeviceConfig 入参版本）。逐 token yield 生成内容。
+    ///
+    /// 内部委托给 `generate(prompt:maxTokens:temperature:modelPath:)`，从 `config` 提取
+    /// `maxTokens` / `temperature` / `modelPath` 后复用既有的真流式实现：
+    /// - MLX 可用：调用 `MLXLMCommon.generate(input:parameters:context:)` 返回的
+    ///   `AsyncStream<Generation>`，逐 token yield（真流式，非完整生成后返回）
+    /// - MLX 不可用：返回占位提示流
+    /// - Rust candle：走 `AetherRustInferenceEngine.generate` 逐 token yield
+    ///
+    /// 设计为 thin wrapper 的目的：
+    /// - 对外提供接收 `OnDeviceConfig` 的统一入口，简化 `OfflineLLMProvider` 调用方
+    /// - 保留 `generate(...)` 作为分参 fallback，避免破坏既有调用方
+    /// - 参数集中到 `OnDeviceConfig`，便于后续扩展（如 topP / topK / repetitionPenalty）
+    ///
+    /// - Parameters:
+    ///   - prompt: 已按 chat template 拼接好的完整提示词
+    ///   - config: 端侧推理配置（提取 `maxTokens` / `temperature` / `modelPath`）
+    /// - Returns: 逐 token 的文本流；流结束时自然 finish，无需特殊结束标记
+    func streamGenerate(prompt: String, config: OnDeviceConfig) -> AsyncStream<String> {
+        generate(
+            prompt: prompt,
+            maxTokens: config.maxTokens,
+            temperature: config.temperature,
+            modelPath: config.modelPath
+        )
+    }
+
     /// 卸载模型，释放内存。
     func unloadModel() {
         #if canImport(MLXLLM)

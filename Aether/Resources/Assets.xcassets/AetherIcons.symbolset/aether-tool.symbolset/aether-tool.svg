@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Placeholder - 需设计资源：工具调用（Tool Call） -->
+<svg width="330" height="330" viewBox="0 0 330 330" xmlns="http://www.w3.org/2000/svg">
+  <g id="aether-tool-placeholder">
+    <!-- 扳手 -->
+    <path d="M115 95 Q80 95 80 130 Q80 160 110 165 V245 H140 V165 Q170 160 170 130 Q170 95 140 95 L130 110 L120 110 L110 95 Z"
+          fill="none" stroke="currentColor" stroke-width="12" stroke-linejoin="round"/>
+    <!-- 螺丝刀 -->
+    <path d="M225 70 L255 100 L235 120 L260 145 L260 220 Q260 245 235 245 Q210 245 210 220 V145 L235 120 Z"
+          fill="none" stroke="currentColor" stroke-width="12" stroke-linejoin="round"/>
+  </g>
+</svg>

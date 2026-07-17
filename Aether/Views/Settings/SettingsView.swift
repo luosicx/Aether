@@ -19,6 +19,7 @@ enum SettingsSection: String, CaseIterable, Identifiable, Hashable {
     case voice
     case features
     case health
+    case icloud
     case about
 
     var id: String { rawValue }
@@ -30,6 +31,7 @@ enum SettingsSection: String, CaseIterable, Identifiable, Hashable {
         case .voice: return String(localized: "语音朗读")
         case .features: return String(localized: "功能与偏好")
         case .health: return String(localized: "健康")
+        case .icloud: return String(localized: "iCloud 同步")
         case .about: return String(localized: "关于")
         }
     }
@@ -41,6 +43,7 @@ enum SettingsSection: String, CaseIterable, Identifiable, Hashable {
         case .voice: return "speaker.wave.2"
         case .features: return "switch.2"
         case .health: return "heart.text.square"
+        case .icloud: return "icloud"
         case .about: return "info.circle"
         }
     }
@@ -96,6 +99,11 @@ struct SettingsView: View {
     // 危险工具授权 Alert 状态
     @State private var showToolAuthorizationAlert = false
     @State private var pendingToolName: String?
+    // Task 14: iCloud 同步开关与状态（从 UserDefaults 读取，需重启 App 生效）
+    @State private var iCloudSyncEnabled: Bool = false
+    @State private var iCloudSyncStatusText: String = String(localized: "未启用")
+    @State private var lastICloudSyncText: String = String(localized: "从未")
+    @State private var showICloudRestartAlert: Bool = false
 
     var body: some View {
         Group {
@@ -104,6 +112,12 @@ struct SettingsView: View {
             } else {
                 compactLayout
             }
+        }
+        .background {
+            // 优化：Esc 键关闭设置 sheet
+            Button("") { isPresented = false }
+                .keyboardShortcut(.escape, modifiers: [])
+                .opacity(0)
         }
         .onAppear { handleAppear() }
         .onDisappear { handleDisappear() }
@@ -138,6 +152,12 @@ struct SettingsView: View {
         } message: {
             Text(NSLocalizedString("该工具可执行系统命令或控制其他应用，存在安全风险。确定要启用吗？", comment: "危险工具授权风险提示"))
         }
+        // Task 14: iCloud 同步开关切换后提示重启 App
+        .alert(NSLocalizedString("需要重启 App", comment: "iCloud 同步切换重启提示标题"), isPresented: $showICloudRestartAlert) {
+            Button(NSLocalizedString("好", comment: "确认按钮"), role: .cancel) {}
+        } message: {
+            Text(NSLocalizedString("iCloud 同步设置已更新，请重启 App 以应用新的存储配置。", comment: "iCloud 同步重启提示正文"))
+        }
     }
 
     // MARK: - Compact (iPhone)
@@ -169,6 +189,7 @@ struct SettingsView: View {
                 avatarSection
                 bubbleStyleSection
                 fontSizeSection
+                icloudSection
                 debugSection
                 aboutSection
             }
@@ -277,6 +298,8 @@ struct SettingsView: View {
             #else
             EmptyView()
             #endif
+        case .icloud:
+            icloudSection
         case .about:
             if let msg = settingsVM.saveMessage {
                 saveMessageSection(msg)
@@ -687,7 +710,8 @@ struct SettingsView: View {
                 HStack {
                     Text("插件管理", comment: "")
                     Spacer()
-                    Image(systemName: "puzzlepiece.extension")
+                    // Task 17：使用 AetherIcons.plugin 兜底渲染
+                    AetherIcon.plugin.systemImage
                         .foregroundStyle(.secondary)
                 }
             }
@@ -876,8 +900,10 @@ struct SettingsView: View {
                 get: { selectedTheme },
                 set: { newValue in
                     selectedTheme = newValue
-                    // 立即切换主题，获得实时预览效果
-                    ThemeManager.shared.switchTheme(newValue)
+                    // 立即切换主题，获得实时预览效果；使用 themeTransition 统一过渡曲线
+                    withAnimation(AnimationTokens.themeTransition) {
+                        ThemeManager.shared.switchTheme(newValue)
+                    }
                 }
             )) {
                 ForEach(AetherTheme.allCases) { theme in
@@ -1102,6 +1128,72 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: - Section: iCloud 同步
+
+    @ViewBuilder
+    private var icloudSection: some View {
+        // Task 14.4: iCloud 同步开关与状态显示
+        // ModelContainer 在 App 启动时根据 UserDefaults `aether.icloud.enabled` 决定使用
+        // CloudKit 还是本地存储；切换开关后必须重启 App 才能真正生效。
+        Section {
+            Toggle("启用 iCloud 同步", isOn: Binding(
+                get: { iCloudSyncEnabled },
+                set: { newValue in
+                    iCloudSyncEnabled = newValue
+                    AetherApp.setICloudSyncEnabled(newValue)
+                    // 启用时记录一次时间戳作为占位「上次同步时间」
+                    // SwiftData + CloudKit 未公开同步事件回调，此处仅作为 UI 显示数据源
+                    if newValue {
+                        AetherApp.lastICloudSyncDate = Date()
+                    }
+                    refreshICloudSyncStatus()
+                    showICloudRestartAlert = true
+                }
+            ))
+            .accessibilityLabel("启用 iCloud 同步")
+            .accessibilityHint("开启后跨设备同步对话数据，需重启 App 生效")
+            .accessibilityIdentifier("iCloudSyncToggle")
+
+            HStack {
+                Text("同步状态", comment: "")
+                Spacer()
+                Text(iCloudSyncStatusText)
+                    .foregroundStyle(iCloudSyncEnabled ? .green : .secondary)
+                    .font(.captionAI)
+            }
+            .accessibilityLabel("同步状态")
+            .accessibilityHint("显示当前 iCloud 同步状态")
+            .accessibilityIdentifier("iCloudSyncStatusRow")
+
+            HStack {
+                Text("上次同步时间", comment: "")
+                Spacer()
+                Text(lastICloudSyncText)
+                    .foregroundStyle(.secondary)
+                    .font(.captionAI)
+            }
+            .accessibilityLabel("上次同步时间")
+            .accessibilityHint("显示上次 iCloud 同步的时间")
+            .accessibilityIdentifier("iCloudLastSyncRow")
+
+            HStack {
+                Text("CloudKit 容器", comment: "")
+                Spacer()
+                Text(AetherApp.cloudKitContainerIdentifier)
+                    .foregroundStyle(.secondary)
+                    .font(.system(.caption, design: .monospaced))
+            }
+            .accessibilityLabel("CloudKit 容器")
+            .accessibilityHint("显示当前使用的 CloudKit 容器标识")
+            .accessibilityIdentifier("iCloudContainerRow")
+        } header: {
+            Text("iCloud 同步", comment: "")
+        } footer: {
+            Text("开启后对话将通过 iCloud CloudKit 在所有登录同一 Apple ID 的设备间同步。需要 Apple Developer 账号、登录 iCloud 且已声明 iCloud 容器。冲突采用 last writer wins 策略。切换开关后请重启 App 生效。", comment: "")
+                .font(.captionAI)
+        }
+    }
+
     // MARK: - Section: 调试面板
 
     @ViewBuilder
@@ -1205,6 +1297,10 @@ struct SettingsView: View {
         // Day 17: 刷新 HealthKit 授权状态与洞察数量
         refreshHealthStatus()
 
+        // Task 14: 初始化 iCloud 同步状态（从 UserDefaults 读取）
+        iCloudSyncEnabled = AetherApp.isICloudSyncEnabled
+        refreshICloudSyncStatus()
+
         // 同步工具启用状态
         settingsVM.loadSettings()
 
@@ -1267,6 +1363,27 @@ struct SettingsView: View {
         let descriptor = FetchDescriptor<HealthInsight>()
         healthInsightCount = (try? modelContext.fetchCount(descriptor)) ?? 0
         #endif
+    }
+
+    // MARK: - Task 14: iCloud 同步状态刷新
+
+    /// 刷新 iCloud 同步状态文案与上次同步时间显示。
+    /// SwiftData + CloudKit 未公开同步事件回调，此处仅根据 UserDefaults 开关状态
+    /// 与占位的「上次同步时间」生成展示文案，不读取 CloudKit 实时同步状态。
+    private func refreshICloudSyncStatus() {
+        if iCloudSyncEnabled {
+            iCloudSyncStatusText = String(localized: "已启用，等待同步")
+        } else {
+            iCloudSyncStatusText = String(localized: "未启用")
+        }
+        if let date = AetherApp.lastICloudSyncDate {
+            let formatter = DateFormatter()
+            formatter.dateStyle = .short
+            formatter.timeStyle = .short
+            lastICloudSyncText = formatter.string(from: date)
+        } else {
+            lastICloudSyncText = String(localized: "从未")
+        }
     }
 
     // MARK: - TTS 配置同步

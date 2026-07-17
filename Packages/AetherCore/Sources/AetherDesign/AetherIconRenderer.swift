@@ -22,10 +22,30 @@ public struct AetherIconRenderer: View {
             case .branch: branchView
             case .theme: themeView
             case .persona: personaView
+            // Task 17：新专属图标暂用 SF Symbol 兜底渲染
+            // 专属 SVG 资源就绪后，可在此处替换为自定义 SwiftUI Path 绘制
+            case .bubble: placeholderSystemImage
+            case .knowledge: placeholderSystemImage
+            case .chip: placeholderSystemImage
+            case .heartPulse: placeholderSystemImage
+            case .shortcut: placeholderSystemImage
+            case .cloud: placeholderSystemImage
+            case .shield: placeholderSystemImage
+            case .mcpSymbol: placeholderSystemImage
+            case .tool: placeholderSystemImage
+            case .exportIcon: placeholderSystemImage
             }
         }
         .frame(width: size, height: size)
         .accessibilityLabel(icon.accessibilityLabel)
+    }
+
+    // MARK: - Task 17：专属图标兜底渲染
+    /// 专属 SVG 资源未就绪时，使用对应 SF Symbol 作为占位渲染
+    private var placeholderSystemImage: some View {
+        icon.systemImage
+            .font(.system(size: size))
+            .foregroundStyle(Color.aetherPurple)
     }
 
     // MARK: - Logo：四角星

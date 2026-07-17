@@ -2,6 +2,7 @@ import AetherServices
 import CoreSpotlight
 import Foundation
 import UniformTypeIdentifiers
+import os
 
 /// Day 18: Spotlight 索引管理。将会话索引到 Spotlight，支持系统搜索直接打开对应会话。
 /// 索引内容：标题、最后一条消息内容、最近更新时间（用 createdAt 兜底，因 Conversation 无 updatedAt 字段）。
@@ -26,7 +27,7 @@ final class SpotlightIndexer: ConversationIndexer {
             attributeSet: attributes
         )
         CSSearchableIndex.default().indexSearchableItems([item]) { error in
-            if let error = error { print("Spotlight index error: \(error)") }
+            if let error = error { Logger.storage.error("Spotlight index error: \(error.localizedDescription, privacy: .public)") }
         }
     }
 

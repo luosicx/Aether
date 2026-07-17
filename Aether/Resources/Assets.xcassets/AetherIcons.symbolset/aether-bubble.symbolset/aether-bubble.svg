@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Placeholder - 需设计资源：对话气泡（Conversation Bubble） -->
+<!-- 实际 SVG 资源就绪后替换此占位文件 -->
+<svg width="330" height="330" viewBox="0 0 330 330" xmlns="http://www.w3.org/2000/svg">
+  <g id="aether-bubble-placeholder">
+    <path d="M75 75 H255 Q275 75 275 95 V185 Q275 205 255 205 H165 L120 250 V205 H75 Q55 205 55 185 V95 Q55 75 75 75 Z"
+          fill="none" stroke="currentColor" stroke-width="12" stroke-linejoin="round"/>
+  </g>
+</svg>

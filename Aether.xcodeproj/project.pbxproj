@@ -125,6 +125,8 @@
 		4B89788521C61AB00BE625D4 /* TerminalCommandTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05219D01EA46579E5C0F8054 /* TerminalCommandTool.swift */; };
 		4CC765D846430FFDDAB647F7 /* AppleScriptTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC997A98E79CCAA20802D0F8 /* AppleScriptTool.swift */; };
 		4D148DB668F36FE54D0EF1E2 /* FeedbackService.swift in Sources */ = {isa = PBXBuildFile; fileRef = E27FA6BB882FAC9DB53C2BBC /* FeedbackService.swift */; };
+		7E15001A000000000000A001 /* ConversationExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E15003C000000000000C003 /* ConversationExporter.swift */; };
+		7E15002B000000000000B002 /* ConversationExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E15003C000000000000C003 /* ConversationExporter.swift */; };
 		4D467C32B0D0798F9AA14A5F /* ConversationListVM.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42A16870D042FAF3B85C9984 /* ConversationListVM.swift */; };
 		4D4B7B5B03F494B83AD34ACC /* FeedbackServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2F1C63B538D08AA782CFD591 /* FeedbackServiceTests.swift */; };
 		4D8B415C25C0FA3C96A8D4F4 /* RAGService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAF92749FCE229D0E7C27266 /* RAGService.swift */; };
@@ -706,6 +708,7 @@
 		E209B4B4DD2C30ADD6CEBA4A /* TypographyTokens.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TypographyTokens.swift; sourceTree = "<group>"; };
 		E23D426313B3F4302BFC7094 /* AetherWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = AetherWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		E27FA6BB882FAC9DB53C2BBC /* FeedbackService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FeedbackService.swift; sourceTree = "<group>"; };
+		7E15003C000000000000C003 /* ConversationExporter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ConversationExporter.swift; sourceTree = "<group>"; };
 		E2D3C4B5A697886950414243 /* MultiWindowUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MultiWindowUITests.swift; sourceTree = "<group>"; };
 		E3F4A5B6C7D8E9F0A1B2C3D4 /* LanguageManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LanguageManager.swift; sourceTree = "<group>"; };
 		E42EAA429A0EACAC0015EDBF /* LogUploaderTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LogUploaderTests.swift; sourceTree = "<group>"; };
@@ -880,6 +883,14 @@
 			path = Feedback;
 			sourceTree = "<group>";
 		};
+		7E15004D000000000000D004 /* Export */ = {
+			isa = PBXGroup;
+			children = (
+				7E15003C000000000000C003 /* ConversationExporter.swift */,
+			);
+			path = Export;
+			sourceTree = "<group>";
+		};
 		0A12A65B3A7A9D61AF95383F /* Search */ = {
 			isa = PBXGroup;
 			children = (
@@ -1000,6 +1011,7 @@
 				PLUG1N000000000000000013 /* Plugin */,
 				BB000000000000000000D010 /* Theme */,
 				F62BF6DCF3ED8FCD3AE58E39 /* Repositories */,
+				7E15004D000000000000D004 /* Export */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -2045,6 +2057,7 @@
 				5E3FBD7A414BF27AED9E65EF /* SpotlightIndexer.swift in Sources */,
 				BDD22AA8182F2A2EBAA08D41 /* PrivacyPolicyView.swift in Sources */,
 				4D148DB668F36FE54D0EF1E2 /* FeedbackService.swift in Sources */,
+				7E15001A000000000000A001 /* ConversationExporter.swift in Sources */,
 				8F74A42F9416998D788FE30D /* CrashReportService.swift in Sources */,
 				B6F2E7DCB46D0553F32217EF /* MarkdownText.swift in Sources */,
 				2374645F18C598CC27BA9502 /* CodeBlockView.swift in Sources */,
@@ -2309,6 +2322,7 @@
 				4A7216970A0FBFCA5FFFA886 /* SpotlightIndexer.swift in Sources */,
 				02C6A61415DA142F98A1B2B3 /* PrivacyPolicyView.swift in Sources */,
 				860916F6BC022204B51AB08F /* FeedbackService.swift in Sources */,
+				7E15002B000000000000B002 /* ConversationExporter.swift in Sources */,
 				D31B3912506F72A18B5EFDC6 /* CrashReportService.swift in Sources */,
 				CDC41288A033779CF19E179F /* MarkdownText.swift in Sources */,
 				0B7EE1AA0D1FC49B4B9A62D4 /* CodeBlockView.swift in Sources */,

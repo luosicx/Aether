@@ -4,29 +4,50 @@ import android.content.Context
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
 import com.aether.app.BuildConfig
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-// 顶层 DataStore 实例（每个 Context 单例）
+// 顶层 DataStore 实例（仅存非敏感数据：base_url / model / accent）
 private val Context.bffDataStore by preferencesDataStore(name = "bff_config")
 
+// 加密 SharedPreferences 文件名（仅存 user_token）
+private const val ENCRYPTED_PREFS_NAME = "bff_secure_prefs"
+
 /**
- * BFF 配置持久化：使用 DataStore Preferences 保存端点 URL、Token 与默认模型。
+ * BFF 配置持久化：
+ * - 非敏感数据（base_url / default_model / accent_color）使用 DataStore Preferences
+ * - 敏感数据（user_token）使用 EncryptedSharedPreferences 加密存储
  */
 class BffConfigStore(private val context: Context) {
 
     companion object {
         private val KEY_BASE_URL = stringPreferencesKey("base_url")
-        private val KEY_USER_TOKEN = stringPreferencesKey("user_token")
         private val KEY_MODEL = stringPreferencesKey("default_model")
         private val KEY_ACCENT = stringPreferencesKey("accent_color")
+        private const val KEY_USER_TOKEN = "user_token"
+    }
+
+    // EncryptedSharedPreferences 实例（懒加载）
+    private val encryptedPrefs by lazy {
+        val masterKey = MasterKey.Builder(context)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build()
+        EncryptedSharedPreferences.create(
+            context,
+            ENCRYPTED_PREFS_NAME,
+            masterKey,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
     }
 
     val config: Flow<BffConfig> = context.bffDataStore.data.map { prefs ->
         BffConfig(
             baseUrl = prefs[KEY_BASE_URL] ?: BuildConfig.BFF_BASE_URL,
-            userToken = prefs[KEY_USER_TOKEN] ?: ""
+            userToken = encryptedPrefs.getString(KEY_USER_TOKEN, "") ?: ""
         )
     }
 
@@ -43,8 +64,8 @@ class BffConfigStore(private val context: Context) {
         context.bffDataStore.edit { it[KEY_BASE_URL] = url }
     }
 
-    suspend fun setUserToken(token: String) {
-        context.bffDataStore.edit { it[KEY_USER_TOKEN] = token }
+    fun setUserToken(token: String) {
+        encryptedPrefs.edit().putString(KEY_USER_TOKEN, token).apply()
     }
 
     suspend fun setDefaultModel(model: String) {

@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 #if os(iOS)
 import WatchConnectivity
@@ -49,7 +50,7 @@ final class WatchConnectivityService: NSObject, WCSessionDelegate {
     /// WCSession 激活完成回调
     func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
         if let error = error {
-            print("WCSession activation failed: \(error)")
+            Logger.network.error("WCSession activation failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 

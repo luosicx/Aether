@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Placeholder - 需设计资源：云端（Cloud） -->
+<svg width="330" height="330" viewBox="0 0 330 330" xmlns="http://www.w3.org/2000/svg">
+  <g id="aether-cloud-placeholder">
+    <path d="M105 230 Q60 230 60 190 Q60 155 100 150 Q105 105 150 105 Q195 105 200 150 Q240 150 240 185 Q240 230 200 230 Z"
+          fill="none" stroke="currentColor" stroke-width="12" stroke-linejoin="round"/>
+    <path d="M180 230 L210 270 M210 230 L180 270"
+          fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round"/>
+  </g>
+</svg>

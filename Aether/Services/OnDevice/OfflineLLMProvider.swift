@@ -9,31 +9,29 @@ import AetherServices
 /// nonisolated 设计允许跨 actor 调用，与 DeepSeekClient/QwenClient 一致。
 nonisolated final class OfflineLLMProvider: LLMProvider, @unchecked Sendable {
 
-    /// 纯文本 chat 流：拼接 Llama-3 prompt → 调用 MLXInferenceEngine.generate 流式生成。
+    /// 纯文本 chat 流：拼接 Llama-3 prompt → 调用 MLXInferenceEngine.streamGenerate 流式生成。
     /// 若模型未加载且 OnDeviceConfig 中有 modelPath，会先自动加载模型。
     func chat(messages: [APIMessage], config: ChatConfig, apiKey: String) -> AsyncStream<String> {
         AsyncStream { continuation in
             let task = Task {
-                let storedPath = Self.loadStoredModelPath()
-                // 自动加载：模型未加载且有路径时，先加载（失败则交由 generate 输出占位提示）
-                var effectivePath = storedPath
-                if !(await MLXInferenceEngine.shared.isLoaded), let path = storedPath {
+                // 加载持久化的 OnDeviceConfig，用其 modelPath 触发自动加载
+                var onDeviceCfg = Self.loadStoredConfig()
+                // 自动加载：模型未加载且有路径时，先加载（失败则清空路径交由 streamGenerate 输出占位提示）
+                if !(await MLXInferenceEngine.shared.isLoaded), let path = onDeviceCfg.modelPath {
                     do {
                         try await MLXInferenceEngine.shared.loadModel(path: path)
                     } catch {
-                        // 加载失败：清空路径避免 generate 重复尝试，交由 generate 输出提示
-                        effectivePath = nil
+                        // 加载失败：清空路径避免 streamGenerate 重复尝试，交由其输出提示
+                        onDeviceCfg.modelPath = nil
                     }
                 }
+                // 用 ChatConfig 的采样参数覆盖 OnDeviceConfig（chat 流的 maxTokens/temperature 以 ChatConfig 为准）
+                onDeviceCfg.maxTokens = config.maxTokens
+                onDeviceCfg.temperature = config.temperature
                 // 按 Llama-3 chat template 拼接完整 prompt
                 let prompt = Self.buildLlama3Prompt(messages: messages, systemPrompt: config.systemPrompt)
-                // 调用 MLX 引擎流式生成（maxTokens/temperature 用 config 传入值）
-                let stream = await MLXInferenceEngine.shared.generate(
-                    prompt: prompt,
-                    maxTokens: config.maxTokens,
-                    temperature: config.temperature,
-                    modelPath: effectivePath
-                )
+                // 调用 MLX 引擎真流式生成（逐 token yield）
+                let stream = await MLXInferenceEngine.shared.streamGenerate(prompt: prompt, config: onDeviceCfg)
                 for await token in stream {
                     if Task.isCancelled { break }
                     continuation.yield(token)
@@ -67,23 +65,22 @@ nonisolated final class OfflineLLMProvider: LLMProvider, @unchecked Sendable {
             }
             // tools 为空：退化为纯文本 chat，包装为 ParsedChunk
             let task = Task {
-                let storedPath = Self.loadStoredModelPath()
-                // 自动加载：模型未加载且有路径时，先加载
-                var effectivePath = storedPath
-                if !(await MLXInferenceEngine.shared.isLoaded), let path = storedPath {
+                // 加载持久化的 OnDeviceConfig，用其 modelPath 触发自动加载
+                var onDeviceCfg = Self.loadStoredConfig()
+                // 自动加载：模型未加载且有路径时，先加载（失败则清空路径交由 streamGenerate 输出占位提示）
+                if !(await MLXInferenceEngine.shared.isLoaded), let path = onDeviceCfg.modelPath {
                     do {
                         try await MLXInferenceEngine.shared.loadModel(path: path)
                     } catch {
-                        effectivePath = nil
+                        onDeviceCfg.modelPath = nil
                     }
                 }
+                // 用 ChatConfig 的采样参数覆盖 OnDeviceConfig（chat 流的 maxTokens/temperature 以 ChatConfig 为准）
+                onDeviceCfg.maxTokens = config.maxTokens
+                onDeviceCfg.temperature = config.temperature
                 let prompt = Self.buildLlama3Prompt(messages: messages, systemPrompt: config.systemPrompt)
-                let stream = await MLXInferenceEngine.shared.generate(
-                    prompt: prompt,
-                    maxTokens: config.maxTokens,
-                    temperature: config.temperature,
-                    modelPath: effectivePath
-                )
+                // 调用 MLX 引擎真流式生成（逐 token yield），包装为 ParsedChunk
+                let stream = await MLXInferenceEngine.shared.streamGenerate(prompt: prompt, config: onDeviceCfg)
                 for await token in stream {
                     if Task.isCancelled { break }
                     continuation.yield(ParsedChunk(content: token, toolCalls: nil))
@@ -124,15 +121,21 @@ nonisolated final class OfflineLLMProvider: LLMProvider, @unchecked Sendable {
         }
     }
 
+    /// 从 UserDefaults 读取持久化的端侧推理配置（OnDeviceConfig）。
+    /// OfflineLLMProvider 无 settingsVM 注入，直接读 UserDefaults 获取配置。
+    /// - Returns: 持久化存储的配置；无数据或解码失败时返回 `.default`
+    private static func loadStoredConfig() -> OnDeviceConfig {
+        guard let data = UserDefaults.standard.data(forKey: OnDeviceConfig.userDefaultsKey) else {
+            return .default
+        }
+        return (try? JSONDecoder().decode(OnDeviceConfig.self, from: data)) ?? .default
+    }
+
     /// 从 UserDefaults 读取持久化的模型路径（OnDeviceConfig.modelPath）。
     /// OfflineLLMProvider 无 settingsVM 注入，直接读 UserDefaults 获取配置。
     /// - Returns: 持久化存储的模型路径，无配置或解码失败时返回 nil
     private static func loadStoredModelPath() -> URL? {
-        guard let data = UserDefaults.standard.data(forKey: OnDeviceConfig.userDefaultsKey) else {
-            return nil
-        }
-        let config = (try? JSONDecoder().decode(OnDeviceConfig.self, from: data)) ?? .default
-        return config.modelPath
+        loadStoredConfig().modelPath
     }
 
     /// 按 Llama-3 chat template 拼接完整 prompt。

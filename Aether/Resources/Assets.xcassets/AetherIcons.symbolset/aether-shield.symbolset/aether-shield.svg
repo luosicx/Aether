@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Placeholder - 需设计资源：安全防护（Shield） -->
+<svg width="330" height="330" viewBox="0 0 330 330" xmlns="http://www.w3.org/2000/svg">
+  <g id="aether-shield-placeholder">
+    <path d="M165 60 L255 95 V175 Q255 230 165 270 Q75 230 75 175 V95 Z"
+          fill="none" stroke="currentColor" stroke-width="14" stroke-linejoin="round"/>
+    <path d="M125 165 L155 195 L210 130"
+          fill="none" stroke="currentColor" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Placeholder - 需设计资源：导出（Export） -->
+<svg width="330" height="330" viewBox="0 0 330 330" xmlns="http://www.w3.org/2000/svg">
+  <g id="aether-export-placeholder">
+    <path d="M85 245 V205 Q85 175 115 175 H195"
+          fill="none" stroke="currentColor" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M165 145 L215 175 L165 205"
+          fill="none" stroke="currentColor" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="120" y="80" width="120" height="100" rx="14"
+          fill="none" stroke="currentColor" stroke-width="12"/>
+  </g>
+</svg>

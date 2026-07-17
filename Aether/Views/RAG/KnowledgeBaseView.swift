@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 import AetherFoundation
 import AetherUI
+import AetherDesign
 
 struct KnowledgeBaseView: View {
     @Environment(\.modelContext) private var modelContext
@@ -134,12 +135,13 @@ struct KnowledgeBaseView: View {
     // MARK: - 空状态
 
     private var emptyState: some View {
+        // Task 17：使用 AetherIcons.knowledge 兜底 SF Symbol
         EmptyStateView(
-            systemImage: "doc.text",
-            title: "暂无文档",
-            message: "导入文档以启用 RAG 知识库",
+            systemImage: AetherIcon.knowledge.fallbackSystemName,
+            title: "知识库为空",
+            message: "导入 PDF 或文本文件来扩充知识库",
             primaryButtonTitle: "导入文档",
-            primaryAction: { showPicker = true }
+            primaryAction: { showFileImporter = true }
         )
     }
 

@@ -2984,6 +2984,88 @@ final class ChatViewModelTests: XCTestCase {
                        "未授权时不应注入健康上下文")
     }
     #endif
+
+    // MARK: - Task 6 状态机可追踪性测试
+
+    /// Task 6: 成功路径完成后 state 应恢复 idle
+    func testStateReturnsToIdleAfterSuccessfulProcessMessage() async throws {
+        let mock = MockLLMProvider()
+        mock.chatChunks = ["Hello", " World"]
+        let vm = ChatViewModel(client: mock)
+        vm.selectedProvider = .onDevice
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+        let userMsg = ChatMessage(role: "user", content: "hi")
+        userMsg.conversation = conv
+        conv.messages.append(userMsg)
+
+        await vm.processMessage("hi", conversation: conv, modelContext: context)
+
+        XCTAssertEqual(vm.state, .idle, "成功完成后 state 应恢复 idle")
+        XCTAssertFalse(vm.isLoading, "成功完成后 isLoading 应为 false")
+    }
+
+    /// Task 6: 缓存命中路径完成后 state 应恢复 idle
+    func testStateReturnsToIdleAfterCacheHit() async throws {
+        let embedding: [Float] = [1.0, 0.0, 0.0]
+        let mock = MockLLMProvider()
+        mock.embedResult = [embedding]
+        let vm = ChatViewModel(client: mock)
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+        let userMsg = ChatMessage(role: "user", content: "你好")
+        userMsg.conversation = conv
+        conv.messages.append(userMsg)
+        // 预置缓存命中
+        vm.cache.set(query: "你好", embedding: embedding, response: "cached-reply")
+
+        await vm.processMessage("你好", conversation: conv, modelContext: context)
+
+        XCTAssertEqual(vm.state, .idle, "缓存命中后 state 应恢复 idle")
+        XCTAssertFalse(vm.isLoading, "缓存命中后 isLoading 应为 false")
+    }
+
+    /// Task 6: 错误路径（API Key 缺失）完成后 state 应恢复 idle
+    func testStateReturnsToIdleAfterError() async throws {
+        let mock = MockLLMProvider()
+        let vm = ChatViewModel(client: mock)
+        vm.selectedProvider = .deepseek
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+        let userMsg = ChatMessage(role: "user", content: "你好")
+        userMsg.conversation = conv
+        conv.messages.append(userMsg)
+
+        await vm.processMessage("你好", conversation: conv, modelContext: context)
+
+        XCTAssertEqual(vm.state, .idle, "错误路径完成后 state 应恢复 idle")
+        XCTAssertNotNil(vm.errorMessage, "应设置错误消息")
+        XCTAssertFalse(vm.isLoading, "错误后 isLoading 应为 false")
+    }
+
+    /// Task 6: ReAct 循环超限后 state 应恢复 idle
+    func testStateReturnsToIdleAfterReActLoopExhausted() async throws {
+        let mock = MockLLMProvider()
+        mock.repeatToolCalls = true
+        mock.toolCalls = [
+            AccumulatedToolCall(id: "call-1", type: "function", name: "calculate",
+                                arguments: "{\"expression\": \"1 + 1\"}")
+        ]
+        let vm = ChatViewModel(client: mock)
+        vm.selectedProvider = .onDevice
+        vm.toolsEnabled = true
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+        let userMsg = ChatMessage(role: "user", content: "循环测试")
+        userMsg.conversation = conv
+        conv.messages.append(userMsg)
+
+        await vm.processMessage("循环测试", conversation: conv, modelContext: context)
+
+        XCTAssertEqual(vm.state, .idle, "ReAct 循环超限后 state 应恢复 idle")
+        XCTAssertNotNil(vm.errorMessage, "超限应设置 errorMessage")
+        XCTAssertFalse(vm.isLoading, "超限后 isLoading 应为 false")
+    }
 }
 
 /// 用于单元测试的 LLMProvider 桩实现：chat 返回可配置的流式 chunk，embed 返回预设结果。

@@ -178,6 +178,73 @@ final class MLXInferenceEngineTests: XCTestCase {
         #endif
     }
 
+    // MARK: - streamGenerate: 真流式生成
+
+    /// 验证 streamGenerate 在 MLX 可用且模型已加载时，流式生成至少 yield 2 次。
+    /// 无 MLX 或模型未加载时通过 XCTSkipIf 跳过（占位模式仅 yield 单个提示 token，无法验证多 token）。
+    func testStreamGenerateYieldsMultipleTokens() async throws {
+        #if canImport(MLXLLM)
+        // 端侧模型未加载时跳过（CI 无模型环境）
+        let isLoaded = await engine.isLoaded
+        try XCTSkipIf(!isLoaded, "端侧模型未加载，跳过流式多 token 测试")
+
+        // 限制 maxTokens 避免测试过慢；maxTokens 足够大以保证至少 yield 2 次
+        var config = OnDeviceConfig.default
+        config.maxTokens = 32
+        let stream = await engine.streamGenerate(prompt: "Hello, how are you today?", config: config)
+        var tokens: [String] = []
+        for await token in stream {
+            tokens.append(token)
+        }
+        XCTAssertGreaterThanOrEqual(tokens.count, 2, "流式生成应至少 yield 2 次，实际：\(tokens.count)")
+        #else
+        try XCTSkipIf(true, "mlx-swift 未集成，跳过流式多 token 测试")
+        #endif
+    }
+
+    /// 验证 streamGenerate 流式拼接后的完整文本非空且不含错误标记。
+    /// 与 generate 的最终结果一致性通过「拼接 token 后非空」间接验证（真流式 vs 一次返回语义等价）。
+    func testStreamGenerateProducesCompleteText() async throws {
+        #if canImport(MLXLLM)
+        let isLoaded = await engine.isLoaded
+        try XCTSkipIf(!isLoaded, "端侧模型未加载，跳过流式完整文本测试")
+
+        var config = OnDeviceConfig.default
+        config.maxTokens = 32
+        let stream = await engine.streamGenerate(prompt: "Say hello in one word.", config: config)
+        var collected = ""
+        var yieldCount = 0
+        for await token in stream {
+            collected += token
+            yieldCount += 1
+        }
+        XCTAssertGreaterThan(yieldCount, 0, "流式生成应至少 yield 1 次")
+        XCTAssertFalse(collected.isEmpty, "流式拼接后的完整文本不应为空")
+        // 完整文本不应包含错误占位标记（生成成功时不出现 [生成失败...]）
+        XCTAssertFalse(collected.contains("[生成失败"), "完整文本不应包含错误标记：\(collected)")
+        #else
+        try XCTSkipIf(true, "mlx-swift 未集成，跳过流式完整文本测试")
+        #endif
+    }
+
+    /// 验证 streamGenerate 在 MLX 不可用时退化为占位提示流（与 generate 占位分支行为一致）。
+    func testStreamGenerateReturnsPlaceholderWhenMLXUnavailable() async throws {
+        #if canImport(MLXLLM)
+        throw XCTSkip("MLX 可用，跳过占位分支测试")
+        #else
+        let stream = await engine.streamGenerate(prompt: "hello", config: .default)
+        var tokens: [String] = []
+        for await token in stream {
+            tokens.append(token)
+        }
+        XCTAssertFalse(tokens.isEmpty, "占位模式应至少返回一个 token")
+        XCTAssertTrue(
+            tokens.joined().contains(NSLocalizedString("[端侧推理不可用：mlx-swift 未集成]", comment: "")),
+            "占位流应包含 mlx-swift 未集成提示"
+        )
+        #endif
+    }
+
     // MARK: - preloadTokenizer
 
     func testPreloadTokenizerDoesNotCrash() async {

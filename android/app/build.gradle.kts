@@ -65,6 +65,9 @@ dependencies {
     // DataStore (偏好设置)
     implementation("androidx.datastore:datastore-preferences:1.1.0")
 
+    // Jetpack Security (加密存储敏感数据，如 BFF Token)
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
     // Room (本地持久化)
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
