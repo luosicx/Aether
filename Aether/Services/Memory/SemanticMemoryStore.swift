@@ -35,7 +35,7 @@ final class SemanticMemoryStore {
             return []
         }
         // 2. 加载全部 Memory（活跃、未归档）作为候选
-        let allMemories = try fetchActiveMemories()
+        let allMemories = try await fetchActiveMemories()
         // 3. 委托 RecallEngine 复合召回
         return await recallEngine.recall(query: queryEmbedding, memories: allMemories, limit: limit)
     }
@@ -72,9 +72,9 @@ final class SemanticMemoryStore {
     }
 
     /// 加载所有活跃（未归档）的 Memory
-    private func fetchActiveMemories() throws -> [Memory] {
+    private func fetchActiveMemories() async throws -> [Memory] {
         // 仅加载未归档记忆（archivedAt == nil）
-        let active = try memoryService.getAllMemories()
+        let active = try await MainActor.run { try memoryService.getAllMemories() }
         return active.filter { $0.archivedAt == nil }
     }
 }

@@ -140,7 +140,7 @@ final class AgingCompactor {
     /// - Returns: 周期执行结果统计
     func runCycle(now: Date = Date()) async throws -> AgingCompactionResult {
         let agingCount = try applyAging(now: now)
-        let archivedCount = try applyArchival(now: now)
+        let archivedCount = try await applyArchival(now: now)
         let compressedCount = try applyCompression(now: now)
         return AgingCompactionResult(
             agedCount: agingCount,

@@ -54,11 +54,11 @@ actor RecallEngine {
         let candidates = await fetchCandidates(query: query, limit: Self.candidateLimit, memories: memories)
         if candidates.isEmpty {
             // VectorStore 不可用，回退到内存暴力扫描
-            return bruteForceRecall(query: query, memories: memories, limit: limit, now: now)
+            return await bruteForceRecall(query: query, memories: memories, limit: limit, now: now)
         }
         // 2. 复合评分
         let scored = candidates.map { (memory, sim) in
-            (memory, computeFinalScore(memory: memory, similarity: sim, now: now))
+            (memory, Self.computeFinalScore(memory: memory, similarity: sim, now: now))
         }
         // 3. 排序 + 同 category 去重（保留最高分）
         let deduped = dedupeByCategory(scored.sorted { $0.1 > $1.1 })

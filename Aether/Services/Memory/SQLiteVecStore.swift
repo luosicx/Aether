@@ -34,10 +34,13 @@ actor SQLiteVecStore: VectorStore {
             isAvailable = false
             throw VectorStoreError.sqliteOpenFailed(Int(openResult))
         }
-        // 启用扩展加载（默认禁用）
-        sqlite3_enable_load_extension(db, 1)
         // 尝试加载 sqlite-vec 扩展（系统默认查找路径）
-        // iOS/macOS 沙箱内 sqlite-vec 扩展通常以静态链接或 framework 方式提供
+        // 注意：iOS/macOS 沙箱内 sqlite-vec 扩展通常以静态链接或 framework 方式提供
+        // CI 环境与未集成 sqlite-vec 二进制的环境会加载失败，自动降级为 BruteForceVectorStore
+        // sqlite3_enable_load_extension / sqlite3_load_extension 在某些 SQLite3 模块中不可用，
+        // 用条件编译跳过（macOS 系统模块不导出这些 API）
+        #if canImport(SQLite3) && !os(macOS)
+        sqlite3_enable_load_extension(db, 1)
         let loadResult = sqlite3_load_extension(db, "sqlitevec", nil, nil)
         if loadResult != SQLITE_OK {
             // 加载失败：iOS 沙箱限制或二进制未集成，标记不可用并关闭 db
@@ -47,6 +50,14 @@ actor SQLiteVecStore: VectorStore {
             return
         }
         sqlite3_enable_load_extension(db, 0)
+        #else
+        // macOS：sqlite-vec 扩展加载 API 不可用，直接标记为不可用
+        // 调用方应通过 VectorStoreFactory 自动降级为 BruteForceVectorStore
+        isAvailable = false
+        sqlite3_close(db)
+        db = nil
+        return
+        #endif
         isAvailable = true
         try createMetaTable()
     }
@@ -87,7 +98,7 @@ actor SQLiteVecStore: VectorStore {
         blobData.withUnsafeBytes { rawBuffer in
             sqlite3_bind_blob(stmt, 1, rawBuffer.baseAddress, blobSize, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
         }
-        sqlite3_bind_int64(stmt, 2, Int32(limit))
+        sqlite3_bind_int64(stmt, 2, sqlite3_int64(limit))
 
         var results: [VectorSearchResult] = []
         while sqlite3_step(stmt) == SQLITE_ROW {
