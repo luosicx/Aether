@@ -8,7 +8,8 @@ import Foundation
 /// - `recall` 返回 top-K 候选，相似度计算基于余弦相似度。
 protocol VectorStore: Sendable {
     /// 是否可用（sqlite-vec 加载成功返回 true；降级实现恒为 true）
-    var isAvailable: Bool { get }
+    /// - Note: 标记为 async 以兼容 actor 实现（actor 属性跨隔离边界访问需 await）
+    var isAvailable: Bool { get async }
 
     /// 建表/初始化存储（幂等）
     func initialize() async throws

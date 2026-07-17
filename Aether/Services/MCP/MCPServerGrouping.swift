@@ -1,4 +1,50 @@
 import Foundation
+import AetherFoundation
+
+/// MCP Server 连接状态枚举。
+///
+/// 用于 `MCPServerInfo.status` 字段，UI 通过此状态显示连接状态。
+public enum MCPServerStatus: Sendable, Equatable {
+    case connecting
+    case connected
+    case disconnected
+    case error(String)
+}
+
+/// MCP Server 信息快照。
+///
+/// 供 `MCPClientManager.serverInfos` 存储与 UI 绑定，
+/// 包含 Server 元信息、连接状态、已注册工具/资源/提示列表。
+public struct MCPServerInfo: Sendable, Equatable, Identifiable {
+    /// Server 唯一标识
+    public let id: String
+    /// Server 显示名称
+    public let name: String
+    /// 连接状态
+    public let status: MCPServerStatus
+    /// 已注册工具列表
+    public let tools: [MCPTool]
+    /// 已注册资源列表
+    public let resources: [MCPResource]
+    /// 已注册提示列表
+    public let prompts: [MCPPrompt]
+
+    public init(
+        id: String,
+        name: String,
+        status: MCPServerStatus,
+        tools: [MCPTool] = [],
+        resources: [MCPResource] = [],
+        prompts: [MCPPrompt] = []
+    ) {
+        self.id = id
+        self.name = name
+        self.status = status
+        self.tools = tools
+        self.resources = resources
+        self.prompts = prompts
+    }
+}
 
 /// MCP Server 三组分类辅助类型，从 MCPClientManager 提取分组数据。
 ///
