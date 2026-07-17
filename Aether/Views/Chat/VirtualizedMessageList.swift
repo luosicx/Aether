@@ -155,14 +155,16 @@ private struct _IOSVirtualizedList<Message: Identifiable & Hashable, Content: Vi
             config.showsSeparators = false
             let section = NSCollectionLayoutSection.list(using: config, layoutEnvironment: layoutEnvironment)
             // 消息间距 18pt，与原 LazyVStack spacing 一致
-            section.interItemSpacing = .fixed(18)
+            // NSCollectionLayoutSection 没有 interItemSpacing 属性；list 布局中每行
+            // 即一个 group，故使用 interGroupSpacing 设置行间距
+            section.interGroupSpacing = 18
             // 内边距与原 padding(.horizontal, 16) / padding(.vertical, 14) 一致
             section.contentInsets = NSDirectionalEdgeInsets(top: 14, leading: 16, bottom: 14, trailing: 16)
             return section
         }
 
         let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
-        collectionView.backgroundColor = .clear
+        collectionView.backgroundColor = UIColor.clear
         collectionView.showsVerticalScrollIndicator = false
         collectionView.contentInsetAdjustmentBehavior = .never
         // Task 3: 向下滑动消息列表时交互式收起键盘

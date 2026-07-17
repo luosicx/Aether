@@ -250,7 +250,7 @@ final class ConversationExporter {
         let printableRect = pageRect.insetBy(dx: 36, dy: 36)
         let renderer = ExportPageRenderer(pageRect: pageRect, printableRect: printableRect)
         let formatter = UIMarkupTextPrintFormatter(markupText: html)
-        renderer.addPrintFormatter(formatter, startingAt: 0)
+        renderer.addPrintFormatter(formatter, startingAtPageAt: 0)
 
         let pdfRenderer = UIGraphicsPDFRenderer(bounds: pageRect, format: UIGraphicsPDFRendererFormat())
         return pdfRenderer.pdfData { context in
