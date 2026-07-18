@@ -105,13 +105,13 @@ final class ToolExecutionCoordinatorTests: XCTestCase {
 
     /// 未注册工具抛错时，execute 内部不会调用 appendHistory（因为 throws 提前返回）
     /// 但通过 recordFailure 可手动记录失败
-    func testRecordFailureAddsHistoryEntry() async {
+    func testRecordFailureAddsHistoryEntry() async throws {
         let startedAt = Date()
         struct TestError: Error {}
         await coordinator.recordFailure(toolName: "failing_tool", startedAt: startedAt, error: TestError())
         let history = await coordinator.historyRecords()
         XCTAssertEqual(history.count, 1, "recordFailure 应添加 1 条历史")
-        let record = try! XCTUnwrap(history.first)
+        let record = try XCTUnwrap(history.first)
         XCTAssertEqual(record.toolName, "failing_tool")
         XCTAssertFalse(record.success)
         XCTAssertNotNil(record.error)
