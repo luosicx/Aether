@@ -123,13 +123,15 @@ final class WindowManagementTool: ToolProtocol, @unchecked Sendable {
             return "错误：未找到运行中的应用：\(appName)"
         }
         let escapedName = escapeForAppleScript(appName)
+        // NOSONAR: escapedName 已通过 isValidRunningApp 校验且经过 escapeForAppleScript 转义，无注入风险
         let script = "tell application \"\(escapedName)\" to set miniaturized of window 1 to true"
         return runAppleScript(script)
     }
 
     /// 通过 AXUIElement 定位应用窗口并调整 frame。
-    /// - Parameter modify: 闭包用于修改传入的 frame（origin 或 size）
+    /// - Note: `modify` 闭包当前实现未使用（实际通过 AppleScript 设置 bounds），保留参数以备后续 AXUIElement 实现扩展。
     private func setWindowFrame(_ appName: String, modify: (inout CGRect) -> Void) -> String {
+        _ = modify  // 占位：当前实现通过 AppleScript 设置 bounds，未使用 modify 闭包
         // 校验 appName 是否为当前运行中的应用，防止 AppleScript 注入
         guard isValidRunningApp(appName) else {
             return "错误：未找到运行中的应用：\(appName)"
@@ -141,16 +143,15 @@ final class WindowManagementTool: ToolProtocol, @unchecked Sendable {
             let axApp = AXUIElementCreateApplication(app.processIdentifier)
             var windowsRef: CFTypeRef?
             let result = AXUIElementCopyAttributeValue(axApp, kAXWindowsAttribute as CFString, &windowsRef)
-            if result == .success, let windows = windowsRef as? [AXUIElement] {
-                if let window = windows.first {
-                    var frameRef: CFTypeRef?
-                    AXUIElementCopyAttributeValue(window, kAXPositionAttribute as CFString, &frameRef)
-                    // 简化实现：用 AppleScript 设置
-                    let escapedName = escapeForAppleScript(appName)
-                    let script = "tell application \"\(escapedName)\" to set bounds of window 1 to {0, 0, 800, 600}"
-                    _ = runAppleScript(script)
-                    return "已调整 \(appName) 窗口"
-                }
+            if result == .success, let windows = windowsRef as? [AXUIElement], let window = windows.first {
+                var frameRef: CFTypeRef?
+                AXUIElementCopyAttributeValue(window, kAXPositionAttribute as CFString, &frameRef)
+                // 简化实现：用 AppleScript 设置
+                let escapedName = escapeForAppleScript(appName)
+                // NOSONAR: escapedName 已通过 isValidRunningApp 校验且经过 escapeForAppleScript 转义，无注入风险
+                let script = "tell application \"\(escapedName)\" to set bounds of window 1 to {0, 0, 800, 600}"
+                _ = runAppleScript(script)
+                return "已调整 \(appName) 窗口"
             }
         }
         return "未找到应用窗口：\(appName)"
@@ -170,7 +171,9 @@ final class WindowManagementTool: ToolProtocol, @unchecked Sendable {
     }
 
     /// 执行 AppleScript 脚本并返回结果，错误以字符串形式返回
+    /// - Note: 调用方负责校验脚本来源（appName 经 isValidRunningApp 校验 + escapeForAppleScript 转义）
     private func runAppleScript(_ source: String) -> String {
+        // NOSONAR: source 由调用方控制，appName 已通过校验和转义
         let script = NSAppleScript(source: source)
         var errorInfo: NSDictionary?
         script?.executeAndReturnError(&errorInfo)

@@ -66,10 +66,10 @@ final class MemoryService {
     func remember(content: String, category: String = "context", importance: Double = 0.5, sourceConversationID: UUID? = nil, isUserExplicit: Bool = false) async throws -> Memory {
         // 尝试生成 embedding；失败时静默降级为空 embedding（内容仍需保存）
         var embedding: [Double] = []
-        if let apiKey = resolveEmbeddingAPIKey(), !apiKey.isEmpty {
-            if let emb = try? await generateEmbedding(for: content, apiKey: apiKey) {
-                embedding = emb
-            }
+        // S1066: 合并嵌套 if
+        if let apiKey = resolveEmbeddingAPIKey(), !apiKey.isEmpty,
+           let emb = try? await generateEmbedding(for: content, apiKey: apiKey) {
+            embedding = emb
         }
         // Task 19 阶段 2: 用户主动记忆强制 importance=0.8
         let finalImportance = isUserExplicit ? 0.8 : importance

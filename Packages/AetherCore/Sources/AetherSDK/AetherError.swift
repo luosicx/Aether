@@ -5,7 +5,8 @@ import AetherFoundation
 ///
 /// 覆盖鉴权、限流、上游错误、网络、工具、RAG、配置与端侧推理 8 类场景。
 /// 所有 case 均 `Sendable`；`toolExecutionFailed` 携带 `LocalizedError` 字符串化错误以保持 Sendable 安全。
-public enum AetherError: Error, Sendable, LocalizedError {
+/// 遵循 `Equatable`：单测中可用 `XCTAssertEqual(error as? AetherError, .networkUnreachable)` 断言具体 case。
+public enum AetherError: Error, Sendable, LocalizedError, Equatable {
     /// 鉴权失败（HTTP 401 / token 无效 / 签名错误）
     case authFailed(reason: String)
     /// 触发限流（HTTP 429），携带建议重试秒数
@@ -50,7 +51,7 @@ public enum AetherError: Error, Sendable, LocalizedError {
     /// 从 `LLMError` 构造 `AetherError`
     public static func from(_ llmError: LLMError) -> AetherError {
         switch llmError {
-        case .networkError(let msg):
+        case .networkError:
             return .networkUnreachable
         case .apiKeyMissing, .apiKeyInvalid:
             return .authFailed(reason: llmError.userMessage)

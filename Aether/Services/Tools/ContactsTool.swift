@@ -62,9 +62,16 @@ final class ContactsTool: ToolProtocol, @unchecked Sendable {
             return "未找到匹配的联系人"
         }
         let lines = merged.map { contact -> String in
-            let name = "\(contact.givenName)\(contact.familyName)".isEmpty ?
-                (contact.familyName.isEmpty ? contact.givenName : contact.familyName) :
-                "\(contact.givenName)\(contact.familyName)"
+            // S3358: 用 if-else 替代嵌套三元，提升可读性
+            let combined = "\(contact.givenName)\(contact.familyName)"
+            let name: String
+            if !combined.isEmpty {
+                name = combined
+            } else if !contact.familyName.isEmpty {
+                name = contact.familyName
+            } else {
+                name = contact.givenName
+            }
             let phones = contact.phoneNumbers.map { $0.value.stringValue }.joined(separator: "、")
             return "姓名：\(name)，电话：\(phones.isEmpty ? "无" : phones)"
         }

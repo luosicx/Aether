@@ -84,9 +84,9 @@ final class ConversationExporter {
         let markdown = exportAsMarkdown(conversation: conversation)
         let html = Self.markdownToHTML(markdown)
         #if os(iOS)
-        return Self.renderPDF_iOS(html: html)
+        return Self.renderPdfIOS(html: html)
         #else
-        return Self.renderPDF_macOS(html: html)
+        return Self.renderPdfMacOS(html: html)
         #endif
     }
 
@@ -245,7 +245,7 @@ final class ConversationExporter {
     }
 
     /// iOS：使用 UIMarkupTextPrintFormatter 渲染 HTML，UIGraphicsPDFRenderer 生成 PDF Data
-    private static func renderPDF_iOS(html: String) -> Data? {
+    private static func renderPdfIOS(html: String) -> Data? {
         let pageRect = CGRect(x: 0, y: 0, width: 595.28, height: 841.89) // A4
         let printableRect = pageRect.insetBy(dx: 36, dy: 36)
         let renderer = ExportPageRenderer(pageRect: pageRect, printableRect: printableRect)
@@ -262,7 +262,7 @@ final class ConversationExporter {
     }
     #else
     /// macOS：使用 NSAttributedString(html:) 解析 HTML，NSPrintOperation 输出到临时 PDF 文件
-    private static func renderPDF_macOS(html: String) -> Data? {
+    private static func renderPdfMacOS(html: String) -> Data? {
         guard let htmlData = html.data(using: .utf8) else { return nil }
         guard let attributed = try? NSAttributedString(
             data: htmlData,

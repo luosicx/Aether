@@ -32,7 +32,7 @@ final class ReadClipboardTool: ToolProtocol, @unchecked Sendable {
     /// - Returns: 剪贴板文本内容，为空时返回 "剪贴板为空"
     /// - Throws: 不抛异常
     @MainActor
-    func execute(arguments: [String: Any]) async throws -> String {
+    func execute(arguments _: [String: Any]) async throws -> String {
         #if os(iOS)
         let content = UIPasteboard.general.string ?? ""
         #else

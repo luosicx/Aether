@@ -107,44 +107,7 @@ pub fn parse_with_tool_accumulation(
         .and_then(|d| d.tool_calls);
 
     if let Some(deltas) = deltas {
-        for td in deltas {
-            let idx = td.index.unwrap_or(0);
-            match accumulated.get_mut(&idx) {
-                Some(existing) => {
-                    if let Some(args) = td.function.as_ref().and_then(|f| f.arguments.as_deref()) {
-                        existing.arguments.push_str(args);
-                    }
-                }
-                None => {
-                    // 与 Swift `guard let id = td.id, let name = ... else { continue }` 对齐：
-                    // 缺少 id 或 name 时跳过该 delta（continue），而非用 `?` 中断整行解析，
-                    // 否则会丢弃同一行已提取的 content（数据丢失回归）。
-                    let id = match td.id {
-                        Some(id) => id,
-                        None => continue,
-                    };
-                    let name = match td.function.as_ref().and_then(|f| f.name.clone()) {
-                        Some(name) => name,
-                        None => continue,
-                    };
-                    let kind = td.kind.unwrap_or_else(|| "function".to_string());
-                    let arguments = td
-                        .function
-                        .as_ref()
-                        .and_then(|f| f.arguments.clone())
-                        .unwrap_or_default();
-                    accumulated.insert(
-                        idx,
-                        AccumulatedToolCall {
-                            id,
-                            kind,
-                            name,
-                            arguments,
-                        },
-                    );
-                }
-            }
-        }
+        accumulate_tool_calls(deltas, accumulated);
     }
 
     let tool_calls = if accumulated.is_empty() {
@@ -158,6 +121,49 @@ pub fn parse_with_tool_accumulation(
         content: content_opt,
         tool_calls,
     })
+}
+
+/// 跨 chunk 累积 tool_calls：已存在则追加 arguments，新 entry 则插入。
+/// 与 Swift `guard let id = td.id, let name = ... else { continue }` 对齐：
+/// 缺少 id 或 name 时跳过该 delta（continue），而非用 `?` 中断整行解析，
+/// 否则会丢弃同一行已提取的 content（数据丢失回归）。
+fn accumulate_tool_calls(
+    deltas: Vec<ToolCallDelta>,
+    accumulated: &mut BTreeMap<i64, AccumulatedToolCall>,
+) {
+    for td in deltas {
+        let idx = td.index.unwrap_or(0);
+        if let Some(existing) = accumulated.get_mut(&idx) {
+            if let Some(args) = td.function.as_ref().and_then(|f| f.arguments.as_deref()) {
+                existing.arguments.push_str(args);
+            }
+            continue;
+        }
+        // 新 entry：缺少 id 或 name 时跳过（continue），避免 `?` 中断整行解析
+        let id = match td.id {
+            Some(id) => id,
+            None => continue,
+        };
+        let name = match td.function.as_ref().and_then(|f| f.name.clone()) {
+            Some(name) => name,
+            None => continue,
+        };
+        let kind = td.kind.unwrap_or_else(|| "function".to_string());
+        let arguments = td
+            .function
+            .as_ref()
+            .and_then(|f| f.arguments.clone())
+            .unwrap_or_default();
+        accumulated.insert(
+            idx,
+            AccumulatedToolCall {
+                id,
+                kind,
+                name,
+                arguments,
+            },
+        );
+    }
 }
 
 fn strip_data_prefix(line: &str) -> Option<String> {

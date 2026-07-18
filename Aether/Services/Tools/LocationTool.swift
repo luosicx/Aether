@@ -37,7 +37,7 @@ final class LocationTool: ToolProtocol, @unchecked Sendable {
     /// 2) 未授权返回提示；3) 成功后用 CLGeocoder 反查地址；
     /// 4) 拼装格式化字符串返回。用户可见错误以字符串返回而非抛错。
     @MainActor
-    func execute(arguments: [String: Any]) async throws -> String {
+    func execute(arguments _: [String: Any]) async throws -> String {
         let fetcher = LocationFetcher()
         let location: CLLocation
         do {
@@ -157,13 +157,13 @@ private final class LocationFetcher: NSObject, CLLocationManagerDelegate, @unche
 
     // MARK: CLLocationManagerDelegate
 
-    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+    func locationManager(_: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         if let location = locations.last {
             resume(returning: location)
         }
     }
 
-    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+    func locationManager(_: CLLocationManager, didFailWithError error: Error) {
         // 权限被拒时 CLError.code == .denied
         if let clError = error as? CLError, clError.code == .denied {
             resume(throwing: LocationError.notAuthorized)

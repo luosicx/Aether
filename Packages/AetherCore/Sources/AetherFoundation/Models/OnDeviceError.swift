@@ -2,7 +2,8 @@ import Foundation
 
 /// Day 16: 端侧推理错误类型。覆盖内存不足、模型缺失、校验失败、量化不支持与加载失败等场景。
 /// LocalizedError：提供用户友好的错误描述。
-public enum OnDeviceError: LocalizedError, Sendable {
+/// Equatable：AetherError 的 onDeviceInferenceFailed case 包含 OnDeviceError，需 Equatable 才能合成 AetherError Equatable。
+public enum OnDeviceError: LocalizedError, Sendable, Equatable {
     /// 设备可用内存不足（端侧推理通常需要 ≥4GB 可用内存）
     case insufficientMemory
     /// 模型文件未找到，携带路径

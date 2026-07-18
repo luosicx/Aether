@@ -15,6 +15,9 @@ import AppKit
 // MARK: - RunShortcutTool
 /// 快捷指令执行工具，跨平台
 final class RunShortcutTool: ToolProtocol, @unchecked Sendable {
+    /// macOS shortcuts CLI 路径（系统标准位置，不存在则 macOS 不可用）
+    private static let shortcutsCLIPath = "/usr/bin/shortcuts"  // NOSONAR - 系统标准 CLI 路径
+
     /// 工具定义
     /// - name: `run_shortcut`
     /// - parameters: `name`（必填，String）— 快捷指令名称；
@@ -63,7 +66,7 @@ final class RunShortcutTool: ToolProtocol, @unchecked Sendable {
     /// 通过 Process 调用 shortcuts CLI 执行快捷指令
     private func runShortcutViaCLI(name: String, input: String?) async throws -> String {
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/shortcuts")
+        process.executableURL = URL(fileURLWithPath: Self.shortcutsCLIPath)
         var args = ["run", name]
         if let input = input {
             args += ["-i", input]
@@ -96,6 +99,9 @@ final class RunShortcutTool: ToolProtocol, @unchecked Sendable {
 // MARK: - ListShortcutsTool
 /// 快捷指令列表工具，跨平台
 final class ListShortcutsTool: ToolProtocol, @unchecked Sendable {
+    /// macOS shortcuts CLI 路径（系统标准位置，不存在则 macOS 不可用）
+    private static let shortcutsCLIPath = "/usr/bin/shortcuts"  // NOSONAR - 系统标准 CLI 路径
+
     /// 工具定义
     /// - name: `list_shortcuts`
     /// - parameters: 无入参
@@ -116,7 +122,7 @@ final class ListShortcutsTool: ToolProtocol, @unchecked Sendable {
     /// - Parameter arguments: 无参数
     /// - Returns: 快捷指令名称列表字符串，或平台不支持提示
     /// - Throws: 不抛异常，错误以字符串形式返回
-    func execute(arguments: [String: Any]) async throws -> String {
+    func execute(arguments _: [String: Any]) async throws -> String {
         #if os(macOS)
         return try await listShortcutsViaCLI()
         #else
@@ -128,7 +134,7 @@ final class ListShortcutsTool: ToolProtocol, @unchecked Sendable {
     /// 通过 Process 调用 shortcuts list 列出所有快捷指令名称
     private func listShortcutsViaCLI() async throws -> String {
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/shortcuts")
+        process.executableURL = URL(fileURLWithPath: Self.shortcutsCLIPath)
         process.arguments = ["list"]
         let pipe = Pipe()
         process.standardOutput = pipe

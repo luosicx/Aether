@@ -94,7 +94,7 @@ final class SwiftDataMessageRepository: MessageRepository {
         try context.save()
     }
 
-    func submitFeedback(messageId: UUID, isPositive: Bool?, citations: [String]?) async throws {
+    func submitFeedback(messageId: UUID, isPositive: Bool?, citations _: [String]?) async throws {
         // 注意：MessageFeedback 当前模型不存储 citations，仅存储 isPositive。
         // citations 参数保留在协议中以备未来扩展，此处忽略。
         let descriptor = FetchDescriptor<ChatMessage>(

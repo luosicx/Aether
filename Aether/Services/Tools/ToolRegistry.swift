@@ -288,6 +288,7 @@ final class CalculatorTool: ToolProtocol, @unchecked Sendable {
             return "错误：表达式无效"
         }
         // 提前拦截除零：检测 / 0
+        // NOSONAR: "/ 0" 和 "/0" 为除零检测的字符串模式，非硬编码 URI
         if expression.contains("/ 0") || expression.contains("/0") {
             return "错误：除零"
         }
@@ -321,7 +322,9 @@ final class CalculatorTool: ToolProtocol, @unchecked Sendable {
 final class NotificationService {
     static let shared = NotificationService()
 
-    private init() {}
+    private init() {
+        // 单例模式：外部不可创建实例
+    }
 
     /// 请求通知授权（失败静默，不处理错误）
     func requestAuthorization() {

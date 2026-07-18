@@ -135,7 +135,7 @@ actor OnDeviceModelDownloader {
                     await self?.updateProgress(p)
                 },
                 onDone: { [weak self] result in
-                    await self?.handleDownloadDone(result: result, destination: destinationURL, expectedSHA256: expectedSHA256)
+                    await self?.handleDownloadDone(result: result, expectedSHA256: expectedSHA256)
                     continuation.resume()
                 }
             )
@@ -159,9 +159,11 @@ actor OnDeviceModelDownloader {
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             let delegate = DownloadDelegate(
                 destinationURL: destinationURL,
-                onProgress: { _ in },
+                onProgress: { _ in
+                    // 静默下载配置文件，不更新进度
+                },
                 onDone: { [weak self] result in
-                    Task { await self?.handleFileDownloadDone(result: result) }
+                    await self?.handleFileDownloadDone(result: result)
                     continuation.resume()
                 }
             )
@@ -262,7 +264,8 @@ actor OnDeviceModelDownloader {
     }
 
     /// 处理下载完成回调：移动文件 → 校验 SHA256 → 更新状态
-    private func handleDownloadDone(result: Result<URL, Error>, destination: URL, expectedSHA256: String) {
+    /// - Note: `destination` 参数已删除（文件已由 DownloadDelegate.didFinishDownloadingTo 移动到目标路径）
+    private func handleDownloadDone(result: Result<URL, Error>, expectedSHA256: String) {
         isDownloading = false
         switch result {
         case .success(let fileURL):
@@ -357,15 +360,15 @@ private final class DownloadDelegate: NSObject, URLSessionDownloadDelegate {
     }
 
     /// 下载进度回调
-    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask,
-                    didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
+    func urlSession(_: URLSession, downloadTask _: URLSessionDownloadTask,
+                    didWriteData _: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
         guard totalBytesExpectedToWrite > 0 else { return }
         let p = Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
         Task { await onProgress(p) }
     }
 
     /// 下载完成：同步移动临时文件到目标路径（避免临时文件被 URLSession 清理后再异步访问）
-    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
+    func urlSession(_: URLSession, downloadTask _: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
         // 先尝试移动到目标路径；失败则复制后删除临时文件
         do {
             try? FileManager.default.removeItem(at: destinationURL)
@@ -381,7 +384,7 @@ private final class DownloadDelegate: NSObject, URLSessionDownloadDelegate {
     }
 
     /// 任务结束回调（成功时 error=nil，失败时携带错误）
-    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+    func urlSession(_: URLSession, task _: URLSessionTask, didCompleteWithError error: Error?) {
         guard let error = error else { return }  // 成功时 error=nil，已由 didFinish 处理
         if !doneFired {
             doneFired = true

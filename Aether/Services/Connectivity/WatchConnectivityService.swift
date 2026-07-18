@@ -48,20 +48,20 @@ final class WatchConnectivityService: NSObject, WCSessionDelegate {
     // MARK: - WCSessionDelegate
 
     /// WCSession 激活完成回调
-    func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
+    func session(_: WCSession, activationDidCompleteWith _: WCSessionActivationState, error: Error?) {
         if let error = error {
             Logger.network.error("WCSession activation failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 
     /// 接收到 watchOS 发来的实时消息，按 action 分发到 NotificationCenter
-    func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
+    func session(_: WCSession, didReceiveMessage message: [String: Any]) {
         handleIncomingMessage(message)
     }
 
     /// Day 17: 接收到 watchOS 发来的后台 userInfo（transferUserInfo 投递），按 action 分发到 NotificationCenter。
     /// 即使 iOS App 不在前台，系统也会在下次启动/唤醒时回调此方法。
-    func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any] = [:]) {
+    func session(_: WCSession, didReceiveUserInfo userInfo: [String: Any] = [:]) {
         handleIncomingMessage(userInfo)
     }
 
@@ -84,19 +84,19 @@ final class WatchConnectivityService: NSObject, WCSessionDelegate {
     }
 
     /// 可达性变化时通知监听方
-    func sessionReachabilityDidChange(_ session: WCSession) {
-        NotificationCenter.default.post(name: .wcReachabilityChanged, object: session.isReachable)
+    func sessionReachabilityDidChange(_: WCSession) {
+        NotificationCenter.default.post(name: .wcReachabilityChanged, object: WCSession.default.isReachable)
     }
 
     // MARK: - iOS only
 
     /// iOS 专属：会话变为非活跃（如切换到其他设备）
-    func sessionDidBecomeInactive(_ session: WCSession) {
+    func sessionDidBecomeInactive(_: WCSession) {
         // 空实现，子类可按需扩展
     }
 
     /// iOS 专属：会话失效后重新激活（系统要求）
-    func sessionDidDeactivate(_ session: WCSession) {
+    func sessionDidDeactivate(_: WCSession) {
         // 重新激活以连接到新配对的 watch
         WCSession.default.activate()
     }

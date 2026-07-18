@@ -166,13 +166,12 @@ final class SettingsViewModel {
             systemPrompt = config.defaultSystemPrompt
         }
         // 仅当用户未切换过 provider 时用远程 defaultProvider 覆盖
-        if !userCustomizedProvider {
-            if let provider = ModelProvider(rawValue: config.defaultProvider) {
-                // 标记正在远程加载，避免 didSet 误标记用户自定义
-                isLoadingFromRemote = true
-                selectedProvider = provider
-                isLoadingFromRemote = false
-            }
+        // S1066: 合并嵌套 if
+        if !userCustomizedProvider, let provider = ModelProvider(rawValue: config.defaultProvider) {
+            // 标记正在远程加载，避免 didSet 误标记用户自定义
+            isLoadingFromRemote = true
+            selectedProvider = provider
+            isLoadingFromRemote = false
         }
         // 仅当 enableFallback == false 且用户未手动开启过时用远程 featureFlags.enableFallback 覆盖
         if !enableFallback {

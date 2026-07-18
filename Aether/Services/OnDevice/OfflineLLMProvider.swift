@@ -11,7 +11,8 @@ nonisolated final class OfflineLLMProvider: LLMProvider, @unchecked Sendable {
 
     /// 纯文本 chat 流：拼接 Llama-3 prompt → 调用 MLXInferenceEngine.streamGenerate 流式生成。
     /// 若模型未加载且 OnDeviceConfig 中有 modelPath，会先自动加载模型。
-    func chat(messages: [APIMessage], config: ChatConfig, apiKey: String) -> AsyncStream<String> {
+    /// - Note: `apiKey` 由协议要求，端侧推理不使用云端 API Key，故忽略。
+    func chat(messages: [APIMessage], config: ChatConfig, apiKey _: String) -> AsyncStream<String> {
         AsyncStream { continuation in
             let task = Task {
                 // 加载持久化的 OnDeviceConfig，用其 modelPath 触发自动加载
@@ -48,7 +49,8 @@ nonisolated final class OfflineLLMProvider: LLMProvider, @unchecked Sendable {
     /// 带工具调用 chat 流：端侧模型不支持工具调用。
     /// tools 非空时发 .llmErrorOccurred 通知（LLMError 无 unsupported case，复用 llmErrorOccurred）；
     /// tools 为空时退化为纯文本 chat，包装为 ParsedChunk。
-    func chat(messages: [APIMessage], config: ChatConfig, tools: [ToolDef], apiKey: String) -> AsyncStream<ParsedChunk> {
+    /// - Note: `apiKey` 由协议要求，端侧推理不使用云端 API Key，故忽略。
+    func chat(messages: [APIMessage], config: ChatConfig, tools: [ToolDef], apiKey _: String) -> AsyncStream<ParsedChunk> {
         AsyncStream { continuation in
             if !tools.isEmpty {
                 // 端侧模型不支持工具调用，发错误通知让 ChatViewModel 自动降级到云端
@@ -101,7 +103,8 @@ nonisolated final class OfflineLLMProvider: LLMProvider, @unchecked Sendable {
     /// 通过 MLXLMCommon ModelContainer 加载后取模型隐藏层输出。当前为离线兜底方案，
     /// 用确定性 hash 为每条文本生成固定向量，归一化后可作为语义缓存的键（精度有限）。
     /// 若需高精度语义搜索，建议启用云端 embedding API。
-    func embed(texts: [String], apiKey: String) async throws -> [[Float]] {
+    /// - Note: `apiKey` 由协议要求，端侧推理不使用云端 API Key，故忽略。
+    func embed(texts: [String], apiKey _: String) async throws -> [[Float]] {
         // 空入参短路返回空数组
         guard !texts.isEmpty else { return [] }
         return texts.map { text in

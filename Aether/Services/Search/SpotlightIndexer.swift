@@ -10,7 +10,9 @@ import os
 final class SpotlightIndexer: ConversationIndexer {
     static let shared = SpotlightIndexer()
 
-    private init() {}
+    private init() {
+        // 单例模式：外部不可创建实例
+    }
 
     /// 索引或更新单个会话
     /// - Parameter conversation: 平台无关的会话数据传输对象
@@ -36,11 +38,15 @@ final class SpotlightIndexer: ConversationIndexer {
     func remove(conversationId: UUID) async {
         CSSearchableIndex.default().deleteSearchableItems(
             withIdentifiers: [conversationId.uuidString]
-        ) { _ in }
+        ) { _ in
+            // 删除完成回调，错误可忽略（下次启动会重新索引）
+        }
     }
 
     /// 清空所有以太会话索引
     func removeAll() async {
-        CSSearchableIndex.default().deleteAllSearchableItems { _ in }
+        CSSearchableIndex.default().deleteAllSearchableItems { _ in
+            // 全部删除完成回调，错误可忽略（下次启动会重新索引）
+        }
     }
 }
