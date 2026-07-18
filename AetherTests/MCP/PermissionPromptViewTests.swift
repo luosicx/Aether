@@ -30,7 +30,7 @@ final class PermissionPromptViewTests: XCTestCase {
         XCTAssertEqual(info.trust, .internet)
         XCTAssertEqual(info.toolCount, 5)
         XCTAssertEqual(info.toolNames.count, 5)
-        XCTAssertEqual(info.internetKeyPin, "sha256:abcdef123456")
+        XCTAssertEqual(info.publicKeyPin, "sha256:abcdef123456")
     }
 
     /// 公网 Server 必须显示公钥指纹（若有）
@@ -44,7 +44,7 @@ final class PermissionPromptViewTests: XCTestCase {
             toolNames: ["tool"],
             publicKeyPin: "sha256:abc"
         )
-        XCTAssertNotNil(info.internetKeyPin)
+        XCTAssertNotNil(info.publicKeyPin)
     }
 
     // MARK: - 2. 信任档位显示文案
