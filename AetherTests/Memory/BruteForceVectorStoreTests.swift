@@ -22,7 +22,8 @@ final class BruteForceVectorStoreTests: XCTestCase {
 
     /// 暴力扫描存储恒可用
     func testIsAlwaysAvailable() async throws {
-        XCTAssertTrue(await store.isAvailable, "BruteForceVectorStore 应恒为可用")
+        let available = await store.isAvailable
+        XCTAssertTrue(available, "BruteForceVectorStore 应恒为可用")
     }
 
     /// 初始化后应为空
@@ -44,7 +45,7 @@ final class BruteForceVectorStoreTests: XCTestCase {
         let results = try await store.query([1.0, 0.0, 0.0], limit: 5)
         XCTAssertEqual(results.count, 1)
         XCTAssertEqual(results.first?.id, id)
-        XCTAssertEqual(results.first?.similarity, 1.0, accuracy: 0.0001)
+        XCTAssertEqual(results.first?.similarity ?? 0, 1.0, accuracy: 0.0001)
         XCTAssertEqual(results.first?.metadata["content"], "用户是素食者")
     }
 
@@ -118,16 +119,19 @@ final class BruteForceVectorStoreTests: XCTestCase {
     func testDelete() async throws {
         let id = UUID()
         try await store.upsert(id: id, embedding: [1.0, 0.0], metadata: [:])
-        XCTAssertEqual(try await store.count(), 1)
+        let countBefore = try await store.count()
+        XCTAssertEqual(countBefore, 1)
 
         try await store.delete(id: id)
-        XCTAssertEqual(try await store.count(), 0)
+        let countAfter = try await store.count()
+        XCTAssertEqual(countAfter, 0)
     }
 
     /// 删除不存在的 ID 应幂等
     func testDeleteNonExistentIsIdempotent() async throws {
         try await store.delete(id: UUID())
-        XCTAssertEqual(try await store.count(), 0)
+        let count = try await store.count()
+        XCTAssertEqual(count, 0)
     }
 
     /// 全部删除
@@ -136,7 +140,8 @@ final class BruteForceVectorStoreTests: XCTestCase {
             try await store.upsert(id: UUID(), embedding: [1.0, 0.0], metadata: [:])
         }
         try await store.deleteAll()
-        XCTAssertEqual(try await store.count(), 0)
+        let count = try await store.count()
+        XCTAssertEqual(count, 0)
     }
 
     // MARK: - 相似度计算（共享静态方法）

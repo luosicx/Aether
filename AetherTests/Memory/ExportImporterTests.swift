@@ -86,7 +86,7 @@ final class ExportImporterTests: XCTestCase {
         let data = try await exporter.exportAllMemories()
 
         // 验证可解码
-        let file = try JSONDecoder.decode(MemoryExportFile.self, from: data)
+        let file = try makeISO8601Decoder().decode(MemoryExportFile.self, from: data)
         XCTAssertEqual(file.version, 1, "版本应为 1")
         XCTAssertEqual(file.count, 0, "空仓库 count=0")
         XCTAssertTrue(file.memories.isEmpty)
@@ -97,7 +97,7 @@ final class ExportImporterTests: XCTestCase {
         _ = makeMemory(content: "测试", embedding: [0.1, 0.2], category: "preference", importance: 0.8)
 
         let data = try await exporter.exportAllMemories()
-        let file = try JSONDecoder.decode(MemoryExportFile.self, from: data)
+        let file = try makeISO8601Decoder().decode(MemoryExportFile.self, from: data)
 
         XCTAssertEqual(file.count, 1)
         let record = file.memories[0]
@@ -115,7 +115,7 @@ final class ExportImporterTests: XCTestCase {
         _ = makeMemory(content: "C")
 
         let data = try await exporter.exportAllMemories()
-        let file = try JSONDecoder.decode(MemoryExportFile.self, from: data)
+        let file = try makeISO8601Decoder().decode(MemoryExportFile.self, from: data)
 
         XCTAssertEqual(file.count, 3)
         XCTAssertEqual(file.memories.count, 3)
@@ -129,7 +129,7 @@ final class ExportImporterTests: XCTestCase {
         let data = try await exporter.exportAllMemories(encrypt: true)
 
         // 应无法直接解码为 JSON（加密后）
-        XCTAssertThrowsError(try JSONDecoder.decode(MemoryExportFile.self, from: data), "加密数据不应能直接解码为 JSON")
+        XCTAssertThrowsError(try makeISO8601Decoder().decode(MemoryExportFile.self, from: data), "加密数据不应能直接解码为 JSON")
     }
 
     // MARK: - 导入测试
@@ -232,9 +232,14 @@ final class ExportImporterTests: XCTestCase {
     }
 
     /// 损坏的 JSON 应抛出错误
-    func testImportCorruptedJSONThrows() {
+    func testImportCorruptedJSONThrows() async {
         let badData = Data("not json".utf8)
-        XCTAssertThrowsError(try exporter.importFromData(badData))
+        do {
+            _ = try await exporter.importFromData(badData)
+            XCTFail("损坏的 JSON 应抛出错误")
+        } catch {
+            // 预期抛出
+        }
     }
 
     // MARK: - 清空测试
@@ -319,12 +324,10 @@ final class ExportImporterTests: XCTestCase {
     }
 }
 
-// MARK: - JSONDecoder 便捷扩展（仅测试用）
+// MARK: - JSONDecoder 便捷函数（仅测试用）
 
-private extension JSONDecoder {
-    func decode<T: Decodable>(_ type: T.Type, from data: Data) throws -> T {
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return try decoder.decode(type, from: data)
-    }
+private func makeISO8601Decoder() -> JSONDecoder {
+    let decoder = JSONDecoder()
+    decoder.dateDecodingStrategy = .iso8601
+    return decoder
 }

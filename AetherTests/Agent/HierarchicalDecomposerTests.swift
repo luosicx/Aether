@@ -158,7 +158,7 @@ final class HierarchicalDecomposerTests: XCTestCase {
     /// applyHeuristics 对合法子任务列表应原样返回
     func testApplyHeuristicsValidList() throws {
         let s1 = SubTask(title: "T1", order: 0)
-        let s2 = SubTask(title: "T2", order: 1, dependencies: [s1.id])
+        let s2 = SubTask(title: "T2", dependencies: [s1.id], order: 1)
         let result = try decomposer.applyHeuristics(to: [s1, s2])
         XCTAssertEqual(result.count, 2)
     }
@@ -232,7 +232,7 @@ final class HierarchicalDecomposerTests: XCTestCase {
     func testAcceptanceCycleDependencyDetection() {
         // 构造带循环依赖的子任务列表
         let s1 = SubTask(title: "T1", order: 0)
-        let s2 = SubTask(title: "T2", order: 1, dependencies: [s1.id])
+        let s2 = SubTask(title: "T2", dependencies: [s1.id], order: 1)
         var s1WithDep = s1
         s1WithDep.dependencies = [s2.id]
         // applyHeuristics 应抛 invalidDAG 错误

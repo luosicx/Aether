@@ -151,7 +151,7 @@ final class HeuristicRulesTests: XCTestCase {
 
     func testGenerateSiblingDependenciesSingle() {
         let rules = HeuristicRules.default
-        let sub = SubTask(title: "T", order: 0, dependencies: [UUID(), UUID()])
+        let sub = SubTask(title: "T", dependencies: [UUID(), UUID()], order: 0)
         let result = rules.generateSiblingDependencies([sub])
         XCTAssertEqual(result.count, 1)
         XCTAssertTrue(result[0].dependencies.isEmpty, "单节点应清空依赖")
@@ -198,8 +198,8 @@ final class HeuristicRulesTests: XCTestCase {
 
     func testTopologicalSortSimpleChain() {
         let s1 = SubTask(title: "T1", order: 0)
-        let s2 = SubTask(title: "T2", order: 1, dependencies: [s1.id])
-        let s3 = SubTask(title: "T3", order: 2, dependencies: [s2.id])
+        let s2 = SubTask(title: "T2", dependencies: [s1.id], order: 1)
+        let s3 = SubTask(title: "T3", dependencies: [s2.id], order: 2)
         let (isAcyclic, order) = HeuristicRules.topologicalSort([s1, s2, s3])
         XCTAssertTrue(isAcyclic)
         XCTAssertEqual(order, [s1.id, s2.id, s3.id])
@@ -208,7 +208,7 @@ final class HeuristicRulesTests: XCTestCase {
     func testTopologicalSortParallel() {
         let s1 = SubTask(title: "T1", order: 0)
         let s2 = SubTask(title: "T2", order: 1)
-        let s3 = SubTask(title: "T3", order: 2, dependencies: [s1.id, s2.id])
+        let s3 = SubTask(title: "T3", dependencies: [s1.id, s2.id], order: 2)
         let (isAcyclic, order) = HeuristicRules.topologicalSort([s1, s2, s3])
         XCTAssertTrue(isAcyclic)
         XCTAssertEqual(order.count, 3)
@@ -221,14 +221,14 @@ final class HeuristicRulesTests: XCTestCase {
 
     func testHasCycleNoCycle() {
         let s1 = SubTask(title: "T1", order: 0)
-        let s2 = SubTask(title: "T2", order: 1, dependencies: [s1.id])
+        let s2 = SubTask(title: "T2", dependencies: [s1.id], order: 1)
         XCTAssertFalse(HeuristicRules.hasCycle([s1, s2]))
     }
 
     func testHasCycleWithCycle() {
         let s1 = SubTask(title: "T1", order: 0)
-        let s2 = SubTask(title: "T2", order: 1, dependencies: [s1.id])
-        let s3 = SubTask(title: "T3", order: 2, dependencies: [s2.id])
+        let s2 = SubTask(title: "T2", dependencies: [s1.id], order: 1)
+        let s3 = SubTask(title: "T3", dependencies: [s2.id], order: 2)
         var s1WithDep = s1
         s1WithDep.dependencies = [s3.id] // 形成环：s1 -> s3 -> s2 -> s1
         XCTAssertTrue(HeuristicRules.hasCycle([s1WithDep, s2, s3]))
@@ -245,7 +245,7 @@ final class HeuristicRulesTests: XCTestCase {
 
     func testValidateDAGValid() {
         let s1 = SubTask(title: "T1", order: 0)
-        let s2 = SubTask(title: "T2", order: 1, dependencies: [s1.id])
+        let s2 = SubTask(title: "T2", dependencies: [s1.id], order: 1)
         let (isValid, reason) = HeuristicRules.validateDAG([s1, s2])
         XCTAssertTrue(isValid)
         XCTAssertNil(reason)
@@ -254,7 +254,7 @@ final class HeuristicRulesTests: XCTestCase {
     func testValidateDAGMissingDependency() {
         let s1 = SubTask(title: "T1", order: 0)
         let missingID = UUID()
-        let s2 = SubTask(title: "T2", order: 1, dependencies: [missingID])
+        let s2 = SubTask(title: "T2", dependencies: [missingID], order: 1)
         let (isValid, reason) = HeuristicRules.validateDAG([s1, s2])
         XCTAssertFalse(isValid, "缺失依赖应校验失败")
         XCTAssertNotNil(reason)
@@ -263,7 +263,7 @@ final class HeuristicRulesTests: XCTestCase {
 
     func testValidateDAGWithCycle() {
         let s1 = SubTask(title: "T1", order: 0)
-        let s2 = SubTask(title: "T2", order: 1, dependencies: [s1.id])
+        let s2 = SubTask(title: "T2", dependencies: [s1.id], order: 1)
         var s1WithDep = s1
         s1WithDep.dependencies = [s2.id]
         let (isValid, reason) = HeuristicRules.validateDAG([s1WithDep, s2])

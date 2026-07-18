@@ -171,7 +171,8 @@ final class RecallEngineTests: XCTestCase {
         _ = await engine.recall(query: [1, 0], memories: [memory], limit: 1, now: now)
 
         XCTAssertNotNil(memory.lastAccessedAt, "召回后 lastAccessedAt 应被设置")
-        XCTAssertEqual(memory.lastAccessedAt?.timeIntervalSince1970, now.timeIntervalSince1970, accuracy: 0.001, "lastAccessedAt 应等于传入的 now")
+        let accessedAt = try XCTUnwrap(memory.lastAccessedAt, "lastAccessedAt 应非 nil")
+        XCTAssertEqual(accessedAt.timeIntervalSince1970, now.timeIntervalSince1970, accuracy: 0.001, "lastAccessedAt 应等于传入的 now")
     }
 
     /// 空查询应返回空数组
