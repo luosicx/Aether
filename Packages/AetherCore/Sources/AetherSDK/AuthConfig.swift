@@ -18,7 +18,7 @@ public enum AuthConfig: Sendable, Equatable {
     case deviceBound(deviceID: String, apiKey: String)
 
     /// 默认方案：API Key
-    public static let `default`: AuthConfig = .apiKey
+    public static let defaultConfig: AuthConfig = .apiKey
 
     /// 应注入到 HTTP 请求的鉴权 headers
     public var headers: [String: String] {

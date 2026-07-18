@@ -14,7 +14,7 @@ final class AuthConfigTests: XCTestCase {
     }
 
     func testAPIKeyDefault() {
-        XCTAssertEqual(AuthConfig.default, .apiKey)
+        XCTAssertEqual(AuthConfig.defaultConfig, .apiKey)
     }
 
     // MARK: - OAuth 2.0
@@ -127,7 +127,7 @@ final class AuthConfigTests: XCTestCase {
 
     func testAuthConfigEquality() {
         XCTAssertEqual(AuthConfig.apiKey, AuthConfig.apiKey)
-        XCTAssertEqual(AuthConfig.default, .apiKey)
+        XCTAssertEqual(AuthConfig.defaultConfig, .apiKey)
 
         let oauth1 = AuthConfig.oauth(OAuthCredential(accessToken: "a"))
         let oauth2 = AuthConfig.oauth(OAuthCredential(accessToken: "a"))

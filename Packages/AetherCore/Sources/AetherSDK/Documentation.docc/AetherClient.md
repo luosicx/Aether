@@ -21,7 +21,7 @@ import AetherSDK
 let config = AetherConfig(
     provider: .deepSeek,
     apiKey: "sk-your-api-key",
-    cache: .default,
+    cache: .defaultConfig,
     auth: .apiKey
 )
 let client = try AetherClient(config: config)

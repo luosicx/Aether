@@ -19,7 +19,7 @@ final class RetryPolicyTests: XCTestCase {
     // MARK: - 默认参数
 
     func testDefaultParameters() {
-        let policy = RetryPolicy.default
+        let policy = RetryPolicy.defaultPolicy
         XCTAssertEqual(policy.maxAttempts, 3)
         XCTAssertEqual(policy.initialDelay, 1.0)
         XCTAssertEqual(policy.backoffMultiplier, 2.0)
@@ -27,9 +27,9 @@ final class RetryPolicyTests: XCTestCase {
 
     func testInitDefaultsEqualDefault() {
         let policy = RetryPolicy()
-        XCTAssertEqual(policy.maxAttempts, RetryPolicy.default.maxAttempts)
-        XCTAssertEqual(policy.initialDelay, RetryPolicy.default.initialDelay)
-        XCTAssertEqual(policy.backoffMultiplier, RetryPolicy.default.backoffMultiplier)
+        XCTAssertEqual(policy.maxAttempts, RetryPolicy.defaultPolicy.maxAttempts)
+        XCTAssertEqual(policy.initialDelay, RetryPolicy.defaultPolicy.initialDelay)
+        XCTAssertEqual(policy.backoffMultiplier, RetryPolicy.defaultPolicy.backoffMultiplier)
     }
 
     // MARK: - 自定义参数
@@ -44,7 +44,7 @@ final class RetryPolicyTests: XCTestCase {
     // MARK: - delay(forAttempt:)
 
     func testDelayForAttemptWithDefaultPolicy() {
-        let policy = RetryPolicy.default
+        let policy = RetryPolicy.defaultPolicy
         XCTAssertEqual(policy.delay(forAttempt: 0), 1.0, "attempt 0 → 1s")
         XCTAssertEqual(policy.delay(forAttempt: 1), 2.0, "attempt 1 → 2s")
         XCTAssertEqual(policy.delay(forAttempt: 2), 4.0, "attempt 2 → 4s")
@@ -52,7 +52,7 @@ final class RetryPolicyTests: XCTestCase {
     }
 
     func testDelayForNegativeAttempt() {
-        let policy = RetryPolicy.default
+        let policy = RetryPolicy.defaultPolicy
         XCTAssertEqual(policy.delay(forAttempt: -1), 0)
         XCTAssertEqual(policy.delay(forAttempt: -100), 0)
     }
@@ -74,7 +74,7 @@ final class RetryPolicyTests: XCTestCase {
     // MARK: - backoffSequence()
 
     func testBackoffSequenceWithDefaultPolicy() {
-        let policy = RetryPolicy.default
+        let policy = RetryPolicy.defaultPolicy
         XCTAssertEqual(policy.backoffSequence(), [1.0, 2.0])
     }
 
@@ -91,7 +91,7 @@ final class RetryPolicyTests: XCTestCase {
     // MARK: - canRetry(afterAttempt:)
 
     func testCanRetryWithDefaultPolicy() {
-        let policy = RetryPolicy.default
+        let policy = RetryPolicy.defaultPolicy
         XCTAssertTrue(policy.canRetry(afterAttempt: 0))
         XCTAssertTrue(policy.canRetry(afterAttempt: 1))
         XCTAssertFalse(policy.canRetry(afterAttempt: 2))
@@ -122,7 +122,7 @@ final class RetryPolicyTests: XCTestCase {
     // MARK: - Sendable
 
     func testSendableConformance() {
-        let policy = RetryPolicy.default
+        let policy = RetryPolicy.defaultPolicy
         let closure: @Sendable () -> Int = { policy.maxAttempts }
         XCTAssertEqual(closure(), 3)
     }
@@ -223,7 +223,7 @@ final class RetryPolicyTests: XCTestCase {
         let config = AetherConfig(
             provider: .deepSeek,
             apiKey: "sk-test",
-            retryPolicy: RetryPolicy.default
+            retryPolicy: RetryPolicy.defaultPolicy
         )
         let client = try AetherClient(config: config, provider: mock)
         do {

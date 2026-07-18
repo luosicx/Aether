@@ -98,9 +98,9 @@ final class AetherConfigTests: XCTestCase {
         let config = AetherConfig(
             provider: .deepSeek,
             apiKey: "sk-valid",
-            cache: CacheConfig.default,
+            cache: CacheConfig.defaultConfig,
             rag: RAGConfig(knowledgeBaseID: "kb-1"),
-            rateLimit: RateLimitConfig.default
+            rateLimit: RateLimitConfig.defaultConfig
         )
         XCTAssertNil(config.validate())
     }
@@ -108,7 +108,7 @@ final class AetherConfigTests: XCTestCase {
     // MARK: - 默认值
 
     func testCacheConfigDefaults() {
-        let cache = CacheConfig.default
+        let cache = CacheConfig.defaultConfig
         XCTAssertTrue(cache.enabled)
         XCTAssertEqual(cache.ttl, 3600)
         XCTAssertEqual(cache.similarityThreshold, 0.92, accuracy: 0.001)
@@ -116,7 +116,7 @@ final class AetherConfigTests: XCTestCase {
     }
 
     func testRateLimitConfigDefaults() {
-        let rl = RateLimitConfig.default
+        let rl = RateLimitConfig.defaultConfig
         XCTAssertEqual(rl.qps, 10)
         XCTAssertEqual(rl.maxConcurrent, 4)
     }

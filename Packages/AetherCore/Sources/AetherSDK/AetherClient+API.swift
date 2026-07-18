@@ -20,11 +20,11 @@ extension AetherClient {
     public func chat(messages: [AetherMessage], tools: [AetherTool] = []) async throws -> String {
         // 1. 注册工具到内部 registry（临时，作用域内）
         for tool in tools {
-            _toolRegistry.register(tool: tool)
+            toolRegistryInternal.register(tool: tool)
         }
         defer {
             for tool in tools {
-                _toolRegistry.unregister(name: tool.definition.name)
+                toolRegistryInternal.unregister(name: tool.definition.name)
             }
         }
 
@@ -49,16 +49,16 @@ extension AetherClient {
 
     /// 实际执行 chat（带重试）
     private func executeChatWithRetry(messages: [AetherMessage], tools: [AetherTool]) async throws -> String {
-        let policy = _retryPolicy
+        let policy = retryPolicyInternal
         var lastError: Error?
         for attempt in 0..<policy.maxAttempts {
             do {
                 return try await AetherClientAPI.chatSingleAttempt(
-                    provider: _provider,
+                    provider: providerInternal,
                     config: config,
                     messages: messages,
                     tools: tools,
-                    toolRegistry: _toolRegistry
+                    toolRegistry: toolRegistryInternal
                 )
             } catch let error as AetherError {
                 lastError = error
@@ -89,43 +89,62 @@ extension AetherClient {
     public func stream(messages: [AetherMessage], tools: [AetherTool] = []) -> AsyncStream<AetherChunk> {
         // 注册工具到内部 registry
         for tool in tools {
-            _toolRegistry.register(tool: tool)
+            toolRegistryInternal.register(tool: tool)
         }
-        let provider = _provider
+        let provider = providerInternal
         let config = self.config
-        let toolRegistry = _toolRegistry
+        let toolRegistry = toolRegistryInternal
         return AsyncStream { continuation in
             let task = Task {
-                defer {
-                    for tool in tools {
-                        toolRegistry.unregister(name: tool.definition.name)
-                    }
-                    continuation.finish()
-                }
-                let apiMessages = AetherClientAPI.convertMessages(messages)
-                let chatConfig = AetherClientAPI.convertChatConfig(config)
-                let toolDefs = AetherClientAPI.convertToolDefs(tools, registry: toolRegistry)
-                if toolDefs.isEmpty {
-                    let stream = provider.chat(messages: apiMessages, config: chatConfig, apiKey: config.apiKey)
-                    for await chunk in stream {
-                        continuation.yield(AetherChunk(content: chunk))
-                    }
-                } else {
-                    let stream = provider.chat(messages: apiMessages, config: chatConfig, tools: toolDefs, apiKey: config.apiKey)
-                    for await parsed in stream {
-                        let content = parsed.content
-                        let toolCalls = parsed.toolCalls?.map {
-                            AetherToolCall(id: $0.id, type: $0.type, name: $0.name, arguments: $0.arguments)
-                        }
-                        continuation.yield(AetherChunk(content: content, toolCalls: toolCalls))
-                    }
-                }
-                continuation.yield(.final())
+                await Self.streamTaskBody(
+                    messages: messages,
+                    tools: tools,
+                    provider: provider,
+                    config: config,
+                    toolRegistry: toolRegistry,
+                    continuation: continuation
+                )
             }
             continuation.onTermination = { _ in
                 task.cancel()
             }
         }
+    }
+
+    /// stream 内部执行体（提取以避免 3 层闭包嵌套触发 S3087）
+    private static func streamTaskBody(
+        messages: [AetherMessage],
+        tools: [AetherTool],
+        provider: LLMProvider,
+        config: AetherConfig,
+        toolRegistry: AetherToolRegistry,
+        continuation: AsyncStream<AetherChunk>.Continuation
+    ) async {
+        defer {
+            for tool in tools {
+                toolRegistry.unregister(name: tool.definition.name)
+            }
+            continuation.finish()
+        }
+        let apiMessages = AetherClientAPI.convertMessages(messages)
+        let chatConfig = AetherClientAPI.convertChatConfig(config)
+        let toolDefs = AetherClientAPI.convertToolDefs(tools, registry: toolRegistry)
+        if toolDefs.isEmpty {
+            let stream = provider.chat(messages: apiMessages, config: chatConfig, apiKey: config.apiKey)
+            for await chunk in stream {
+                continuation.yield(AetherChunk(content: chunk))
+            }
+        } else {
+            let stream = provider.chat(messages: apiMessages, config: chatConfig, tools: toolDefs, apiKey: config.apiKey)
+            for await parsed in stream {
+                let content = parsed.content
+                let toolCalls = parsed.toolCalls?.map {
+                    AetherToolCall(id: $0.id, type: $0.type, name: $0.name, arguments: $0.arguments)
+                }
+                continuation.yield(AetherChunk(content: content, toolCalls: toolCalls))
+            }
+        }
+        continuation.yield(.final())
     }
 
     // MARK: - embed
@@ -136,8 +155,8 @@ extension AetherClient {
     /// - Throws: `AetherError`
     public func embed(texts: [String]) async throws -> [[Float]] {
         try await AetherClientAPI.embed(
-            provider: _provider,
-            embeddingProvider: _embeddingProvider,
+            provider: providerInternal,
+            embeddingProvider: embeddingProviderInternal,
             config: config,
             texts: texts
         )
@@ -152,7 +171,7 @@ extension AetherClient {
     /// - Returns: 相关文档列表
     /// - Throws: `AetherError`
     public func retrieve(query: String, topK: Int = 5) async throws -> [AetherDocument] {
-        guard let ragProvider = _ragProvider else {
+        guard let ragProvider = ragProviderInternal else {
             throw AetherError.ragRetrievalFailed(reason: "未注入 RAGProvider，请通过 init(config:provider:ragProvider:) 注入")
         }
         guard let ragConfig = config.rag else {
@@ -204,7 +223,9 @@ internal enum AetherClientAPI {
     }
 
     /// AetherTool 列表 + registry → ToolDef 数组（含已注册工具）
+    /// - Note: `tools` 参数仅在调用方注册到 registry 后由 registry 统一管理，此处读取 registry 即可
     static func convertToolDefs(_ tools: [AetherTool], registry: AetherToolRegistry) -> [ToolDef] {
+        _ = tools // 已注册到 registry，本函数读取 registry 即可
         // 使用 registry 中所有可用工具（含传入的 tools 已注册）
         let defs = registry.availableDefinitions()
         return defs.map { def in

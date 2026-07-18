@@ -26,7 +26,7 @@ let config = AetherConfig(
     rag: RAGConfig(knowledgeBaseID: "my-kb", topK: 5),
     rateLimit: RateLimitConfig(qps: 10, maxConcurrent: 4),
     auth: .apiKey,
-    retryPolicy: .default
+    retryPolicy: .defaultPolicy
 )
 ```
 

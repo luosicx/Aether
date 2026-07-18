@@ -24,6 +24,7 @@ public struct AetherConfig: Sendable, Equatable {
     public var retryPolicy: RetryPolicy?
 
     /// 创建配置
+    // NOSONAR: SDK 配置对象，参数均提供默认值（除 provider/apiKey），符合 Swift 配置对象惯例
     public init(
         provider: AetherProvider,
         apiKey: String,
@@ -31,8 +32,8 @@ public struct AetherConfig: Sendable, Equatable {
         cache: CacheConfig? = nil,
         rag: RAGConfig? = nil,
         rateLimit: RateLimitConfig? = nil,
-        auth: AuthConfig = .default,
-        retryPolicy: RetryPolicy? = .default
+        auth: AuthConfig = .defaultConfig,
+        retryPolicy: RetryPolicy? = .defaultPolicy
     ) {
         self.provider = provider
         self.apiKey = apiKey
@@ -106,7 +107,7 @@ public struct CacheConfig: Sendable, Equatable {
     }
 
     /// 默认配置
-    public static let `default` = CacheConfig()
+    public static let defaultConfig = CacheConfig()
 }
 
 /// RAG 知识库配置
@@ -135,5 +136,5 @@ public struct RateLimitConfig: Sendable, Equatable {
     }
 
     /// 默认配置
-    public static let `default` = RateLimitConfig()
+    public static let defaultConfig = RateLimitConfig()
 }

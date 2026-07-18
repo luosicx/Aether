@@ -14,7 +14,9 @@ public final class AetherToolRegistry: @unchecked Sendable {
     /// 工具权限（name → permission）
     private var permissions: [String: ToolPermission] = [:]
 
-    public init() {}
+    public init() {
+        // 空初始化器：使用默认空 tools/permissions 字典
+    }
 
     /// 注册工具（同名覆盖）
     public func register(tool: AetherTool) {

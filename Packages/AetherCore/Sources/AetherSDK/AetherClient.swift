@@ -23,8 +23,8 @@ public final class AetherClient: @unchecked Sendable {
     private let embeddingProvider: AetherEmbeddingProvider?
     /// 工具注册中心
     private let toolRegistry: AetherToolRegistry
-    /// 语义缓存（懒加载，仅 cache.enabled 时创建；SemanticCache 是 @MainActor 隔离，故 _cache 也通过 MainActor 访问）
-    private var _cache: SemanticCache?
+    /// 语义缓存（懒加载，仅 cache.enabled 时创建；SemanticCache 是 @MainActor 隔离，故 cacheStorage 也通过 MainActor 访问）
+    private var cacheStorage: SemanticCache?
 
     // MARK: - 初始化
 
@@ -40,7 +40,7 @@ public final class AetherClient: @unchecked Sendable {
         self.ragProvider = nil
         self.embeddingProvider = nil
         self.toolRegistry = AetherToolRegistry()
-        self._cache = nil
+        self.cacheStorage = nil
     }
 
     /// 内部初始化器：允许注入 LLMProvider / RAGProvider / EmbeddingProvider（测试与 App 桥接用）
@@ -66,7 +66,7 @@ public final class AetherClient: @unchecked Sendable {
         self.ragProvider = ragProvider
         self.embeddingProvider = embeddingProvider
         self.toolRegistry = toolRegistry
-        self._cache = nil
+        self.cacheStorage = nil
     }
 
     // MARK: - 内部工具
@@ -85,20 +85,20 @@ public final class AetherClient: @unchecked Sendable {
     /// - Returns: 缓存实例；若 cache 未启用返回 nil
     internal func getCache() async -> SemanticCache? {
         guard config.cache?.enabled == true else { return nil }
-        // 所有 _cache 访问均通过 MainActor 串行化（SemanticCache 本身是 @MainActor）
+        // 所有 cacheStorage 访问均通过 MainActor 串行化（SemanticCache 本身是 @MainActor）
         return await MainActor.run {
-            if self._cache == nil {
-                self._cache = SemanticCache()
+            if self.cacheStorage == nil {
+                self.cacheStorage = SemanticCache()
             }
-            return self._cache
+            return self.cacheStorage
         }
     }
 
     // MARK: - Internal Accessors（供 API 扩展文件访问）
 
-    internal var _provider: LLMProvider { provider }
-    internal var _ragProvider: AetherRAGProvider? { ragProvider }
-    internal var _embeddingProvider: AetherEmbeddingProvider? { embeddingProvider }
-    internal var _toolRegistry: AetherToolRegistry { toolRegistry }
-    internal var _retryPolicy: RetryPolicy { config.retryPolicy ?? .default }
+    internal var providerInternal: LLMProvider { provider }
+    internal var ragProviderInternal: AetherRAGProvider? { ragProvider }
+    internal var embeddingProviderInternal: AetherEmbeddingProvider? { embeddingProvider }
+    internal var toolRegistryInternal: AetherToolRegistry { toolRegistry }
+    internal var retryPolicyInternal: RetryPolicy { config.retryPolicy ?? .defaultPolicy }
 }

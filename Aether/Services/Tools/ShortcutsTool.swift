@@ -16,7 +16,8 @@ import AppKit
 /// 快捷指令执行工具，跨平台
 final class RunShortcutTool: ToolProtocol, @unchecked Sendable {
     /// macOS shortcuts CLI 路径（系统标准位置，不存在则 macOS 不可用）
-    private static let shortcutsCLIPath = "/usr/bin/shortcuts"  // NOSONAR - 系统标准 CLI 路径
+    // NOSONAR: 系统标准 CLI 路径，安全可控（macOS 内置命令，非用户输入）
+    private static let shortcutsCLIPath = "/usr/bin/shortcuts"
 
     /// 工具定义
     /// - name: `run_shortcut`
@@ -100,7 +101,8 @@ final class RunShortcutTool: ToolProtocol, @unchecked Sendable {
 /// 快捷指令列表工具，跨平台
 final class ListShortcutsTool: ToolProtocol, @unchecked Sendable {
     /// macOS shortcuts CLI 路径（系统标准位置，不存在则 macOS 不可用）
-    private static let shortcutsCLIPath = "/usr/bin/shortcuts"  // NOSONAR - 系统标准 CLI 路径
+    // NOSONAR: 系统标准 CLI 路径，安全可控（macOS 内置命令，非用户输入）
+    private static let shortcutsCLIPath = "/usr/bin/shortcuts"
 
     /// 工具定义
     /// - name: `list_shortcuts`
