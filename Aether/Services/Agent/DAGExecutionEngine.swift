@@ -100,7 +100,7 @@ final class DAGExecutionEngine {
     ///   - task: 待执行的 AgentTask
     ///   - executor: 节点执行器闭包（由 orchestrator 注入）
     /// - Throws: `EngineError`
-    func run(_ task: AgentTask, executor: @Sendable @escaping NodeExecutor) async throws {
+    func run(_ task: AgentTask, executor: @escaping @Sendable NodeExecutor) async throws {
         let subTasks = task.subTasks
         guard !subTasks.isEmpty else { return }
 
@@ -174,7 +174,7 @@ final class DAGExecutionEngine {
     ///   - batch: 可执行子任务列表
     ///   - task: 所属 AgentTask
     ///   - executor: 节点执行器
-    private func executeBatch(_ batch: [SubTask], task: AgentTask, executor: @Sendable @escaping NodeExecutor) async throws {
+    private func executeBatch(_ batch: [SubTask], task: AgentTask, executor: @escaping @Sendable NodeExecutor) async throws {
         // 限制并发数：取前 maxConcurrency 个
         let currentBatch = Array(batch.prefix(Self.maxConcurrency))
         let remaining = batch.dropFirst(Self.maxConcurrency)
@@ -282,7 +282,7 @@ final class DAGExecutionEngine {
     ///   - task: 所属 AgentTask
     ///   - nodeID: 失败节点 ID
     ///   - executor: 节点执行器
-    func retryFailedNode(task: AgentTask, nodeID: UUID, executor: @Sendable @escaping NodeExecutor) async throws {
+    func retryFailedNode(task: AgentTask, nodeID: UUID, executor: @escaping @Sendable NodeExecutor) async throws {
         guard let sub = task.subTasks.first(where: { $0.id == nodeID }) else { return }
         _ = task.updateSubTaskStatus(id: nodeID, status: .pending)
         await stateMachine.reset(nodeID)
