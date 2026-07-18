@@ -1,5 +1,6 @@
 import XCTest
 @testable import Aether
+import AetherFoundation
 
 /// `PermissionPromptView` 与权限审批流程的单元测试。
 ///

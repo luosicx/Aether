@@ -100,7 +100,7 @@ final class AgentPerformanceBaselineTests: XCTestCase {
     /// - Returns: (completedCount, totalCount, skippedCount, failedCount)
     private func executeAndCount(
         subTasks: [SubTask],
-        executor: DAGExecutionEngine.NodeExecutor,
+        executor: @escaping @Sendable DAGExecutionEngine.NodeExecutor,
         retryPolicy: RetryPolicy
     ) async -> (completed: Int, skipped: Int, failed: Int, total: Int) {
         let task = AgentTask(goal: "基线测试")

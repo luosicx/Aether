@@ -1,6 +1,7 @@
 import XCTest
 import CryptoKit
 @testable import Aether
+import AetherFoundation
 
 /// MCP 安全加固模块单元测试。
 ///

@@ -1,5 +1,6 @@
 import XCTest
 @testable import Aether
+import AetherFoundation
 
 /// `MCPSettingsView` 三组 Server 显示与审批操作的单元测试。
 ///
