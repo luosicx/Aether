@@ -482,6 +482,12 @@
 		F64CE3AE9BD2A6C70E7FA68D /* DAGVisualizationViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100C00108 /* DAGVisualizationViewTests.swift */; };
 		AD95A90701D0791B6C307089 /* InterventionPanelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100C00109 /* InterventionPanelTests.swift */; };
 		C377A94D6147939F189D1355 /* AgentPerformanceBaselineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100C0010A /* AgentPerformanceBaselineTests.swift */; };
+		9A1B2C3D4E5F607100C0AA0B /* AgentRoleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100C0010B /* AgentRoleTests.swift */; };
+		9A1B2C3D4E5F607100C0AA0C /* ToolExecutionCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100C0010C /* ToolExecutionCoordinatorTests.swift */; };
+		ABCDEF000000000000000027 /* MCPServerGroupingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000017 /* MCPServerGroupingTests.swift */; };
+		ABCDEF000000000000000029 /* MCPToolAdapterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000019 /* MCPToolAdapterTests.swift */; };
+		ABCDEF00000000000000002B /* MCPResourceServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF00000000000000001B /* MCPResourceServiceTests.swift */; };
+		ABCDEF00000000000000002D /* MCPPromptServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF00000000000000001D /* MCPPromptServiceTests.swift */; };
 
 /* End PBXBuildFile section */
 
@@ -912,6 +918,12 @@
 		9A1B2C3D4E5F607100C00108 /* DAGVisualizationViewTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DAGVisualizationViewTests.swift; sourceTree = "<group>"; };
 		9A1B2C3D4E5F607100C00109 /* InterventionPanelTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InterventionPanelTests.swift; sourceTree = "<group>"; };
 		9A1B2C3D4E5F607100C0010A /* AgentPerformanceBaselineTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AgentPerformanceBaselineTests.swift; sourceTree = "<group>"; };
+		9A1B2C3D4E5F607100C0010B /* AgentRoleTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AgentRoleTests.swift; sourceTree = "<group>"; };
+		9A1B2C3D4E5F607100C0010C /* ToolExecutionCoordinatorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ToolExecutionCoordinatorTests.swift; sourceTree = "<group>"; };
+		ABCDEF000000000000000017 /* MCPServerGroupingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MCPServerGroupingTests.swift; sourceTree = "<group>"; };
+		ABCDEF000000000000000019 /* MCPToolAdapterTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MCPToolAdapterTests.swift; sourceTree = "<group>"; };
+		ABCDEF00000000000000001B /* MCPResourceServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MCPResourceServiceTests.swift; sourceTree = "<group>"; };
+		ABCDEF00000000000000001D /* MCPPromptServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MCPPromptServiceTests.swift; sourceTree = "<group>"; };
 
 /* End PBXFileReference section */
 
@@ -1501,6 +1513,8 @@
 				9A1B2C3D4E5F607100C00108 /* DAGVisualizationViewTests.swift */,
 				9A1B2C3D4E5F607100C00109 /* InterventionPanelTests.swift */,
 				9A1B2C3D4E5F607100C0010A /* AgentPerformanceBaselineTests.swift */,
+				9A1B2C3D4E5F607100C0010B /* AgentRoleTests.swift */,
+				9A1B2C3D4E5F607100C0010C /* ToolExecutionCoordinatorTests.swift */,
 			);
 			path = Agent;
 			sourceTree = "<group>";
@@ -1697,6 +1711,10 @@
 				FF6E0B6C6ACAC58174D858DC /* PermissionPromptViewTests.swift */,
 				C5FCC129B4E6DD3C3FB81A3C /* MCPSettingsViewTests.swift */,
 				894137D6833B7A3B3029AA38 /* TrustBoundaryTests.swift */,
+				ABCDEF000000000000000017 /* MCPServerGroupingTests.swift */,
+				ABCDEF000000000000000019 /* MCPToolAdapterTests.swift */,
+				ABCDEF00000000000000001B /* MCPResourceServiceTests.swift */,
+				ABCDEF00000000000000001D /* MCPPromptServiceTests.swift */,
 			);
 			path = MCP;
 			sourceTree = "<group>";
@@ -2508,6 +2526,12 @@
 				9721CF6F84A8D2CBA8F80605 /* PermissionPromptViewTests.swift in Sources */,
 				4CF3AB4DB02467898455DE0D /* MCPSettingsViewTests.swift in Sources */,
 				CC4CF23DC148EF5F47786036 /* TrustBoundaryTests.swift in Sources */,
+				9A1B2C3D4E5F607100C0AA0B /* AgentRoleTests.swift in Sources */,
+				9A1B2C3D4E5F607100C0AA0C /* ToolExecutionCoordinatorTests.swift in Sources */,
+				ABCDEF000000000000000027 /* MCPServerGroupingTests.swift in Sources */,
+				ABCDEF000000000000000029 /* MCPToolAdapterTests.swift in Sources */,
+				ABCDEF00000000000000002B /* MCPResourceServiceTests.swift in Sources */,
+				ABCDEF00000000000000002D /* MCPPromptServiceTests.swift in Sources */,
 				F4604345BBBD2D1C96E806DB /* PluginManagerTests.swift in Sources */,
 				CA452DC200489916F69A9AE8 /* PluginSandboxTests.swift in Sources */,
 				297A062F9A45A639E75D4BF5 /* ForkTests.swift in Sources */,
