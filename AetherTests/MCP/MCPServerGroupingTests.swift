@@ -39,9 +39,12 @@ final class MCPServerGroupingTests: XCTestCase {
     }
 
     // MARK: - MCPServerInfo 构造
+    //
+    // 注：AetherFoundation 也定义了同名 MCPServerInfo（使用 ConnectionStatus 枚举），
+    // 这里显式用 Aether.MCPServerInfo 消除歧义，使 .connected 解析为 MCPServerStatus.connected
 
     func testInfoMinimalInit() {
-        let info = MCPServerInfo(id: "s1", name: "Server1", status: .connected)
+        let info = Aether.MCPServerInfo(id: "s1", name: "Server1", status: .connected)
         XCTAssertEqual(info.id, "s1")
         XCTAssertEqual(info.name, "Server1")
         XCTAssertEqual(info.status, .connected)
@@ -54,7 +57,7 @@ final class MCPServerGroupingTests: XCTestCase {
         let tool = MCPTool(name: "search", description: "搜索", inputSchema: [:])
         let resource = MCPResource(uri: "file:///r1", name: "Resource1")
         let prompt = MCPPrompt(name: "prompt1", description: "Prompt1", arguments: nil)
-        let info = MCPServerInfo(
+        let info = Aether.MCPServerInfo(
             id: "s2",
             name: "Server2",
             status: .connected,
@@ -71,9 +74,9 @@ final class MCPServerGroupingTests: XCTestCase {
     }
 
     func testInfoEquality() {
-        let info1 = MCPServerInfo(id: "s1", name: "A", status: .connected)
-        let info2 = MCPServerInfo(id: "s1", name: "A", status: .connected)
-        let info3 = MCPServerInfo(id: "s1", name: "A", status: .disconnected)
+        let info1 = Aether.MCPServerInfo(id: "s1", name: "A", status: .connected)
+        let info2 = Aether.MCPServerInfo(id: "s1", name: "A", status: .connected)
+        let info3 = Aether.MCPServerInfo(id: "s1", name: "A", status: .disconnected)
         XCTAssertEqual(info1, info2, "相同字段应相等")
         XCTAssertNotEqual(info1, info3, "status 不同应不等")
     }

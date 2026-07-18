@@ -141,7 +141,8 @@ final class ToolExecutionCoordinatorTests: XCTestCase {
         _ = try await coordinator.execute(name: "calculate", arguments: ["expression": "1 + 1"])
         let countBefore = await coordinator.executionCount
         XCTAssertEqual(countBefore, 1)
-        XCTAssertFalse(await coordinator.historyRecords().isEmpty)
+        let historyBefore = await coordinator.historyRecords()
+        XCTAssertFalse(historyBefore.isEmpty)
 
         await coordinator.reset()
 

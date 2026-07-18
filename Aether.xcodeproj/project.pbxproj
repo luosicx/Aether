@@ -437,9 +437,13 @@
 		ABCDEF100000000000000021 /* MCPConfigFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000021 /* MCPConfigFile.swift */; };
 		ABCDEF100000000000000022 /* MCPConfigFileLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000022 /* MCPConfigFileLoader.swift */; };
 		ABCDEF100000000000000023 /* MCPDiscoveryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000023 /* MCPDiscoveryService.swift */; };
+		ABCDEF100000000000000010 /* MCPResourceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000010 /* MCPResourceService.swift */; };
+		ABCDEF100000000000000012 /* MCPPromptService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000012 /* MCPPromptService.swift */; };
 		ABCDEF100000000000000024 /* MCPServerGrouping.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000024 /* MCPServerGrouping.swift */; };
 		ABCDEF100000000000000025 /* TrustBoundary.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000025 /* TrustBoundary.swift */; };
 		ABCDEF100000000000000026 /* PermissionPromptView.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000026 /* PermissionPromptView.swift */; };
+		ABCDEF200000000000000010 /* MCPResourceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000010 /* MCPResourceService.swift */; };
+		ABCDEF200000000000000012 /* MCPPromptService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000012 /* MCPPromptService.swift */; };
 		ABCDEF200000000000000020 /* MCPSecurity.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000020 /* MCPSecurity.swift */; };
 		ABCDEF200000000000000021 /* MCPConfigFile.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000021 /* MCPConfigFile.swift */; };
 		ABCDEF200000000000000022 /* MCPConfigFileLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000022 /* MCPConfigFileLoader.swift */; };
@@ -2365,6 +2369,8 @@
 				ABCDEF100000000000000021 /* MCPConfigFile.swift in Sources */,
 				ABCDEF100000000000000022 /* MCPConfigFileLoader.swift in Sources */,
 				ABCDEF100000000000000023 /* MCPDiscoveryService.swift in Sources */,
+				ABCDEF100000000000000010 /* MCPResourceService.swift in Sources */,
+				ABCDEF100000000000000012 /* MCPPromptService.swift in Sources */,
 				ABCDEF100000000000000024 /* MCPServerGrouping.swift in Sources */,
 				ABCDEF100000000000000025 /* TrustBoundary.swift in Sources */,
 				ABCDEF100000000000000026 /* PermissionPromptView.swift in Sources */,
@@ -2678,6 +2684,8 @@
 				ABCDEF200000000000000021 /* MCPConfigFile.swift in Sources */,
 				ABCDEF200000000000000022 /* MCPConfigFileLoader.swift in Sources */,
 				ABCDEF200000000000000023 /* MCPDiscoveryService.swift in Sources */,
+				ABCDEF200000000000000010 /* MCPResourceService.swift in Sources */,
+				ABCDEF200000000000000012 /* MCPPromptService.swift in Sources */,
 				ABCDEF200000000000000024 /* MCPServerGrouping.swift in Sources */,
 				ABCDEF200000000000000025 /* TrustBoundary.swift in Sources */,
 				ABCDEF200000000000000026 /* PermissionPromptView.swift in Sources */,
