@@ -485,7 +485,7 @@
 		9A1B2C3D4E5F607100C0AA0B /* AgentRoleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100C0010B /* AgentRoleTests.swift */; };
 		9A1B2C3D4E5F607100C0AA0C /* ToolExecutionCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100C0010C /* ToolExecutionCoordinatorTests.swift */; };
 		ABCDEF000000000000000027 /* MCPServerGroupingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000017 /* MCPServerGroupingTests.swift */; };
-		ABCDEF000000000000000029 /* MCPToolAdapterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000019 /* MCPToolAdapterTests.swift */; };
+		ABCDEF000000000000000029 /* MCPToolAdapterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF00000000000000001E /* MCPToolAdapterTests.swift */; };
 		ABCDEF00000000000000002B /* MCPResourceServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF00000000000000001B /* MCPResourceServiceTests.swift */; };
 		ABCDEF00000000000000002D /* MCPPromptServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF00000000000000001D /* MCPPromptServiceTests.swift */; };
 
@@ -921,7 +921,7 @@
 		9A1B2C3D4E5F607100C0010B /* AgentRoleTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AgentRoleTests.swift; sourceTree = "<group>"; };
 		9A1B2C3D4E5F607100C0010C /* ToolExecutionCoordinatorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ToolExecutionCoordinatorTests.swift; sourceTree = "<group>"; };
 		ABCDEF000000000000000017 /* MCPServerGroupingTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MCPServerGroupingTests.swift; sourceTree = "<group>"; };
-		ABCDEF000000000000000019 /* MCPToolAdapterTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MCPToolAdapterTests.swift; sourceTree = "<group>"; };
+		ABCDEF00000000000000001E /* MCPToolAdapterTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MCPToolAdapterTests.swift; sourceTree = "<group>"; };
 		ABCDEF00000000000000001B /* MCPResourceServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MCPResourceServiceTests.swift; sourceTree = "<group>"; };
 		ABCDEF00000000000000001D /* MCPPromptServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MCPPromptServiceTests.swift; sourceTree = "<group>"; };
 
@@ -1712,7 +1712,7 @@
 				C5FCC129B4E6DD3C3FB81A3C /* MCPSettingsViewTests.swift */,
 				894137D6833B7A3B3029AA38 /* TrustBoundaryTests.swift */,
 				ABCDEF000000000000000017 /* MCPServerGroupingTests.swift */,
-				ABCDEF000000000000000019 /* MCPToolAdapterTests.swift */,
+				ABCDEF00000000000000001E /* MCPToolAdapterTests.swift */,
 				ABCDEF00000000000000001B /* MCPResourceServiceTests.swift */,
 				ABCDEF00000000000000001D /* MCPPromptServiceTests.swift */,
 			);
