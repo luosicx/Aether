@@ -46,7 +46,8 @@ final class AetherToolRegistryTests: XCTestCase {
             description: "bad json",
             parametersJSON: "not valid json {"
         )
-        XCTAssertEqual(def.parameters(), [:])
+        // [String: Any] 不能直接 Equatable 比较；改用 isEmpty 判空
+        XCTAssertTrue(def.parameters().isEmpty)
     }
 
     // MARK: - AetherToolRegistry
