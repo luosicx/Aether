@@ -328,6 +328,77 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Run AetherSDK tests with coverage
+        # AetherSDK 是 SPM 包 target（Packages/AetherCore/Sources/AetherSDK），
+        # 不在 Xcode 项目的 AetherTests target 中，xccov 无法采集其覆盖率。
+        # 需用 swift test 单独跑 AetherSDKTests 并生成 cobertura XML，
+        # 供 code-quality job 合并到 SonarCloud 总覆盖率报告。
+        id: sdk-test
+        continue-on-error: true
+        working-directory: Packages/AetherCore
+        run: |
+          echo "=== Running AetherSDK tests with coverage ==="
+          swift test --enable-code-coverage --filter AetherSDKTests 2>&1 | tee /tmp/sdk-test.log
+          # 找到 profdata 文件（路径因平台不同而变化，用 find 兜底）
+          PROFDATA=$(find .build -name "default.profdata" -type f 2>/dev/null | head -1)
+          if [ -z "$PROFDATA" ]; then
+            echo "WARNING: no profdata found, skipping AetherSDK coverage"
+            exit 0
+          fi
+          echo "Found profdata: $PROFDATA"
+          # 找到 AetherSDKTests 可执行文件（macOS 上是 .xctest bundle 内的可执行文件）
+          EXECUTABLE=$(find .build -path "*AetherSDKTests.xctest*Contents*MacOS*AetherSDKTests" -type f 2>/dev/null | head -1)
+          if [ -z "$EXECUTABLE" ]; then
+            # Linux/非 macOS 路径
+            EXECUTABLE=$(find .build -name "AetherSDKTests" -type f -perm +111 2>/dev/null | head -1)
+          fi
+          if [ -z "$EXECUTABLE" ]; then
+            echo "WARNING: no AetherSDKTests executable found, skipping coverage export"
+            exit 0
+          fi
+          echo "Found executable: $EXECUTABLE"
+          # 导出 cobertura XML
+          mkdir -p "$GITHUB_WORKSPACE/coverage-sdk"
+          xcrun llvm-cov export -format=cobertura \
+            -instr-profile="$PROFDATA" \
+            "$EXECUTABLE" \
+            > "$GITHUB_WORKSPACE/coverage-sdk/coverage.xml" 2>/tmp/llvm-cov-err.txt || {
+              echo "WARNING: llvm-cov export failed:"
+              cat /tmp/llvm-cov-err.txt
+              exit 0
+            }
+          echo "AetherSDK cobertura XML generated:"
+          head -5 "$GITHUB_WORKSPACE/coverage-sdk/coverage.xml"
+          # 修正文件路径：llvm-cov 输出的路径可能是绝对路径，需转为相对路径
+          python3 - "$GITHUB_WORKSPACE/coverage-sdk/coverage.xml" << 'PYEOF'
+          import sys, os, xml.etree.ElementTree as ET
+          path = sys.argv[1]
+          tree = ET.parse(path)
+          root = tree.getroot()
+          project_root = os.environ.get('GITHUB_WORKSPACE', os.getcwd())
+          for cls in root.iter('class'):
+              fname = cls.get('filename', '')
+              if not fname:
+                  continue
+              # 转为相对路径，以 Packages/AetherCore/Sources/AetherSDK/ 为基准
+              if os.path.isabs(fname):
+                  try:
+                      rel = os.path.relpath(fname, project_root)
+                      cls.set('filename', rel)
+                  except ValueError:
+                      pass
+          tree.write(path, encoding='utf-8', xml_declaration=True)
+          PYEOF
+
+      - name: Upload AetherSDK coverage report
+        if: always() && steps.sdk-test.outcome != 'skipped'
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-report-sdk
+          path: coverage-sdk/coverage.xml
+          if-no-files-found: warn
+          retention-days: 7
+
   ui-tests:
     needs: rust-apple
     runs-on: macos-15
@@ -903,15 +974,24 @@ jobs:
           name: coverage-report-rust
           path: coverage-rust
 
+      - name: Download AetherSDK coverage report
+        # 下载 AetherSDK 覆盖率（swift test --enable-code-coverage 生成），
+        # 合并到 SonarQube 上传的 coverage.xml
+        continue-on-error: true
+        uses: actions/download-artifact@v7
+        with:
+          name: coverage-report-sdk
+          path: coverage-sdk
+
       - name: Merge coverage reports
-        # 合并 iOS + macOS (Swift, lineToCover 格式) + Rust (cobertura <line hits> 格式)
+        # 合并 iOS + macOS (Swift, lineToCover 格式) + Rust + AetherSDK (cobertura <line hits> 格式)
         run: |
           mkdir -p coverage-report
-          python3 - coverage-ios/coverage.xml coverage-macos/coverage.xml coverage-rust/coverage.xml coverage-report/coverage.xml << 'PYEOF'
+          python3 - coverage-ios/coverage.xml coverage-macos/coverage.xml coverage-rust/coverage.xml coverage-sdk/coverage.xml coverage-report/coverage.xml << 'PYEOF'
           import sys
           import xml.etree.ElementTree as ET
 
-          ios_path, macos_path, rust_path, output_path = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+          ios_path, macos_path, rust_path, sdk_path, output_path = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]
 
           def parse_swift_coverage(path):
               """Parse iOS/macOS cobertura-style XML (lineToCover format).
@@ -948,22 +1028,59 @@ jobs:
                   # 需添加 rust/ 前缀以匹配 SonarCloud 的 sonar.sources（项目根目录为基准）
                   if not fpath.startswith("rust/"):
                       fpath = "rust/" + fpath
-                  lines = {}
-                  lines_el = cls.find("lines")
-                  if lines_el is None:
+                  lines = parse_cobertura_class(cls, fpath, "rust/")
+                  if not lines:
                       continue
-                  for l in lines_el.findall("line"):
-                      try:
-                          ln = int(l.get("number", "0"))
-                      except (TypeError, ValueError):
-                          continue
-                      try:
-                          hits = int(l.get("hits", "0"))
-                      except (TypeError, ValueError):
-                          hits = 0
-                      lines[ln] = hits > 0
                   if fpath in files:
-                      # 同一文件多 class，合并
+                      for ln, cov in lines.items():
+                          files[fpath][ln] = files[fpath].get(ln, False) or cov
+                  else:
+                      files[fpath] = lines
+              return files
+
+          def parse_cobertura_class(cls, fpath, prefix):
+              """Parse a cobertura <class> element's <lines> children."""
+              lines = {}
+              lines_el = cls.find("lines")
+              if lines_el is None:
+                  return lines
+              for l in lines_el.findall("line"):
+                  try:
+                      ln = int(l.get("number", "0"))
+                  except (TypeError, ValueError):
+                      continue
+                  try:
+                      hits = int(l.get("hits", "0"))
+                  except (TypeError, ValueError):
+                      hits = 0
+                  lines[ln] = hits > 0
+              return lines
+
+          def parse_sdk_coverage(path):
+              """Parse AetherSDK llvm-cov cobertura XML (<line hits=> format, same as Rust).
+              Return {filepath: {lineno: covered_bool}}"""
+              files = {}
+              try:
+                  root = ET.parse(path).getroot()
+              except (ET.ParseError, FileNotFoundError):
+                  return files
+              for cls in root.iter("class"):
+                  fpath = cls.get("filename")
+                  if not fpath:
+                      continue
+                  # llvm-cov 输出的路径可能是绝对路径或相对路径
+                  # 规范化为 Packages/AetherCore/Sources/AetherSDK/xxx.swift 格式
+                  if "Sources/AetherSDK/" in fpath:
+                      idx = fpath.find("Sources/AetherSDK/")
+                      if idx > 0 and not fpath.startswith("Packages/"):
+                          fpath = "Packages/AetherCore/" + fpath[idx:]
+                  elif not fpath.startswith("Packages/"):
+                      # 兜底：如果路径不含 AetherSDK，跳过
+                      continue
+                  lines = parse_cobertura_class(cls, fpath, "Packages/AetherCore/Sources/AetherSDK/")
+                  if not lines:
+                      continue
+                  if fpath in files:
                       for ln, cov in lines.items():
                           files[fpath][ln] = files[fpath].get(ln, False) or cov
                   else:
@@ -973,9 +1090,10 @@ jobs:
           ios = parse_swift_coverage(ios_path)
           macos = parse_swift_coverage(macos_path)
           rust = parse_rust_coverage(rust_path)
+          sdk = parse_sdk_coverage(sdk_path)
 
           # Merge: union of all files, a line is covered if covered in any source
-          all_paths = set(ios.keys()) | set(macos.keys()) | set(rust.keys())
+          all_paths = set(ios.keys()) | set(macos.keys()) | set(rust.keys()) | set(sdk.keys())
           merged_files = {}
           total_covered = 0
           total_lines = 0
@@ -983,10 +1101,11 @@ jobs:
               ios_lines = ios.get(path, {})
               macos_lines = macos.get(path, {})
               rust_lines = rust.get(path, {})
-              all_lns = set(ios_lines.keys()) | set(macos_lines.keys()) | set(rust_lines.keys())
+              sdk_lines = sdk.get(path, {})
+              all_lns = set(ios_lines.keys()) | set(macos_lines.keys()) | set(rust_lines.keys()) | set(sdk_lines.keys())
               merged_lines = {}
               for ln in all_lns:
-                  covered = ios_lines.get(ln, False) or macos_lines.get(ln, False) or rust_lines.get(ln, False)
+                  covered = ios_lines.get(ln, False) or macos_lines.get(ln, False) or rust_lines.get(ln, False) or sdk_lines.get(ln, False)
                   merged_lines[ln] = covered
                   if covered:
                       total_covered += 1
@@ -1006,7 +1125,7 @@ jobs:
 
           rate = total_covered / total_lines if total_lines else 0
           print(f"Merged coverage: line-rate={rate:.4f} ({total_covered}/{total_lines} lines)")
-          print(f"Files: iOS={len(ios)}, macOS={len(macos)}, Rust={len(rust)}, merged={len(merged_files)}")
+          print(f"Files: iOS={len(ios)}, macOS={len(macos)}, Rust={len(rust)}, AetherSDK={len(sdk)}, merged={len(merged_files)}")
           PYEOF
 
       - name: Verify merged coverage report
