@@ -151,6 +151,53 @@ final class AetherErrorTests: XCTestCase {
         }
     }
 
+    func testFromLLMErrorUnknown() {
+        let llmErr = LLMError.unknown("something went wrong")
+        let aetherErr = AetherError.from(llmErr)
+        if case .providerError(let code, _) = aetherErr {
+            XCTAssertEqual(code, -1)
+        } else {
+            XCTFail("期望 providerError，实际：\(aetherErr)")
+        }
+    }
+
+    func testFromLLMErrorLLMErrorOccurred() {
+        let llmErr = LLMError.llmErrorOccurred("bff error")
+        let aetherErr = AetherError.from(llmErr)
+        if case .providerError(let code, let msg) = aetherErr {
+            XCTAssertEqual(code, -1)
+            XCTAssertEqual(msg, "bff error")
+        } else {
+            XCTFail("期望 providerError，实际：\(aetherErr)")
+        }
+    }
+
+    // MARK: - Equatable
+
+    func testErrorEquality() {
+        XCTAssertEqual(AetherError.networkUnreachable, .networkUnreachable)
+        XCTAssertEqual(AetherError.authFailed(reason: "x"), .authFailed(reason: "x"))
+        XCTAssertNotEqual(AetherError.authFailed(reason: "x"), .authFailed(reason: "y"))
+        XCTAssertEqual(AetherError.rateLimited(retryAfter: 5), .rateLimited(retryAfter: 5))
+        XCTAssertEqual(
+            AetherError.providerError(code: 500, message: "err"),
+            .providerError(code: 500, message: "err")
+        )
+        XCTAssertEqual(
+            AetherError.toolExecutionFailed(name: "t", errorDescription: "d"),
+            .toolExecutionFailed(name: "t", errorDescription: "d")
+        )
+        XCTAssertEqual(
+            AetherError.ragRetrievalFailed(reason: "r"),
+            .ragRetrievalFailed(reason: "r")
+        )
+        XCTAssertEqual(AetherError.invalidConfig(reason: "c"), .invalidConfig(reason: "c"))
+        XCTAssertEqual(
+            AetherError.onDeviceInferenceFailed(error: .insufficientMemory),
+            .onDeviceInferenceFailed(error: .insufficientMemory)
+        )
+    }
+
     // MARK: - Sendable
 
     func testErrorIsSendable() {

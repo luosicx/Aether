@@ -83,6 +83,111 @@ final class AetherClientTests: XCTestCase {
         let closure: @Sendable () -> AetherProvider = { client.config.provider }
         XCTAssertEqual(closure(), .deepSeek)
     }
+
+    // MARK: - AetherMessage 便捷构造
+
+    func testAetherMessageSystemConvenience() {
+        let msg = AetherMessage.system("hello")
+        XCTAssertEqual(msg.role, .system)
+        XCTAssertEqual(msg.content, "hello")
+        XCTAssertNil(msg.images)
+        XCTAssertNil(msg.toolCallId)
+        XCTAssertNil(msg.toolName)
+        XCTAssertNil(msg.toolCalls)
+    }
+
+    func testAetherMessageUserConvenience() {
+        let msg = AetherMessage.user("question")
+        XCTAssertEqual(msg.role, .user)
+        XCTAssertEqual(msg.content, "question")
+    }
+
+    func testAetherMessageAssistantConvenience() {
+        let msg = AetherMessage.assistant("answer")
+        XCTAssertEqual(msg.role, .assistant)
+        XCTAssertEqual(msg.content, "answer")
+    }
+
+    func testAetherMessageToolConvenience() {
+        let msg = AetherMessage.tool(name: "calc", callId: "call-1", content: "42")
+        XCTAssertEqual(msg.role, .tool)
+        XCTAssertEqual(msg.content, "42")
+        XCTAssertEqual(msg.toolName, "calc")
+        XCTAssertEqual(msg.toolCallId, "call-1")
+    }
+
+    func testAetherMessageInitWithImages() {
+        let msg = AetherMessage(role: .user, content: "multi", images: ["base64-img"])
+        XCTAssertEqual(msg.images, ["base64-img"])
+    }
+
+    func testAetherMessageRoleRawValues() {
+        XCTAssertEqual(AetherMessage.Role.system.rawValue, "system")
+        XCTAssertEqual(AetherMessage.Role.user.rawValue, "user")
+        XCTAssertEqual(AetherMessage.Role.assistant.rawValue, "assistant")
+        XCTAssertEqual(AetherMessage.Role.tool.rawValue, "tool")
+    }
+
+    // MARK: - AetherToolCall
+
+    func testAetherToolCallDefaultType() {
+        let call = AetherToolCall(id: "call-1", name: "echo", arguments: "{}")
+        XCTAssertEqual(call.type, "function")
+        XCTAssertEqual(call.id, "call-1")
+        XCTAssertEqual(call.name, "echo")
+        XCTAssertEqual(call.arguments, "{}")
+    }
+
+    func testAetherToolCallCustomType() {
+        let call = AetherToolCall(id: "call-2", type: "custom", name: "search", arguments: "{\"q\":\"a\"}")
+        XCTAssertEqual(call.type, "custom")
+    }
+
+    // MARK: - AetherChunk 便捷构造
+
+    func testAetherChunkTextConvenience() {
+        let chunk = AetherChunk.text("hello")
+        XCTAssertEqual(chunk.content, "hello")
+        XCTAssertNil(chunk.toolCalls)
+        XCTAssertFalse(chunk.isFinal)
+    }
+
+    func testAetherChunkToolCallsConvenience() {
+        let calls = [AetherToolCall(id: "c1", name: "echo", arguments: "{}")]
+        let chunk = AetherChunk.toolCalls(calls)
+        XCTAssertNil(chunk.content)
+        XCTAssertEqual(chunk.toolCalls?.count, 1)
+        XCTAssertFalse(chunk.isFinal)
+    }
+
+    func testAetherChunkFinalConvenience() {
+        let chunk = AetherChunk.final()
+        XCTAssertNil(chunk.content)
+        XCTAssertNil(chunk.toolCalls)
+        XCTAssertTrue(chunk.isFinal)
+    }
+
+    func testAetherChunkDefaultInit() {
+        let chunk = AetherChunk()
+        XCTAssertNil(chunk.content)
+        XCTAssertNil(chunk.toolCalls)
+        XCTAssertFalse(chunk.isFinal)
+    }
+
+    // MARK: - AetherDocument
+
+    func testAetherDocumentInitWithDefaultMetadata() {
+        let doc = AetherDocument(content: "c", source: "s", score: 0.9)
+        XCTAssertEqual(doc.content, "c")
+        XCTAssertEqual(doc.source, "s")
+        XCTAssertEqual(doc.score, 0.9, accuracy: 0.001)
+        XCTAssertEqual(doc.metadata, [:])
+    }
+
+    func testAetherDocumentInitWithMetadata() {
+        let doc = AetherDocument(content: "c", source: "s", score: 0.5, metadata: ["page": "1"])
+        XCTAssertEqual(doc.metadata["page"], "1")
+    }
 }
 
 // MARK: - Mock LLMProvider

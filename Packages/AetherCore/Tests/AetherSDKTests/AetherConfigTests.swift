@@ -16,9 +16,9 @@ final class AetherConfigTests: XCTestCase {
         XCTAssertNil(config.cache)
         XCTAssertNil(config.rag)
         XCTAssertNil(config.rateLimit)
-        XCTAssertEqual(config.auth, .default)
+        XCTAssertEqual(config.auth, .defaultConfig)
         XCTAssertEqual(config.auth, .apiKey)
-        XCTAssertEqual(config.retryPolicy, .default)
+        XCTAssertEqual(config.retryPolicy, .defaultPolicy)
     }
 
     func testInitWithAllFields() {
