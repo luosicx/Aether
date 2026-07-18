@@ -147,7 +147,7 @@ final class ExportImporter {
             memory.createdAt = record.createdAt
             memory.lastAccessedAt = record.lastAccessedAt
             memory.archivedAt = record.archivedAt
-            memoryService.insertImported(memory)
+            try memoryService.insertImported(memory)
             imported += 1
         }
         return MemoryImportResult(

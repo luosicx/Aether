@@ -131,7 +131,7 @@ final class DAGExecutionEngine {
             let pendingIDs = await stateMachine.nodeIDs(in: .pending)
             if pendingIDs.isEmpty {
                 // 无 pending 节点但未全部终止：可能存在 running，等待
-                let runningIDs = await stateMachine.nodeIDs(in: .running)
+                let runningIDs = await stateMachine.nodeIDs(in: .inProgress)
                 if runningIDs.isEmpty {
                     // 既无 pending 也无 running 但未终止：理论上不应发生
                     break
@@ -199,9 +199,11 @@ final class DAGExecutionEngine {
                     for attempt in 0..<retryPolicy.maxAttempts {
                         do {
                             if let toolName = sub.toolName {
-                                return try await toolCoordinator.execute(name: toolName, arguments: [:])
+                                let toolResult = try await toolCoordinator.execute(name: toolName, arguments: [:])
+                                return SubTaskResult(id: sub.id, result: toolResult, errorMessage: nil)
                             } else {
-                                return try await executor(sub)
+                                let execResult = try await executor(sub)
+                                return SubTaskResult(id: sub.id, result: execResult, errorMessage: nil)
                             }
                         } catch {
                             lastError = error

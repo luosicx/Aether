@@ -85,18 +85,18 @@ actor NodeStateMachine {
         attemptCounts[nodeID] ?? 0
     }
 
-    /// 标记节点为 running
+    /// 标记节点为 inProgress
     /// - Parameter nodeID: 节点 ID
     /// - Throws: `StateMachineError`：节点未找到或非法迁移
     func markRunning(_ nodeID: UUID) throws {
         guard let current = statuses[nodeID] else {
             throw StateMachineError.nodeNotFound(nodeID)
         }
-        // 允许 pending → running，failed → running（重试）
+        // 允许 pending → inProgress，failed → inProgress（重试）
         guard current == .pending || current == .failed else {
-            throw StateMachineError.illegalTransition(from: current, to: .running, nodeID: nodeID)
+            throw StateMachineError.illegalTransition(from: current, to: .inProgress, nodeID: nodeID)
         }
-        statuses[nodeID] = .running
+        statuses[nodeID] = .inProgress
         attemptCounts[nodeID, default: 0] += 1
     }
 
@@ -107,7 +107,7 @@ actor NodeStateMachine {
         guard let current = statuses[nodeID] else {
             throw StateMachineError.nodeNotFound(nodeID)
         }
-        guard current == .running else {
+        guard current == .inProgress else {
             throw StateMachineError.illegalTransition(from: current, to: .completed, nodeID: nodeID)
         }
         statuses[nodeID] = .completed
@@ -120,7 +120,7 @@ actor NodeStateMachine {
         guard let current = statuses[nodeID] else {
             throw StateMachineError.nodeNotFound(nodeID)
         }
-        guard current == .running else {
+        guard current == .inProgress else {
             throw StateMachineError.illegalTransition(from: current, to: .failed, nodeID: nodeID)
         }
         statuses[nodeID] = .failed
