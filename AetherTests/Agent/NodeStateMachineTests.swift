@@ -54,7 +54,7 @@ final class NodeStateMachineTests: XCTestCase {
         try? await sm.markRunning(id)
         await sm.register(nodeID: id)
         let status = await sm.status(of: id)
-        XCTAssertEqual(status, .running, "重复注册不应重置状态")
+        XCTAssertEqual(status, .inProgress, "重复注册不应重置状态")
     }
 
     // MARK: - 状态查询
@@ -78,7 +78,7 @@ final class NodeStateMachineTests: XCTestCase {
         let completed = await sm.nodeIDs(in: .completed)
         XCTAssertEqual(completed, [ids[0]])
 
-        let running = await sm.nodeIDs(in: .running)
+        let running = await sm.nodeIDs(in: .inProgress)
         XCTAssertEqual(running, [ids[1]])
     }
 
@@ -90,7 +90,7 @@ final class NodeStateMachineTests: XCTestCase {
         await sm.register(nodeID: id)
         try await sm.markRunning(id)
         let status = await sm.status(of: id)
-        XCTAssertEqual(status, .running)
+        XCTAssertEqual(status, .inProgress)
     }
 
     func testLegalTransitionRunningToCompleted() async throws {
@@ -127,7 +127,7 @@ final class NodeStateMachineTests: XCTestCase {
         try await sm.markFailed(id)
         try await sm.markRunning(id) // 重试
         let status = await sm.status(of: id)
-        XCTAssertEqual(status, .running)
+        XCTAssertEqual(status, .inProgress)
     }
 
     func testLegalTransitionFailedToSkipped() async throws {
@@ -190,7 +190,7 @@ final class NodeStateMachineTests: XCTestCase {
 
     // MARK: - 节点未找到
 
-    func testNodeNotFound() async {
+    func testNodeNotFound() async throws {
         let sm = NodeStateMachine()
         do {
             try await sm.markRunning(UUID())
@@ -201,6 +201,8 @@ final class NodeStateMachineTests: XCTestCase {
             } else {
                 XCTFail("应为 nodeNotFound")
             }
+        } catch {
+            XCTFail("应为 nodeNotFound，实际: \(error)")
         }
     }
 
