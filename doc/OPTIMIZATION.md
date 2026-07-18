@@ -78,7 +78,7 @@
 
 ### 3.1 测试覆盖率
 
-- **现状**：UT 2661 / UIT 30，0 skip。AetherCore SPM 包含 Rust FFI 包装器单元测试。
+- **现状**：UT 2723 / UIT 30，0 skip。AetherCore SPM 包含 Rust FFI 包装器单元测试。
 - **优化**：将 Service 层覆盖率提升到 80%；为 macOS-only 工具补充单元测试；为 Rust FFI 10 个模块补充边界条件测试（空输入 / 超大输入 / 无效 UTF-8 / null 指针返回）。
 - **验收**：Codecov / Xcode Coverage 显示覆盖率 ≥ 80%。
 
