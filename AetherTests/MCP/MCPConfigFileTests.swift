@@ -64,8 +64,7 @@ final class MCPConfigFileTests: XCTestCase {
             transport: .sse(url: "http://localhost:3000/sse", headers: nil),
             trust: .lan,
             autoConnect: false,
-            toolWhitelist: nil,
-            toolBlacklist: ["dangerous_tool"],
+            toolPolicy: ToolPolicy(blacklist: ["dangerous_tool"]),
             publicKeyPin: "sha256:abcdef"
         )
         let original = MCPConfigFile(
@@ -159,8 +158,7 @@ final class MCPConfigFileTests: XCTestCase {
             transport: .stdio(command: "node", args: ["server.js"], env: ["X": "1"]),
             trust: .local,
             autoConnect: true,
-            toolWhitelist: ["a"],
-            toolBlacklist: nil,
+            toolPolicy: ToolPolicy(whitelist: ["a"]),
             publicKeyPin: nil
         )
 
@@ -185,8 +183,6 @@ final class MCPConfigFileTests: XCTestCase {
             transport: .sse(url: "http://example.com/sse", headers: ["Authorization": "Bearer x"]),
             trust: .public,
             autoConnect: false,
-            toolWhitelist: nil,
-            toolBlacklist: nil,
             publicKeyPin: nil
         )
 

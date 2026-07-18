@@ -18,7 +18,7 @@ final class TrustBoundaryTests: XCTestCase {
         let server = MCPConfigFile.Server(
             id: "s1", name: "S1",
             transport: .stdio(command: "node", args: [], env: nil),
-            trust: .local, autoConnect: false, toolWhitelist: nil, toolBlacklist: nil, publicKeyPin: nil
+            trust: .local, autoConnect: false, publicKeyPin: nil
         )
         let boundary = TrustBoundary.classify(server: server)
         XCTAssertEqual(boundary, .local)
@@ -31,7 +31,7 @@ final class TrustBoundaryTests: XCTestCase {
             let server = MCPConfigFile.Server(
                 id: "h", name: "H",
                 transport: .sse(url: "http://\(host)/sse", headers: nil),
-                trust: .lan, autoConnect: false, toolWhitelist: nil, toolBlacklist: nil, publicKeyPin: nil
+                trust: .lan, autoConnect: false, publicKeyPin: nil
             )
             let boundary = TrustBoundary.classify(server: server)
             XCTAssertEqual(boundary, .lan, "\(host) 应判定为 lan")
@@ -43,7 +43,7 @@ final class TrustBoundaryTests: XCTestCase {
         let server = MCPConfigFile.Server(
             id: "p1", name: "P1",
             transport: .sse(url: "https://example.com/sse", headers: nil),
-            trust: .public, autoConnect: false, toolWhitelist: nil, toolBlacklist: nil, publicKeyPin: nil
+            trust: .public, autoConnect: false, publicKeyPin: nil
         )
         let boundary = TrustBoundary.classify(server: server)
         XCTAssertEqual(boundary, .public)
@@ -53,21 +53,21 @@ final class TrustBoundaryTests: XCTestCase {
     func testTrustBoundaryFromRawValue() {
         XCTAssertEqual(TrustBoundary(rawValue: "local"), .local)
         XCTAssertEqual(TrustBoundary(rawValue: "lan"), .lan)
-        XCTAssertEqual(TrustBoundary(rawValue: "public"), .public)
+        XCTAssertEqual(TrustBoundary(rawValue: "public"), .internet)
         XCTAssertNil(TrustBoundary(rawValue: "unknown"))
     }
 
     /// TrustBoundary 严重度排序：public > lan > local
     func testTrustBoundarySeverity() {
         XCTAssertLessThan(TrustBoundary.local.severity, TrustBoundary.lan.severity)
-        XCTAssertLessThan(TrustBoundary.lan.severity, TrustBoundary.public.severity)
+        XCTAssertLessThan(TrustBoundary.lan.severity, TrustBoundary.internet.severity)
     }
 
     /// local 边界应默认放行（仍受 ToolAuthorization 约束）
     func testLocalBoundaryAutoApprove() {
         XCTAssertTrue(TrustBoundary.local.shouldAutoApprove, "local 边界应默认放行")
         XCTAssertFalse(TrustBoundary.lan.shouldAutoApprove, "lan 边界需用户首次确认")
-        XCTAssertFalse(TrustBoundary.public.shouldAutoApprove, "public 边界需用户确认")
+        XCTAssertFalse(TrustBoundary.internet.shouldAutoApprove, "internet 边界需用户确认")
     }
 }
 

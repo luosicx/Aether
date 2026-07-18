@@ -7,22 +7,22 @@ import AetherFoundation
 ///
 /// - local：本机 stdio 子进程，默认放行（仍受 `ToolAuthorization` 约束）。
 /// - lan：局域网 SSE，需用户首次确认；白名单工具自动放行。
-/// - `public`：公网 SSE，强制用户确认或拒绝（黑名单优先）。
+/// - internet：公网 SSE，强制用户确认或拒绝（黑名单优先）。
 public enum TrustBoundary: String, Codable, Sendable, Equatable, Hashable, Comparable {
     case local
     case lan
-    case `public`
+    case internet = "public"
 
-    /// 严重度排序：local < lan < public
+    /// 严重度排序：local < lan < internet
     public var severity: Int {
         switch self {
         case .local: return 0
         case .lan: return 1
-        case .public: return 2
+        case .internet: return 2
         }
     }
 
-    /// 是否应默认放行（local 边界默认放行，lan/public 需用户确认）
+    /// 是否应默认放行（local 边界默认放行，lan/internet 需用户确认）
     public var shouldAutoApprove: Bool {
         self == .local
     }
@@ -125,20 +125,20 @@ public struct PermissionPolicy: Sendable, Equatable {
         switch trust {
         case .local:
             return .allow
-        case .lan, .public:
+        case .lan, .internet:
             return .requireConfirmation
         }
     }
 
     /// 判定工具调用权限。
     /// - Parameters:
-    ///   - serverID: Server 唯一标识
+    ///   - serverID: Server 唯一标识（保留用于未来按 Server 差异化策略；当前仅按工具名判定）
     ///   - toolName: 工具名
     ///   - toolWhitelist: 工具白名单（nil 表示全部需确认）
     ///   - toolBlacklist: 工具黑名单
     /// - Returns: 权限决策
     public func decideToolCall(
-        serverID: String,
+        serverID _: String,
         toolName: String,
         toolWhitelist: [String]?,
         toolBlacklist: [String]?

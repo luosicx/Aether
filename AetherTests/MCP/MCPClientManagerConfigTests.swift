@@ -31,8 +31,6 @@ final class MCPClientManagerConfigTests: XCTestCase {
                     transport: .stdio(command: "mcp-fs", args: [], env: nil),
                     trust: .local,
                     autoConnect: true,
-                    toolWhitelist: nil,
-                    toolBlacklist: nil,
                     publicKeyPin: nil
                 )
             ],
@@ -61,8 +59,6 @@ final class MCPClientManagerConfigTests: XCTestCase {
                     transport: .stdio(command: "x", args: [], env: nil),
                     trust: .local,
                     autoConnect: false,
-                    toolWhitelist: nil,
-                    toolBlacklist: nil,
                     publicKeyPin: nil
                 )
             ],
@@ -97,8 +93,6 @@ final class MCPClientManagerConfigTests: XCTestCase {
                     transport: .stdio(command: "x", args: [], env: nil),
                     trust: .local,
                     autoConnect: true,
-                    toolWhitelist: nil,
-                    toolBlacklist: nil,
                     publicKeyPin: nil
                 )
             ],
@@ -126,8 +120,6 @@ final class MCPClientManagerConfigTests: XCTestCase {
                     transport: .stdio(command: "x", args: [], env: nil),
                     trust: .local,
                     autoConnect: true,
-                    toolWhitelist: nil,
-                    toolBlacklist: nil,
                     publicKeyPin: nil
                 )
             ],
@@ -161,8 +153,6 @@ final class MCPClientManagerConfigTests: XCTestCase {
                     transport: .sse(url: "https://example.com/sse", headers: nil),
                     trust: .public,
                     autoConnect: true,
-                    toolWhitelist: nil,
-                    toolBlacklist: nil,
                     publicKeyPin: nil
                 )
             ],
@@ -194,8 +184,6 @@ final class MCPClientManagerConfigTests: XCTestCase {
                     transport: .sse(url: "https://example.com/sse", headers: nil),
                     trust: .public,
                     autoConnect: true,
-                    toolWhitelist: nil,
-                    toolBlacklist: nil,
                     publicKeyPin: nil
                 )
             ],
@@ -228,8 +216,6 @@ final class MCPClientManagerConfigTests: XCTestCase {
                     transport: .sse(url: "https://example.com/sse", headers: nil),
                     trust: .public,
                     autoConnect: true,
-                    toolWhitelist: nil,
-                    toolBlacklist: nil,
                     publicKeyPin: nil
                 )
             ],
@@ -261,8 +247,6 @@ final class MCPClientManagerConfigTests: XCTestCase {
             transport: .stdio(command: "x", args: [], env: nil),
             trust: .local,
             autoConnect: false,
-            toolWhitelist: nil,
-            toolBlacklist: nil,
             publicKeyPin: nil
         )
         manager.addDiscoveredCandidate(server, boundary: .local)
@@ -286,8 +270,6 @@ final class MCPClientManagerConfigTests: XCTestCase {
             transport: .sse(url: "https://example.com/sse", headers: nil),
             trust: .public,
             autoConnect: false,
-            toolWhitelist: nil,
-            toolBlacklist: nil,
             publicKeyPin: nil
         )
         manager.addDiscoveredCandidate(server, boundary: .public)
@@ -309,8 +291,6 @@ final class MCPClientManagerConfigTests: XCTestCase {
             transport: .sse(url: "https://example.com/sse", headers: nil),
             trust: .public,
             autoConnect: false,
-            toolWhitelist: nil,
-            toolBlacklist: nil,
             publicKeyPin: nil
         )
         manager.addDiscoveredCandidate(server, boundary: .public)
@@ -337,8 +317,6 @@ final class MCPClientManagerConfigTests: XCTestCase {
             transport: .sse(url: "https://example.com/sse", headers: nil),
             trust: .public,
             autoConnect: false,
-            toolWhitelist: nil,
-            toolBlacklist: nil,
             publicKeyPin: nil
         )
         manager.addDiscoveredCandidate(server, boundary: .public)

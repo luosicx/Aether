@@ -53,14 +53,14 @@ final class PermissionPromptViewTests: XCTestCase {
     func testTrustBoundaryDisplayText() {
         XCTAssertEqual(TrustBoundary.local.displayName, "本地")
         XCTAssertEqual(TrustBoundary.lan.displayName, "局域网")
-        XCTAssertEqual(TrustBoundary.public.displayName, "公网")
+        XCTAssertEqual(TrustBoundary.internet.displayName, "公网")
     }
 
     /// 各信任档位应有对应的风险等级描述
     func testTrustBoundaryRiskLevel() {
         XCTAssertEqual(TrustBoundary.local.riskLevel, "低")
         XCTAssertEqual(TrustBoundary.lan.riskLevel, "中")
-        XCTAssertEqual(TrustBoundary.public.riskLevel, "高")
+        XCTAssertEqual(TrustBoundary.internet.riskLevel, "高")
     }
 
     // MARK: - 3. 公网 Server 首次必弹
@@ -77,8 +77,6 @@ final class PermissionPromptViewTests: XCTestCase {
             transport: .sse(url: "https://example.com/sse", headers: nil),
             trust: .public,
             autoConnect: false,
-            toolWhitelist: nil,
-            toolBlacklist: nil,
             publicKeyPin: nil
         )
         manager.addDiscoveredCandidate(server, boundary: .public)
@@ -103,8 +101,6 @@ final class PermissionPromptViewTests: XCTestCase {
             transport: .sse(url: "https://example.com/sse", headers: nil),
             trust: .public,
             autoConnect: false,
-            toolWhitelist: nil,
-            toolBlacklist: nil,
             publicKeyPin: nil
         )
         manager.addDiscoveredCandidate(server, boundary: .public)
@@ -127,8 +123,6 @@ final class PermissionPromptViewTests: XCTestCase {
             transport: .sse(url: "https://example.com/sse", headers: nil),
             trust: .public,
             autoConnect: false,
-            toolWhitelist: nil,
-            toolBlacklist: nil,
             publicKeyPin: nil
         )
         manager.addDiscoveredCandidate(server, boundary: .public)

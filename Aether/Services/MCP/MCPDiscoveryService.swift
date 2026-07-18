@@ -150,8 +150,6 @@ final class MCPDiscoveryService {
             transport: .sse(url: makeSSEURL(host: service.hostName, port: service.port), headers: nil),
             trust: boundary,
             autoConnect: false,
-            toolWhitelist: nil,
-            toolBlacklist: nil,
             publicKeyPin: nil
         )
         manager.addDiscoveredCandidate(server, boundary: boundary)
@@ -238,7 +236,7 @@ final class BonjourServiceBrowser: NSObject, MCPServiceBrowsing, @unchecked Send
 
 extension BonjourServiceBrowser: NetServiceBrowserDelegate {
     /// 发现新服务时触发：解析 hostName 与 TXT record
-    func netServiceBrowser(_ browser: NetServiceBrowser, didFind service: NetService, moreComing: Bool) {
+    func netServiceBrowser(_: NetServiceBrowser, didFind service: NetService, moreComing _: Bool) {
         lock.lock()
         let alreadyResolving = resolvingServices.contains(service.name)
         if !alreadyResolving {
@@ -253,7 +251,7 @@ extension BonjourServiceBrowser: NetServiceBrowserDelegate {
     }
 
     /// 服务消失
-    func netServiceBrowser(_ browser: NetServiceBrowser, didRemove service: NetService, moreComing: Bool) {
+    func netServiceBrowser(_: NetServiceBrowser, didRemove service: NetService, moreComing _: Bool) {
         lock.lock()
         resolvingServices.remove(service.name)
         lock.unlock()
@@ -284,7 +282,7 @@ extension BonjourServiceBrowser: NetServiceDelegate {
     }
 
     /// 解析失败：从 resolving 集合移除（允许后续重试）
-    func netService(_ sender: NetService, didNotResolve errorDict: [String: NSNumber]) {
+    func netService(_ sender: NetService, didNotResolve _: [String: NSNumber]) {
         lock.lock()
         resolvingServices.remove(sender.name)
         lock.unlock()

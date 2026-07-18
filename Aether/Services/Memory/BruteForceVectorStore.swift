@@ -15,6 +15,7 @@ actor BruteForceVectorStore: VectorStore {
     private var records: [(id: UUID, embedding: [Double], metadata: [String: String])] = []
 
     /// 创建 BruteForceVectorStore 实例
+    /// 注：纯内存降级方案无需初始化资源；显式声明 init() 以便测试与 VectorStoreFactory 构造。
     init() {}
 
     func initialize() async throws {

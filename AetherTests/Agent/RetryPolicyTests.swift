@@ -23,12 +23,12 @@ final class RetryPolicyTests: XCTestCase {
         XCTAssertEqual(policy.backoffMultiplier, 2.0)
     }
 
-    /// `RetryPolicy()` 等同于 `.default`
+    /// `RetryPolicy()` 等同于 `.defaultPolicy`
     func testInitDefaultsEqualDefault() {
         let policy = RetryPolicy()
-        XCTAssertEqual(policy.maxAttempts, RetryPolicy.default.maxAttempts)
-        XCTAssertEqual(policy.initialDelay, RetryPolicy.default.initialDelay)
-        XCTAssertEqual(policy.backoffMultiplier, RetryPolicy.default.backoffMultiplier)
+        XCTAssertEqual(policy.maxAttempts, RetryPolicy.defaultPolicy.maxAttempts)
+        XCTAssertEqual(policy.initialDelay, RetryPolicy.defaultPolicy.initialDelay)
+        XCTAssertEqual(policy.backoffMultiplier, RetryPolicy.defaultPolicy.backoffMultiplier)
     }
 
     // MARK: - 自定义参数
@@ -45,7 +45,7 @@ final class RetryPolicyTests: XCTestCase {
 
     /// 默认策略退避序列：1s → 2s → 4s
     func testDelayForAttemptWithDefaultPolicy() {
-        let policy = RetryPolicy.default
+        let policy = RetryPolicy.defaultPolicy
         XCTAssertEqual(policy.delay(forAttempt: 0), 1.0, "attempt 0 → 1s")
         XCTAssertEqual(policy.delay(forAttempt: 1), 2.0, "attempt 1 → 2s")
         XCTAssertEqual(policy.delay(forAttempt: 2), 4.0, "attempt 2 → 4s")
@@ -54,7 +54,7 @@ final class RetryPolicyTests: XCTestCase {
 
     /// 负数 attempt 返回 0
     func testDelayForNegativeAttempt() {
-        let policy = RetryPolicy.default
+        let policy = RetryPolicy.defaultPolicy
         XCTAssertEqual(policy.delay(forAttempt: -1), 0)
         XCTAssertEqual(policy.delay(forAttempt: -100), 0)
     }

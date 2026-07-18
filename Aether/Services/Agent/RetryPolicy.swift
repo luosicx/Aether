@@ -30,7 +30,7 @@ struct RetryPolicy: Sendable {
     }
 
     /// 默认策略：3 次尝试，1s/2s/4s 退避
-    static let `default` = RetryPolicy()
+    static let defaultPolicy = RetryPolicy()
 
     /// 计算第 N 次失败后的退避延迟（秒）
     /// - Parameter attempt: 失败的尝试序号（0 表示首次失败，1 表示第二次失败，以此类推）

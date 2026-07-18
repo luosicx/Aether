@@ -31,7 +31,7 @@ extension TrustBoundary {
         switch self {
         case .local: return "本地"
         case .lan: return "局域网"
-        case .public: return "公网"
+        case .internet: return "公网"
         }
     }
 
@@ -40,7 +40,7 @@ extension TrustBoundary {
         switch self {
         case .local: return "低"
         case .lan: return "中"
-        case .public: return "高"
+        case .internet: return "高"
         }
     }
 
@@ -49,7 +49,7 @@ extension TrustBoundary {
         switch self {
         case .local: return .green
         case .lan: return .orange
-        case .public: return .red
+        case .internet: return .red
         }
     }
 }

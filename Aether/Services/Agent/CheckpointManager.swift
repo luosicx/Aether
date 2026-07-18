@@ -104,7 +104,7 @@ final class CheckpointManager {
     // MARK: - 私有
 
     /// 实际持久化逻辑
-    private func persist(task: AgentTask) {
+    private func persist(task _: AgentTask) {
         guard let modelContext = modelContext else { return }
         do {
             try modelContext.save()

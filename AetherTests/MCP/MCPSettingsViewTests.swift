@@ -47,8 +47,6 @@ final class MCPSettingsViewTests: XCTestCase {
             transport: .sse(url: "https://example.com/sse", headers: nil),
             trust: .public,
             autoConnect: false,
-            toolWhitelist: nil,
-            toolBlacklist: nil,
             publicKeyPin: nil
         )
         manager.addDiscoveredCandidate(server, boundary: .public)
@@ -96,7 +94,7 @@ final class MCPSettingsViewTests: XCTestCase {
                 id: "cand", name: "候选",
                 transport: .sse(url: "https://example.com/sse", headers: nil),
                 trust: .public, autoConnect: false,
-                toolWhitelist: nil, toolBlacklist: nil, publicKeyPin: nil
+                publicKeyPin: nil
             ),
             boundary: .public
         )
@@ -124,7 +122,7 @@ final class MCPSettingsViewTests: XCTestCase {
                 id: "manual", name: "手动",
                 transport: .sse(url: "https://example.com/sse", headers: nil),
                 trust: .public, autoConnect: false,
-                toolWhitelist: nil, toolBlacklist: nil, publicKeyPin: nil
+                publicKeyPin: nil
             ),
             boundary: .public
         )
@@ -176,8 +174,6 @@ final class MCPSettingsViewTests: XCTestCase {
                     transport: .stdio(command: "x", args: [], env: nil),
                     trust: .local,
                     autoConnect: true,
-                    toolWhitelist: nil,
-                    toolBlacklist: nil,
                     publicKeyPin: nil
                 )
             ],

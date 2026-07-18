@@ -42,7 +42,7 @@ struct HeuristicRules {
     }
 
     /// 默认规则实例
-    static let `default` = HeuristicRules()
+    static let defaultRules = HeuristicRules()
 
     // MARK: - 深度/宽度/总数约束
 

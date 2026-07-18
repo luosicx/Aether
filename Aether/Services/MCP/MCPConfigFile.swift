@@ -60,14 +60,21 @@ public struct MCPConfigFile: Codable, Sendable, Equatable {
         }
 
         /// 构造 Server 配置
+        /// - Parameters:
+        ///   - id: 唯一标识
+        ///   - name: 显示名称
+        ///   - transport: 传输方式
+        ///   - trust: 信任档位（缺省 lan）
+        ///   - autoConnect: 是否自动连接（缺省 false）
+        ///   - toolPolicy: 工具白/黑名单策略（缺省 nil，表示全部需确认）
+        ///   - publicKeyPin: 公钥指纹（缺省 nil）
         public init(
             id: String,
             name: String,
             transport: MCPConfig.Transport,
             trust: TrustBoundary = .lan,
             autoConnect: Bool = false,
-            toolWhitelist: [String]? = nil,
-            toolBlacklist: [String]? = nil,
+            toolPolicy: ToolPolicy? = nil,
             publicKeyPin: String? = nil
         ) {
             self.id = id
@@ -75,8 +82,8 @@ public struct MCPConfigFile: Codable, Sendable, Equatable {
             self.transport = transport
             self.trust = trust
             self.autoConnect = autoConnect
-            self.toolWhitelist = toolWhitelist
-            self.toolBlacklist = toolBlacklist
+            self.toolWhitelist = toolPolicy?.whitelist
+            self.toolBlacklist = toolPolicy?.blacklist
             self.publicKeyPin = publicKeyPin
         }
 
@@ -104,6 +111,23 @@ public struct MCPConfigFile: Codable, Sendable, Equatable {
                 transport: transport,
                 enabled: autoConnect
             )
+        }
+    }
+
+    /// Server 的工具白/黑名单策略（合并以减少构造器参数数量）。
+    public struct ToolPolicy: Codable, Sendable, Equatable, Hashable {
+        /// 工具白名单（自动放行，nil 表示全部需确认）
+        public let whitelist: [String]?
+        /// 工具黑名单（自动拒绝）
+        public let blacklist: [String]?
+
+        /// 构造 ToolPolicy
+        /// - Parameters:
+        ///   - whitelist: 工具白名单（nil 表示全部需确认）
+        ///   - blacklist: 工具黑名单
+        public init(whitelist: [String]? = nil, blacklist: [String]? = nil) {
+            self.whitelist = whitelist
+            self.blacklist = blacklist
         }
     }
 
