@@ -70,7 +70,7 @@ final class MCPConfigFileTests: XCTestCase {
         let original = MCPConfigFile(
             servers: [server],
             discovery: MCPConfigFile.Discovery(zeroconf: true, zeroconfType: "_aether_mcp._tcp.", scanIntervalSec: 30),
-            policy: MCPConfigFile.Policy(defaultTrust: .public, blacklist: ["bad.example.com"], whitelist: nil)
+            policy: MCPConfigFile.Policy(defaultTrust: .internet, blacklist: ["bad.example.com"], whitelist: nil)
         )
 
         let data = try JSONEncoder().encode(original)
@@ -129,7 +129,7 @@ final class MCPConfigFileTests: XCTestCase {
         let cases: [(String, TrustBoundary)] = [
             ("local", .local),
             ("lan", .lan),
-            ("public", .public)
+            ("public", .internet)
         ]
         for (raw, expected) in cases {
             let json = """
@@ -181,7 +181,7 @@ final class MCPConfigFileTests: XCTestCase {
             id: "conv-sse",
             name: "SSE",
             transport: .sse(url: "http://example.com/sse", headers: ["Authorization": "Bearer x"]),
-            trust: .public,
+            trust: .internet,
             autoConnect: false,
             publicKeyPin: nil
         )

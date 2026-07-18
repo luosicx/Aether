@@ -370,7 +370,7 @@ final class MCPSecurityTests: XCTestCase {
             transport: .sse(url: "http://127.0.0.1:8082/sse", headers: nil),
             trust: .lan,
             autoConnect: true,
-            publicKeyPin: nilwrongPin
+            publicKeyPin: wrongPin
         )
 
         // 由于公钥不匹配，应被加入已拒绝列表而非连接
@@ -406,7 +406,7 @@ final class MCPSecurityTests: XCTestCase {
             transport: .sse(url: "http://127.0.0.1:8083/sse", headers: nil),
             trust: .lan,
             autoConnect: true,
-            publicKeyPin: nilinvalidPin
+            publicKeyPin: invalidPin
         )
 
         let configFile = MCPConfigFile(servers: [server], discovery: nil, policy: nil)

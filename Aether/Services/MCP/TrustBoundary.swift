@@ -45,7 +45,7 @@ public enum TrustBoundary: String, Codable, Sendable, Equatable, Hashable, Compa
             if isPrivateNetworkURL(urlString) {
                 return .lan
             }
-            return .public
+            return .internet
         }
         return server.trust
     }

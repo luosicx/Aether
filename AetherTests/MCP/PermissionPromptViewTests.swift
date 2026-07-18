@@ -18,7 +18,7 @@ final class PermissionPromptViewTests: XCTestCase {
         let info = PermissionPromptInfo(
             serverID: "srv-1",
             serverName: "测试 Server",
-            trust: .public,
+            trust: .internet,
             transportDescription: "SSE: https://example.com/sse",
             toolCount: 5,
             toolNames: ["search", "calc", "fs_read", "fs_list", "dangerous"],
@@ -27,10 +27,10 @@ final class PermissionPromptViewTests: XCTestCase {
 
         XCTAssertEqual(info.serverID, "srv-1")
         XCTAssertEqual(info.serverName, "测试 Server")
-        XCTAssertEqual(info.trust, .public)
+        XCTAssertEqual(info.trust, .internet)
         XCTAssertEqual(info.toolCount, 5)
         XCTAssertEqual(info.toolNames.count, 5)
-        XCTAssertEqual(info.publicKeyPin, "sha256:abcdef123456")
+        XCTAssertEqual(info.internetKeyPin, "sha256:abcdef123456")
     }
 
     /// 公网 Server 必须显示公钥指纹（若有）
@@ -38,13 +38,13 @@ final class PermissionPromptViewTests: XCTestCase {
         let info = PermissionPromptInfo(
             serverID: "pub",
             serverName: "公网",
-            trust: .public,
+            trust: .internet,
             transportDescription: "SSE: https://example.com/sse",
             toolCount: 1,
             toolNames: ["tool"],
             publicKeyPin: "sha256:abc"
         )
-        XCTAssertNotNil(info.publicKeyPin)
+        XCTAssertNotNil(info.internetKeyPin)
     }
 
     // MARK: - 2. 信任档位显示文案
@@ -75,11 +75,11 @@ final class PermissionPromptViewTests: XCTestCase {
             id: "pub-prompt",
             name: "公网弹窗",
             transport: .sse(url: "https://example.com/sse", headers: nil),
-            trust: .public,
+            trust: .internet,
             autoConnect: false,
             publicKeyPin: nil
         )
-        manager.addDiscoveredCandidate(server, boundary: .public)
+        manager.addDiscoveredCandidate(server, boundary: .internet)
 
         XCTAssertTrue(manager.candidateServers.contains { $0.id == "pub-prompt" },
                       "公网 Server 应进入候选列表等待审批")
@@ -99,11 +99,11 @@ final class PermissionPromptViewTests: XCTestCase {
             id: "approve-test",
             name: "批准测试",
             transport: .sse(url: "https://example.com/sse", headers: nil),
-            trust: .public,
+            trust: .internet,
             autoConnect: false,
             publicKeyPin: nil
         )
-        manager.addDiscoveredCandidate(server, boundary: .public)
+        manager.addDiscoveredCandidate(server, boundary: .internet)
 
         await manager.approveCandidate(serverID: "approve-test")
 
@@ -121,11 +121,11 @@ final class PermissionPromptViewTests: XCTestCase {
             id: "reject-test",
             name: "拒绝测试",
             transport: .sse(url: "https://example.com/sse", headers: nil),
-            trust: .public,
+            trust: .internet,
             autoConnect: false,
             publicKeyPin: nil
         )
-        manager.addDiscoveredCandidate(server, boundary: .public)
+        manager.addDiscoveredCandidate(server, boundary: .internet)
 
         manager.rejectCandidate(serverID: "reject-test")
 

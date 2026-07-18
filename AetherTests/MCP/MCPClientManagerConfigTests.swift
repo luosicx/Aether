@@ -151,7 +151,7 @@ final class MCPClientManagerConfigTests: XCTestCase {
                     id: "public-1",
                     name: "公网 Server",
                     transport: .sse(url: "https://example.com/sse", headers: nil),
-                    trust: .public,
+                    trust: .internet,
                     autoConnect: true,
                     publicKeyPin: nil
                 )
@@ -164,7 +164,7 @@ final class MCPClientManagerConfigTests: XCTestCase {
         XCTAssertEqual(count, 0, "public Server 不应自动连接")
         XCTAssertEqual(manager.candidateServers.count, 1)
         XCTAssertEqual(manager.candidateServers[0].id, "public-1")
-        XCTAssertEqual(manager.getCandidateTrustBoundary(serverID: "public-1"), .public)
+        XCTAssertEqual(manager.getCandidateTrustBoundary(serverID: "public-1"), .internet)
     }
 
     /// approveCandidate 应触发连接并从候选列表移除
@@ -182,7 +182,7 @@ final class MCPClientManagerConfigTests: XCTestCase {
                     id: "cand-1",
                     name: "候选",
                     transport: .sse(url: "https://example.com/sse", headers: nil),
-                    trust: .public,
+                    trust: .internet,
                     autoConnect: true,
                     publicKeyPin: nil
                 )
@@ -214,7 +214,7 @@ final class MCPClientManagerConfigTests: XCTestCase {
                     id: "reject-1",
                     name: "拒绝",
                     transport: .sse(url: "https://example.com/sse", headers: nil),
-                    trust: .public,
+                    trust: .internet,
                     autoConnect: true,
                     publicKeyPin: nil
                 )
@@ -268,11 +268,11 @@ final class MCPClientManagerConfigTests: XCTestCase {
             id: "discovered-public",
             name: "发现公网",
             transport: .sse(url: "https://example.com/sse", headers: nil),
-            trust: .public,
+            trust: .internet,
             autoConnect: false,
             publicKeyPin: nil
         )
-        manager.addDiscoveredCandidate(server, boundary: .public)
+        manager.addDiscoveredCandidate(server, boundary: .internet)
 
         XCTAssertEqual(manager.candidateServers.count, 1)
         XCTAssertEqual(manager.candidateServers[0].id, "discovered-public")
@@ -289,12 +289,12 @@ final class MCPClientManagerConfigTests: XCTestCase {
             id: "dup-1",
             name: "重复",
             transport: .sse(url: "https://example.com/sse", headers: nil),
-            trust: .public,
+            trust: .internet,
             autoConnect: false,
             publicKeyPin: nil
         )
-        manager.addDiscoveredCandidate(server, boundary: .public)
-        manager.addDiscoveredCandidate(server, boundary: .public)
+        manager.addDiscoveredCandidate(server, boundary: .internet)
+        manager.addDiscoveredCandidate(server, boundary: .internet)
 
         XCTAssertEqual(manager.candidateServers.count, 1, "重复发现不应追加")
     }
@@ -315,11 +315,11 @@ final class MCPClientManagerConfigTests: XCTestCase {
             id: "discovered-bad",
             name: "发现黑名单",
             transport: .sse(url: "https://example.com/sse", headers: nil),
-            trust: .public,
+            trust: .internet,
             autoConnect: false,
             publicKeyPin: nil
         )
-        manager.addDiscoveredCandidate(server, boundary: .public)
+        manager.addDiscoveredCandidate(server, boundary: .internet)
 
         XCTAssertTrue(manager.candidateServers.isEmpty)
         XCTAssertTrue(manager.rejectedServerIDs.contains("discovered-bad"))

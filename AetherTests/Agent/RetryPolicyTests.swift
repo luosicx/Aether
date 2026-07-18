@@ -17,7 +17,7 @@ final class RetryPolicyTests: XCTestCase {
 
     /// 默认策略参数正确
     func testDefaultParameters() {
-        let policy = RetryPolicy.default
+        let policy = RetryPolicy.defaultPolicy
         XCTAssertEqual(policy.maxAttempts, 3)
         XCTAssertEqual(policy.initialDelay, 1.0)
         XCTAssertEqual(policy.backoffMultiplier, 2.0)
@@ -79,7 +79,7 @@ final class RetryPolicyTests: XCTestCase {
 
     /// 默认策略退避序列：[1, 2]（3 次尝试，2 次重试间隔）
     func testBackoffSequenceWithDefaultPolicy() {
-        let policy = RetryPolicy.default
+        let policy = RetryPolicy.defaultPolicy
         let sequence = policy.backoffSequence()
         XCTAssertEqual(sequence, [1.0, 2.0])
     }
@@ -102,7 +102,7 @@ final class RetryPolicyTests: XCTestCase {
 
     /// 默认策略：尝试 0/1 次后可重试，尝试 2 次后不可重试
     func testCanRetryWithDefaultPolicy() {
-        let policy = RetryPolicy.default
+        let policy = RetryPolicy.defaultPolicy
         XCTAssertTrue(policy.canRetry(afterAttempt: 0), "首次失败后可重试")
         XCTAssertTrue(policy.canRetry(afterAttempt: 1), "第 2 次失败后可重试")
         XCTAssertFalse(policy.canRetry(afterAttempt: 2), "第 3 次失败后不可重试（已达 maxAttempts）")
@@ -182,7 +182,7 @@ final class RetryPolicyTests: XCTestCase {
 
     /// RetryPolicy 应满足 Sendable（可在 actor 间传递）
     func testSendableConformance() {
-        let policy = RetryPolicy.default
+        let policy = RetryPolicy.defaultPolicy
         // 此测试主要验证编译期 Sendable 合规；运行时无操作
         XCTAssertEqual(policy.maxAttempts, 3)
         // Sendable 类型可在 @Sendable 闭包中捕获

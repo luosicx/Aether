@@ -171,7 +171,7 @@ struct PermissionPromptView: View {
         info: PermissionPromptInfo(
             serverID: "example-server",
             serverName: "示例 MCP Server",
-            trust: .public,
+            trust: .internet,
             transportDescription: "SSE: https://example.com/sse",
             toolCount: 3,
             toolNames: ["search", "calc", "fs_read"],

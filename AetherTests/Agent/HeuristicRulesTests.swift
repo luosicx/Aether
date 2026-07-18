@@ -20,7 +20,7 @@ final class HeuristicRulesTests: XCTestCase {
     // MARK: - 默认参数
 
     func testDefaultParameters() {
-        let rules = HeuristicRules.default
+        let rules = HeuristicRules.defaultRules
         XCTAssertEqual(rules.maxDepth, 3)
         XCTAssertEqual(rules.maxWidth, 8)
         XCTAssertEqual(rules.maxTotalCount, 50)
@@ -42,7 +42,7 @@ final class HeuristicRulesTests: XCTestCase {
     // MARK: - 深度/宽度/总数约束
 
     func testCanDecomposeDepth() {
-        let rules = HeuristicRules.default
+        let rules = HeuristicRules.defaultRules
         XCTAssertTrue(rules.canDecompose(depth: 0), "depth 0 应可分解")
         XCTAssertTrue(rules.canDecompose(depth: 1), "depth 1 应可分解")
         XCTAssertTrue(rules.canDecompose(depth: 2), "depth 2 应可分解")
@@ -51,7 +51,7 @@ final class HeuristicRulesTests: XCTestCase {
     }
 
     func testIsWidthValid() {
-        let rules = HeuristicRules.default
+        let rules = HeuristicRules.defaultRules
         XCTAssertTrue(rules.isWidthValid(0))
         XCTAssertTrue(rules.isWidthValid(8))
         XCTAssertFalse(rules.isWidthValid(9))
@@ -59,7 +59,7 @@ final class HeuristicRulesTests: XCTestCase {
     }
 
     func testIsTotalCountValid() {
-        let rules = HeuristicRules.default
+        let rules = HeuristicRules.defaultRules
         XCTAssertTrue(rules.isTotalCountValid(0))
         XCTAssertTrue(rules.isTotalCountValid(50))
         XCTAssertFalse(rules.isTotalCountValid(51))
@@ -69,14 +69,14 @@ final class HeuristicRulesTests: XCTestCase {
     // MARK: - 宽度截断
 
     func testClampWidthNoTruncation() {
-        let rules = HeuristicRules.default
+        let rules = HeuristicRules.defaultRules
         let subTasks = (0..<5).map { i in SubTask(title: "T\(i)", order: i) }
         let result = rules.clampWidth(subTasks)
         XCTAssertEqual(result.count, 5)
     }
 
     func testClampWidthTruncatesTo8() {
-        let rules = HeuristicRules.default
+        let rules = HeuristicRules.defaultRules
         let subTasks = (0..<12).map { i in SubTask(title: "T\(i)", order: i) }
         let result = rules.clampWidth(subTasks)
         XCTAssertEqual(result.count, 8, "应截断到 maxWidth=8")
@@ -87,57 +87,57 @@ final class HeuristicRulesTests: XCTestCase {
     // MARK: - 复杂度启发式
 
     func testShouldDecomposeFurtherEmptyDescription() {
-        let rules = HeuristicRules.default
+        let rules = HeuristicRules.defaultRules
         XCTAssertFalse(rules.shouldDecomposeFurther(description: ""))
     }
 
     func testShouldDecomposeFurtherShortDescription() {
-        let rules = HeuristicRules.default
+        let rules = HeuristicRules.defaultRules
         XCTAssertFalse(rules.shouldDecomposeFurther(description: "简单任务"))
     }
 
     func testShouldDecomposeFurtherLongDescription() {
-        let rules = HeuristicRules.default
+        let rules = HeuristicRules.defaultRules
         let longDesc = String(repeating: "a", count: 101)
         XCTAssertTrue(rules.shouldDecomposeFurther(description: longDesc))
     }
 
     func testShouldDecomposeFurtherExactlyAtThreshold() {
-        let rules = HeuristicRules.default
+        let rules = HeuristicRules.defaultRules
         let desc = String(repeating: "a", count: 100)
         XCTAssertFalse(rules.shouldDecomposeFurther(description: desc), "恰好 100 字符不应触发")
     }
 
     func testShouldDecomposeFurtherConnector并且() {
-        let rules = HeuristicRules.default
+        let rules = HeuristicRules.defaultRules
         XCTAssertTrue(rules.shouldDecomposeFurther(description: "做A，并且做B"))
     }
 
     func testShouldDecomposeFurtherConnector然后() {
-        let rules = HeuristicRules.default
+        let rules = HeuristicRules.defaultRules
         XCTAssertTrue(rules.shouldDecomposeFurther(description: "先做A然后做B"))
     }
 
     func testShouldDecomposeFurtherNoConnector() {
-        let rules = HeuristicRules.default
+        let rules = HeuristicRules.defaultRules
         XCTAssertFalse(rules.shouldDecomposeFurther(description: "做A做B做C"))
     }
 
     func testShouldDecomposeSubTaskAtDepthExceeded() {
-        let rules = HeuristicRules.default
+        let rules = HeuristicRules.defaultRules
         let sub = SubTask(title: "复杂任务", description: String(repeating: "a", count: 200))
         // depth=3 时不应再分解（maxDepth=3）
         XCTAssertFalse(rules.shouldDecompose(subTask: sub, atDepth: 3, currentTotalCount: 1))
     }
 
     func testShouldDecomposeSubTaskAtTotalCountExceeded() {
-        let rules = HeuristicRules.default
+        let rules = HeuristicRules.defaultRules
         let sub = SubTask(title: "复杂任务", description: String(repeating: "a", count: 200))
         XCTAssertFalse(rules.shouldDecompose(subTask: sub, atDepth: 1, currentTotalCount: 50))
     }
 
     func testShouldDecomposeSubTaskNormal() {
-        let rules = HeuristicRules.default
+        let rules = HeuristicRules.defaultRules
         let sub = SubTask(title: "复杂任务", description: "做A然后做B并且做C")
         XCTAssertTrue(rules.shouldDecompose(subTask: sub, atDepth: 1, currentTotalCount: 1))
     }
@@ -145,12 +145,12 @@ final class HeuristicRulesTests: XCTestCase {
     // MARK: - 同层兄弟 DAG 依赖生成
 
     func testGenerateSiblingDependenciesEmpty() {
-        let rules = HeuristicRules.default
+        let rules = HeuristicRules.defaultRules
         XCTAssertTrue(rules.generateSiblingDependencies([]).isEmpty)
     }
 
     func testGenerateSiblingDependenciesSingle() {
-        let rules = HeuristicRules.default
+        let rules = HeuristicRules.defaultRules
         let sub = SubTask(title: "T", dependencies: [UUID(), UUID()], order: 0)
         let result = rules.generateSiblingDependencies([sub])
         XCTAssertEqual(result.count, 1)
@@ -158,7 +158,7 @@ final class HeuristicRulesTests: XCTestCase {
     }
 
     func testGenerateSiblingDependenciesSerial() {
-        let rules = HeuristicRules.default
+        let rules = HeuristicRules.defaultRules
         let s1 = SubTask(title: "T1", order: 0)
         let s2 = SubTask(title: "T2", order: 1)
         let s3 = SubTask(title: "T3", order: 2)
@@ -170,7 +170,7 @@ final class HeuristicRulesTests: XCTestCase {
     }
 
     func testGenerateSiblingDependenciesAllParallel() {
-        let rules = HeuristicRules.default
+        let rules = HeuristicRules.defaultRules
         let s1 = SubTask(title: "T1", order: 0, parallel: true)
         let s2 = SubTask(title: "T2", order: 1, parallel: true)
         let s3 = SubTask(title: "T3", order: 2, parallel: true)
@@ -180,7 +180,7 @@ final class HeuristicRulesTests: XCTestCase {
     }
 
     func testGenerateSiblingDependenciesMixedParallelSerial() {
-        let rules = HeuristicRules.default
+        let rules = HeuristicRules.defaultRules
         // s1 parallel, s2 serial, s3 parallel, s4 serial
         let s1 = SubTask(title: "T1", order: 0, parallel: true)
         let s2 = SubTask(title: "T2", order: 1, parallel: false)
@@ -276,7 +276,7 @@ final class HeuristicRulesTests: XCTestCase {
 
     /// 验收 1: 深度 ≤ 3、宽度 ≤ 8、总数 ≤ 50、无循环依赖
     func testAcceptanceCriteriaHeuristicBounds() {
-        let rules = HeuristicRules.default
+        let rules = HeuristicRules.defaultRules
         XCTAssertLessThanOrEqual(rules.maxDepth, 3)
         XCTAssertLessThanOrEqual(rules.maxWidth, 8)
         XCTAssertLessThanOrEqual(rules.maxTotalCount, 50)

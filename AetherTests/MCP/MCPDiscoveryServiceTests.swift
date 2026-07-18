@@ -161,7 +161,7 @@ final class MCPDiscoveryServiceTests: XCTestCase {
         try await Task.sleep(nanoseconds: 200_000_000)
 
         let boundary = manager.getCandidateTrustBoundary(serverID: "public-srv")
-        XCTAssertEqual(boundary, .public, "trust=public 应映射到 public 信任档位")
+        XCTAssertEqual(boundary, .internet, "trust=public 应映射到 internet 信任档位")
 
         service.stopScanning()
     }

@@ -45,11 +45,11 @@ final class MCPSettingsViewTests: XCTestCase {
             id: "cand-1",
             name: "候选 Server",
             transport: .sse(url: "https://example.com/sse", headers: nil),
-            trust: .public,
+            trust: .internet,
             autoConnect: false,
             publicKeyPin: nil
         )
-        manager.addDiscoveredCandidate(server, boundary: .public)
+        manager.addDiscoveredCandidate(server, boundary: .internet)
 
         let groups = MCPServerGrouping.classify(manager: manager)
         XCTAssertTrue(groups.connected.isEmpty)
@@ -93,10 +93,10 @@ final class MCPSettingsViewTests: XCTestCase {
             MCPConfigFile.Server(
                 id: "cand", name: "候选",
                 transport: .sse(url: "https://example.com/sse", headers: nil),
-                trust: .public, autoConnect: false,
+                trust: .internet, autoConnect: false,
                 publicKeyPin: nil
             ),
-            boundary: .public
+            boundary: .internet
         )
         // 已拒绝
         manager.rejectCandidate(serverID: "rej")
@@ -121,10 +121,10 @@ final class MCPSettingsViewTests: XCTestCase {
             MCPConfigFile.Server(
                 id: "manual", name: "手动",
                 transport: .sse(url: "https://example.com/sse", headers: nil),
-                trust: .public, autoConnect: false,
+                trust: .internet, autoConnect: false,
                 publicKeyPin: nil
             ),
-            boundary: .public
+            boundary: .internet
         )
 
         await manager.approveCandidate(serverID: "manual")

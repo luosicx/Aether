@@ -165,7 +165,7 @@ final class MCPDiscoveryService {
         if isPrivateHost(service.hostName) {
             return .lan
         }
-        return .public
+        return .internet
     }
 
     /// 构造 SSE URL

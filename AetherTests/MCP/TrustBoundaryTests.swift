@@ -43,10 +43,10 @@ final class TrustBoundaryTests: XCTestCase {
         let server = MCPConfigFile.Server(
             id: "p1", name: "P1",
             transport: .sse(url: "https://example.com/sse", headers: nil),
-            trust: .public, autoConnect: false, publicKeyPin: nil
+            trust: .internet, autoConnect: false, publicKeyPin: nil
         )
         let boundary = TrustBoundary.classify(server: server)
-        XCTAssertEqual(boundary, .public)
+        XCTAssertEqual(boundary, .internet)
     }
 
     /// TrustBoundary 应能从 trust 字段直接构造
@@ -94,7 +94,7 @@ final class PermissionPolicyTests: XCTestCase {
             blacklist: ["malicious.example.com"],
             defaultTrust: .lan
         )
-        let decision = policy.decide(for: "malicious.example.com", trust: .public)
+        let decision = policy.decide(for: "malicious.example.com", trust: .internet)
         XCTAssertEqual(decision, .deny)
     }
 
@@ -127,7 +127,7 @@ final class PermissionPolicyTests: XCTestCase {
             blacklist: [],
             defaultTrust: .lan
         )
-        let decision = policy.decide(for: "public-server.example.com", trust: .public)
+        let decision = policy.decide(for: "public-server.example.com", trust: .internet)
         XCTAssertEqual(decision, .requireConfirmation, "public Server 首次必弹确认")
     }
 

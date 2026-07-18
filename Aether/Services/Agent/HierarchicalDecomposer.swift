@@ -46,8 +46,8 @@ final class HierarchicalDecomposer {
     /// 创建 HierarchicalDecomposer
     /// - Parameters:
     ///   - goalDecomposer: 底层 LLM 分解器
-    ///   - rules: 启发式规则，默认 `.default`
-    init(goalDecomposer: GoalDecomposer, rules: HeuristicRules = .default) {
+    ///   - rules: 启发式规则，默认 `.defaultRules`
+    init(goalDecomposer: GoalDecomposer, rules: HeuristicRules = .defaultRules) {
         self.goalDecomposer = goalDecomposer
         self.rules = rules
     }

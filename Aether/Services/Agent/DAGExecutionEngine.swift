@@ -78,11 +78,11 @@ final class DAGExecutionEngine {
     /// - Parameters:
     ///   - stateMachine: 节点状态机（可选，默认新建）
     ///   - toolCoordinator: 工具协调器（可选，默认 shared）
-    ///   - retryPolicy: 重试策略（可选，默认 `.default`）
+    ///   - retryPolicy: 重试策略（可选，默认 `.defaultPolicy`）
     ///   - checkpointManager: 检查点管理器（可选，默认新建）
     init(stateMachine: NodeStateMachine? = nil,
          toolCoordinator: ToolExecutionCoordinator = ToolExecutionCoordinator.shared,
-         retryPolicy: RetryPolicy = .default,
+         retryPolicy: RetryPolicy = .defaultPolicy,
          checkpointManager: CheckpointManager? = nil) {
         self.stateMachine = stateMachine ?? NodeStateMachine()
         self.toolCoordinator = toolCoordinator
