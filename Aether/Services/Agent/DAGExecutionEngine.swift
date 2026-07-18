@@ -100,7 +100,7 @@ final class DAGExecutionEngine {
     ///   - task: 待执行的 AgentTask
     ///   - executor: 节点执行器闭包（由 orchestrator 注入）
     /// - Throws: `EngineError`
-    func run(_ task: AgentTask, executor: NodeExecutor) async throws {
+    func run(_ task: AgentTask, executor: @Sendable @escaping NodeExecutor) async throws {
         let subTasks = task.subTasks
         guard !subTasks.isEmpty else { return }
 
@@ -174,7 +174,7 @@ final class DAGExecutionEngine {
     ///   - batch: 可执行子任务列表
     ///   - task: 所属 AgentTask
     ///   - executor: 节点执行器
-    private func executeBatch(_ batch: [SubTask], task: AgentTask, executor: NodeExecutor) async throws {
+    private func executeBatch(_ batch: [SubTask], task: AgentTask, executor: @Sendable @escaping NodeExecutor) async throws {
         // 限制并发数：取前 maxConcurrency 个
         let currentBatch = Array(batch.prefix(Self.maxConcurrency))
         let remaining = batch.dropFirst(Self.maxConcurrency)
@@ -189,6 +189,7 @@ final class DAGExecutionEngine {
         // 捕获 Sendable 依赖到本地常量（避免在 TaskGroup 子任务中跨 MainActor 访问 self）
         let retryPolicy = self.retryPolicy
         let toolCoordinator = self.toolCoordinator
+        let executorWrapper = executor
 
         // 并行执行（TaskGroup + semaphore）
         try await withThrowingTaskGroup(of: SubTaskResult.self) { group in
@@ -202,7 +203,7 @@ final class DAGExecutionEngine {
                                 let toolResult = try await toolCoordinator.execute(name: toolName, arguments: [:])
                                 return SubTaskResult(id: sub.id, result: toolResult, errorMessage: nil)
                             } else {
-                                let execResult = try await executor(sub)
+                                let execResult = try await executorWrapper(sub)
                                 return SubTaskResult(id: sub.id, result: execResult, errorMessage: nil)
                             }
                         } catch {
@@ -281,7 +282,7 @@ final class DAGExecutionEngine {
     ///   - task: 所属 AgentTask
     ///   - nodeID: 失败节点 ID
     ///   - executor: 节点执行器
-    func retryFailedNode(task: AgentTask, nodeID: UUID, executor: NodeExecutor) async throws {
+    func retryFailedNode(task: AgentTask, nodeID: UUID, executor: @Sendable @escaping NodeExecutor) async throws {
         guard let sub = task.subTasks.first(where: { $0.id == nodeID }) else { return }
         _ = task.updateSubTaskStatus(id: nodeID, status: .pending)
         await stateMachine.reset(nodeID)
