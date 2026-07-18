@@ -14,9 +14,11 @@ actor BruteForceVectorStore: VectorStore {
     /// 内存中的记录数组
     private var records: [(id: UUID, embedding: [Double], metadata: [String: String])] = []
 
-    /// 创建 BruteForceVectorStore 实例
-    /// 注：纯内存降级方案无需初始化资源；显式声明 init() 以便测试与 VectorStoreFactory 构造。
-    init() {}
+    /// 创建 BruteForceVectorStore 实例（显式声明以便测试与 VectorStoreFactory 构造）
+    init() {
+        // 纯内存降级方案无需初始化资源；
+        // 显式声明 init() 以便测试与 VectorStoreFactory 构造。
+    }
 
     func initialize() async throws {
         // 无需初始化，纯内存

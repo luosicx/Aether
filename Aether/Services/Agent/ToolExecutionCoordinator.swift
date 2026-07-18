@@ -22,10 +22,11 @@ actor ToolExecutionCoordinator {
     private var history: [ToolExecutionRecord] = []
     private let historyLimit = 100
 
-    /// 创建 ToolExecutionCoordinator
-    /// 注：actor 隔离的默认构造器，所有属性已有初始值；
-    /// 显式声明 init() 以便在 @MainActor 测试上下文中创建实例（actor 默认 init 非 Sendable 时不便跨隔离域调用）。
-    init() {}
+    /// 创建 ToolExecutionCoordinator（显式声明以便在 @MainActor 测试上下文中创建实例）
+    init() {
+        // actor 隔离的默认构造器，所有属性已有初始值；
+        // actor 默认 init 非 Sendable 时不便跨隔离域调用，故显式声明。
+    }
 
     /// 串行化执行工具调用
     /// - Parameters:
