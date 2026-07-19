@@ -378,7 +378,7 @@ final class MemoryServiceTests: XCTestCase {
         // 持久化层应同步反映 importance=0.8
         let all = try service.getAllMemories()
         XCTAssertEqual(all.count, 1)
-        XCTAssertEqual(all.first?.importance, 0.8, accuracy: 0.001)
+        XCTAssertEqual(try XCTUnwrap(all.first?.importance), 0.8, accuracy: 0.001)
         XCTAssertTrue(all.first?.isUserExplicit ?? false)
     }
 
@@ -429,6 +429,6 @@ final class MemoryServiceTests: XCTestCase {
         XCTAssertEqual(all.first?.content, "导入记忆")
         XCTAssertEqual(all.first?.embedding, [0.1, 0.2, 0.3])
         XCTAssertEqual(all.first?.category, "fact")
-        XCTAssertEqual(all.first?.importance, 0.7, accuracy: 0.001)
+        XCTAssertEqual(try XCTUnwrap(all.first?.importance), 0.7, accuracy: 0.001)
     }
 }
