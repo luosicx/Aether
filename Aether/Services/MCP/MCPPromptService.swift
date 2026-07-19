@@ -1,4 +1,5 @@
 import Foundation
+import AetherFoundation
 
 /// MCP 提示词模板管理服务。
 ///

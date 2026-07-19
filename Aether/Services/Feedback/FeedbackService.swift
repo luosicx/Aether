@@ -9,7 +9,9 @@ import UIKit
 final class FeedbackService {
     /// 单例
     static let shared = FeedbackService()
-    private init() {}
+    private init() {
+        // 单例模式：外部不可创建实例
+    }
 
     /// 收件邮箱
     private let recipient = "feedback@aether.app"
@@ -84,7 +86,7 @@ struct MailComposerView: UIViewControllerRepresentable {
         return composer
     }
 
-    func updateUIViewController(_ uiViewController: MFMailComposeViewController, context: Context) {
+    func updateUIViewController(_: MFMailComposeViewController, context _: Context) {
         // 无需更新
     }
 
@@ -102,7 +104,7 @@ struct MailComposerView: UIViewControllerRepresentable {
 
         func mailComposeController(_ controller: MFMailComposeViewController,
                                    didFinishWith result: MFMailComposeResult,
-                                   error: Error?) {
+                                   error _: Error?) {
             controller.dismiss(animated: true)
             onFinish?(result)
         }

@@ -12,7 +12,9 @@ import Bugly
 final class CrashReportService: @unchecked Sendable {
     /// 单例
     static let shared = CrashReportService()
-    private init() {}
+    private init() {
+        // 单例模式：外部不可创建实例
+    }
 
     /// 初始化崩溃监控
     /// - Parameter appKey: Bugly App Key（Info.plist 中读取）

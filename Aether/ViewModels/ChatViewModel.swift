@@ -316,11 +316,11 @@ final class ChatViewModel {
             for await status in stream {
                 guard !Task.isCancelled else { return }
                 self.currentNetworkStatus = status
-                switch status {
-                case .offline:
+                // S1301: 单 case switch 改 if 提升可读性
+                if status == .offline {
                     // 断网：切到端侧推理
                     self.switchToOnDevice()
-                default:
+                } else {
                     // 联网（wifi/cellular/online）：切回原 provider
                     self.switchToOriginalProvider()
                 }
@@ -646,11 +646,11 @@ final class ChatViewModel {
         var effectiveSystemPrompt = buildEffectiveSystemPrompt(base: conversation.systemPrompt, preference: preference)
         // Day 17: 注入健康上下文（最近 24h 睡眠/心率/步数）
         #if os(iOS)
-        if injectHealthContext, let healthService = healthKitService, healthService.isAuthorized {
-            if let summary = try? await healthService.fetchDailySummary() {
-                let healthLine = String(format: NSLocalizedString("用户最近 24h：%@", comment: ""), String(format: NSLocalizedString("睡眠 %.1fh，心率均值 %.0fbpm，步数 %d", comment: ""), summary.sleepHours, summary.avgHeartRate, summary.stepCount))
-                effectiveSystemPrompt = (effectiveSystemPrompt.isEmpty ? "" : effectiveSystemPrompt + "\n") + healthLine
-            }
+        // S1066: 合并嵌套 if
+        if injectHealthContext, let healthService = healthKitService, healthService.isAuthorized,
+           let summary = try? await healthService.fetchDailySummary() {
+            let healthLine = String(format: NSLocalizedString("用户最近 24h：%@", comment: ""), String(format: NSLocalizedString("睡眠 %.1fh，心率均值 %.0fbpm，步数 %d", comment: ""), summary.sleepHours, summary.avgHeartRate, summary.stepCount))
+            effectiveSystemPrompt = (effectiveSystemPrompt.isEmpty ? "" : effectiveSystemPrompt + "\n") + healthLine
         }
         #endif
 

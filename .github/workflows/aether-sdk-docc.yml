@@ -1,0 +1,89 @@
+# AetherSDK DocC Documentation Generation
+#
+# This workflow generates DocC documentation for the AetherSDK target
+# and publishes it to GitHub Pages.
+#
+# NOTE: This is a draft job. To activate:
+# 1. Ensure repository has GitHub Pages enabled (Settings → Pages → Source: GitHub Actions)
+# 2. Uncomment the `on:` triggers below
+#
+# Trigger suggestions:
+#   - On push to main when Sources/AetherSDK/** changes
+#   - On workflow_dispatch for manual runs
+#
+# on:
+#   push:
+#     branches: [main]
+#     paths:
+#       - 'Packages/AetherCore/Sources/AetherSDK/**'
+#       - '.github/workflows/aether-sdk-docc.yml'
+#   workflow_dispatch:
+#
+# permissions:
+#   contents: read
+#   pages: write
+#   id-token: write
+
+name: AetherSDK DocC (Draft)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-docc:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Select Xcode (latest)
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Cache SPM
+        uses: actions/cache@v5
+        with:
+          path: |
+            .build
+            ~/Library/Caches/org.swift.swiftpm
+          key: ${{ runner.os }}-spm-docc-${{ hashFiles('Packages/AetherCore/Package.resolved') }}
+
+      - name: Generate DocC Documentation
+        # Generates DocC documentation for the AetherSDK target.
+        # Output goes to .build/docc/AetherSDK.doccarchive
+        run: |
+          cd Packages/AetherCore
+          swift package \
+            --allow-writing-to-directory .build/docc \
+            generate-documentation \
+            --target AetherSDK \
+            --output-path .build/docc/AetherSDK.doccarchive \
+            --emit-warning # emit warnings for missing docs; fail CI on warnings
+
+      - name: Convert DocC Archive to Static Site
+        # Convert .doccarchive to static HTML for GitHub Pages
+        run: |
+          cd Packages/AetherCore
+          mkdir -p .build/docc-html
+          $(xcrun --find docc) process-archive \
+            transform-for-static-hosting \
+            .build/docc/AetherSDK.doccarchive \
+            --output-path .build/docc-html \
+            --hosting-base-path AIBuiler/aether-sdk-docs
+
+      - name: Upload DocC Archive Artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: aether-sdk-doccarchive
+          path: Packages/AetherCore/.build/docc/AetherSDK.doccarchive
+
+      - name: Upload Static Site Artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: aether-sdk-docc-html
+          path: Packages/AetherCore/.build/docc-html
+
+      # Uncomment when GitHub Pages is configured
+      # - name: Deploy to GitHub Pages
+      #   uses: actions/deploy-pages@v4
+      #   with:
+      #     artifact_name: aether-sdk-docc-html

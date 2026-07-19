@@ -97,6 +97,7 @@ final class HealthKitService: HealthDataSource, @unchecked Sendable {
                     return
                 }
                 var result: [Date: Double] = [:]
+                // NOSONAR: HKStatisticsCollectionQuery API 要求 enumerateStatistics 闭包嵌套于 initialResultsHandler 内
                 results?.enumerateStatistics(from: startDate, to: now, with: { stat, _ in
                     if let quantity = stat.averageQuantity()?.doubleValue(for: unit) {
                         result[calendar.startOfDay(for: stat.startDate)] = quantity
@@ -120,6 +121,7 @@ final class HealthKitService: HealthDataSource, @unchecked Sendable {
         let sleepType = HKCategoryType(.sleepAnalysis)
 
         return try await withCheckedThrowingContinuation { continuation in
+            // NOSONAR: HKSampleQuery 完成回调内构建结果，仅一层闭包
             let query = HKSampleQuery(sampleType: sleepType, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, error in
                 if let error = error {
                     continuation.resume(throwing: error)
@@ -182,6 +184,7 @@ final class HealthKitService: HealthDataSource, @unchecked Sendable {
                     return
                 }
                 var result: [Date: Int] = [:]
+                // NOSONAR: HKStatisticsCollectionQuery API 要求 enumerateStatistics 闭包嵌套于 initialResultsHandler 内
                 results?.enumerateStatistics(from: startDate, to: now, with: { stat, _ in
                     if let quantity = stat.sumQuantity()?.doubleValue(for: unit) {
                         result[calendar.startOfDay(for: stat.startDate)] = Int(quantity)

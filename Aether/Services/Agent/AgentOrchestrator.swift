@@ -61,6 +61,35 @@ final class AgentOrchestrator {
     /// 审查失败后的最大重试次数
     private let maxReviewRetries = 3
 
+    /// Task 20: DAG 执行引擎（懒加载）
+    private lazy var dagEngine: DAGExecutionEngine = {
+        let engine = DAGExecutionEngine(
+            checkpointManager: CheckpointManager(modelContext: modelContext)
+        )
+        // 进度回调：每节点完成时持久化
+        engine.onProgress = { [weak self] task in
+            try? self?.modelContext.save()
+        }
+        // 节点失败回调：可由上层订阅触发 UI 干预
+        engine.onNodeFailed = { _ in
+            // 失败时 engine 已标记 failed 状态，UI 层通过 @Published 监听
+        }
+        return engine
+    }()
+
+    /// Task 20: 用户干预回调（节点失败时触发，UI 层订阅）
+    /// 参数为失败的 SubTask
+    var onNodeFailed: ((SubTask) -> Void)? {
+        get { dagEngine.onNodeFailed }
+        set { dagEngine.onNodeFailed = newValue }
+    }
+
+    /// Task 20: 进度更新回调
+    var onProgress: ((AgentTask) -> Void)? {
+        get { dagEngine.onProgress }
+        set { dagEngine.onProgress = newValue }
+    }
+
     /// 创建 AgentOrchestrator
     /// - Parameters:
     ///   - modelContext: SwiftData 数据上下文
@@ -125,37 +154,115 @@ final class AgentOrchestrator {
 
     /// 执行所有子任务（DAG 调度）
     ///
-    /// 循环获取 `nextExecutableSubTask()`，按依赖顺序逐个执行。
-    /// 无依赖的子任务按 `order` 顺序执行；有依赖的子任务等待依赖完成后执行。
-    /// 每个子任务完成后持久化状态，支持断点续执行。
+    /// Task 20: 内部委托给 `DAGExecutionEngine` 进行并行 DAG 调度，
+    /// 对外接口（`startTask` / `executeAll` / `cancel`）保持不变，现有调用方零改动。
+    ///
+    /// 引擎行为：
+    /// - 获取所有依赖已就绪的 pending 节点，并行提交执行（最大并发 4）
+    /// - 节点失败按指数退避重试（1s/2s/4s，最大 3 次）
+    /// - 每节点完成即检查点持久化
+    /// - 失败节点用尽重试后标记 failed，触发 `onNodeFailed` 回调
+    /// - 跳过 failed 节点的下游依赖（自动级联 skipped）
     /// - Throws: `OrchestratorError.noActiveTask` 或子任务执行错误
     func executeAll() async throws {
         guard let task = currentTask else {
             throw OrchestratorError.noActiveTask
         }
 
-        // 循环执行直到所有子任务完成
-        while !task.isAllSubTasksCompleted {
-            // 获取当前可执行的子任务（pending 且依赖全部完成）
-            guard let subTask = task.nextExecutableSubTask() else {
-                // 没有可执行的子任务
-                if task.isAllSubTasksCompleted {
-                    task.markCompleted()
-                } else {
-                    // 可能存在失败导致无法继续
-                    task.markFailed()
-                }
-                try modelContext.save()
-                return
+        // Task 20: 委托给 DAGExecutionEngine 并行调度
+        let executor: DAGExecutionEngine.NodeExecutor = { [llmProvider, agentConfig, enableReview, maxReviewRetries] subTask in
+            // executor 在非 MainActor 上下文执行（保证并行）
+            // 仅捕获 Sendable 值：llmProvider / agentConfig / enableReview / maxReviewRetries
+            let systemPrompt = AgentRole.executor.systemPrompt
+            let userContent = """
+            子任务：\(subTask.title)
+            描述：\(subTask.description)
+            请执行此子任务并给出结果。
+            """
+            let messages: [APIMessage] = [
+                APIMessage(role: "system", content: systemPrompt, images: nil, toolCallId: nil, toolName: nil, toolCalls: nil),
+                APIMessage(role: "user", content: userContent, images: nil, toolCallId: nil, toolName: nil, toolCalls: nil)
+            ]
+            let model = agentConfig.model ?? ChatConfig.default.model
+            let config = ChatConfig(model: model, systemPrompt: systemPrompt, maxTokens: 2048, temperature: 0.7)
+
+            var result = ""
+            let stream = llmProvider.chat(messages: messages, config: config, apiKey: "")
+            for await chunk in stream {
+                result += chunk
             }
 
-            // 执行单个子任务（含状态管理和审查）
-            try await executeSubTask(subTask)
+            // 审查者角色审查结果（enableReview=true 时）
+            if enableReview {
+                var attempts = 0
+                while attempts < maxReviewRetries {
+                    let passed = await Self.reviewResult(subTask: subTask, result: result, llmProvider: llmProvider, model: model)
+                    if passed { break }
+                    attempts += 1
+                    // 审查未通过，重新执行
+                    let retryStream = llmProvider.chat(messages: messages, config: config, apiKey: "")
+                    result = ""
+                    for await chunk in retryStream {
+                        result += chunk
+                    }
+                }
+            }
+            return result
         }
 
-        // 所有子任务完成，标记任务完成
-        task.markCompleted()
-        try modelContext.save()
+        do {
+            try await dagEngine.run(task, executor: executor)
+            // 所有节点终止后：若全部完成（含 skipped）则标记任务完成；若有 failed 则标记失败
+            if task.isAllSubTasksCompleted {
+                task.markCompleted()
+            } else if task.hasFailedSubTask {
+                task.markFailed()
+            }
+            try modelContext.save()
+        } catch let error as DAGExecutionEngine.EngineError {
+            // 引擎错误转换为 OrchestratorError
+            switch error {
+            case .deadlock:
+                task.markFailed()
+                try modelContext.save()
+                throw OrchestratorError.noExecutableSubTask
+            case .subTaskFailed(let id, let reason):
+                task.markFailed()
+                try modelContext.save()
+                throw OrchestratorError.subTaskFailed(id, reason)
+            case .stateMachine(let smError):
+                throw OrchestratorError.subTaskFailed(UUID(), smError.localizedDescription)
+            }
+        }
+    }
+
+    /// Task 20: 静态审查方法（不依赖 self，可在非 MainActor 上下文调用）
+    /// - Parameters:
+    ///   - subTask: 被审查的子任务
+    ///   - result: 执行结果
+    ///   - llmProvider: LLM 供应商
+    ///   - model: 模型名
+    /// - Returns: true 表示审查通过
+    private static func reviewResult(subTask: SubTask, result: String, llmProvider: LLMProvider, model: String) async -> Bool {
+        let systemPrompt = AgentRole.reviewer.systemPrompt
+        let userContent = """
+        子任务：\(subTask.title)
+        描述：\(subTask.description)
+        执行结果：\(result)
+
+        请审查此结果是否正确、完整。回复"通过"或"不通过"，并说明原因。
+        """
+        let messages: [APIMessage] = [
+            APIMessage(role: "system", content: systemPrompt, images: nil, toolCallId: nil, toolName: nil, toolCalls: nil),
+            APIMessage(role: "user", content: userContent, images: nil, toolCallId: nil, toolName: nil, toolCalls: nil)
+        ]
+        let config = ChatConfig(model: model, systemPrompt: systemPrompt, maxTokens: 512, temperature: 0.3)
+        let stream = llmProvider.chat(messages: messages, config: config, apiKey: "")
+        var response = ""
+        for await chunk in stream {
+            response += chunk
+        }
+        return response.contains("通过") && !response.contains("不通过")
     }
 
     /// 取消当前任务
@@ -165,6 +272,79 @@ final class AgentOrchestrator {
             throw OrchestratorError.noActiveTask
         }
         task.cancel()
+        try modelContext.save()
+    }
+
+    // MARK: - Task 20: 用户干预
+
+    /// Task 20: 跳过失败节点（用户干预）
+    ///
+    /// 将指定 failed 节点状态改为 skipped，并级联跳过其下游依赖节点。
+    /// - Parameter nodeID: 失败节点 ID
+    /// - Throws: `OrchestratorError.noActiveTask`
+    func skipFailedNode(nodeID: UUID) async throws {
+        guard let task = currentTask else {
+            throw OrchestratorError.noActiveTask
+        }
+        await dagEngine.skipFailedNode(task: task, nodeID: nodeID)
+        try modelContext.save()
+    }
+
+    /// Task 20: 重试失败节点（用户干预）
+    ///
+    /// 重置失败节点为 pending，重新执行。
+    /// - Parameter nodeID: 失败节点 ID
+    /// - Throws: `OrchestratorError.noActiveTask` 或执行错误
+    func retryFailedNode(nodeID: UUID) async throws {
+        guard let task = currentTask else {
+            throw OrchestratorError.noActiveTask
+        }
+        let executor: DAGExecutionEngine.NodeExecutor = { [llmProvider, agentConfig, enableReview, maxReviewRetries] subTask in
+            let systemPrompt = AgentRole.executor.systemPrompt
+            let userContent = """
+            子任务：\(subTask.title)
+            描述：\(subTask.description)
+            请执行此子任务并给出结果。
+            """
+            let messages: [APIMessage] = [
+                APIMessage(role: "system", content: systemPrompt, images: nil, toolCallId: nil, toolName: nil, toolCalls: nil),
+                APIMessage(role: "user", content: userContent, images: nil, toolCallId: nil, toolName: nil, toolCalls: nil)
+            ]
+            let model = agentConfig.model ?? ChatConfig.default.model
+            let config = ChatConfig(model: model, systemPrompt: systemPrompt, maxTokens: 2048, temperature: 0.7)
+            var result = ""
+            let stream = llmProvider.chat(messages: messages, config: config, apiKey: "")
+            for await chunk in stream {
+                result += chunk
+            }
+            if enableReview {
+                var attempts = 0
+                while attempts < maxReviewRetries {
+                    let passed = await Self.reviewResult(subTask: subTask, result: result, llmProvider: llmProvider, model: model)
+                    if passed { break }
+                    attempts += 1
+                    let retryStream = llmProvider.chat(messages: messages, config: config, apiKey: "")
+                    result = ""
+                    for await chunk in retryStream {
+                        result += chunk
+                    }
+                }
+            }
+            return result
+        }
+        try await dagEngine.retryFailedNode(task: task, nodeID: nodeID, executor: executor)
+        try modelContext.save()
+    }
+
+    /// Task 20: 取消整个任务（用户干预）
+    ///
+    /// 将所有 pending/running 节点标记为 skipped，任务状态改为 cancelled。
+    /// - Throws: `OrchestratorError.noActiveTask`
+    func cancelTaskIntervention() async throws {
+        guard let task = currentTask else {
+            throw OrchestratorError.noActiveTask
+        }
+        await dagEngine.cancelTask(task)
         try modelContext.save()
     }
 
@@ -320,13 +500,36 @@ final class AgentOrchestrator {
 
     /// Task 11.2: 启动时恢复未完成的任务
     ///
-    /// 查找 status == .inProgress 的 AgentTask，设为当前任务。
-    /// 若存在多个，取第一个。
+    /// Task 20 扩展：加载检查点，从最后一个 `completed` 节点续执行。
+    /// 幂等恢复：检查点中已记录的 completed 节点 ID 集合，不重复执行。
+    ///
+    /// 流程：
+    /// 1. 查找 status == .inProgress 的 AgentTask
+    /// 2. 若存在检查点（checkpointAt != nil），验证 completedNodeIDs 与 subTasks 状态一致
+    /// 3. 设为当前任务，等待 executeAll() 调用续执行
     private func resumeInProgressTask() throws {
         let descriptor = FetchDescriptor<AgentTask>()
         let tasks = try modelContext.fetch(descriptor)
         if let inProgressTask = tasks.first(where: { $0.status == .inProgress }) {
             currentTask = inProgressTask
+            // Task 20: 加载检查点，验证已完成节点状态
+            loadCheckpointForResume(task: inProgressTask)
+        }
+    }
+
+    /// Task 20: 加载检查点进行幂等恢复
+    ///
+    /// 将 completedNodeIDs 中记录的节点状态同步到 subTasks（防止数据不一致）。
+    /// - Parameter task: 待恢复的任务
+    private func loadCheckpointForResume(task: AgentTask) {
+        guard task.checkpointAt != nil else { return }
+        let completedSet = Set(task.completedNodeIDs)
+        // 验证：检查点中标记为 completed 的节点，subTasks 中也应为 completed
+        for sub in task.subTasks where completedSet.contains(sub.id) {
+            if sub.status != .completed && sub.status != .skipped {
+                // 数据不一致：检查点标记完成但 subTask 状态未更新，修正为 completed
+                _ = task.updateSubTaskStatus(id: sub.id, status: .completed)
+            }
         }
     }
 }

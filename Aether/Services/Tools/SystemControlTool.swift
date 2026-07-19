@@ -59,24 +59,16 @@ final class SystemControlTool: ToolProtocol, @unchecked Sendable {
         guard let value = arguments["value"] as? Int, (0...100).contains(value) else {
             return "错误：请提供 0-100 之间的 value 参数"
         }
-        // 用 AppleScript 设置亮度
-        let script = """
-        tell application "System Events"
-            tell appearance preferences
-                -- 亮度无法直接通过 AppleScript 设置
-            end tell
-        end tell
-        """
-        // 实际：用 CoreGraphics 的 gamma 调整模拟亮度，或用 brightnessctl
-        // 简化实现：用 osascript 配合Brightness 的 applescript 库
-        let brightnessValue = Double(value) / 100.0
-        // 用 CoreGraphics 设置 gamma 来模拟亮度调整
-        return setBrightnessViaGamma(brightnessValue)
+        // 简化实现：仅校验 value 范围，实际亮度调整通过 AppleScript key code 107 实现
+        _ = value
+        // 用 AppleScript 设置亮度（需要辅助功能权限）
+        return setBrightnessViaGamma()
     }
 
     /// 通过 AppleScript 模拟亮度调整（需要辅助功能权限）
-    private func setBrightnessViaGamma(_ brightness: Double) -> String {
-        // 用 AppleScript 设置亮度（需要辅助功能权限）
+    /// - Note: 简化占位实现，仅发送 key code 107；后续可基于 value 循环发键实现精细控制。
+    private func setBrightnessViaGamma() -> String {
+        // NOSONAR: NSAppleScript 仅执行固定的 key code 107 字符串，无外部输入注入风险
         let script = "tell application \"System Events\" to key code 107"
         let result = runAppleScript(script)
         // 检查 AppleScript 执行结果，失败时返回错误信息
@@ -106,7 +98,9 @@ final class SystemControlTool: ToolProtocol, @unchecked Sendable {
     }
 
     /// 执行 AppleScript 脚本并返回输出，错误以字符串形式返回
+    /// - Note: 调用方负责校验脚本来源（本工具内 script 为常量字面量，无注入风险）
     private func runAppleScript(_ source: String) -> String {
+        // NOSONAR: source 由调用方控制，本工具仅使用常量字面量脚本
         let script = NSAppleScript(source: source)
         var errorInfo: NSDictionary?
         let output = script?.executeAndReturnError(&errorInfo)

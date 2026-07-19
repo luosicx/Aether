@@ -11,7 +11,9 @@ let package = Package(
         .library(name: "AetherFoundation", targets: ["AetherFoundation"]),
         .library(name: "AetherServices", targets: ["AetherServices"]),
         .library(name: "AetherDesign", targets: ["AetherDesign"]),
-        .library(name: "AetherUI", targets: ["AetherUI"])
+        .library(name: "AetherUI", targets: ["AetherUI"]),
+        // Task 24: AetherSDK 顶层入口，依赖 AetherServices / AetherFoundation / AetherRust
+        .library(name: "AetherSDK", targets: ["AetherSDK"])
     ],
     dependencies: [],
     targets: [
@@ -38,9 +40,21 @@ let package = Package(
             name: "AetherUI",
             dependencies: ["AetherDesign", "AetherFoundation"]
         ),
+        // Task 24 阶段 1: AetherSDK target，作为第三方集成的统一入口
+        .target(
+            name: "AetherSDK",
+            dependencies: ["AetherFoundation", "AetherServices", "AetherRust"],
+            path: "Sources/AetherSDK"
+        ),
         .testTarget(
             name: "AetherCoreTests",
             dependencies: ["AetherFoundation", "AetherServices", "AetherDesign", "AetherUI"]
+        ),
+        // Task 24 阶段 1: AetherSDK 单元测试
+        .testTarget(
+            name: "AetherSDKTests",
+            dependencies: ["AetherSDK", "AetherFoundation", "AetherServices"],
+            path: "Tests/AetherSDKTests"
         )
     ]
 )

@@ -1,4 +1,5 @@
 import Foundation
+import AetherFoundation
 
 /// MCP 资源管理服务。
 ///

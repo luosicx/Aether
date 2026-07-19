@@ -27,7 +27,8 @@ final class DeviceInfoTool: ToolProtocol, @unchecked Sendable {
     /// 返回多行设备信息字符串。
     /// - iOS：UIDevice 读取型号/版本/电量，FileManager 读取可用存储
     /// - macOS：ProcessInfo 读取 OS 版本，电量返回 "不适用"，存储同上
-    func execute(arguments: [String: Any]) async throws -> String {
+    /// - Note: `arguments` 由协议要求，本工具不读取参数（无入参），故忽略。
+    func execute(arguments _: [String: Any]) async throws -> String {
         let model = deviceModel()
         let osVersion = systemVersion()
         let battery = batteryPercentage()

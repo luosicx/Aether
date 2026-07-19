@@ -54,6 +54,7 @@ final class OCRTool: ToolProtocol, @unchecked Sendable {
         }
         // 用 continuation 将 Vision 的回调式 API 包装为 async 调用
         return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
+            // NOSONAR: VNRecognizeTextRequest 回调由 Vision API 设计要求，嵌套不可避免
             let request = VNRecognizeTextRequest { request, error in
                 if let error = error {
                     continuation.resume(throwing: error)

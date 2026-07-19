@@ -223,7 +223,7 @@ final class VoiceService: NSObject {
 @MainActor
 extension VoiceService: @preconcurrency AVSpeechSynthesizerDelegate {
     /// 自然结束才触发 onSpeakFinished。试听结束不触发回调。
-    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+    func speechSynthesizer(_: AVSpeechSynthesizer, didFinish _: AVSpeechUtterance) {
         Task { @MainActor [weak self] in
             guard let self = self else { return }
             // 试听结束：仅清理 isPreviewing，不触发主流程回调
@@ -240,7 +240,7 @@ extension VoiceService: @preconcurrency AVSpeechSynthesizerDelegate {
     /// 区分用户主动停止与系统取消：
     /// - 用户主动停止（stopSpeaking 触发）：不触发 onSpeakFinished，toggleSpeak 已同步清理 speakingMessageId
     /// - 系统取消（音频被抢占/voice 不可用）：兜底触发 onSpeakFinished 清理 speakingMessageId，避免按钮卡红
-    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
+    func speechSynthesizer(_: AVSpeechSynthesizer, didCancel _: AVSpeechUtterance) {
         Task { @MainActor [weak self] in
             guard let self = self else { return }
             let wasPreview = self.isCurrentPreview

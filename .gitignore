@@ -40,3 +40,8 @@ node_modules/
 # macOS Finder 复制产物（" 2" 后缀重复文件）
 * 2.*
 * 2
+
+# 构建产物（xcframework / Android）
+Packages/AetherCore/aether_core.xcframework/
+android/.gradle/
+android/local.properties
