@@ -244,4 +244,130 @@ final class HierarchicalDecomposerTests: XCTestCase {
             }
         }
     }
+
+    // MARK: - 深度耗尽
+
+    /// maxDepth=1 时复杂目标不再递归分解，叶子节点 depth == 1。
+    /// canDecompose(depth: 1) 返回 false，shouldDecompose 直接返回 false，
+    /// 含"并且"的复杂子任务不再递归，作为叶子收集在 depth=1。
+    func testDecomposeDepthExhaustion() async throws {
+        let rules = HeuristicRules(maxDepth: 1, maxWidth: 8, maxTotalCount: 50)
+        let shallowDecomposer = HierarchicalDecomposer(goalDecomposer: goalDecomposer, rules: rules)
+        mockLLM.responses = [complexSubTasksJSON]
+
+        let subTasks = try await shallowDecomposer.decompose(goal: "深度耗尽测试")
+
+        XCTAssertEqual(mockLLM.chatCallCount, 1, "maxDepth=1 时复杂目标不应递归分解")
+        XCTAssertEqual(subTasks.count, 1, "应只收集到一个叶子节点")
+        XCTAssertEqual(subTasks[0].depth, 1, "叶子节点深度应为 1")
+    }
+
+    // MARK: - LLM 返回空数组与 emptyDecomposition
+
+    /// LLM 返回空数组时的行为验证：
+    /// - 场景 1: LLM 返回 "[]"，GoalDecomposer 抛 .noSubTasks，
+    ///   HierarchicalDecomposer 捕获后降级为单叶子节点（不抛 .emptyDecomposition）。
+    /// - 场景 2: maxTotalCount=0 时 collected 为空，decompose 抛 .emptyDecomposition。
+    func testDecomposeLLMReturnsEmptyArrayThrows() async throws {
+        // 场景 1: LLM 返回空数组 — 降级为单叶子节点
+        mockLLM.responses = ["[]"]
+        let subTasks = try await decomposer.decompose(goal: "空数组测试")
+        XCTAssertEqual(subTasks.count, 1, "LLM 返回空数组时应降级为单叶子节点")
+        XCTAssertEqual(subTasks[0].depth, 1)
+
+        // 场景 2: maxTotalCount=0 时 collected 为空，触发 .emptyDecomposition
+        let zeroMock = MockLLMProvider()
+        zeroMock.responses = [simpleSubTasksJSON]
+        let zeroDecomposer = HierarchicalDecomposer(
+            goalDecomposer: GoalDecomposer(llmProvider: zeroMock),
+            rules: HeuristicRules(maxDepth: 3, maxWidth: 8, maxTotalCount: 0)
+        )
+        XCTAssertThrowsError(try await zeroDecomposer.decompose(goal: "零上限测试")) { error in
+            guard let error = error as? HierarchicalDecomposer.DecomposeError,
+                  case .emptyDecomposition = error else {
+                XCTFail("应抛出 .emptyDecomposition，实际：\(error)")
+                return
+            }
+        }
+    }
+
+    // MARK: - 总数截断
+
+    /// 总数超限时 decompose 截断到 maxTotalCount。
+    /// 构造 maxTotalCount=3 的 rules，LLM 返回 5 个子任务，
+    /// 由于 collected.count + siblings.count 超限，提前返回并截断到 3 个。
+    func testDecomposeTruncatesToMaxTotalCount() async throws {
+        let fiveSubTasksJSON = """
+        [
+          {"title": "T1", "description": "d1", "dependencies": [], "toolName": null, "order": 0},
+          {"title": "T2", "description": "d2", "dependencies": [0], "toolName": null, "order": 1},
+          {"title": "T3", "description": "d3", "dependencies": [1], "toolName": null, "order": 2},
+          {"title": "T4", "description": "d4", "dependencies": [2], "toolName": null, "order": 3},
+          {"title": "T5", "description": "d5", "dependencies": [3], "toolName": null, "order": 4}
+        ]
+        """
+        let rules = HeuristicRules(maxDepth: 3, maxWidth: 8, maxTotalCount: 3)
+        let smallLimitDecomposer = HierarchicalDecomposer(goalDecomposer: goalDecomposer, rules: rules)
+        mockLLM.responses = [fiveSubTasksJSON]
+
+        let subTasks = try await smallLimitDecomposer.decompose(goal: "总数截断测试")
+
+        XCTAssertLessThanOrEqual(subTasks.count, 3, "应截断到 maxTotalCount=3")
+    }
+
+    // MARK: - 宽度截断
+
+    /// applyHeuristics 按深度分组截断宽度，每组 ≤ maxWidth。
+    /// 构造 10 个 depth=1 的无依赖子任务，maxWidth=3，
+    /// 校验结果按 depth 分组后每组数量 ≤ 3。
+    func testApplyHeuristicsTruncatesWidthByDepth() throws {
+        let rules = HeuristicRules(maxDepth: 3, maxWidth: 3, maxTotalCount: 50)
+        let smallWidthDecomposer = HierarchicalDecomposer(goalDecomposer: goalDecomposer, rules: rules)
+        // 构造 10 个 depth=1 的无依赖子任务
+        let subTasks = (0..<10).map { i in SubTask(title: "T\(i)", order: i) }
+
+        let result = try smallWidthDecomposer.applyHeuristics(to: subTasks)
+
+        let byDepth = Dictionary(grouping: result, by: \.depth)
+        for (_, group) in byDepth {
+            XCTAssertLessThanOrEqual(group.count, 3, "每组子任务数应 ≤ maxWidth=3")
+        }
+        XCTAssertLessThanOrEqual(result.count, 3, "总结果数应 ≤ maxWidth=3")
+    }
+
+    // MARK: - 跨层依赖继承
+
+    /// 第二层第一个子任务的 dependencies 应包含父节点的依赖。
+    /// 构造两层分解：第一层 sub1(简单) + sub2(含"并且"，触发递归)，
+    /// sub2 经 generateSiblingDependencies 后依赖 sub1.id；
+    /// 递归进入第二层时 parentDependencies=[sub1.id]，
+    /// 第二层第一个子任务 child1 继承 parentDependencies。
+    func testDecomposeInheritsParentDependencies() async throws {
+        let layer1JSON = """
+        [
+          {"title": "简单任务", "description": "简单", "dependencies": [], "toolName": null, "order": 0},
+          {"title": "复杂任务", "description": "做A并且做B", "dependencies": [0], "toolName": null, "order": 1}
+        ]
+        """
+        let layer2JSON = """
+        [
+          {"title": "子A", "description": "做A", "dependencies": [], "toolName": null, "order": 0},
+          {"title": "子B", "description": "做B", "dependencies": [0], "toolName": null, "order": 1}
+        ]
+        """
+        mockLLM.responses = [layer1JSON, layer2JSON]
+
+        let subTasks = try await decomposer.decompose(goal: "继承依赖测试")
+
+        let depth1Tasks = subTasks.filter { $0.depth == 1 }
+        let depth2Tasks = subTasks.filter { $0.depth == 2 }
+
+        XCTAssertEqual(depth1Tasks.count, 1, "应有一个 depth=1 的子任务（简单任务；复杂任务被递归分解，不再保留）")
+        XCTAssertEqual(depth2Tasks.count, 2, "应有两个 depth=2 的子任务")
+
+        // 第二层第一个子任务的 dependencies 应包含父节点的依赖（即第一层第一个子任务的 ID）
+        let parentID = depth1Tasks[0].id
+        XCTAssertTrue(depth2Tasks[0].dependencies.contains(parentID),
+                      "第二层第一个子任务的 dependencies 应包含父节点的依赖")
+    }
 }

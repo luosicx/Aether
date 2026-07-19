@@ -254,6 +254,263 @@ final class MCPDiscoveryServiceTests: XCTestCase {
 
         service.stopScanning()
     }
+
+    // MARK: - 7. TXT Record trust 字段解析（local / lan）
+
+    /// TXT record trust=local 应解析为 .local 信任档位，触发 .allow 自动连接（不进入候选列表）。
+    @MainActor
+    func testTXTRecordTrustLocalParsed() async throws {
+        let mockBrowser = MockServiceBrowser()
+        let manager = MCPClientManager(clientFactory: { config in
+            MockMCPClient(config: config)
+        })
+        let service = MCPDiscoveryService(
+            manager: manager,
+            browserFactory: { mockBrowser },
+            scanIntervalSec: 60
+        )
+
+        service.startScanning()
+        mockBrowser.simulateDiscovery(
+            DiscoveredService(
+                name: "local-trust-srv",
+                hostName: "192.168.1.200",
+                port: 3000,
+                txtRecord: ["trust": "local"]
+            )
+        )
+        // 等待自动连接 Task 完成（.local → .allow → connect）
+        try await Task.sleep(nanoseconds: 300_000_000)
+
+        // trust=local → resolveTrustBoundary 返回 .local → decision=.allow → 自动连接
+        // 不进入候选列表，candidateTrustBoundaries 不存储
+        XCTAssertEqual(manager.candidateServers.count, 0, "trust=local 应自动连接，不进入候选列表")
+        XCTAssertNil(manager.getCandidateTrustBoundary(serverID: "local-trust-srv"),
+                     "local 信任档位不存储在 candidateTrustBoundaries")
+        // 自动连接应成功（MockMCPClient 默认连接成功）
+        XCTAssertEqual(manager.serverInfos["local-trust-srv"]?.status, .connected,
+                       "trust=local 应触发自动连接并连接成功")
+
+        service.stopScanning()
+    }
+
+    /// TXT record trust=lan 应解析为 .lan 信任档位，进入候选列表待用户确认。
+    @MainActor
+    func testTXTRecordTrustLanParsed() async throws {
+        let mockBrowser = MockServiceBrowser()
+        let manager = MCPClientManager(clientFactory: { config in
+            MockMCPClient(config: config)
+        })
+        let service = MCPDiscoveryService(
+            manager: manager,
+            browserFactory: { mockBrowser },
+            scanIntervalSec: 60
+        )
+
+        service.startScanning()
+        mockBrowser.simulateDiscovery(
+            DiscoveredService(
+                name: "lan-trust-srv",
+                hostName: "203.0.113.5",
+                port: 3000,
+                txtRecord: ["trust": "lan"]
+            )
+        )
+        try await Task.sleep(nanoseconds: 200_000_000)
+
+        // trust=lan → resolveTrustBoundary 返回 .lan → decision=requireConfirmation → 进入候选列表
+        XCTAssertEqual(manager.getCandidateTrustBoundary(serverID: "lan-trust-srv"), .lan,
+                       "trust=lan 应映射到 lan 信任档位")
+
+        service.stopScanning()
+    }
+
+    // MARK: - 8. isPrivateHost 缺省信任判定（无 TXT trust 字段）
+
+    /// hostName="localhost" 应判定为私有网络 → .lan。
+    @MainActor
+    func testDefaultTrustFromLocalhost() async throws {
+        let mockBrowser = MockServiceBrowser()
+        let manager = MCPClientManager(clientFactory: { config in
+            MockMCPClient(config: config)
+        })
+        let service = MCPDiscoveryService(
+            manager: manager,
+            browserFactory: { mockBrowser },
+            scanIntervalSec: 60
+        )
+
+        service.startScanning()
+        mockBrowser.simulateDiscovery(
+            DiscoveredService(
+                name: "localhost-srv",
+                hostName: "localhost",
+                port: 3000,
+                txtRecord: [:]
+            )
+        )
+        try await Task.sleep(nanoseconds: 200_000_000)
+
+        XCTAssertEqual(manager.getCandidateTrustBoundary(serverID: "localhost-srv"), .lan,
+                       "localhost 应判定为私有网络 → lan")
+
+        service.stopScanning()
+    }
+
+    /// hostName="127.0.0.1"（127.x.x.x 回环 subnet）应判定为 .lan。
+    @MainActor
+    func testDefaultTrustFrom127Subnet() async throws {
+        let mockBrowser = MockServiceBrowser()
+        let manager = MCPClientManager(clientFactory: { config in
+            MockMCPClient(config: config)
+        })
+        let service = MCPDiscoveryService(
+            manager: manager,
+            browserFactory: { mockBrowser },
+            scanIntervalSec: 60
+        )
+
+        service.startScanning()
+        mockBrowser.simulateDiscovery(
+            DiscoveredService(
+                name: "loopback-srv",
+                hostName: "127.0.0.1",
+                port: 3000,
+                txtRecord: [:]
+            )
+        )
+        try await Task.sleep(nanoseconds: 200_000_000)
+
+        XCTAssertEqual(manager.getCandidateTrustBoundary(serverID: "loopback-srv"), .lan,
+                       "127.x.x.x 回环地址应判定为 lan")
+
+        service.stopScanning()
+    }
+
+    /// hostName="10.0.0.5"（10.x.x.x 私有 subnet）应判定为 .lan。
+    @MainActor
+    func testDefaultTrustFrom10Subnet() async throws {
+        let mockBrowser = MockServiceBrowser()
+        let manager = MCPClientManager(clientFactory: { config in
+            MockMCPClient(config: config)
+        })
+        let service = MCPDiscoveryService(
+            manager: manager,
+            browserFactory: { mockBrowser },
+            scanIntervalSec: 60
+        )
+
+        service.startScanning()
+        mockBrowser.simulateDiscovery(
+            DiscoveredService(
+                name: "ten-subnet-srv",
+                hostName: "10.0.0.5",
+                port: 3000,
+                txtRecord: [:]
+            )
+        )
+        try await Task.sleep(nanoseconds: 200_000_000)
+
+        XCTAssertEqual(manager.getCandidateTrustBoundary(serverID: "ten-subnet-srv"), .lan,
+                       "10.x.x.x 私有地址应判定为 lan")
+
+        service.stopScanning()
+    }
+
+    /// hostName 为 172.16-31.x.x 应判定为 .lan；172.32.x.x 不在私有范围 → .internet。
+    @MainActor
+    func testDefaultTrustFrom172Subnet() async throws {
+        let mockBrowser = MockServiceBrowser()
+        let manager = MCPClientManager(clientFactory: { config in
+            MockMCPClient(config: config)
+        })
+        let service = MCPDiscoveryService(
+            manager: manager,
+            browserFactory: { mockBrowser },
+            scanIntervalSec: 60
+        )
+
+        service.startScanning()
+        // 172.16.0.1 — 私有范围下界
+        mockBrowser.simulateDiscovery(
+            DiscoveredService(
+                name: "172-16-srv",
+                hostName: "172.16.0.1",
+                port: 3000,
+                txtRecord: [:]
+            )
+        )
+        // 172.31.255.255 — 私有范围上界
+        mockBrowser.simulateDiscovery(
+            DiscoveredService(
+                name: "172-31-srv",
+                hostName: "172.31.255.255",
+                port: 3000,
+                txtRecord: [:]
+            )
+        )
+        // 172.32.0.1 — 私有范围之外
+        mockBrowser.simulateDiscovery(
+            DiscoveredService(
+                name: "172-32-srv",
+                hostName: "172.32.0.1",
+                port: 3000,
+                txtRecord: [:]
+            )
+        )
+        try await Task.sleep(nanoseconds: 300_000_000)
+
+        XCTAssertEqual(manager.getCandidateTrustBoundary(serverID: "172-16-srv"), .lan,
+                       "172.16.x.x 应判定为 lan（私有范围下界）")
+        XCTAssertEqual(manager.getCandidateTrustBoundary(serverID: "172-31-srv"), .lan,
+                       "172.31.x.x 应判定为 lan（私有范围上界）")
+        XCTAssertEqual(manager.getCandidateTrustBoundary(serverID: "172-32-srv"), .internet,
+                       "172.32.x.x 不在私有范围，应判定为 internet")
+
+        service.stopScanning()
+    }
+
+    /// hostName 为非 IPv4 格式（abc / 1.2.3）应判定为 .internet。
+    @MainActor
+    func testDefaultTrustFromNonIPv4Host() async throws {
+        let mockBrowser = MockServiceBrowser()
+        let manager = MCPClientManager(clientFactory: { config in
+            MockMCPClient(config: config)
+        })
+        let service = MCPDiscoveryService(
+            manager: manager,
+            browserFactory: { mockBrowser },
+            scanIntervalSec: 60
+        )
+
+        service.startScanning()
+        // 非法主机名（无 IPv4 段）
+        mockBrowser.simulateDiscovery(
+            DiscoveredService(
+                name: "non-ip-srv",
+                hostName: "abc",
+                port: 3000,
+                txtRecord: [:]
+            )
+        )
+        // 段数不足 4 的地址
+        mockBrowser.simulateDiscovery(
+            DiscoveredService(
+                name: "short-ip-srv",
+                hostName: "1.2.3",
+                port: 3000,
+                txtRecord: [:]
+            )
+        )
+        try await Task.sleep(nanoseconds: 300_000_000)
+
+        XCTAssertEqual(manager.getCandidateTrustBoundary(serverID: "non-ip-srv"), .internet,
+                       "非 IPv4 主机名应判定为 internet")
+        XCTAssertEqual(manager.getCandidateTrustBoundary(serverID: "short-ip-srv"), .internet,
+                       "段数不足 4 的地址应判定为 internet")
+
+        service.stopScanning()
+    }
 }
 
 // MARK: - Mock ServiceBrowser

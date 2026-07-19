@@ -628,4 +628,242 @@ final class AgentOrchestratorTests: XCTestCase {
         let orchestrator = makeOrchestrator()
         XCTAssertFalse(orchestrator.enableReview, "enableReview 默认应为 false")
     }
+
+    // MARK: - Task 20: 用户干预（skipFailedNode / retryFailedNode / cancelTaskIntervention）
+
+    /// skipFailedNode：跳过失败节点，并级联跳过下游 pending 节点
+    ///
+    /// 设置 s0 与 s1 均为 failed，跳过 s0 后：
+    /// - s0 直接变 skipped（skipFailedNode 直接修改）
+    /// - s2 因 s1 仍为 failed，被 cascadeSkipFailed 级联标记为 skipped
+    /// - s1 仍为 failed（未被本操作处理）
+    func testSkipFailedNodeIntervention() async throws {
+        // 创建链式依赖任务 s0 → s1 → s2
+        mockLLM.responses = [chainedSubTasksJSON]
+        let orchestrator = makeOrchestrator()
+        let task = try await orchestrator.startTask(goal: "干预测试")
+
+        // 预先标记 s0 与 s1 为 failed（模拟级联失败，便于验证 cascadeSkipFailed 触发的级联跳过）
+        let s0 = task.subTasks[0]
+        let s1 = task.subTasks[1]
+        _ = task.updateSubTaskStatus(id: s0.id, status: .failed, result: "执行失败")
+        _ = task.updateSubTaskStatus(id: s1.id, status: .failed, result: "执行失败")
+
+        // 调用 skipFailedNode 跳过 s0
+        try await orchestrator.skipFailedNode(nodeID: s0.id)
+
+        // 验证 s0 状态变为 skipped（直接跳过）
+        XCTAssertEqual(task.subTasks[0].status, .skipped, "s0 应被跳过")
+        // 验证 s2 因 s1 仍为 failed 被级联跳过（cascadeSkipFailed 触发）
+        XCTAssertEqual(task.subTasks[2].status, .skipped, "s2 应被级联跳过")
+        // s1 仍为 failed（未被本操作跳过）
+        XCTAssertEqual(task.subTasks[1].status, .failed, "s1 仍应为 failed")
+
+        // 验证状态已持久化
+        let fetched = try context.fetch(FetchDescriptor<AgentTask>())
+        XCTAssertEqual(fetched.first?.subTasks[0].status, .skipped, "skipped 状态应已持久化")
+        XCTAssertEqual(fetched.first?.subTasks[2].status, .skipped, "级联 skipped 状态应已持久化")
+    }
+
+    /// retryFailedNode：重试失败节点，第二次 mock 返回成功，验证状态变为 completed
+    func testRetryFailedNodeInterventionSucceeds() async throws {
+        // responses: [分解, 重试执行结果]
+        mockLLM.responses = [chainedSubTasksJSON, "重试结果"]
+        let orchestrator = makeOrchestrator()
+        let task = try await orchestrator.startTask(goal: "重试测试")
+
+        // 预先标记 s0 为 failed（模拟首次执行失败）
+        let s0 = task.subTasks[0]
+        _ = task.updateSubTaskStatus(id: s0.id, status: .failed, result: "首次失败")
+
+        // 调用 retryFailedNode 重试（mock 返回 "重试结果"）
+        try await orchestrator.retryFailedNode(nodeID: s0.id)
+
+        // 验证 s0 状态变为 completed，结果为重试结果
+        XCTAssertEqual(task.subTasks[0].status, .completed, "s0 重试后应已完成")
+        XCTAssertEqual(task.subTasks[0].result, "重试结果", "s0 结果应为重试结果")
+
+        // 验证状态已持久化
+        let fetched = try context.fetch(FetchDescriptor<AgentTask>())
+        XCTAssertEqual(fetched.first?.subTasks[0].status, .completed, "completed 状态应已持久化")
+        XCTAssertEqual(fetched.first?.subTasks[0].result, "重试结果")
+    }
+
+    /// cancelTaskIntervention：取消整个任务，所有 pending 子任务变为 skipped
+    func testCancelTaskIntervention() async throws {
+        mockLLM.responses = [chainedSubTasksJSON]
+        let orchestrator = makeOrchestrator()
+        let task = try await orchestrator.startTask(goal: "取消测试")
+
+        // 调用 cancelTaskIntervention
+        try await orchestrator.cancelTaskIntervention()
+
+        // 验证所有 pending 子任务变为 skipped
+        for (i, sub) in task.subTasks.enumerated() {
+            XCTAssertEqual(sub.status, .skipped, "子任务 \(i) 应变为 skipped")
+        }
+        // 验证任务状态为 cancelled
+        XCTAssertEqual(task.status, .cancelled, "任务应标记为 cancelled")
+
+        // 验证状态已持久化
+        let fetched = try context.fetch(FetchDescriptor<AgentTask>())
+        XCTAssertEqual(fetched.first?.status, .cancelled, "cancelled 状态应已持久化")
+    }
+
+    /// 无 currentTask 时调用三个干预方法均抛 .noActiveTask
+    func testSkipRetryCancelWithoutTaskThrows() async {
+        let orchestrator = makeOrchestrator()
+        let dummyID = UUID()
+
+        // skipFailedNode 无任务时应抛 .noActiveTask
+        do {
+            try await orchestrator.skipFailedNode(nodeID: dummyID)
+            XCTFail("skipFailedNode 无任务时应抛错")
+        } catch let error as AgentOrchestrator.OrchestratorError {
+            if case .noActiveTask = error { /* 预期 */ } else {
+                XCTFail("skipFailedNode 应抛 .noActiveTask")
+            }
+        } catch {
+            XCTFail("skipFailedNode 应抛 OrchestratorError")
+        }
+
+        // retryFailedNode 无任务时应抛 .noActiveTask
+        do {
+            try await orchestrator.retryFailedNode(nodeID: dummyID)
+            XCTFail("retryFailedNode 无任务时应抛错")
+        } catch let error as AgentOrchestrator.OrchestratorError {
+            if case .noActiveTask = error { /* 预期 */ } else {
+                XCTFail("retryFailedNode 应抛 .noActiveTask")
+            }
+        } catch {
+            XCTFail("retryFailedNode 应抛 OrchestratorError")
+        }
+
+        // cancelTaskIntervention 无任务时应抛 .noActiveTask
+        do {
+            try await orchestrator.cancelTaskIntervention()
+            XCTFail("cancelTaskIntervention 无任务时应抛错")
+        } catch let error as AgentOrchestrator.OrchestratorError {
+            if case .noActiveTask = error { /* 预期 */ } else {
+                XCTFail("cancelTaskIntervention 应抛 .noActiveTask")
+            }
+        } catch {
+            XCTFail("cancelTaskIntervention 应抛 OrchestratorError")
+        }
+    }
+
+    // MARK: - Task 20: 检查点恢复
+
+    /// loadCheckpointForResume：检查点标记完成但子任务状态未同步时，init 后状态被修正为 completed
+    func testLoadCheckpointForResumeWithCheckpoint() throws {
+        // 预插入 inProgress 任务，含检查点但子任务状态未同步
+        let task = AgentTask(goal: "检查点恢复测试")
+        task.markInProgress()
+        let s1 = SubTask(title: "已完成步骤", order: 0)
+        let s2 = SubTask(title: "待执行步骤", order: 1)
+        task.updateSubTasks([s1, s2])
+        // s1 实际状态保持 pending（模拟数据不一致）
+        // 设置检查点：checkpointAt != nil，completedNodeIDs 包含 s1.id
+        task.recordCheckpoint(completedIDs: [s1.id])
+        context.insert(task)
+        try context.save()
+
+        // 初始化 orchestrator，应自动恢复并修正状态
+        let orchestrator = makeOrchestrator()
+        XCTAssertNotNil(orchestrator.currentTask, "应自动恢复 inProgress 任务")
+        // 验证 s1 状态被修正为 completed
+        XCTAssertEqual(orchestrator.currentTask?.subTasks[0].status, .completed,
+                       "s1 状态应被修正为 completed")
+        // s2 不在 completedNodeIDs 中，保持 pending
+        XCTAssertEqual(orchestrator.currentTask?.subTasks[1].status, .pending,
+                       "s2 应保持 pending")
+    }
+
+    // MARK: - executeNext 工具执行路径
+
+    /// executeNext 子任务带 toolName 时走 executeWithTool 路径（区别于 executeAll 走 toolCoordinator）
+    func testExecuteNextWithToolSubTask() async throws {
+        mockLLM.responses = [toolSubTasksJSON]
+        let orchestrator = makeOrchestrator()
+        let task = try await orchestrator.startTask(goal: "工具执行（executeNext）")
+
+        // 调用 executeNext 执行工具子任务（非 executeAll）
+        try await orchestrator.executeNext()
+
+        // get_current_time 工具应返回时间字符串
+        let result = task.subTasks.first?.result ?? ""
+        XCTAssertFalse(result.isEmpty, "工具执行结果不应为空")
+        XCTAssertEqual(task.subTasks.first?.status, .completed, "子任务应已完成")
+        // DateTimeTool 返回格式 "yyyy-MM-dd HH:mm:ss ZZZZ"
+        XCTAssertTrue(result.contains("-"), "时间结果应包含日期分隔符")
+    }
+
+    // MARK: - executeAll 死锁处理
+
+    /// executeAll 处理引擎死锁：自环依赖导致 .noExecutableSubTask，任务标记为 failed
+    func testExecuteAllHandlesEngineDeadlock() async throws {
+        // 构造自环依赖子任务（s0 依赖自身 ID）
+        let task = AgentTask(goal: "死锁测试")
+        task.markInProgress()
+        var s0 = SubTask(title: "自环节点", order: 0)
+        s0.dependencies = [s0.id]  // 自环依赖
+        task.updateSubTasks([s0])
+        context.insert(task)
+        try context.save()
+
+        // 初始化 orchestrator，自动恢复 inProgress 任务
+        let orchestrator = makeOrchestrator()
+        XCTAssertNotNil(orchestrator.currentTask, "应自动恢复 inProgress 任务")
+
+        // 调用 executeAll，预期抛 .noExecutableSubTask
+        do {
+            try await orchestrator.executeAll()
+            XCTFail("死锁应抛 .noExecutableSubTask")
+        } catch let error as AgentOrchestrator.OrchestratorError {
+            if case .noExecutableSubTask = error { /* 预期 */ } else {
+                XCTFail("应抛 .noExecutableSubTask，实际：\(error)")
+            }
+        } catch {
+            XCTFail("应抛 OrchestratorError，实际：\(error)")
+        }
+
+        // 验证任务标记为 failed
+        XCTAssertEqual(task.status, .failed, "任务应标记为 failed")
+    }
+
+    // MARK: - executeNext 失败处理
+
+    /// executeNext 子任务执行失败时抛 .subTaskFailed，子任务状态变为 failed 并持久化
+    ///
+    /// 注：MockLLMProvider 不支持抛错，故通过 toolName 指定不存在的工具触发 executeWithTool 抛错
+    func testExecuteNextSubTaskFailureThrows() async throws {
+        // 子任务使用不存在的工具，触发 executeWithTool 抛错
+        let nonExistentToolJSON = """
+        [
+          {"title": "失败任务", "description": "调用不存在的工具", "dependencies": [], "toolName": "non_existent_tool_xyz", "order": 0}
+        ]
+        """
+        mockLLM.responses = [nonExistentToolJSON]
+        let orchestrator = makeOrchestrator()
+        let task = try await orchestrator.startTask(goal: "失败测试")
+
+        // 调用 executeNext，预期抛 .subTaskFailed
+        do {
+            try await orchestrator.executeNext()
+            XCTFail("应抛 .subTaskFailed 错误")
+        } catch let error as AgentOrchestrator.OrchestratorError {
+            if case .subTaskFailed = error { /* 预期 */ } else {
+                XCTFail("应抛 .subTaskFailed，实际：\(error)")
+            }
+        } catch {
+            XCTFail("应抛 OrchestratorError，实际：\(error)")
+        }
+
+        // 验证子任务状态为 failed
+        XCTAssertEqual(task.subTasks[0].status, .failed, "子任务应标记为 failed")
+
+        // 验证状态已持久化
+        let fetched = try context.fetch(FetchDescriptor<AgentTask>())
+        XCTAssertEqual(fetched.first?.subTasks[0].status, .failed, "失败状态应已持久化")
+    }
 }

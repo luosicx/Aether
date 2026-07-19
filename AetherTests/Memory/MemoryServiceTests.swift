@@ -343,4 +343,92 @@ final class MemoryServiceTests: XCTestCase {
     func testGetAllMemoriesEmpty() throws {
         XCTAssertEqual(try service.getAllMemories().count, 0, "空仓库应返回空数组")
     }
+
+    // MARK: - 补充覆盖：无 API Key 降级与导入路径
+
+    /// 无 Qwen Key 时 remember 仍应持久化记忆，但 embedding 为空数组（降级存储保证内容不丢失）
+    func testRememberWithoutAPIKeyStoresWithEmptyEmbedding() async throws {
+        // 重置 Keychain 后端，确保无 Qwen Key
+        KeychainManager.shared.backend = InMemoryKeychainBackend()
+
+        let memory = try await service.remember(content: "无 Key 记忆", category: "context", importance: 0.6)
+
+        XCTAssertEqual(memory.embedding, [], "无 API Key 时 embedding 应为空数组")
+        XCTAssertEqual(memory.content, "无 Key 记忆")
+        XCTAssertEqual(memory.importance, 0.6, accuracy: 0.001, "无 Key 不影响 importance 透传")
+
+        // 验证 Memory 已持久化到 SwiftData
+        let all = try service.getAllMemories()
+        XCTAssertEqual(all.count, 1, "记忆应已持久化")
+        XCTAssertEqual(all.first?.content, "无 Key 记忆")
+        XCTAssertEqual(all.first?.embedding, [], "持久化后的 embedding 应为空")
+    }
+
+    /// isUserExplicit=true 时即使传入 importance=0.3 也应被强制为 0.8（用户主动记忆默认重要）
+    func testRememberUserExplicitForcesImportance08() async throws {
+        let memory = try await service.remember(
+            content: "用户主动记忆",
+            importance: 0.3,
+            isUserExplicit: true
+        )
+
+        XCTAssertEqual(memory.importance, 0.8, accuracy: 0.001, "isUserExplicit=true 应强制 importance=0.8")
+        XCTAssertTrue(memory.isUserExplicit, "isUserExplicit 应保持为 true")
+
+        // 持久化层应同步反映 importance=0.8
+        let all = try service.getAllMemories()
+        XCTAssertEqual(all.count, 1)
+        XCTAssertEqual(all.first?.importance, 0.8, accuracy: 0.001)
+        XCTAssertTrue(all.first?.isUserExplicit ?? false)
+    }
+
+    /// 无 Qwen Key 时 recall 应直接返回空数组（不进入 embedding 路径）
+    func testRecallWithoutAPIKeyReturnsEmpty() async throws {
+        // 重置 Keychain，确保无 Qwen Key
+        KeychainManager.shared.backend = InMemoryKeychainBackend()
+
+        // 即使有带 embedding 的记忆存在，recall 也应返回空
+        let existing = Memory(content: "已有记忆", embedding: [1.0, 0.0, 0.0], category: "context")
+        context.insert(existing)
+        try context.save()
+
+        let results = try await service.recall(query: "任意查询", limit: 5)
+        XCTAssertEqual(results, [], "无 API Key 时 recall 应返回空数组")
+    }
+
+    /// 无 Qwen Key 时 generateQueryEmbedding 应返回空数组（供 RecallEngine 复用的降级语义）
+    func testGenerateQueryEmbeddingWithoutAPIKeyReturnsEmpty() async throws {
+        // 重置 Keychain，确保无 Qwen Key
+        KeychainManager.shared.backend = InMemoryKeychainBackend()
+
+        let embedding = try await service.generateQueryEmbedding(for: "查询文本")
+        XCTAssertEqual(embedding, [], "无 API Key 时 generateQueryEmbedding 应返回空数组")
+    }
+
+    /// insertImported 应保留传入 Memory 的原始 id 与 createdAt（用于跨设备恢复）
+    func testInsertImportedPersistsMemory() throws {
+        // 构造 Memory 并手动指定 id/createdAt（init 不接收这两个参数；与 ExportImporter 生产代码同模式）
+        let customID = UUID()
+        let customCreatedAt = Date(timeIntervalSince1970: 1_700_000_000)
+        let memory = Memory(
+            content: "导入记忆",
+            embedding: [0.1, 0.2, 0.3],
+            category: "fact",
+            importance: 0.7,
+            isUserExplicit: false
+        )
+        memory.id = customID
+        memory.createdAt = customCreatedAt
+
+        try service.insertImported(memory)
+
+        let all = try service.getAllMemories()
+        XCTAssertEqual(all.count, 1, "应已持久化 1 条记忆")
+        XCTAssertEqual(all.first?.id, customID, "id 应保持指定原值，不被重新生成")
+        XCTAssertEqual(all.first?.createdAt, customCreatedAt, "createdAt 应保持指定原值，不被覆盖为当前时间")
+        XCTAssertEqual(all.first?.content, "导入记忆")
+        XCTAssertEqual(all.first?.embedding, [0.1, 0.2, 0.3])
+        XCTAssertEqual(all.first?.category, "fact")
+        XCTAssertEqual(all.first?.importance, 0.7, accuracy: 0.001)
+    }
 }

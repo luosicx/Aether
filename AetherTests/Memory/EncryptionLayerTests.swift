@@ -176,4 +176,48 @@ final class EncryptionLayerTests: XCTestCase {
         let tooShort = Data([0x01, 0x02])
         XCTAssertThrowsError(try layer.decrypt(tooShort), "过短的密文应抛出错误")
     }
+
+    // MARK: - 解码失败场景
+
+    /// decryptToString 在解密成功但明文非合法 UTF-8 时应抛出 decryptionFailed。
+    /// 构造合法加密的非 UTF-8 字节序列（Data([0xFF, 0xFE])），加密后调用 decryptToString。
+    func testDecryptToStringInvalidUTF8Throws() throws {
+        layer.enable()
+        // 0xFF, 0xFE 不是合法 UTF-8 字节序列
+        let nonUTF8Bytes = Data([0xFF, 0xFE])
+        let encrypted = try layer.encrypt(nonUTF8Bytes)
+
+        XCTAssertThrowsError(try layer.decryptToString(encrypted), "非 UTF-8 明文应抛出 decryptionFailed") { error in
+            guard case EncryptionError.decryptionFailed = error else {
+                return XCTFail("应抛出 decryptionFailed，实际：\(error)")
+            }
+        }
+    }
+
+    // MARK: - Keychain 损坏数据场景
+
+    /// Keychain 中存在非密钥字节数据时，loadKeyFromKeychain 仍返回 SymmetricKey（CryptoKit 不校验大小）。
+    /// 验证 enable() 加载已存在的（损坏）数据作为密钥，不生成新密钥覆盖。
+    /// 注：CryptoKit 的 SymmetricKey(data:) 接受任意非空数据，不在初始化时校验密钥长度，
+    /// 因此 loadKeyFromKeychain 不会因数据"非密钥"而返回 nil —— 实现层未做密钥长度校验。
+    func testLoadKeyFromKeychainWithCorruptData() throws {
+        // 写入非密钥字节数据（3 字节，非合法 AES-256 密钥长度 32 字节）
+        let corruptData = Data([0x00, 0x01, 0x02])
+        try KeychainManager.shared.save(key: EncryptionLayer.keychainAccount, value: corruptData)
+
+        // 创建新 EncryptionLayer（setUp 已注入 InMemoryKeychainBackend）
+        let newLayer = EncryptionLayer()
+
+        // enable() 应加载已存在的（损坏）密钥，而非生成新密钥
+        let result = newLayer.enable()
+        XCTAssertTrue(result, "enable 应返回 true（SymmetricKey 接受任意非空数据）")
+        XCTAssertTrue(newLayer.isEnabled, "isEnabled 应为 true")
+
+        // Keychain 中应仍为原始损坏数据（未生成新密钥覆盖）
+        let storedData = KeychainManager.shared.readData(key: EncryptionLayer.keychainAccount)
+        XCTAssertEqual(storedData, corruptData, "应保留原始损坏数据，未生成新密钥")
+
+        // 清理
+        newLayer.clearKey()
+    }
 }

@@ -321,4 +321,107 @@ final class NodeStateMachineTests: XCTestCase {
         XCTAssertEqual(snapshot[ids[0]], .completed)
         XCTAssertEqual(snapshot[ids[1]], .pending)
     }
+
+    // MARK: - 非法状态迁移（补充覆盖）
+
+    /// running → skipped 应为非法迁移（仅 pending/failed 可跳过）。
+    func testIllegalTransitionInProgressToSkipped() async throws {
+        let id = UUID()
+        let sm = NodeStateMachine(nodeIDs: [id])
+        try await sm.markRunning(id)
+        do {
+            try await sm.markSkipped(id)
+            XCTFail("running → skipped 应为非法迁移")
+        } catch let error as NodeStateMachine.StateMachineError {
+            if case .illegalTransition(let from, let to, _) = error {
+                XCTAssertEqual(from, .inProgress, "源状态应为 inProgress")
+                XCTAssertEqual(to, .skipped, "目标状态应为 skipped")
+            } else {
+                XCTFail("应为 illegalTransition，实际：\(error)")
+            }
+        } catch {
+            XCTFail("应抛出 StateMachineError，实际：\(error)")
+        }
+        // 状态应保持 inProgress（迁移失败不修改状态）
+        let status = await sm.status(of: id)
+        XCTAssertEqual(status, .inProgress, "非法迁移不应改变状态")
+    }
+
+    /// skipped → completed 应为非法迁移（skipped 为终止状态，仅可 reset）。
+    func testIllegalTransitionSkippedToCompleted() async throws {
+        let id = UUID()
+        let sm = NodeStateMachine(nodeIDs: [id])
+        try await sm.markSkipped(id)
+        do {
+            try await sm.markCompleted(id)
+            XCTFail("skipped → completed 应为非法迁移")
+        } catch let error as NodeStateMachine.StateMachineError {
+            if case .illegalTransition(let from, let to, _) = error {
+                XCTAssertEqual(from, .skipped, "源状态应为 skipped")
+                XCTAssertEqual(to, .completed, "目标状态应为 completed")
+            } else {
+                XCTFail("应为 illegalTransition，实际：\(error)")
+            }
+        } catch {
+            XCTFail("应抛出 StateMachineError，实际：\(error)")
+        }
+        // 状态应保持 skipped
+        let status = await sm.status(of: id)
+        XCTAssertEqual(status, .skipped, "非法迁移不应改变状态")
+    }
+
+    /// pending → failed 应为非法迁移（必须先 running 才能 failed）。
+    func testIllegalTransitionPendingToFailed() async throws {
+        let id = UUID()
+        let sm = NodeStateMachine(nodeIDs: [id])
+        do {
+            try await sm.markFailed(id)
+            XCTFail("pending → failed 应为非法迁移（未经过 running）")
+        } catch let error as NodeStateMachine.StateMachineError {
+            if case .illegalTransition(let from, let to, _) = error {
+                XCTAssertEqual(from, .pending, "源状态应为 pending")
+                XCTAssertEqual(to, .failed, "目标状态应为 failed")
+            } else {
+                XCTFail("应为 illegalTransition，实际：\(error)")
+            }
+        } catch {
+            XCTFail("应抛出 StateMachineError，实际：\(error)")
+        }
+        // 状态应保持 pending
+        let status = await sm.status(of: id)
+        XCTAssertEqual(status, .pending, "非法迁移不应改变状态")
+    }
+
+    // MARK: - 批量注册混合场景
+
+    /// 批量注册时已存在的节点状态不应被重置，新节点应注册为 pending。
+    func testRegisterBatchWithMixedExistingAndNew() async throws {
+        let id1 = UUID()
+        let id2 = UUID()
+        let id3 = UUID()
+        let sm = NodeStateMachine(nodeIDs: [id1])
+        // 预先注册 id1 并标记为 running
+        try await sm.markRunning(id1)
+
+        // 批量注册 [id1, id2, id3]
+        await sm.register(nodeIDs: [id1, id2, id3])
+
+        // id1 状态不应被重置（仍为 inProgress）
+        let status1 = await sm.status(of: id1)
+        XCTAssertEqual(status1, .inProgress, "已存在的节点状态不应被批量注册重置")
+        // id1 的尝试次数也不应被重置
+        let count1 = await sm.attemptCount(of: id1)
+        XCTAssertEqual(count1, 1, "已存在节点的尝试次数不应被批量注册重置")
+
+        // id2、id3 应为 pending
+        let status2 = await sm.status(of: id2)
+        XCTAssertEqual(status2, .pending, "新节点应注册为 pending")
+        let status3 = await sm.status(of: id3)
+        XCTAssertEqual(status3, .pending, "新节点应注册为 pending")
+        // 新节点尝试次数应为 0
+        let count2 = await sm.attemptCount(of: id2)
+        XCTAssertEqual(count2, 0, "新节点尝试次数应为 0")
+        let count3 = await sm.attemptCount(of: id3)
+        XCTAssertEqual(count3, 0, "新节点尝试次数应为 0")
+    }
 }
