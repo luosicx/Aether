@@ -282,12 +282,16 @@ final class HierarchicalDecomposerTests: XCTestCase {
             goalDecomposer: GoalDecomposer(llmProvider: zeroMock),
             rules: HeuristicRules(maxDepth: 3, maxWidth: 8, maxTotalCount: 0)
         )
-        XCTAssertThrowsError(try await zeroDecomposer.decompose(goal: "零上限测试")) { error in
-            guard let error = error as? HierarchicalDecomposer.DecomposeError,
-                  case .emptyDecomposition = error else {
+        do {
+            _ = try await zeroDecomposer.decompose(goal: "零上限测试")
+            XCTFail("应抛出 .emptyDecomposition")
+        } catch let error as HierarchicalDecomposer.DecomposeError {
+            guard case .emptyDecomposition = error else {
                 XCTFail("应抛出 .emptyDecomposition，实际：\(error)")
                 return
             }
+        } catch {
+            XCTFail("应抛出 DecomposeError.emptyDecomposition，实际：\(error)")
         }
     }
 
