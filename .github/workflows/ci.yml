@@ -346,11 +346,22 @@ jobs:
             exit 0
           fi
           echo "Found profdata: $PROFDATA"
-          # 找到 AetherSDKTests 可执行文件（macOS 上是 .xctest bundle 内的可执行文件）
-          EXECUTABLE=$(find .build -path "*AetherSDKTests.xctest*Contents*MacOS*AetherSDKTests" -type f 2>/dev/null | head -1)
+          # 找到 AetherSDKTests 可执行文件
+          # SPM 在 macOS 上不生成 .xctest bundle，而是直接生成 Mach-O 可执行文件
+          # 路径形如 .build/arm64-apple-macosx/debug/AetherSDKTests
+          # 在 Linux 上路径形如 .build/x86_64-unknown-linux-gnu/debug/AetherSDKTests
+          # 用 -perm -0111（BSD/GNU find 兼容，表示所有 these bits set）匹配可执行权限
+          EXECUTABLE=""
+          # 优先匹配 SPM 直接生成的可执行文件
+          for candidate in $(find .build -name "AetherSDKTests" -type f 2>/dev/null); do
+            if [ -x "$candidate" ]; then
+              EXECUTABLE="$candidate"
+              break
+            fi
+          done
+          # 兜底：查找 .xctest bundle 内的可执行文件（旧 xcodebuild 路径）
           if [ -z "$EXECUTABLE" ]; then
-            # Linux/非 macOS 路径
-            EXECUTABLE=$(find .build -name "AetherSDKTests" -type f -perm +111 2>/dev/null | head -1)
+            EXECUTABLE=$(find .build -path "*AetherSDKTests.xctest*Contents*MacOS*AetherSDKTests" -type f 2>/dev/null | head -1)
           fi
           if [ -z "$EXECUTABLE" ]; then
             echo "WARNING: no AetherSDKTests executable found, skipping coverage export"
