@@ -31,12 +31,13 @@ final class AetherClientAPITests: XCTestCase {
         )
         do {
             _ = try await client.chat(messages: [.user("hi")])
-            XCTFail("应抛出 providerError")
+            XCTFail("应抛出 networkUnreachable")
         } catch let error as AetherError {
-            if case .providerError = error {
+            // 空响应表示网络故障/流提前结束，源码按可重试的 networkUnreachable 抛出
+            if case .networkUnreachable = error {
                 // 预期
             } else {
-                XCTFail("期望 providerError，实际：\(error)")
+                XCTFail("期望 networkUnreachable，实际：\(error)")
             }
         }
     }
