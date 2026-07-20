@@ -23,7 +23,7 @@ Aether Android 客户端使用 **Kotlin + Jetpack Compose + Room** 技术栈：
 | 项 | 要求 | 说明 |
 |----|------|------|
 | JDK | 17 | `sourceCompatibility` / `targetCompatibility` 均为 17 |
-| Android SDK | 34 | Build Tools 34.0.0 |
+| Android SDK | 35 | Build Tools 35.0.0 |
 | Gradle | 8.7 | **已随仓库提交 `gradlew`，无需手动安装** Gradle |
 
 > 仓库已提交 `android/gradlew` / `android/gradlew.bat` / `android/gradle/wrapper/gradle-wrapper.jar`，所有构建均通过 wrapper 执行，无需本机预装 Gradle，也无需运行 `gradle wrapper` 现场生成。
@@ -74,12 +74,12 @@ Debug APK 已使用 debug 签名，可直接 `adb install` 到设备或模拟器
 - `android/gradlew`（Unix shell 脚本）
 - `android/gradlew.bat`（Windows 批处理脚本）
 - `android/gradle/wrapper/gradle-wrapper.jar`
-- `android/gradle/wrapper/gradle-wrapper.properties`（指定 Gradle 8.7）
+- `android/gradle/wrapper/gradle-wrapper.properties`（指定 Gradle 8.10）
 
 因此：
 
 - **无需**在本机安装 Gradle
-- **无需**运行 `gradle wrapper --gradle-version 8.7` 现场生成
+- **无需**运行 `gradle wrapper --gradle-version 8.10` 现场生成
 - 构建脚本统一通过 `./gradlew --no-daemon` 调用，保证版本一致
 
 ---

@@ -73,6 +73,15 @@ extension AetherApp {
     }()
 
     /// 预构建的 ModelContainer，使用 sharedModelConfiguration。
+    ///
+    /// P1-7: 双重故障兜底策略——
+    /// 1. 优先用 sharedModelConfiguration（持久化到 SQLite）
+    /// 2. 失败时降级到 in-memory 模式（App 可运行但数据不持久化）
+    /// 3. in-memory 也失败时（系统级 SwiftData 故障，几乎不可能发生），
+    ///    上报到 CrashReportService 后 fatalError——
+    ///    因为 SwiftUI App 启动必须返回 ModelContainer，没有 ModelContainer 时 ChatView
+    ///    通过 @Environment(\.modelContext) 访问会立即崩溃，无法显示任何降级 UI。
+    ///    此 fatalError 是「无可恢复的最后一道防线」，符合 Swift fatalError 语义。
     static let sharedModelContainer: ModelContainer = {
         do {
             return try ModelContainer(
@@ -81,8 +90,8 @@ extension AetherApp {
                 configurations: AetherApp.sharedModelConfiguration
             )
         } catch {
-            // Fallback：内存模式容器，避免 throw 中断 App 启动；in-memory 几乎不会失败，
-            // 若失败则 fatalError（与 try! 等价，但避免 force_try 违规）
+            // Fallback：内存模式容器，避免 throw 中断 App 启动
+            Logger.app.error("持久化 ModelContainer 创建失败，降级到 in-memory 模式: \(error.localizedDescription, privacy: .public)")
             do {
                 return try ModelContainer(
                     for: Conversation.self, ChatMessage.self, DocumentChunk.self,
@@ -90,7 +99,14 @@ extension AetherApp {
                     configurations: ModelConfiguration(isStoredInMemoryOnly: true)
                 )
             } catch {
-                fatalError("Failed to create in-memory ModelContainer: \(error)")
+                // 双重故障：持久化 + in-memory 均失败，SwiftData 系统级故障
+                // 上报到崩溃监控便于后续定位，然后 fatalError（无法继续）
+                CrashReportService.shared.reportException(
+                    NSError(domain: "AetherApp", code: -1, userInfo: [
+                        NSLocalizedDescriptionKey: "Failed to create in-memory ModelContainer: \(error)"
+                    ])
+                )
+                fatalError("Failed to create in-memory ModelContainer (SwiftData 系统级故障): \(error)")
             }
         }
     }()

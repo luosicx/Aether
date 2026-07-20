@@ -1,5 +1,6 @@
 import Foundation
 import AetherFoundation
+import os
 
 /// MCP 资源管理服务。
 ///
@@ -31,7 +32,14 @@ final class MCPResourceService {
         for server in servers {
             guard let client = clientManager.getClient(serverID: server.id) else { continue }
             // 单个 Server 拉取失败时跳过，不中断整体聚合
-            guard let resources = try? await client.listResources() else { continue }
+            // P2-2: 将 try? 改为 do/catch + Logger.warning，便于诊断拉取失败原因
+            let resources: [MCPResource]
+            do {
+                resources = try await client.listResources()
+            } catch {
+                Logger.mcp.warning("getAllResources: listResources 失败 (server=\(server.id, privacy: .public))，已跳过：\(error.localizedDescription, privacy: .public)")
+                continue
+            }
             for resource in resources {
                 result.append((serverID: server.id, resource: resource))
             }

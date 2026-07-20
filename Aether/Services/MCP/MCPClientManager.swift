@@ -1,4 +1,5 @@
 import Foundation
+import os
 import AetherFoundation
 
 /// MCP 客户端管理器，管理多个 MCP Server 连接。
@@ -128,9 +129,28 @@ final class MCPClientManager {
             try await client.connect()
 
             // 拉取 tools / resources / prompts（单个失败不中断整体连接）
-            let allTools = (try? await client.listTools()) ?? []
-            let resources = (try? await client.listResources()) ?? []
-            let prompts = (try? await client.listPrompts()) ?? []
+            // P2-2: 将 try? 改为 do/catch + Logger.warning，便于诊断单个能力拉取失败原因
+            let allTools: [MCPTool]
+            do {
+                allTools = try await client.listTools()
+            } catch {
+                Logger.mcp.warning("listTools 失败 (server=\(config.id, privacy: .public))，已降级为空数组：\(error.localizedDescription, privacy: .public)")
+                allTools = []
+            }
+            let resources: [MCPResource]
+            do {
+                resources = try await client.listResources()
+            } catch {
+                Logger.mcp.warning("listResources 失败 (server=\(config.id, privacy: .public))，已降级为空数组：\(error.localizedDescription, privacy: .public)")
+                resources = []
+            }
+            let prompts: [MCPPrompt]
+            do {
+                prompts = try await client.listPrompts()
+            } catch {
+                Logger.mcp.warning("listPrompts 失败 (server=\(config.id, privacy: .public))，已降级为空数组：\(error.localizedDescription, privacy: .public)")
+                prompts = []
+            }
 
             // 速率限制：截断到 100 个工具
             let cappedCount = ToolRateLimiter.cappedRegisterCount(toolCount: allTools.count)
@@ -307,6 +327,7 @@ final class MCPClientManager {
                         connectedCount += 1
                     } catch {
                         // 连接失败不中断后续 Server，错误状态已记录到 serverInfos
+                        Logger.mcp.warning("批量连接 Server 失败 (serverID=\(server.id, privacy: .public)): \(error.localizedDescription, privacy: .public)")
                     }
                 }
             case .requireConfirmation:
@@ -337,6 +358,7 @@ final class MCPClientManager {
             try await connect(config: server.toMCPConfig())
         } catch {
             // 连接失败：状态已记录，保留在 approvedServerIDs 避免重复弹窗
+            Logger.mcp.warning("批准后连接 Server 失败 (serverID=\(serverID, privacy: .public)): \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -380,6 +402,7 @@ final class MCPClientManager {
                     try await self.connect(config: server.toMCPConfig())
                 } catch {
                     // 连接失败不阻塞发现流程
+                    Logger.mcp.warning("发现流程: 已批准 Server 连接失败 (serverID=\(server.id, privacy: .public)): \(error.localizedDescription, privacy: .public)")
                 }
             }
             return
@@ -394,6 +417,7 @@ final class MCPClientManager {
                     try await self.connect(config: server.toMCPConfig())
                 } catch {
                     // 连接失败不阻塞发现流程
+                    Logger.mcp.warning("发现流程: local 边界 Server 连接失败 (serverID=\(server.id, privacy: .public)): \(error.localizedDescription, privacy: .public)")
                 }
             }
         case .requireConfirmation:

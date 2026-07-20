@@ -4,9 +4,13 @@ import AetherFoundation
 /// Day 13: Qwen（阿里云百炼 DashScope）API 客户端，实现 LLMProvider 协议。
 /// 通过 OpenAI 兼容模式端点提供 chat 流式对话和 embed 向量嵌入能力。
 /// nonisolated 设计允许跨 actor 调用。
+///
+/// P1-8: 原实现 `private lazy var session: URLSession = .shared` 在 nonisolated + @unchecked Sendable 类中
+/// 跨 actor 首次访问存在数据竞争。URLSession.shared 是线程安全的全局常量，无需 lazy 延迟初始化，
+/// 改为 `let` 后由编译器保证线程安全。
 nonisolated public final class QwenClient: LLMProvider, @unchecked Sendable {
-    /// URLSession 实例，lazy 加载默认用 .shared
-    private lazy var session: URLSession = .shared
+    /// URLSession 实例（URLSession.shared 线程安全，无需 lazy）
+    private let session: URLSession = .shared
     /// SSE 流解析器
     private let parser = SSEParser()
     /// 当前 client 对应的供应商（取 baseURL / endpoints / models 的统一入口）

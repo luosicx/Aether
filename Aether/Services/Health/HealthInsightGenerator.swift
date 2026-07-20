@@ -11,13 +11,16 @@ import AetherServices
 /// - macOS: 注入 nil（无健康数据，跳过健康上下文）
 ///
 /// 设计要点：
-/// - 用 `actor` 隔离，避免与主线程共享 ModelContext 引发数据竞争
+/// - 用 `@MainActor` 隔离：ModelContext 非 Sendable，必须在创建它的 actor 上访问；
+///   App 主流程（AetherApp-iOS BGTask、HealthSettingsView）创建的 ModelContext 均在 MainActor，
+///   故此处与主线程对齐，避免跨 actor 访问违反 SwiftData 隔离规则。
 /// - 通过工厂方法 `make(modelContext:)` 注入默认 LLMProvider 与 HealthDataSource
 /// - 生成完成后追加免责声明，并通过 `sendInsightNotification` 推送本地通知
-actor HealthInsightGenerator {
+@MainActor
+final class HealthInsightGenerator {
     /// LLM 供应商，用于生成洞察文本
     private let llmProvider: LLMProvider
-    /// SwiftData 上下文，用于持久化 HealthInsight
+    /// SwiftData 上下文，用于持久化 HealthInsight（必须在 MainActor 上访问）
     private let modelContext: ModelContext
     /// 健康数据源（平台无关协议）。nil 时使用空数据跳过健康上下文（macOS 默认）
     private let dataSource: HealthDataSource?
@@ -94,7 +97,9 @@ actor HealthInsightGenerator {
 
     /// 发送洞察生成的本地通知（1 秒后触发）
     /// - Parameter insight: 生成的 HealthInsight
-    nonisolated func sendInsightNotification(_ insight: HealthInsight) {
+    /// - Note: 因类整体 `@MainActor` 隔离，调用方需在 MainActor 上下文或使用 `await`。
+    ///   通知提交本身是异步的，UI 线程不会阻塞。
+    func sendInsightNotification(_ insight: HealthInsight) {
         let content = UNMutableNotificationContent()
         content.title = NSLocalizedString("健康洞察已生成", comment: "")
         // 通知正文取洞察内容前 80 字符（避免过长）
@@ -121,6 +126,8 @@ actor HealthInsightGenerator {
     }
 
     /// 构造发送给 LLM 的 prompt，包含聚合后的健康数据与请求建议的指令。
+    /// - Note: 标注为非 MainActor 隔离以便未来在长耗时 LLM 调用前以 `Task.detached` 提前计算，
+    ///   参数均为 Sendable 值类型，无需 actor 隔离。
     private nonisolated func constructPrompt(heartRate: [Date: Double], sleep: [Date: Double], steps: [Date: Int], days: Int) -> String {
         var lines: [String] = []
         lines.append(String(format: NSLocalizedString("以下是最近 %d 天的健康数据：", comment: ""), days))

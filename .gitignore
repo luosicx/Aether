@@ -1,6 +1,10 @@
 # 临时脚本(pbxproj 注册/路径修复一次性脚本)
 *.rb
 
+# Python 字节码缓存
+__pycache__/
+*.pyc
+
 # 临时文件
 *.tmp
 

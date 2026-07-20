@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import os
 import AetherFoundation
 
 /// Task 10/11/12: Agent 任务编排引擎。
@@ -22,8 +23,14 @@ final class AgentOrchestrator {
         case noActiveTask
         /// 没有可执行的子任务
         case noExecutableSubTask
-        /// 子任务执行失败，携带子任务 ID 与原因
+        /// 子任务执行失败，携带子任务 ID 与原因（向后兼容变体，不保留原始 Error 上下文）
         case subTaskFailed(UUID, String)
+        /// 子任务执行失败，携带子任务 ID、原因与底层错误。
+        /// - Parameters:
+        ///   - id: 子任务 ID
+        ///   - reason: 用户可见的错误信息（通常为 `error.localizedDescription`）
+        ///   - underlying: 原始底层错误，保留用于诊断
+        case subTaskFailedWithCause(id: UUID, reason: String, underlying: Error)
         /// 审查未通过，携带子任务 ID 与原因
         case reviewFailed(UUID, String)
 
@@ -34,6 +41,8 @@ final class AgentOrchestrator {
             case .noExecutableSubTask:
                 return "没有可执行的子任务"
             case .subTaskFailed(let id, let reason):
+                return "子任务 \(id) 执行失败：\(reason)"
+            case .subTaskFailedWithCause(let id, let reason, _):
                 return "子任务 \(id) 执行失败：\(reason)"
             case .reviewFailed(let id, let reason):
                 return "子任务 \(id) 审查未通过：\(reason)"
@@ -68,7 +77,12 @@ final class AgentOrchestrator {
         )
         // 进度回调：每节点完成时持久化
         engine.onProgress = { [weak self] task in
-            try? self?.modelContext.save()
+            do {
+                try self?.modelContext.save()
+            } catch {
+                // 进度持久化失败：检查点机制会在下次 flush 时重试，但日志需可见
+                Logger.agent.error("DAG 进度回调 modelContext.save 失败 (taskID=\(task.id, privacy: .public)): \(error.localizedDescription, privacy: .public)")
+            }
         }
         // 节点失败回调：可由上层订阅触发 UI 干预
         engine.onNodeFailed = { _ in
@@ -102,7 +116,13 @@ final class AgentOrchestrator {
         self.agentConfig = agentConfig
 
         // Task 11.2: 启动时检查并恢复未完成的任务
-        try? resumeInProgressTask()
+        do {
+            try resumeInProgressTask()
+        } catch {
+            // 启动恢复失败：不阻塞 AgentOrchestrator 初始化，记录日志便于排查
+            // 用户视角：未完成任务不会自动续执行，但可手动从历史记录中恢复
+            Logger.agent.error("启动恢复未完成任务失败 (用户可手动从历史记录恢复): \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     // MARK: - Task 10: 任务编排
@@ -383,7 +403,8 @@ final class AgentOrchestrator {
             // 执行失败：更新状态并持久化
             _ = task.updateSubTaskStatus(id: subTask.id, status: .failed, result: error.localizedDescription)
             try modelContext.save()
-            throw OrchestratorError.subTaskFailed(subTask.id, error.localizedDescription)
+            // P2-3: 携带 underlying 保留原始 Error 上下文
+            throw OrchestratorError.subTaskFailedWithCause(id: subTask.id, reason: error.localizedDescription, underlying: error)
         }
 
         // 更新结果并标记完成

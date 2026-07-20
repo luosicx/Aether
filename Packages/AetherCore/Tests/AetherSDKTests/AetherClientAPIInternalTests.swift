@@ -286,10 +286,11 @@ final class AetherClientAPIInternalTests: XCTestCase {
 
 // MARK: - Throwing RAGProvider
 
-final class ThrowingRAGProvider: AetherRAGProvider, @unchecked Sendable {
-    let error: Error
+/// Generic 错误抛出 stub：约束 E: Error & Sendable，编译器自动推断 Sendable
+final class ThrowingRAGProvider<E: Error & Sendable>: AetherRAGProvider {
+    let error: E
 
-    init(error: Error) {
+    init(error: E) {
         self.error = error
     }
 

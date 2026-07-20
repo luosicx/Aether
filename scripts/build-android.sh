@@ -123,7 +123,7 @@ ensure_gradlew() {
     if [ ! -x "$GRADLEW" ]; then
         if [ ! -f "$GRADLEW" ]; then
             log_error "未找到 gradlew: $GRADLEW"
-            log_error "请运行: cd android && gradle wrapper --gradle-version 8.7"
+            log_error "请运行: cd android && gradle wrapper --gradle-version 8.10"
         else
             log_error "gradlew 不可执行: $GRADLEW"
             log_error "请运行: chmod +x $GRADLEW"

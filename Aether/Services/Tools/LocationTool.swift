@@ -9,11 +9,21 @@ import CoreLocation
 import AetherFoundation
 
 /// 定位相关错误
-private enum LocationError: Error {
+private enum LocationError: Error, LocalizedError {
     /// 未授权
     case notAuthorized
     /// 定位超时
     case timeout
+
+    /// 用户可见的错误描述（中文本地化）。
+    var errorDescription: String? {
+        switch self {
+        case .notAuthorized:
+            return NSLocalizedString("定位权限未授权，请在系统设置中允许", comment: "")
+        case .timeout:
+            return NSLocalizedString("定位请求超时（10 秒未收到结果）", comment: "")
+        }
+    }
 }
 
 /// 获取设备地理位置与逆地理编码结果的工具。
@@ -108,11 +118,16 @@ final class LocationTool: ToolProtocol, @unchecked Sendable {
 // MARK: - LocationFetcher
 
 /// CLLocationManager 的 async 封装。通过 CheckedContinuation 把基于 delegate 的定位
-/// 转为 async 调用，并附带 10 秒超时。所有对 continuation 与 manager 的访问均在主线程进行，
-/// 与 CLLocationManagerDelegate 回调线程一致，避免数据竞争。
+/// 转为 async 调用，并附带 10 秒超时。
+///
+/// 线程安全：continuation 通过 NSLock 保护，避免 `DispatchQueue.main.async` 设置与
+/// delegate 回调 resume 之间的数据竞争。`CLLocationManager` 必须在主线程访问，
+/// 故 `requestLocation()` 内部仍 hop 到主线程发起请求。
 private final class LocationFetcher: NSObject, CLLocationManagerDelegate, @unchecked Sendable {
     private let manager = CLLocationManager()
     private var continuation: CheckedContinuation<CLLocation, Error>?
+    /// continuation 访问锁（与 main.async 双保险）
+    private let lock = NSLock()
 
     override init() {
         super.init()
@@ -125,7 +140,9 @@ private final class LocationFetcher: NSObject, CLLocationManagerDelegate, @unche
         try await withCheckedThrowingContinuation { cont in
             // 在主线程设置 continuation 并发起请求，确保与 delegate 回调同线程
             DispatchQueue.main.async {
+                self.lock.lock()
                 self.continuation = cont
+                self.lock.unlock()
                 self.manager.requestWhenInUseAuthorization()
                 self.manager.requestLocation()
             }
@@ -136,21 +153,31 @@ private final class LocationFetcher: NSObject, CLLocationManagerDelegate, @unche
     }
 
     /// 安全地 resume returning（防重复 resume 导致崩溃）
-    /// 统一在 DispatchQueue.main 上执行，与 continuation 的设置线程一致，避免数据竞争
+    /// 持锁读取并清空 continuation，与 requestLocation() / resume(throwing:) 串行化
     private func resume(returning location: CLLocation) {
         DispatchQueue.main.async {
-            guard let continuation = self.continuation else { return }
+            self.lock.lock()
+            guard let continuation = self.continuation else {
+                self.lock.unlock()
+                return
+            }
             self.continuation = nil
+            self.lock.unlock()
             continuation.resume(returning: location)
         }
     }
 
     /// 安全地 resume throwing（防重复 resume 导致崩溃）
-    /// 统一在 DispatchQueue.main 上执行，与 continuation 的设置线程一致，避免数据竞争
+    /// 持锁读取并清空 continuation，与 requestLocation() / resume(returning:) 串行化
     private func resume(throwing error: Error) {
         DispatchQueue.main.async {
-            guard let continuation = self.continuation else { return }
+            self.lock.lock()
+            guard let continuation = self.continuation else {
+                self.lock.unlock()
+                return
+            }
             self.continuation = nil
+            self.lock.unlock()
             continuation.resume(throwing: error)
         }
     }

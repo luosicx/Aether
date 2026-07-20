@@ -6,6 +6,10 @@ import AetherFoundation
 /// 覆盖鉴权、限流、上游错误、网络、工具、RAG、配置与端侧推理 8 类场景。
 /// 所有 case 均 `Sendable`；`toolExecutionFailed` 携带 `LocalizedError` 字符串化错误以保持 Sendable 安全。
 /// 遵循 `Equatable`：单测中可用 `XCTAssertEqual(error as? AetherError, .networkUnreachable)` 断言具体 case。
+///
+/// P2-3 上下文丢失修复：新增 `ragRetrievalFailedWithCause(reason:underlying:)` 变体，
+/// 在保留 `ragRetrievalFailed(reason:)` 向后兼容的同时，允许调用方携带原始底层 Error 用于诊断。
+/// 由于 `Error` 不一定 `Equatable`，自定义 `==` 实现仅比较 `reason`，忽略 `underlying`。
 public enum AetherError: Error, Sendable, LocalizedError, Equatable {
     /// 鉴权失败（HTTP 401 / token 无效 / 签名错误）
     case authFailed(reason: String)
@@ -17,8 +21,13 @@ public enum AetherError: Error, Sendable, LocalizedError, Equatable {
     case networkUnreachable
     /// 工具执行失败，携带工具名与底层错误描述
     case toolExecutionFailed(name: String, errorDescription: String)
-    /// RAG 检索失败
+    /// RAG 检索失败（向后兼容变体，不保留原始 Error 上下文）
     case ragRetrievalFailed(reason: String)
+    /// RAG 检索失败，携带原因与底层错误。
+    /// - Parameters:
+    ///   - reason: 用户可见的错误信息（通常为 `error.localizedDescription`）
+    ///   - underlying: 原始底层错误，保留用于诊断（不参与 Equatable 判等）
+    case ragRetrievalFailedWithCause(reason: String, underlying: Error)
     /// 配置无效（apiKey 缺失 / baseURL 非法 / 模型名空等）
     case invalidConfig(reason: String)
     /// 端侧推理失败（包装 `OnDeviceError`）
@@ -39,10 +48,40 @@ public enum AetherError: Error, Sendable, LocalizedError, Equatable {
             return String(format: NSLocalizedString("工具 %@ 执行失败：%@", comment: ""), name, desc)
         case .ragRetrievalFailed(let reason):
             return String(format: NSLocalizedString("知识库检索失败：%@", comment: ""), reason)
+        case .ragRetrievalFailedWithCause(let reason, _):
+            return String(format: NSLocalizedString("知识库检索失败：%@", comment: ""), reason)
         case .invalidConfig(let reason):
             return String(format: NSLocalizedString("配置无效：%@", comment: ""), reason)
         case .onDeviceInferenceFailed(let error):
             return error.errorDescription
+        }
+    }
+
+    /// 自定义 Equatable 实现。
+    /// `ragRetrievalFailedWithCause` 仅比较 `reason`，忽略 `underlying` Error
+    /// （Error 不一定 Equatable，无法参与判等）。
+    public static func == (lhs: AetherError, rhs: AetherError) -> Bool {
+        switch (lhs, rhs) {
+        case (.authFailed(let l), .authFailed(let r)):
+            return l == r
+        case (.rateLimited(let l), .rateLimited(let r)):
+            return l == r
+        case (.providerError(let lc, let lm), .providerError(let rc, let rm)):
+            return lc == rc && lm == rm
+        case (.networkUnreachable, .networkUnreachable):
+            return true
+        case (.toolExecutionFailed(let ln, let ld), .toolExecutionFailed(let rn, let rd)):
+            return ln == rn && ld == rd
+        case (.ragRetrievalFailed(let l), .ragRetrievalFailed(let r)):
+            return l == r
+        case (.ragRetrievalFailedWithCause(let l, _), .ragRetrievalFailedWithCause(let r, _)):
+            return l == r
+        case (.invalidConfig(let l), .invalidConfig(let r)):
+            return l == r
+        case (.onDeviceInferenceFailed(let l), .onDeviceInferenceFailed(let r)):
+            return l == r
+        default:
+            return false
         }
     }
 

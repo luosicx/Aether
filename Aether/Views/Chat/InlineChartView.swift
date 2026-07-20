@@ -167,14 +167,14 @@ struct InlineChartView: View {
                 }
 
                 // 绘制填充区域
-                if points.count >= 2 {
+                if points.count >= 2, let lastPoint = points.last {
                     Path { path in
                         path.move(to: CGPoint(x: points[0].x, y: chartHeight))
                         path.addLine(to: points[0])
                         for i in 1..<points.count {
                             path.addLine(to: points[i])
                         }
-                        path.addLine(to: CGPoint(x: points.last!.x, y: chartHeight))
+                        path.addLine(to: CGPoint(x: lastPoint.x, y: chartHeight))
                         path.closeSubpath()
                     }
                     .fill(

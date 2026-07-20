@@ -140,7 +140,14 @@ final class ChatStorage {
         let descriptor = FetchDescriptor<Conversation>(
             sortBy: [SortDescriptor(\.createdAt, order: .forward)]
         )
-        guard let all = try? modelContext.fetch(descriptor) else { return [] }
+        // P2-2: 将 try? 改为 do/catch + Logger.warning，便于诊断 fetch 失败原因
+        let all: [Conversation]
+        do {
+            all = try modelContext.fetch(descriptor)
+        } catch {
+            Logger.storage.warning("fetchChildConversations: fetch 失败，已降级为空数组：\(error.localizedDescription, privacy: .public)")
+            return []
+        }
         return all.filter { $0.parentConversationID == conversationID }
     }
 
@@ -181,7 +188,14 @@ final class ChatStorage {
     /// 清理无消息的空对话（messages 为空），避免会话列表堆积空对话
     func cleanupEmptyConversations() {
         let descriptor = FetchDescriptor<Conversation>()
-        guard let allConversations = try? modelContext.fetch(descriptor) else { return }
+        // P2-2: 将 try? 改为 do/catch + Logger.warning，便于诊断 fetch 失败原因
+        let allConversations: [Conversation]
+        do {
+            allConversations = try modelContext.fetch(descriptor)
+        } catch {
+            Logger.storage.warning("cleanupEmptyConversations: fetch 失败，已跳过清理：\(error.localizedDescription, privacy: .public)")
+            return
+        }
         for conv in allConversations where conv.messages.isEmpty {
             let convId = conv.id
             modelContext.delete(conv)
@@ -293,7 +307,15 @@ final class ChatStorage {
 }
 
 /// Task 21: 分叉操作错误类型
-enum ForkError: Error {
+enum ForkError: Error, LocalizedError {
     /// 分叉点消息在父对话中不存在
     case messageNotFound
+
+    /// 用户可见的错误描述（中文本地化）。
+    var errorDescription: String? {
+        switch self {
+        case .messageNotFound:
+            return NSLocalizedString("分叉点消息在父对话中不存在", comment: "")
+        }
+    }
 }

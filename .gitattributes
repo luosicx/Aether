@@ -1,0 +1,107 @@
+# Git 属性配置（P1-13 / H-C2）
+# 标准化行尾、文件类型识别、diff/merge 行为
+# 详见：https://git-scm.com/docs/gitattributes
+
+# 默认所有文本文件使用 LF 行尾（跨平台一致性）
+* text=auto eol=lf
+
+# 显式标记文本文件（避免误判）
+*.swift        text eol=lf diff=swift
+*.rs           text eol=lf diff=rust
+*.js           text eol=lf
+*.mjs          text eol=lf
+*.cjs          text eol=lf
+*.ts           text eol=lf
+*.jsx          text eol=lf
+*.tsx          text eol=lf
+*.kt           text eol=lf
+*.kts          text eol=lf
+*.java         text eol=lf
+*.py           text eol=lf
+*.sh           text eol=lf
+*.yml          text eol=lf
+*.yaml         text eol=lf
+*.json         text eol=lf
+*.xml          text eol=lf
+*.html         text eol=lf
+*.css          text eol=lf
+*.md           text eol=lf
+*.txt          text eol=lf
+*.toml         text eol=lf
+*.properties   text eol=lf
+*.ini          text eol=lf
+*.cfg          text eol=lf
+*.gitignore    text eol=lf
+*.gitattributes text eol=lf
+Makefile       text eol=lf
+Dockerfile     text eol=lf
+*.env          text eol=lf
+
+# Windows 专用脚本保留 CRLF
+*.bat          text eol=crlf
+*.cmd          text eol=crlf
+*.ps1          text eol=crlf
+
+# 二进制文件（不做行尾转换、不显示 diff）
+*.png          binary
+*.jpg          binary
+*.jpeg         binary
+*.gif          binary
+*.ico          binary
+*.icns         binary
+*.pdf          binary
+*.zip          binary
+*.gz           binary
+*.tar          binary
+*.tgz          binary
+*.jar          binary
+*.war          binary
+*.dylib        binary
+*.so           binary
+*.dll          binary
+*.a            binary
+*.o            binary
+*.obj          binary
+*.exe          binary
+*.bin          binary
+*.dat          binary
+*.db           binary
+*.sqlite       binary
+*.wasm         binary
+*.framework    binary
+
+# Xcode 资源
+*.xcassets     binary
+*.xcframework  binary
+*.xib          binary
+*.storyboard   binary
+*.nib          binary
+
+# macOS / iOS 资源
+*.plist        text eol=lf
+*.entitlements text eol=lf
+*.xcprivacy    text eol=lf
+*.xcstrings    text eol=lf
+*.xcscheme     text eol=lf
+*.xib          binary
+*.strings      text eol=lf
+
+# 证书与密钥（不应提交，但显式标记为 binary 防止误提交时泄露）
+*.pem          binary
+*.cer          binary
+*.crt          binary
+*.key          binary
+*.p12          binary
+*.mobileprovision binary
+
+# 锁文件（合并时保留本地版本，避免冲突）
+Package.resolved merge=ours
+package-lock.json merge=ours
+Cargo.lock      merge=ours
+gradle.lockfile merge=ours
+
+# 大文件（标记为 binary 并设置 diff=ldriff 避免内存爆炸）
+*.xcresult     binary -diff
+*.ipa          binary -diff
+*.dmg          binary -diff
+*.app          binary -diff

@@ -7,6 +7,11 @@ import AetherRustC
 /// `aether-core` token-bucket（连续 refill，每秒按比例补充）。
 /// 调用方传入当前时间戳，避免 Rust 侧依赖 `std::time::Instant`
 /// （WASM32 不可用）。
+///
+/// 线程安全契约：实例应仅在单一 actor 中使用（如 `RateLimiter` actor 持有
+/// `chatBucket` / `embedBucket`）。跨 actor 共享需在调用点加 NSLock，
+/// 否则并发 `acquire` 会导致令牌计数错乱（可能突破限流上限）。
+/// Rust FFI 层（`aether_rate_limiter_acquire`）未加 Mutex，依赖外部串行化。
 public final class AetherRustTokenBucket: @unchecked Sendable {
     private let state: OpaquePointer
 

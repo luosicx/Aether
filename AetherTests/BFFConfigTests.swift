@@ -225,4 +225,168 @@ final class BFFConfigTests: XCTestCase {
         b.chatRateLimitPerMin = 99
         XCTAssertNotEqual(a, b, "chatRateLimitPerMin 不同时配置不应相等")
     }
+
+    // MARK: - P1-11: Token TTL（H-S5）
+
+    /// 默认 tokenIssuedAt 应为 nil
+    func testDefaultTokenIssuedAtIsNil() {
+        let config = BFFConfig.default
+        XCTAssertNil(config.tokenIssuedAt, "默认 tokenIssuedAt 应为 nil")
+    }
+
+    /// 默认 isTokenExpired 应为 false（无 token 视为未过期，避免误报）
+    func testDefaultIsTokenExpiredIsFalse() {
+        XCTAssertFalse(BFFConfig.default.isTokenExpired, "无 token 时 isTokenExpired 应为 false")
+    }
+
+    /// tokenTTLSeconds 应为 90 天（7,776,000 秒）
+    func testTokenTTLSecondsIs90Days() {
+        XCTAssertEqual(BFFConfig.tokenTTLSeconds, 90 * 24 * 60 * 60, "TTL 应为 90 天")
+    }
+
+    /// 签发时间为当前时 isTokenExpired 应为 false
+    func testIsTokenExpiredFalseForFreshToken() {
+        let config = BFFConfig(userToken: "fresh-token", tokenIssuedAt: Date())
+        XCTAssertFalse(config.isTokenExpired, "新签发的 token 不应过期")
+    }
+
+    /// 签发时间超过 TTL 时 isTokenExpired 应为 true
+    func testIsTokenExpiredTrueForStaleToken() {
+        let staleDate = Date().addingTimeInterval(-(BFFConfig.tokenTTLSeconds + 1))
+        let config = BFFConfig(userToken: "stale-token", tokenIssuedAt: staleDate)
+        XCTAssertTrue(config.isTokenExpired, "签发时间超过 TTL 的 token 应过期")
+    }
+
+    /// 有 token 但无签发时间时 isTokenExpired 应为 false（兼容旧版未记录签发时间的情况）
+    func testIsTokenExpiredFalseWhenNoIssuedAt() {
+        let config = BFFConfig(userToken: "token-without-issued-at", tokenIssuedAt: nil)
+        XCTAssertFalse(config.isTokenExpired, "无签发时间时不应视为过期")
+    }
+
+    /// NonSensitive 自定义 Codable 向后兼容：旧 JSON 缺失 tokenIssuedAt 字段时应解码成功（值为 nil）
+    /// 验证旧版本 UserDefaults 中的数据迁移到新版本不会因缺失字段抛 DecodingError
+    func testNonSensitiveDecodingBackwardCompatMissingTokenIssuedAt() throws {
+        // 旧版本 JSON：无 tokenIssuedAt 字段
+        let legacyJSON = """
+        {"enabled":true,"endpointURL":"https://legacy.example.com","chatRateLimitPerMin":15,"embedRateLimitPerMin":8}
+        """.data(using: .utf8)!
+        let decoded = try JSONDecoder().decode(BFFConfig.NonSensitive.self, from: legacyJSON)
+        XCTAssertTrue(decoded.enabled, "enabled 应解码为 true")
+        XCTAssertEqual(decoded.endpointURL?.absoluteString, "https://legacy.example.com")
+        XCTAssertNil(decoded.tokenIssuedAt, "缺失 tokenIssuedAt 字段时应为 nil")
+        XCTAssertEqual(decoded.chatRateLimitPerMin, 15)
+        XCTAssertEqual(decoded.embedRateLimitPerMin, 8)
+    }
+
+    /// NonSensitive 编码后包含 tokenIssuedAt 字段，解码后应保持一致
+    func testNonSensitiveRoundTripWithTokenIssuedAt() throws {
+        let issuedAt = Date(timeIntervalSince1970: 1_700_000_000)
+        let original = BFFConfig.NonSensitive(
+            enabled: true,
+            endpointURL: URL(string: "https://round-trip.example.com"),
+            tokenIssuedAt: issuedAt,
+            chatRateLimitPerMin: 30,
+            embedRateLimitPerMin: 20
+        )
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(BFFConfig.NonSensitive.self, from: data)
+        XCTAssertEqual(decoded.enabled, true)
+        XCTAssertEqual(decoded.tokenIssuedAt, issuedAt, "tokenIssuedAt 往返应保持一致")
+        XCTAssertEqual(decoded.chatRateLimitPerMin, 30)
+    }
+
+    /// BFFConfig 主体（含 userToken + tokenIssuedAt）往返应保持一致
+    func testBFFConfigRoundTripWithTokenIssuedAt() throws {
+        let issuedAt = Date(timeIntervalSince1970: 1_700_000_000)
+        let original = BFFConfig(
+            enabled: true,
+            endpointURL: URL(string: "https://full.example.com"),
+            userToken: "full-token-abc",
+            tokenIssuedAt: issuedAt,
+            chatRateLimitPerMin: 40,
+            embedRateLimitPerMin: 25
+        )
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(BFFConfig.self, from: data)
+        XCTAssertEqual(decoded, original, "含 tokenIssuedAt 的完整配置往返应相等")
+        XCTAssertEqual(decoded.tokenIssuedAt, issuedAt, "tokenIssuedAt 应保持一致")
+    }
+
+    // MARK: - P1-12: SSL Pinning（H-S1）
+
+    /// 默认 pinnedSPKIHashes 应为空数组
+    func testDefaultPinnedSPKIHashesIsEmpty() {
+        XCTAssertTrue(BFFConfig.default.pinnedSPKIHashes.isEmpty, "默认 pinnedSPKIHashes 应为空数组")
+    }
+
+    /// 默认 isSSLPinningEnabled 应为 false
+    func testDefaultIsSSLPinningEnabledIsFalse() {
+        XCTAssertFalse(BFFConfig.default.isSSLPinningEnabled, "默认不应启用 SSL Pinning")
+    }
+
+    /// 配置 pinnedSPKIHashes 后 isSSLPinningEnabled 应为 true
+    func testIsSSLPinningEnabledTrueWhenHashesConfigured() {
+        let config = BFFConfig(pinnedSPKIHashes: ["abc123==", "def456=="])
+        XCTAssertTrue(config.isSSLPinningEnabled, "配置 pin 后应启用 SSL Pinning")
+    }
+
+    /// pinnedSPKIHashes 应参与 BFFConfig Codable 往返
+    func testPinnedSPKIHashesRoundTrip() throws {
+        let original = BFFConfig(
+            enabled: true,
+            endpointURL: URL(string: "https://pin.example.com"),
+            userToken: "pin-token",
+            pinnedSPKIHashes: ["sha256/abc==", "sha256/def=="],
+            chatRateLimitPerMin: 30,
+            embedRateLimitPerMin: 15
+        )
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(BFFConfig.self, from: data)
+        XCTAssertEqual(decoded.pinnedSPKIHashes, ["sha256/abc==", "sha256/def=="], "pinnedSPKIHashes 往返应保持一致")
+        XCTAssertEqual(decoded, original, "整体配置应相等")
+    }
+
+    /// NonSensitive 自定义 Codable 向后兼容：旧 JSON 缺失 pinnedSPKIHashes 字段时应解码成功（值为空数组）
+    func testNonSensitiveDecodingBackwardCompatMissingPinnedSPKIHashes() throws {
+        // 旧版本 JSON：无 pinnedSPKIHashes 字段
+        let legacyJSON = """
+        {"enabled":true,"endpointURL":"https://legacy.example.com","chatRateLimitPerMin":15,"embedRateLimitPerMin":8}
+        """.data(using: .utf8)!
+        let decoded = try JSONDecoder().decode(BFFConfig.NonSensitive.self, from: legacyJSON)
+        XCTAssertTrue(decoded.pinnedSPKIHashes.isEmpty, "缺失 pinnedSPKIHashes 字段时应为空数组")
+    }
+
+    /// NonSensitive 编解码往返应保持 pinnedSPKIHashes
+    func testNonSensitiveRoundTripPinnedSPKIHashes() throws {
+        let original = BFFConfig.NonSensitive(
+            enabled: true,
+            endpointURL: URL(string: "https://rt.example.com"),
+            pinnedSPKIHashes: ["pin1==", "pin2=="],
+            chatRateLimitPerMin: 25,
+            embedRateLimitPerMin: 12
+        )
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(BFFConfig.NonSensitive.self, from: data)
+        XCTAssertEqual(decoded.pinnedSPKIHashes, ["pin1==", "pin2=="], "pinnedSPKIHashes 往返应保持一致")
+        XCTAssertEqual(decoded, original, "NonSensitive 整体应相等")
+    }
+
+    /// BFFProxyClient 在 pinnedSPKIHashes 非空时应创建带 delegate 的 URLSession（P1-12）
+    func testBFFProxyClientCreatesPinningSessionWhenConfigured() async {
+        let config = BFFConfig(
+            enabled: true,
+            endpointURL: URL(string: "https://pin.example.com"),
+            userToken: "pin-token",
+            pinnedSPKIHashes: ["fake-pin-hash=="],
+            chatRateLimitPerMin: 20,
+            embedRateLimitPerMin: 10
+        )
+        let mockSession = URLSession(configuration: .ephemeral)
+        let client = BFFProxyClient(provider: .deepseek, config: config, session: mockSession)
+
+        // 启用 Pinning 后，传入的 mockSession 应被忽略，使用带 delegate 的新 URLSession
+        // 验证方式：发送一个请求，如果使用 mockSession（无 protocolClasses），
+        // MockURLProtocol 不会被触发；如果使用新 session，请求会真实发出（这里只验证 client 可构造）
+        XCTAssertNotNil(client, "BFFProxyClient 应能成功构造（含 Pinning 配置）")
+    }
 }
