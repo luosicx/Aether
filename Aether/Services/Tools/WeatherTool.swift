@@ -50,6 +50,8 @@ final class WeatherTool: ToolProtocol, @unchecked Sendable {
                     return "未找到城市：\(trimmedCity)"
                 case .network(let message):
                     return "天气查询失败：\(message)"
+                case .networkWithCause(let reason, _):
+                    return "天气查询失败：\(reason)"
                 }
             }
         } else {
