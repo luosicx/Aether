@@ -108,9 +108,7 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 45
     outputs:
-      sign-mode:
-        description: 'Signing mode (signed or unsigned)'
-        value: ${{ steps.sign-mode.outputs.mode }}
+      sign-mode: ${{ steps.sign-mode.outputs.mode }}
     steps:
       - uses: actions/checkout@v5
 
