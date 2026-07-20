@@ -641,9 +641,10 @@ jobs:
   unit-tests-macos:
     needs: rust-apple
     runs-on: macos-15
-    # M-C13: 原 90 分钟过长（iOS unit-tests 仅 45 分钟），macOS 单测规模与 iOS 相当。
-    #        60 分钟足够覆盖 macOS-specific tools + 跨平台测试，超时通常是卡死需排查。
-    timeout-minutes: 60
+    # M-C13: macOS 单测规模与 iOS 相当（实测 ~57 分钟），但 CI runner 性能波动大。
+    #        原 60 分钟 margin 仅 3 分钟，实测偶发超时 cancelled（run 29783239627）。
+    #        90 分钟给足 buffer，避免性能波动导致误判失败；若持续接近 90 分钟需排查卡死。
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v5
 
