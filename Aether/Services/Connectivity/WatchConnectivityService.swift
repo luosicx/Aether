@@ -1,6 +1,5 @@
 import Foundation
 import os
-import os.locking
 
 #if os(iOS)
 import WatchConnectivity
