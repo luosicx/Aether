@@ -1,5 +1,5 @@
 import Foundation
-import os.locking
+import os
 import AetherFoundation
 
 /// Day 13: 自动降级装饰器。主 provider 抛 LLMError 时自动用备用 provider 重试一次。

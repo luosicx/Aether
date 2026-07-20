@@ -1,5 +1,5 @@
 import Foundation
-import os.locking
+import os
 #if os(iOS)
 import UIKit
 #else
