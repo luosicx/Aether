@@ -108,8 +108,10 @@ final class CertificatePinningDelegate: NSObject, URLSessionDelegate, @unchecked
             return nil
         }
         // 获取 DER 编码的公钥
-        var error: CFError?
-        guard let publicKeyData = SecKeyCopyExternalRepresentation(publicKey, &error) as Data? else {
+        // 注意：Xcode 26+ SDK 中 SecKeyCopyExternalRepresentation 的 error 参数类型
+        // 从 UnsafeMutablePointer<CFError?> 变为 UnsafeMutablePointer<Unmanaged<CFError>?>，
+        // 此处不需要错误详情，直接传 nil 即可。
+        guard let publicKeyData = SecKeyCopyExternalRepresentation(publicKey, nil) as Data? else {
             return nil
         }
         // 计算 SHA256 hash
