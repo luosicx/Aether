@@ -77,7 +77,7 @@
 
 ### 2.3 产物
 
-- 路径：`build/dmg/Aether-{version}-unsigned.dmg`
+- 路径：`build/dmg/Aether-macOS-{version}-unsigned.dmg`
 - 用途：**仅本地测试用**，不可公开分发
 
 ### 2.4 用户安装方式
@@ -132,7 +132,7 @@ export TEAM_ID="TEAMID"
 
 ### 3.4 产物
 
-- 路径：`build/dmg/Aether-{version}.dmg`
+- 路径：`build/dmg/Aether-macOS-{version}.dmg`
 - 用途：可直接公开分发，Gatekeeper 放行
 
 ### 3.5 提示
@@ -149,14 +149,14 @@ export TEAM_ID="TEAMID"
 
 | 模式 | 文件名 |
 | --- | --- |
-| 签名模式 | `Aether-{版本}.dmg` |
-| 无签名模式 | `Aether-{版本}-unsigned.dmg` |
+| 签名模式 | `Aether-macOS-{版本}.dmg` |
+| 无签名模式 | `Aether-macOS-{版本}-unsigned.dmg` |
 
 ### 4.2 输出目录
 
 ```
 build/dmg/
-└── Aether-{version}[-unsigned].dmg
+└── Aether-macOS-{version}[-unsigned].dmg
 ```
 
 ### 4.3 DMG 元信息
@@ -260,7 +260,7 @@ codesign -dvvv --verbose=4 Aether.app
 
 ```bash
 gh release create v{version} \
-  build/dmg/Aether-{version}.dmg \
+  build/dmg/Aether-macOS-{version}.dmg \
   --title "Aether v{version}" \
   --notes "Release notes"
 ```
@@ -269,43 +269,48 @@ gh release create v{version} \
 
 ```bash
 gh release create v{version} \
-  build/dmg/Aether-{version}.dmg \
+  build/dmg/Aether-macOS-{version}.dmg \
   --title "Aether v{version}" \
   --notes-file doc/CHANGELOG.md
 ```
 
-### 6.2 CI 集成思路（可选）
+### 6.2 CI 自动集成（release.yml）
 
-> 本节为可选方案，不在当前 spec 实现范围内。
+`release.yml` 的 `build-macos` job 已自动判断签名模式，无需手动配置 workflow 文件。在仓库 Settings → Secrets and variables → Actions 中配置以下 4 个 secrets 即可启用签名与公证：
 
-在 `.github/workflows/ci.yml` 新增 `macos-dmg` job，实现自动化打包与发布：
+| Secret | 说明 |
+| --- | --- |
+| `DEVELOPER_ID_APPLICATION` | 签名身份，如 `Developer ID Application: Your Name (TEAMID)` |
+| `APPLE_ID` | Apple ID 账号邮箱 |
+| `APP_SPECIFIC_PASSWORD` | 在 https://appleid.apple.com 生成的 App-Specific Password |
+| `TEAM_ID` | Apple Developer Team ID |
 
-1. **新增 job**：在 `.github/workflows/ci.yml` 中新增 `macos-dmg` job，使用 `macos-14` 或更高版本的 runner
-2. **注入 Secrets**：在 GitHub repo Settings → Secrets and variables → Actions 中配置：
-   - `DEVELOPER_ID_APPLICATION`
-   - `APPLE_ID`
-   - `APP_SPECIFIC_PASSWORD`
-   - `TEAM_ID`
-3. **导入签名证书**：将 Developer ID 证书以 base64 编码存入 Secrets，在 job 中解码并导入钥匙串
-4. **执行打包**：
-   ```yaml
-   - name: Build signed DMG
-     env:
-       DEVELOPER_ID_APPLICATION: ${{ secrets.DEVELOPER_ID_APPLICATION }}
-       APPLE_ID: ${{ secrets.APPLE_ID }}
-       APP_SPECIFIC_PASSWORD: ${{ secrets.APP_SPECIFIC_PASSWORD }}
-       TEAM_ID: ${{ secrets.TEAM_ID }}
-     run: ./scripts/build-dmg.sh --signed --notarize
-   ```
-5. **上传产物**：
-   ```yaml
-   - name: Upload DMG artifact
-     uses: actions/upload-artifact@v4
-     with:
-       name: Aether-dmg
-       path: build/dmg/*.dmg
-   ```
-6. **自动创建 Release**（可选）：在 tag 推送时触发，使用 `softprops/action-gh-release` 等 action 自动创建 Release 并附加 .dmg
+#### 自动判断逻辑
+
+- 4 个 secrets 均配置时：调用 `./scripts/build-dmg.sh --signed --notarize`，产出 `Aether-macOS-{version}.dmg`
+- 任一 secret 缺失时：回退 unsigned 模式，调用 `./scripts/build-dmg.sh --unsigned`，产出 `Aether-macOS-{version}-unsigned.dmg`，Release notes 中标注"未签名版本"
+
+#### 触发流程
+
+1. 在仓库 Settings → Secrets and variables → Actions 中配置上述 4 个 secrets
+2. 推送 `v*` tag（如 `v1.2.0`）触发 release.yml
+3. `build-macos` job 自动执行 Archive → 签名 → 公证 → 装订 → 打包 DMG
+4. 产物作为 Release 资产上传至 GitHub Release 页面，附带 `.sha256` 校验文件
+
+#### 签名验证
+
+下载 DMG 挂载后，对 .app 执行以下命令验证签名与公证状态：
+
+```bash
+spctl -a -t exec -v Aether.app
+# 退出码 0 表示签名通过，输出含 "accepted"
+```
+
+#### 未签名模式提示
+
+未配置 secrets 时，Release body 中包含以下提示：
+
+> ⚠️ macOS DMG 未签名，首次打开需右键 → 打开绕过 Gatekeeper
 
 ---
 

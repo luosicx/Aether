@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import os
 import AetherFoundation
 import AetherServices
 
@@ -45,16 +46,33 @@ final class SwiftDataMessageRepository: MessageRepository {
             }
             // toolCalls 编码为 JSON
             if let toolCalls = message.toolCalls, !toolCalls.isEmpty {
-                existing.toolCallData = try? JSONEncoder().encode(toolCalls)
+                do {
+                    existing.toolCallData = try JSONEncoder().encode(toolCalls)
+                } catch {
+                    // toolCalls 编码失败：toolCallData 留空，LLM 多轮调用上下文丢失
+                    // 记录日志便于排查（ToolCallDTO 应保证 Codable 不失败）
+                    Logger.storage.error("更新消息时 toolCalls 编码失败 (messageId=\(message.id, privacy: .public)): \(error.localizedDescription, privacy: .public)")
+                }
             }
         } else {
             // 创建新消息
+            let toolCallData: Data?
+            if let toolCalls = message.toolCalls {
+                do {
+                    toolCallData = try JSONEncoder().encode(toolCalls)
+                } catch {
+                    Logger.storage.error("创建消息时 toolCalls 编码失败 (messageId=\(message.id, privacy: .public)): \(error.localizedDescription, privacy: .public)")
+                    toolCallData = nil
+                }
+            } else {
+                toolCallData = nil
+            }
             let newMessage = ChatMessage(
                 role: message.role,
                 content: message.content,
                 imageData: message.imageData.flatMap { Data(base64Encoded: $0) },
                 attachedImage: message.attachedImage.flatMap { Data(base64Encoded: $0) },
-                toolCallData: message.toolCalls.flatMap { try? JSONEncoder().encode($0) },
+                toolCallData: toolCallData,
                 toolCallId: message.toolCallId,
                 toolName: message.toolName
             )

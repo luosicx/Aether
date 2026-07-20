@@ -1,9 +1,14 @@
 import Foundation
+import os.locking
 import AetherFoundation
 
 /// Day 13: 自动降级装饰器。主 provider 抛 LLMError 时自动用备用 provider 重试一次。
 /// chat / chatWithTools 路径会降级；embed 路径不降级（避免双倍调用）。
 /// lastUsedProvider 暴露实际命中的 provider，供 DebugInfo 展示。
+///
+/// P1-3: 原实现使用 `nonisolated(unsafe) var` 暴露可变状态，跨 actor 读写无同步保护，
+/// 存在数据竞争。现改用 `OSAllocatedUnfairLock` 保护 lastUsedProvider / didFallback，
+/// 既保留 `@unchecked Sendable` 兼容性（LLMProvider 协议要求），又满足 Swift 6 严格并发。
 public final class FallbackLLMProvider: LLMProvider, @unchecked Sendable {
     /// 主 provider
     private let primary: LLMProvider
@@ -14,19 +19,29 @@ public final class FallbackLLMProvider: LLMProvider, @unchecked Sendable {
     /// 备用 provider 对应的 ModelProvider
     private let fallbackProvider: ModelProvider
 
-    /// 最近一次请求实际命中的 provider（初值为主 provider，触发降级后改为备用）
-    /// nonisolated(unsafe) 适配 Swift 6 minimal（跨 actor 读写需调用方自行同步，本类只在 LLMProvider 方法内写入）
-    public nonisolated(unsafe) private(set) var lastUsedProvider: ModelProvider
+    /// 最近一次请求实际命中的 provider（初值为主 provider，触发降级后改为备用）。
+    /// 用 OSAllocatedUnfairLock 保护跨 actor 读写。
+    private let lastUsedProviderLock: OSAllocatedUnfairLock<ModelProvider>
+    /// 是否在最近一次请求中触发了降级。同上，用锁保护。
+    private let didFallbackLock: OSAllocatedUnfairLock<Bool>
 
-    /// 是否在最近一次请求中触发了降级
-    public nonisolated(unsafe) private(set) var didFallback: Bool = false
+    /// 当前实际命中的 provider（线程安全读取）
+    public var lastUsedProvider: ModelProvider {
+        lastUsedProviderLock.withLock { $0 }
+    }
+
+    /// 最近一次请求是否触发了降级（线程安全读取）
+    public var didFallback: Bool {
+        didFallbackLock.withLock { $0 }
+    }
 
     public init(primary: LLMProvider, fallback: LLMProvider, primaryProvider: ModelProvider, fallbackProvider: ModelProvider) {
         self.primary = primary
         self.fallback = fallback
         self.primaryProvider = primaryProvider
         self.fallbackProvider = fallbackProvider
-        self.lastUsedProvider = primaryProvider
+        self.lastUsedProviderLock = OSAllocatedUnfairLock(initialState: primaryProvider)
+        self.didFallbackLock = OSAllocatedUnfairLock(initialState: false)
     }
 
     /// 纯文本 chat 流：先尝试主 provider，若未产出任何内容则降级到备用 provider。
@@ -41,9 +56,9 @@ public final class FallbackLLMProvider: LLMProvider, @unchecked Sendable {
                     continuation.yield(content)
                 }
                 if !yieldedAny {
-                    // 主 provider 未产出任何内容，触发降级
-                    self.lastUsedProvider = self.fallbackProvider
-                    self.didFallback = true
+                    // 主 provider 未产出任何内容，触发降级（线程安全写入）
+                    self.lastUsedProviderLock.withLock { $0 = self.fallbackProvider }
+                    self.didFallbackLock.withLock { $0 = true }
                     let fallbackStream = self.fallback.chat(messages: messages, config: config, apiKey: apiKey)
                     for await content in fallbackStream {
                         continuation.yield(content)
@@ -65,9 +80,9 @@ public final class FallbackLLMProvider: LLMProvider, @unchecked Sendable {
                     continuation.yield(chunk)
                 }
                 if !yieldedAny {
-                    // 主 provider 未产出，降级到 fallback
-                    self.lastUsedProvider = self.fallbackProvider
-                    self.didFallback = true
+                    // 主 provider 未产出，降级到 fallback（线程安全写入）
+                    self.lastUsedProviderLock.withLock { $0 = self.fallbackProvider }
+                    self.didFallbackLock.withLock { $0 = true }
                     let fallbackStream = self.fallback.chat(messages: messages, config: config, tools: tools, apiKey: apiKey)
                     for await chunk in fallbackStream {
                         continuation.yield(chunk)
@@ -80,8 +95,8 @@ public final class FallbackLLMProvider: LLMProvider, @unchecked Sendable {
 
     /// embed 路径不降级，直接调用主 provider
     public func embed(texts: [String], apiKey: String) async throws -> [[Float]] {
-        lastUsedProvider = primaryProvider
-        didFallback = false
+        lastUsedProviderLock.withLock { $0 = primaryProvider }
+        didFallbackLock.withLock { $0 = false }
         return try await primary.embed(texts: texts, apiKey: apiKey)
     }
 }

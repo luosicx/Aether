@@ -1,0 +1,93 @@
+# Pre-commit hooks 配置（P1-13 / H-C1）
+#
+# 本项目支持两种 pre-commit 使用方式：
+# 1. **pre-commit 框架**（推荐）：安装 `pip install pre-commit` 后运行 `pre-commit install`
+# 2. **Git native hooks**（无 Python 依赖）：运行 `make install-hooks` 安装本地脚本
+#
+# 两种方式都启用以下检查：
+# - 大文件提交防护（>1MB）
+# - 合并冲突标记残留检测
+# - 私钥/凭据泄露检测（私钥开头、AWS keys、API keys 等模式）
+# - 调试代码残留检测（print、TODO/FIXME 在生产代码中）
+# - Swift 代码格式与 lint（swiftformat --check + swiftlint --strict）
+#
+# 已存在的工具配置：
+# - .swiftformat：SwiftFormat 配置
+# - .swiftlint.yml：SwiftLint 配置（已针对历史代码调整阈值）
+# - .gitattributes：行尾与文件类型标准化
+# - sonar-project.properties：SonarCloud 质量门
+
+repos:
+  # 通用 pre-commit hooks（轻量级、跨语言）
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+        name: 行尾空格清理
+        exclude: '\.md$'  # Markdown 中行尾两个空格表示换行
+      - id: end-of-file-fixer
+        name: 文件末尾换行
+        exclude: '\.xcassets/.*$'  # Xcode 资源 JSON 不修改
+      - id: check-yaml
+        name: YAML 语法校验
+        args: ['--unsafe']
+      - id: check-json
+        name: JSON 语法校验
+        exclude: '\.xcassets/.*$'  # xcassets Contents.json 是片段不是完整 JSON
+      - id: check-merge-conflict
+        name: 合并冲突标记检测
+      - id: check-added-large-files
+        name: 大文件提交防护（>1MB）
+        args: ['--maxkb=1024']
+        exclude: |
+          (?x)^(
+              Packages/AetherCore/aether_core\.xcframework/.*|
+              screenshots/.*\.png|
+              Aether/Resources/Assets\.xcassets/AppIcon\.appiconset/.*
+          )$
+      - id: detect-private-key
+        name: 私钥泄露检测
+        exclude: |
+          (?x)^(
+              Examples/.*|  # 示例代码可能引用测试密钥
+              AetherTests/.*|  # 测试代码使用 fake/test 密钥
+              CloudflareWorkers/test/.*
+          )$
+      - id: check-case-conflict
+        name: 文件名大小写冲突检测（macOS/Windows 不区分大小写）
+
+  # Swift 代码格式校验（不修改，仅报告）
+  # 注：需本地安装 swiftformat（brew install swiftformat）
+  - repo: local
+    hooks:
+      - id: swiftformat-check
+        name: SwiftFormat 校验（仅检查不修改）
+        entry: swiftformat
+        language: system
+        types: [swift]
+        pass_filenames: true
+        args: ['--config', '.swiftformat', '--check']
+        exclude: |
+          (?x)^(
+              Packages/AetherCore/Sources/AetherRust/.*|
+              Examples/.*
+          )$
+
+      - id: swiftlint
+        name: SwiftLint 严格模式校验
+        entry: swiftlint
+        language: system
+        types: [swift]
+        pass_filenames: true
+        args: ['lint', '--strict', '--config', '.swiftlint.yml']
+        exclude: |
+          (?x)^(
+              Packages/AetherCore/Sources/AetherRust/.*|
+              Examples/.*
+          )$
+
+# 全局配置
+# 跳过某些 hook 时使用 `SKIP=swiftlint,swiftformat-check git commit`
+default_install_hook_types: [pre-commit]
+# 仅在提交相关文件时触发对应 hook（性能优化）
+minimum_pre_commit_version: '3.0.0'

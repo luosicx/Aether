@@ -6,6 +6,10 @@ import AetherRustC
 /// 将 `MLXInferenceEngine` 与 `OnDeviceModelDownloader` 中两处重复的
 /// CryptoKit `SHA256` 实现统一迁移至 Rust `sha2` crate，
 /// 去除 CryptoKit 依赖。保持分块读取特性，避免大文件一次性载入内存。
+///
+/// 线程安全契约：实例应仅在单一 actor / 串行上下文中使用（如 `aetherSha256(of:)`
+/// 局部实例）。跨 actor 共享需在调用点外部加锁，否则并发 `update` 会破坏 Rust 侧
+/// 哈希状态。Rust FFI 层（`aether_sha256_update`）未加 Mutex，依赖外部串行化。
 public final class AetherRustSha256: @unchecked Sendable {
     private let state: OpaquePointer
 

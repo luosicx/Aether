@@ -16,6 +16,11 @@ import AetherRustC
 /// try engine.loadModel(at: modelDir, config: .init(temperature: 0.7))
 /// for token in try engine.generate(prompt: "你好") { print(token.text) }
 /// ```
+///
+/// 线程安全契约：实例应仅在单一 actor 中使用（如 `MLXInferenceEngine` actor
+/// 持有 `rustEngine`）。跨 actor 共享需在调用点加 NSLock，否则并发 `generate`
+/// 会破坏 KV cache 导致输出错乱。Rust FFI 层（`aether_inference_generate`）
+/// 仅对 `Option<LoadedModel>` 加 Mutex 保护加载状态，推理过程本身未加锁。
 public final class AetherRustInferenceEngine: @unchecked Sendable {
     private let handle: OpaquePointer
 
@@ -174,9 +179,23 @@ public struct AetherRustGeneratedToken: Equatable {
 }
 
 /// 推理错误。
-public enum AetherRustInferenceError: Error {
+public enum AetherRustInferenceError: Error, LocalizedError {
     case loadFailed
     case inferenceFailed
     case invalidJson
     case notLoaded
+
+    /// 用户可见的错误描述（中文本地化）。
+    public var errorDescription: String? {
+        switch self {
+        case .loadFailed:
+            return NSLocalizedString("端侧模型加载失败", comment: "")
+        case .inferenceFailed:
+            return NSLocalizedString("端侧推理执行失败", comment: "")
+        case .invalidJson:
+            return NSLocalizedString("Rust 推理返回数据 JSON 解析失败", comment: "")
+        case .notLoaded:
+            return NSLocalizedString("端侧模型未加载，请先加载模型", comment: "")
+        }
+    }
 }

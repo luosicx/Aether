@@ -112,7 +112,15 @@ public actor LogUploader {
 }
 
 /// LogUploader 专用错误类型。
-public enum LogUploaderError: Error {
+public enum LogUploaderError: Error, LocalizedError {
     /// 缺少上传凭证。需要后端提供 STS 临时凭证或预签名 URL。
     case missingCredentials
+
+    /// 用户可见的错误描述（中文本地化）。
+    public var errorDescription: String? {
+        switch self {
+        case .missingCredentials:
+            return NSLocalizedString("缺少日志上传凭证，请联系管理员获取 STS 临时凭证或预签名 URL", comment: "")
+        }
+    }
 }

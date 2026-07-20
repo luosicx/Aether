@@ -6,9 +6,23 @@ on:
   pull_request:
     branches: [main]
 
+# 最小权限原则：默认所有 job 只读；需要写权限的 job（如 code-quality）在自己的 permissions 块中显式提升
+permissions:
+  contents: read
+
+# CI 全局变量：集中管理易变配置，便于跨 job 复用与统一调整
+# M-C1: 模拟器名称曾硬编码为 "iPhone 17"，Xcode 升级后若模拟器名称变更需逐处修改；
+#       改为 env 变量后只需修改此一处。
+# M-C2: Xcode 版本采用 latest（macos-15 runner 自动匹配最新稳定版），
+#       cache key 已含 xcode-version 输出，版本升级时缓存自动失效重建。
+env:
+  IOS_SIMULATOR_NAME: 'iPhone 17'
+  IOS_SCHEME: 'Aether-iOS'
+  MACOS_SCHEME: 'Aether-macOS'
+
 jobs:
   unit-tests:
-    needs: [rust-apple, rust, watch-widget-build]
+    needs: [rust-apple, rust]
     runs-on: macos-15
     timeout-minutes: 45
     outputs:
@@ -16,6 +30,12 @@ jobs:
       coverage_pass: ${{ steps.coverage.outputs.coverage_pass }}
     steps:
       - uses: actions/checkout@v5
+
+      - name: Select Xcode (latest)
+        id: setup-xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: 'latest'
 
       - name: 缓存 DerivedData 和 SPM
         # 缓存 Xcode 构建产物和 Swift Package Manager 依赖，
@@ -27,7 +47,7 @@ jobs:
             ~/Library/Developer/Xcode/DerivedData
             ~/Library/Caches/org.swift.swiftpm
             .build
-          key: ${{ runner.os }}-xcode-ios-unit-${{ hashFiles('Packages/AetherCore/Package.resolved', 'Aether.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+          key: ${{ runner.os }}-xcode-${{ steps.setup-xcode.outputs.xcode-version }}-ios-unit-${{ hashFiles('Packages/AetherCore/Package.resolved', 'Aether.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
           restore-keys: |
             ${{ runner.os }}-xcode-ios-unit-
 
@@ -47,13 +67,13 @@ jobs:
           name: coverage-report-rust
           path: coverage-rust
 
-      - name: Select Xcode (latest)
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: 'latest'
-
       - name: Setup iOS Simulator
-        run: bash scripts/ci-setup-simulator.sh
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 5
+          max_attempts: 2
+          retry_on: error
+          command: bash scripts/ci-setup-simulator.sh
 
       - name: Build for Testing
         id: build
@@ -61,7 +81,7 @@ jobs:
           xcodebuild build-for-testing \
             -project Aether.xcodeproj \
             -scheme Aether-iOS \
-            -destination 'platform=iOS Simulator,name=iPhone 17,arch=arm64' \
+            -destination 'platform=iOS Simulator,name=${{ env.IOS_SIMULATOR_NAME }},arch=arm64' \
             -configuration Debug \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO ARCHS=arm64 SWIFT_STRICT_CONCURRENCY=complete 2>&1 | tee /tmp/build.log
@@ -81,7 +101,7 @@ jobs:
           xcodebuild test-without-building \
             -project Aether.xcodeproj \
             -scheme Aether-iOS \
-            -destination 'platform=iOS Simulator,name=iPhone 17,arch=arm64' \
+            -destination 'platform=iOS Simulator,name=${{ env.IOS_SIMULATOR_NAME }},arch=arm64' \
             -configuration Debug \
             -derivedDataPath build \
             -skip-testing:AetherUITests \
@@ -240,82 +260,14 @@ jobs:
           mkdir -p coverage-report
           # 创建空 coverage.xml 作为 fallback（xccov 在 Xcode 26.3 上不可用）
           echo '<coverage version="1"></coverage>' > coverage-report/coverage.xml
-          # 使用 xcrun xccov view --report 的文本输出生成 cobertura.xml
+          # 使用 xcrun xccov view --report 的文本输出，调用 scripts/xccov-to-cobertura.py 转换
+          # 脚本默认排除 Views/DesignSystem/App/Protocols/AetherTests 等无法单测的目录
           xcrun xccov view --report TestResults.xcresult > /tmp/coverage_report.txt 2>/tmp/xccov_err.txt || {
             echo "WARNING: xccov view --report failed, using empty coverage.xml"
             cat /tmp/xccov_err.txt
             exit 0
           }
-          python3 - /tmp/coverage_report.txt coverage-report/coverage.xml << 'PYEOF'
-          import re, os, sys
-          from xml.sax.saxutils import escape
-          report_path, output_xml = sys.argv[1], sys.argv[2]
-          with open(report_path, 'r') as f:
-              text = f.read()
-          pattern = re.compile(r"^\s+(/\S+\.swift)\s+([\d.]+)%\s+\((\d+)/(\d+)\)", re.MULTILINE)
-          project_root = os.getcwd()
-          EXCLUDE_PATTERNS = [
-              "/Views/", "/DesignSystem/", "/App/AetherApp",
-              "/Protocols/", "/Actors/", "/AetherUITests/",
-              "/AetherWatch/", "/AetherTests/",
-              "/AetherDesign/", "/AetherUI/", "/AppIntents/",
-              "/OnDevice/", "/Health/", "/Connectivity/",
-              "/Crash/", "/Search/",
-          ]
-          files = []
-          total_covered = 0
-          total_valid = 0
-          for m in pattern.finditer(text):
-              abs_path = m.group(1)
-              cov = int(m.group(3))
-              tot = int(m.group(4))
-              try:
-                  rel_path = os.path.relpath(abs_path, project_root)
-              except ValueError:
-                  rel_path = abs_path
-              if not rel_path.startswith("Aether/"):
-                  continue
-              if any(p in rel_path for p in EXCLUDE_PATTERNS):
-                  continue
-              # 读取实际源文件行数，确保 lineNumber 不超过文件行数
-              # （xccov 的 tot 是可执行单元数，可能超过实际文件行数）
-              abs_file_path = os.path.join(project_root, rel_path)
-              try:
-                  with open(abs_file_path, 'r') as sf:
-                      actual_lines = sum(1 for _ in sf)
-              except (IOError, OSError):
-                  actual_lines = tot  # fallback
-              # 如果可执行单元数超过文件行数，按比例缩放
-              if actual_lines > 0:
-                  max_lines = min(tot, actual_lines)
-                  if tot > 0:
-                      scaled_cov = int(round(cov * max_lines / tot))
-                  else:
-                      scaled_cov = 0
-                  scaled_tot = max_lines
-              else:
-                  scaled_cov = cov
-                  scaled_tot = tot
-              files.append((rel_path, scaled_cov, scaled_tot))
-              total_covered += scaled_cov
-              total_valid += scaled_tot
-          if total_valid == 0:
-              print("WARNING: no coverage data found in report, using empty coverage.xml", file=sys.stderr)
-              with open(output_xml, 'w', encoding='utf-8') as f:
-                  f.write('<coverage version="1"></coverage>\n')
-              sys.exit(0)
-          with open(output_xml, 'w', encoding='utf-8') as f:
-              f.write('<coverage version="1">\n')
-              for rel_path, f_cov, f_tot in files:
-                  f.write(f'  <file path="{escape(rel_path)}">\n')
-                  for ln in range(1, f_tot + 1):
-                      covered = "true" if ln <= f_cov else "false"
-                      f.write(f'    <lineToCover lineNumber="{ln}" covered="{covered}"/>\n')
-                  f.write(f'  </file>\n')
-              f.write('</coverage>\n')
-          print(f"coverage.xml written: line-rate={total_covered/total_valid:.4f} ({total_covered}/{total_valid} lines)")
-          print(f"Sample paths: {[f[0] for f in files[:3]]}")
-          PYEOF
+          python3 scripts/xccov-to-cobertura.py /tmp/coverage_report.txt coverage-report/coverage.xml
           LINE_RATE=$(python3 -c "import xml.etree.ElementTree as ET; r=ET.parse('coverage-report/coverage.xml').getroot(); covered=sum(1 for f in r.findall('file') for l in f.findall('lineToCover') if l.get('covered')=='true'); total=sum(1 for f in r.findall('file') for l in f.findall('lineToCover')); print(f'{covered/total:.4f}' if total else '0')")
           echo "coverage.xml line-rate: $LINE_RATE"
 
@@ -392,64 +344,10 @@ jobs:
           echo "AetherSDK lcov generated:"
           head -8 "$GITHUB_WORKSPACE/coverage-sdk/coverage.lcov"
           # 将 lcov 转换为 cobertura XML（合并脚本期望 <line hits=> 格式）
-          python3 - "$GITHUB_WORKSPACE/coverage-sdk/coverage.lcov" "$GITHUB_WORKSPACE/coverage-sdk/coverage.xml" << 'PYEOF'
-          import sys, os
-          from xml.sax.saxutils import escape
-
-          lcov_path, xml_path = sys.argv[1], sys.argv[2]
-          project_root = os.environ.get('GITHUB_WORKSPACE', os.getcwd())
-
-          # 解析 lcov：每个 record 以 SF: 开始，DA: 行号,命中数 结束，end_of_record 结尾
-          records = []
-          cur_file = None
-          cur_lines = []
-          with open(lcov_path, 'r', encoding='utf-8', errors='replace') as f:
-              for line in f:
-                  line = line.rstrip('\n')
-                  if line.startswith('SF:'):
-                      cur_file = line[3:]
-                      cur_lines = []
-                  elif line.startswith('DA:'):
-                      parts = line[3:].split(',')
-                      if len(parts) >= 2:
-                          try:
-                              lineno = int(parts[0])
-                              hits = int(parts[1])
-                              cur_lines.append((lineno, hits))
-                          except ValueError:
-                              pass
-                  elif line == 'end_of_record':
-                      if cur_file is not None:
-                          records.append((cur_file, cur_lines))
-                      cur_file, cur_lines = None, []
-
-          # 写 cobertura XML
-          with open(xml_path, 'w', encoding='utf-8') as f:
-              f.write('<?xml version="1.0" ?>\n')
-              f.write('<coverage version="6.3">\n')
-              f.write('  <packages>\n')
-              f.write('    <package>\n')
-              f.write('      <classes>\n')
-              for src_file, lines in records:
-                  # 转为相对路径
-                  fname = src_file
-                  if os.path.isabs(fname):
-                      try:
-                          fname = os.path.relpath(fname, project_root)
-                      except ValueError:
-                          pass
-                  f.write(f'        <class filename="{escape(fname)}">\n')
-                  f.write('          <lines>\n')
-                  for lineno, hits in lines:
-                      f.write(f'            <line number="{lineno}" hits="{hits}"/>\n')
-                  f.write('          </lines>\n')
-                  f.write('        </class>\n')
-              f.write('      </classes>\n')
-              f.write('    </package>\n')
-              f.write('  </packages>\n')
-              f.write('</coverage>\n')
-          print(f"Generated cobertura XML with {len(records)} files")
-          PYEOF
+          # 调用 scripts/lcov-to-cobertura.py 完成 lcov → cobertura XML 转换
+          python3 "$GITHUB_WORKSPACE/scripts/lcov-to-cobertura.py" \
+            "$GITHUB_WORKSPACE/coverage-sdk/coverage.lcov" \
+            "$GITHUB_WORKSPACE/coverage-sdk/coverage.xml"
           echo "AetherSDK cobertura XML generated:"
           head -10 "$GITHUB_WORKSPACE/coverage-sdk/coverage.xml"
 
@@ -469,6 +367,12 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Select Xcode (latest)
+        id: setup-xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: 'latest'
+
       - name: 缓存 DerivedData 和 SPM
         # 缓存 Xcode 构建产物和 Swift Package Manager 依赖，
         # 基于锁文件生成 cache key，支持部分命中回退
@@ -479,7 +383,7 @@ jobs:
             ~/Library/Developer/Xcode/DerivedData
             ~/Library/Caches/org.swift.swiftpm
             .build
-          key: ${{ runner.os }}-xcode-ios-ui-${{ hashFiles('Packages/AetherCore/Package.resolved', 'Aether.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+          key: ${{ runner.os }}-xcode-${{ steps.setup-xcode.outputs.xcode-version }}-ios-ui-${{ hashFiles('Packages/AetherCore/Package.resolved', 'Aether.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
           restore-keys: |
             ${{ runner.os }}-xcode-ios-ui-
 
@@ -489,13 +393,13 @@ jobs:
           name: aether-core-xcframework
           path: Packages/AetherCore
 
-      - name: Select Xcode (latest)
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: 'latest'
-
       - name: Setup iOS Simulator
-        run: bash scripts/ci-setup-simulator.sh
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 5
+          max_attempts: 2
+          retry_on: error
+          command: bash scripts/ci-setup-simulator.sh
 
       - name: Build for Testing
         id: build
@@ -503,7 +407,7 @@ jobs:
           xcodebuild build-for-testing \
             -project Aether.xcodeproj \
             -scheme Aether-iOS \
-            -destination 'platform=iOS Simulator,name=iPhone 17,arch=arm64' \
+            -destination 'platform=iOS Simulator,name=${{ env.IOS_SIMULATOR_NAME }},arch=arm64' \
             -configuration Debug \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO ARCHS=arm64 SWIFT_STRICT_CONCURRENCY=complete 2>&1 | tee /tmp/build.log
@@ -523,7 +427,7 @@ jobs:
           xcodebuild test-without-building \
             -project Aether.xcodeproj \
             -scheme Aether-iOS \
-            -destination 'platform=iOS Simulator,name=iPhone 17,arch=arm64' \
+            -destination 'platform=iOS Simulator,name=${{ env.IOS_SIMULATOR_NAME }},arch=arm64' \
             -configuration Debug \
             -derivedDataPath build \
             -only-testing:AetherUITests \
@@ -559,6 +463,12 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Select Xcode (latest)
+        id: setup-xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: 'latest'
+
       - name: 缓存 DerivedData 和 SPM
         # 缓存 Xcode 构建产物和 Swift Package Manager 依赖，
         # 基于锁文件生成 cache key，支持部分命中回退
@@ -569,7 +479,7 @@ jobs:
             ~/Library/Developer/Xcode/DerivedData
             ~/Library/Caches/org.swift.swiftpm
             .build
-          key: ${{ runner.os }}-xcode-ios-security-${{ hashFiles('Packages/AetherCore/Package.resolved', 'Aether.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+          key: ${{ runner.os }}-xcode-${{ steps.setup-xcode.outputs.xcode-version }}-ios-security-${{ hashFiles('Packages/AetherCore/Package.resolved', 'Aether.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
           restore-keys: |
             ${{ runner.os }}-xcode-ios-security-
 
@@ -578,11 +488,6 @@ jobs:
         with:
           name: aether-core-xcframework
           path: Packages/AetherCore
-
-      - name: Select Xcode (latest)
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: 'latest'
 
       - name: Setup iOS Simulator
         run: bash scripts/ci-setup-simulator.sh
@@ -593,7 +498,7 @@ jobs:
           xcodebuild build-for-testing \
             -project Aether.xcodeproj \
             -scheme Aether-iOS \
-            -destination 'platform=iOS Simulator,name=iPhone 17,arch=arm64' \
+            -destination 'platform=iOS Simulator,name=${{ env.IOS_SIMULATOR_NAME }},arch=arm64' \
             -configuration Debug \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO ARCHS=arm64 SWIFT_STRICT_CONCURRENCY=complete 2>&1 | tee /tmp/build.log
@@ -613,7 +518,7 @@ jobs:
           xcodebuild test-without-building \
             -project Aether.xcodeproj \
             -scheme Aether-iOS \
-            -destination 'platform=iOS Simulator,name=iPhone 17,arch=arm64' \
+            -destination 'platform=iOS Simulator,name=${{ env.IOS_SIMULATOR_NAME }},arch=arm64' \
             -configuration Debug \
             -derivedDataPath build \
             -only-testing:AetherTests/ToolRegistryTests \
@@ -654,6 +559,12 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Select Xcode (latest)
+        id: setup-xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: 'latest'
+
       - name: 缓存 DerivedData 和 SPM
         # 缓存 Xcode 构建产物和 Swift Package Manager 依赖，
         # 基于锁文件生成 cache key，支持部分命中回退
@@ -664,7 +575,7 @@ jobs:
             ~/Library/Developer/Xcode/DerivedData
             ~/Library/Caches/org.swift.swiftpm
             .build
-          key: ${{ runner.os }}-xcode-macos-security-${{ hashFiles('Packages/AetherCore/Package.resolved', 'Aether.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+          key: ${{ runner.os }}-xcode-${{ steps.setup-xcode.outputs.xcode-version }}-macos-security-${{ hashFiles('Packages/AetherCore/Package.resolved', 'Aether.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
           restore-keys: |
             ${{ runner.os }}-xcode-macos-security-
 
@@ -673,11 +584,6 @@ jobs:
         with:
           name: aether-core-xcframework
           path: Packages/AetherCore
-
-      - name: Select Xcode (latest)
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: 'latest'
 
       - name: Build for Testing (macOS)
         id: build_macos
@@ -735,9 +641,17 @@ jobs:
   unit-tests-macos:
     needs: rust-apple
     runs-on: macos-15
-    timeout-minutes: 90
+    # M-C13: 原 90 分钟过长（iOS unit-tests 仅 45 分钟），macOS 单测规模与 iOS 相当。
+    #        60 分钟足够覆盖 macOS-specific tools + 跨平台测试，超时通常是卡死需排查。
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
+
+      - name: Select Xcode (latest)
+        id: setup-xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: 'latest'
 
       - name: 缓存 DerivedData 和 SPM
         # 缓存 Xcode 构建产物和 Swift Package Manager 依赖，
@@ -749,7 +663,7 @@ jobs:
             ~/Library/Developer/Xcode/DerivedData
             ~/Library/Caches/org.swift.swiftpm
             .build
-          key: ${{ runner.os }}-xcode-macos-unit-${{ hashFiles('Packages/AetherCore/Package.resolved', 'Aether.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+          key: ${{ runner.os }}-xcode-${{ steps.setup-xcode.outputs.xcode-version }}-macos-unit-${{ hashFiles('Packages/AetherCore/Package.resolved', 'Aether.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
           restore-keys: |
             ${{ runner.os }}-xcode-macos-unit-
 
@@ -758,11 +672,6 @@ jobs:
         with:
           name: aether-core-xcframework
           path: Packages/AetherCore
-
-      - name: Select Xcode (latest)
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: 'latest'
 
       - name: Build for Testing (macOS)
         id: build_macos
@@ -829,72 +738,8 @@ jobs:
             cat /tmp/xccov_err.txt
             exit 0
           }
-          python3 - /tmp/coverage_report_macos.txt coverage-report-macos/coverage.xml << 'PYEOF'
-          import re, os, sys
-          from xml.sax.saxutils import escape
-          report_path, output_xml = sys.argv[1], sys.argv[2]
-          with open(report_path, 'r') as f:
-              text = f.read()
-          pattern = re.compile(r"^\s+(/\S+\.swift)\s+([\d.]+)%\s+\((\d+)/(\d+)\)", re.MULTILINE)
-          project_root = os.getcwd()
-          EXCLUDE_PATTERNS = [
-              "/Views/", "/DesignSystem/", "/App/AetherApp",
-              "/Protocols/", "/Actors/", "/AetherUITests/",
-              "/AetherWatch/", "/AetherTests/",
-              "/AetherDesign/", "/AetherUI/", "/AppIntents/",
-              "/OnDevice/", "/Health/", "/Connectivity/",
-              "/Crash/", "/Search/",
-          ]
-          files = []
-          total_covered = 0
-          total_valid = 0
-          for m in pattern.finditer(text):
-              abs_path = m.group(1)
-              cov = int(m.group(3))
-              tot = int(m.group(4))
-              try:
-                  rel_path = os.path.relpath(abs_path, project_root)
-              except ValueError:
-                  rel_path = abs_path
-              if not rel_path.startswith("Aether/"):
-                  continue
-              if any(p in rel_path for p in EXCLUDE_PATTERNS):
-                  continue
-              abs_file_path = os.path.join(project_root, rel_path)
-              try:
-                  with open(abs_file_path, 'r') as sf:
-                      actual_lines = sum(1 for _ in sf)
-              except (IOError, OSError):
-                  actual_lines = tot
-              if actual_lines > 0:
-                  max_lines = min(tot, actual_lines)
-                  if tot > 0:
-                      scaled_cov = int(round(cov * max_lines / tot))
-                  else:
-                      scaled_cov = 0
-                  scaled_tot = max_lines
-              else:
-                  scaled_cov = cov
-                  scaled_tot = tot
-              files.append((rel_path, scaled_cov, scaled_tot))
-              total_covered += scaled_cov
-              total_valid += scaled_tot
-          if total_valid == 0:
-              print("WARNING: no coverage data found in macOS report, using empty coverage.xml", file=sys.stderr)
-              with open(output_xml, 'w', encoding='utf-8') as f:
-                  f.write('<coverage version="1"></coverage>\n')
-              sys.exit(0)
-          with open(output_xml, 'w', encoding='utf-8') as f:
-              f.write('<coverage version="1">\n')
-              for rel_path, f_cov, f_tot in files:
-                  f.write(f'  <file path="{escape(rel_path)}">\n')
-                  for ln in range(1, f_tot + 1):
-                      covered = "true" if ln <= f_cov else "false"
-                      f.write(f'    <lineToCover lineNumber="{ln}" covered="{covered}"/>\n')
-                  f.write(f'  </file>\n')
-              f.write('</coverage>\n')
-          print(f"macOS coverage.xml written: line-rate={total_covered/total_valid:.4f} ({total_covered}/{total_valid} lines)")
-          PYEOF
+          # 调用 scripts/xccov-to-cobertura.py 完成 xccov 文本 → cobertura XML 转换
+          python3 scripts/xccov-to-cobertura.py /tmp/coverage_report_macos.txt coverage-report-macos/coverage.xml
 
       - name: Upload macOS coverage report artifact
         if: always()
@@ -910,6 +755,15 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
+
+      - name: 缓存 Homebrew
+        # 缓存 Homebrew 下载产物，加速 swiftlint 安装
+        uses: actions/cache@v5
+        with:
+          path: ~/Library/Caches/Homebrew
+          key: homebrew-swiftlint-${{ runner.os }}
+          restore-keys: |
+            homebrew-swiftlint-
 
       - name: Install SwiftLint
         run: brew install swiftlint
@@ -932,9 +786,10 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Setup Node.js
+        # D-1: Node.js 20 已于 2026-04-30 EOL，升级到 22 LTS（向后兼容）
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: 'CloudflareWorkers/package-lock.json'
 
@@ -951,7 +806,7 @@ jobs:
   coverage-summary:
     # 统合所有平台测试 job 的结果（iOS / macOS / Android / Windows / Rust / Security）
     # 任一上游测试失败均会反映到此处，作为 PR 合并的总质量门
-    needs: [unit-tests, unit-tests-macos, ui-tests, android-build, windows-build, rust, security-tests, security-tests-macos, swiftlint]
+    needs: [unit-tests, unit-tests-macos, ui-tests, android-build, windows-build, rust, security-tests, security-tests-macos]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -998,7 +853,7 @@ jobs:
   # Code quality status check: SonarQube static analysis
   code-quality:
     # 依赖 coverage-summary（即所有测试 job 完成）后再运行 SonarQube 分析
-    needs: [coverage-summary]
+    needs: [unit-tests, unit-tests-macos, rust]
     runs-on: macos-15
     if: always()
     permissions:
@@ -1048,148 +903,15 @@ jobs:
 
       - name: Merge coverage reports
         # 合并 iOS + macOS (Swift, lineToCover 格式) + Rust + AetherSDK (cobertura <line hits> 格式)
+        # 调用 scripts/merge-coverage.py 完成四源覆盖率合并（union 策略）
         run: |
           mkdir -p coverage-report
-          python3 - coverage-ios/coverage.xml coverage-macos/coverage.xml coverage-rust/coverage.xml coverage-sdk/coverage.xml coverage-report/coverage.xml << 'PYEOF'
-          import sys
-          import xml.etree.ElementTree as ET
-
-          ios_path, macos_path, rust_path, sdk_path, output_path = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]
-
-          def parse_swift_coverage(path):
-              """Parse iOS/macOS cobertura-style XML (lineToCover format).
-              Return {filepath: {lineno: covered_bool}}"""
-              files = {}
-              try:
-                  root = ET.parse(path).getroot()
-              except (ET.ParseError, FileNotFoundError):
-                  return files
-              for f in root.findall('file'):
-                  fpath = f.get('path')
-                  lines = {}
-                  for l in f.findall('lineToCover'):
-                      ln = int(l.get('lineNumber'))
-                      covered = l.get('covered') == 'true'
-                      lines[ln] = covered
-                  files[fpath] = lines
-              return files
-
-          def parse_rust_coverage(path):
-              """Parse Rust cargo-llvm-cov cobertura XML (<line hits=> format).
-              Return {filepath: {lineno: covered_bool}}"""
-              files = {}
-              try:
-                  root = ET.parse(path).getroot()
-              except (ET.ParseError, FileNotFoundError):
-                  return files
-              # Cobertura: <class filename="..."><lines><line number="N" hits="H"/></lines></class>
-              for cls in root.iter("class"):
-                  fpath = cls.get("filename")
-                  if not fpath:
-                      continue
-                  # cargo-llvm-cov 工作目录为 rust/，生成的路径如 aether-core/src/chunk.rs
-                  # 需添加 rust/ 前缀以匹配 SonarCloud 的 sonar.sources（项目根目录为基准）
-                  if not fpath.startswith("rust/"):
-                      fpath = "rust/" + fpath
-                  lines = parse_cobertura_class(cls, fpath, "rust/")
-                  if not lines:
-                      continue
-                  if fpath in files:
-                      for ln, cov in lines.items():
-                          files[fpath][ln] = files[fpath].get(ln, False) or cov
-                  else:
-                      files[fpath] = lines
-              return files
-
-          def parse_cobertura_class(cls, fpath, prefix):
-              """Parse a cobertura <class> element's <lines> children."""
-              lines = {}
-              lines_el = cls.find("lines")
-              if lines_el is None:
-                  return lines
-              for l in lines_el.findall("line"):
-                  try:
-                      ln = int(l.get("number", "0"))
-                  except (TypeError, ValueError):
-                      continue
-                  try:
-                      hits = int(l.get("hits", "0"))
-                  except (TypeError, ValueError):
-                      hits = 0
-                  lines[ln] = hits > 0
-              return lines
-
-          def parse_sdk_coverage(path):
-              """Parse AetherSDK llvm-cov cobertura XML (<line hits=> format, same as Rust).
-              Return {filepath: {lineno: covered_bool}}"""
-              files = {}
-              try:
-                  root = ET.parse(path).getroot()
-              except (ET.ParseError, FileNotFoundError):
-                  return files
-              for cls in root.iter("class"):
-                  fpath = cls.get("filename")
-                  if not fpath:
-                      continue
-                  # llvm-cov 输出的路径可能是绝对路径或相对路径
-                  # 规范化为 Packages/AetherCore/Sources/AetherSDK/xxx.swift 格式
-                  if "Sources/AetherSDK/" in fpath:
-                      idx = fpath.find("Sources/AetherSDK/")
-                      if idx > 0 and not fpath.startswith("Packages/"):
-                          fpath = "Packages/AetherCore/" + fpath[idx:]
-                  elif not fpath.startswith("Packages/"):
-                      # 兜底：如果路径不含 AetherSDK，跳过
-                      continue
-                  lines = parse_cobertura_class(cls, fpath, "Packages/AetherCore/Sources/AetherSDK/")
-                  if not lines:
-                      continue
-                  if fpath in files:
-                      for ln, cov in lines.items():
-                          files[fpath][ln] = files[fpath].get(ln, False) or cov
-                  else:
-                      files[fpath] = lines
-              return files
-
-          ios = parse_swift_coverage(ios_path)
-          macos = parse_swift_coverage(macos_path)
-          rust = parse_rust_coverage(rust_path)
-          sdk = parse_sdk_coverage(sdk_path)
-
-          # Merge: union of all files, a line is covered if covered in any source
-          all_paths = set(ios.keys()) | set(macos.keys()) | set(rust.keys()) | set(sdk.keys())
-          merged_files = {}
-          total_covered = 0
-          total_lines = 0
-          for path in all_paths:
-              ios_lines = ios.get(path, {})
-              macos_lines = macos.get(path, {})
-              rust_lines = rust.get(path, {})
-              sdk_lines = sdk.get(path, {})
-              all_lns = set(ios_lines.keys()) | set(macos_lines.keys()) | set(rust_lines.keys()) | set(sdk_lines.keys())
-              merged_lines = {}
-              for ln in all_lns:
-                  covered = ios_lines.get(ln, False) or macos_lines.get(ln, False) or rust_lines.get(ln, False) or sdk_lines.get(ln, False)
-                  merged_lines[ln] = covered
-                  if covered:
-                      total_covered += 1
-                  total_lines += 1
-              merged_files[path] = merged_lines
-
-          with open(output_path, 'w', encoding='utf-8') as f:
-              f.write('<coverage version="1">\n')
-              for path in sorted(merged_files.keys()):
-                  lines = merged_files[path]
-                  f.write(f'  <file path="{path}">\n')
-                  for ln in sorted(lines.keys()):
-                      covered = "true" if lines[ln] else "false"
-                      f.write(f'    <lineToCover lineNumber="{ln}" covered="{covered}"/>\n')
-                  f.write(f'  </file>\n')
-              f.write('</coverage>\n')
-
-          rate = total_covered / total_lines if total_lines else 0
-          print(f"Merged coverage: line-rate={rate:.4f} ({total_covered}/{total_lines} lines)")
-          print(f"Files: iOS={len(ios)}, macOS={len(macos)}, Rust={len(rust)}, AetherSDK={len(sdk)}, merged={len(merged_files)}")
-          PYEOF
+          python3 scripts/merge-coverage.py \
+            coverage-ios/coverage.xml \
+            coverage-macos/coverage.xml \
+            coverage-rust/coverage.xml \
+            coverage-sdk/coverage.xml \
+            coverage-report/coverage.xml
 
       - name: Verify merged coverage report
         run: |
@@ -1219,244 +941,26 @@ jobs:
           # 原因：iOS xccov 在 Xcode 26.3 上不稳定，导致 new_coverage 指标波动；
           # 待 xccov 稳定或迁移到 xcresulttool 后可在 properties 中恢复为 true。
           args: >
-            ${{ github.event_name == 'pull_request' && format('-Dsonar.pullrequest.key={0} -Dsonar.pullrequest.branch={1} -Dsonar.pullrequest.base={2} -Dsonar.pullrequest.provider=github -Dsonar.pullrequest.github.repository=luosicx/Aether', github.event.pull_request.number, github.head_ref, github.base_ref) || '' }}
+            ${{ github.event_name == 'pull_request' && format('-Dsonar.pullrequest.key={0} -Dsonar.pullrequest.branch={1} -Dsonar.pullrequest.base={2} -Dsonar.pullrequest.provider=github -Dsonar.pullrequest.github.repository={3}', github.event.pull_request.number, github.head_ref, github.base_ref, github.repository) || '' }}
 
       - name: Post SonarCloud report to PR
         # 仅在 PR 事件时执行：SonarCloud 分析完成后，自动将质量门状态、
         # 代码问题、覆盖率和评级作为评论发布到 PR。
-        # 若同一 PR 已有报告评论，则更新而非重复创建。
+        # 若同一 PR 已有报告评论，则删除旧评论后创建新评论，确保 PR 上始终只有一条最新报告。
+        # 调用 scripts/sonar-pr-comment.py 完成轮询质量门 → 拉取度量 → 生成 Markdown →
+        # 删除旧评论 → 创建新评论的完整流程。
         if: github.event_name == 'pull_request'
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          # M-C3: PROJECT_KEY 是 SonarCloud 平台配置（下划线命名），保留硬编码；
+          #       REPO 改用 github.repository 上下文变量，仓库重命名时自动跟随。
           PROJECT_KEY: luosicx_Aether
           COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          python3 - << 'PYEOF'
-          import json, os, sys, time, urllib.request, urllib.error, base64, subprocess
-
-          sonar_host = (os.environ.get('SONAR_HOST_URL') or 'https://sonarcloud.io').rstrip('/')
-          sonar_token = os.environ['SONAR_TOKEN']
-          project_key = os.environ['PROJECT_KEY']
-          pr_number = os.environ['PR_NUMBER']
-          commit_sha = os.environ.get('COMMIT_SHA', '')[:7]
-          repo = 'luosicx/Aether'
-
-          auth = base64.b64encode(f'{sonar_token}:'.encode()).decode()
-          headers = {'Authorization': f'Basic {auth}'}
-
-          def api_get(url, timeout=30):
-              req = urllib.request.Request(url, headers=headers)
-              with urllib.request.urlopen(req, timeout=timeout) as resp:
-                  return json.loads(resp.read())
-
-          # 1. 轮询质量门状态（分析报告上传后需数秒处理）
-          print(f"Polling SonarCloud quality gate for PR #{pr_number}...")
-          qg = None
-          for attempt in range(15):
-              try:
-                  qg = api_get(f'{sonar_host}/api/qualitygates/project_status?projectKey={project_key}&pullRequest={pr_number}')
-                  if qg.get('projectStatus', {}).get('status'):
-                      print(f"  Quality gate ready (attempt {attempt+1}/15)")
-                      break
-              except urllib.error.HTTPError:
-                  if attempt == 0:
-                      print(f"  Waiting for analysis to be processed...")
-              except Exception as e:
-                  print(f"  attempt {attempt+1}: {e}")
-              time.sleep(5)
-
-          if not qg:
-              print("WARNING: SonarCloud quality gate unavailable, skipping PR comment")
-              sys.exit(0)
-
-          # 2. 获取度量指标
-          metrics = 'new_bugs,new_vulnerabilities,new_code_smells,new_coverage,new_duplicated_lines_density,new_lines,new_security_hotspots,new_security_hotspots_reviewed,bugs,vulnerabilities,code_smells,coverage,duplicated_lines_density,ncloc,sqale_rating,reliability_rating,security_rating'
-          try:
-              mr = api_get(f'{sonar_host}/api/measures/component?component={project_key}&pullRequest={pr_number}&metricKeys={metrics}')
-              measures = {m['metric']: m for m in mr.get('component', {}).get('measures', [])}
-          except Exception as e:
-              print(f"WARNING: measures fetch failed: {e}")
-              measures = {}
-
-          # 3. 获取问题列表
-          try:
-              ir = api_get(f'{sonar_host}/api/issues/search?componentKeys={project_key}&pullRequest={pr_number}&ps=100')
-              issues = ir.get('issues', [])
-          except Exception as e:
-              print(f"WARNING: issues fetch failed: {e}")
-              issues = []
-
-          # --- 辅助函数 ---
-          def rating_letter(val):
-              try:
-                  return chr(64 + int(float(val)))  # 1->A, 2->B, ...
-              except (ValueError, TypeError):
-                  return val or 'N/A'
-
-          def period(key, default='0'):
-              m = measures.get(key)
-              if not m:
-                  return default
-              ps = m.get('periods', [])
-              return ps[0].get('value', default) if ps else default
-
-          def val(m_key, default='N/A'):
-              m = measures.get(m_key)
-              return m.get('value', default) if m else default
-
-          # --- 提取数据 ---
-          ps = qg.get('projectStatus', {})
-          qg_status = ps.get('status', 'UNKNOWN')
-          conditions = ps.get('conditions', [])
-
-          new_bugs = period('new_bugs')
-          new_vulns = period('new_vulnerabilities')
-          new_smells = period('new_code_smells')
-          new_hotspots = period('new_security_hotspots')
-          new_coverage = period('new_coverage', 'N/A')
-          new_dup = period('new_duplicated_lines_density', 'N/A')
-          new_lines = period('new_lines')
-          hotspots_reviewed = period('new_security_hotspots_reviewed', 'N/A')
-
-          total_bugs = val('bugs', '0')
-          total_vulns = val('vulnerabilities', '0')
-          total_smells = val('code_smells', '0')
-          total_coverage = val('coverage', 'N/A')
-          total_dup = val('duplicated_lines_density', 'N/A')
-          ncloc = val('ncloc', 'N/A')
-
-          rel_rating = rating_letter(val('reliability_rating'))
-          sec_rating = rating_letter(val('security_rating'))
-          maint_rating = rating_letter(val('sqale_rating'))
-
-          # 质量门条件表
-          metric_names = {
-              'new_reliability_rating': '新代码可靠性评级',
-              'new_security_rating': '新代码安全性评级',
-              'new_maintainability_rating': '新代码可维护性评级',
-              'new_coverage': '新代码覆盖率',
-              'new_duplicated_lines_density': '新代码重复率',
-              'new_security_hotspots_reviewed': '安全热点审查率',
-          }
-          cond_rows = []
-          for c in conditions:
-              mk = c.get('metricKey', '')
-              name = metric_names.get(mk, mk)
-              cstatus = c.get('status', '')
-              icon = '✅' if cstatus == 'OK' else '❌'
-              comp = c.get('comparator', '')
-              threshold = c.get('errorThreshold', '')
-              actual = c.get('actualValue', '')
-              comp_text = {'LT': '≥', 'GT': '≤'}.get(comp, comp)
-              cond_rows.append(f'| {name} | {comp_text} {threshold} | {actual} | {icon} {cstatus} |')
-
-          # --- 生成 Markdown ---
-          qg_icon = '✅ PASSED' if qg_status == 'OK' else '❌ FAILED' if qg_status == 'ERROR' else qg_status
-          dashboard_url = f"{sonar_host}/dashboard?id={project_key}&pullRequest={pr_number}"
-
-          md = []
-          md.append('<!-- sonarcloud-report -->')
-          md.append('## 🔍 SonarCloud 代码质量分析报告')
-          md.append('')
-          md.append(f'**分析提交:** `{commit_sha}`  ')
-          md.append(f'**SonarCloud 面板:** [查看完整报告]({dashboard_url})')
-          md.append('')
-          md.append('---')
-          md.append('')
-          md.append(f'### 质量门状态: {qg_icon}')
-          md.append('')
-          md.append('| 条件 | 阈值 | 实际值 | 结果 |')
-          md.append('|------|------|--------|------|')
-          md.extend(cond_rows)
-          md.append('')
-          md.append('### 代码问题统计')
-          md.append('')
-          md.append('| 类型 | 新代码 | 全量代码 |')
-          md.append('|------|--------|----------|')
-          md.append(f'| 🐛 Bug | {new_bugs} | {total_bugs} |')
-          md.append(f'| 🔒 漏洞 | {new_vulns} | {total_vulns} |')
-          md.append(f'| 💨 代码异味 | {new_smells} | {total_smells} |')
-          md.append(f'| 🔥 安全热点 | {new_hotspots} | — |')
-          md.append('')
-          md.append('### 覆盖率与代码指标')
-          md.append('')
-          md.append('| 指标 | 值 |')
-          md.append('|------|-----|')
-          md.append(f'| 新代码行数 | {new_lines} 行 |')
-          md.append(f'| 新代码覆盖率 | {new_coverage}% |')
-          md.append(f'| 整体覆盖率 | {total_coverage}% |')
-          md.append(f'| 新代码重复率 | {new_dup}% |')
-          md.append(f'| 整体重复率 | {total_dup}% |')
-          md.append(f'| 代码行数 (NCLOC) | {ncloc} |')
-          md.append('')
-          md.append('### 代码评级')
-          md.append('')
-          md.append('| 维度 | 评级 |')
-          md.append('|------|------|')
-          md.append(f'| 可靠性 | {rel_rating} |')
-          md.append(f'| 安全性 | {sec_rating} |')
-          md.append(f'| 可维护性 | {maint_rating} |')
-          md.append('')
-
-          # 问题详情（如果有）
-          if issues:
-              md.append('### 问题详情')
-              md.append('')
-              md.append('| 严重度 | 类型 | 文件 | 描述 |')
-              md.append('|--------|------|------|------|')
-              for i in issues[:20]:
-                  sev = i.get('severity', '')
-                  typ = i.get('type', '')
-                  comp = i.get('component', '').replace(f'{project_key}:', '')
-                  line = i.get('line', '')
-                  msg = i.get('message', '')[:80]
-                  loc = f'{comp}:{line}' if line else comp
-                  md.append(f'| {sev} | {typ} | {loc} | {msg} |')
-              if len(issues) > 20:
-                  md.append(f'| ... | ... | ... | 还有 {len(issues)-20} 个问题 |')
-              md.append('')
-
-          md.append('---')
-          md.append('> _由 CI `code-quality` job 自动生成，数据来源: SonarCloud API_')
-
-          comment_body = '\n'.join(md)
-
-          # --- 发布/更新 PR 评论 ---
-          comment_file = '/tmp/sonar_comment.md'
-          with open(comment_file, 'w') as f:
-              f.write(comment_body)
-
-          # 查找所有旧报告评论并删除（通过 HTML 标记 sonarcloud-report）
-          # 删除全部旧评论后创建新评论，确保 PR 上始终只有一条最新报告
-          result = subprocess.run(
-              ['gh', 'api', f'repos/{repo}/issues/{pr_number}/comments', '--paginate',
-               '--jq', '.[] | select(.body | contains("<!-- sonarcloud-report -->")) | .id'],
-              capture_output=True, text=True
-          )
-          existing_ids = [x.strip() for x in result.stdout.strip().split('\n') if x.strip()]
-
-          if existing_ids:
-              for cid in existing_ids:
-                  print(f"Deleting old comment {cid}")
-                  subprocess.run(
-                      ['gh', 'api', '--method', 'DELETE',
-                       f'repos/{repo}/issues/comments/{cid}'],
-                      capture_output=True
-                  )
-
-          # 创建新评论（始终为最新内容，出现在 PR 评论列表顶部）
-          print("Creating new PR comment")
-          subprocess.run(
-              ['gh', 'api', '--method', 'POST',
-               f'repos/{repo}/issues/{pr_number}/comments',
-               '-F', f'body=@{comment_file}'],
-              check=True
-          )
-          print("Created new comment")
-          PYEOF
+          REPO: ${{ github.repository }}
+        run: python3 scripts/sonar-pr-comment.py
 
   # Android 客户端构建验证
   android-build:
@@ -1487,7 +991,17 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+
+      - name: 缓存 Android NDK
+        # 缓存 NDK 产物，避免每次构建都重新下载
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.android/sdk/ndk/*
+          key: android-ndk-${{ hashFiles('**/build.gradle*', '**/gradle-wrapper.properties') }}-x86_64
+          restore-keys: |
+            android-ndk-
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
@@ -1513,7 +1027,7 @@ jobs:
 
       - name: Generate Gradle Wrapper
         working-directory: android
-        run: gradle wrapper --gradle-version 8.7
+        run: gradle wrapper --gradle-version 8.10
 
       - name: Build Debug APK
         working-directory: android
@@ -1563,7 +1077,7 @@ jobs:
         run: cargo build -p aether-core-ffi --target x86_64-pc-windows-msvc --release
 
       - name: Upload Rust DLL artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: aether-core-windows-dll
           path: rust/target/x86_64-pc-windows-msvc/release/aether_core_ffi.dll
@@ -1572,7 +1086,7 @@ jobs:
 
       - name: Download Rust DLL into Native/
         # 下载刚上传的 DLL 到 windows/Aether.Windows/Native/，供 csproj 引用并复制到输出目录
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: aether-core-windows-dll
           path: windows/Aether.Windows/Native
@@ -1621,7 +1135,15 @@ jobs:
           workspaces: rust
 
       - name: Install wasm-pack
-        run: cargo install wasm-pack || true
+        # M-C5: 原 `cargo install wasm-pack || true` 静默吞错，无法区分
+        # "已安装" 与 "网络失败"。改为先检查命令是否可用，未安装时再执行
+        # cargo install；安装失败让 step 明确失败，便于诊断。
+        run: |
+          if command -v wasm-pack > /dev/null 2>&1; then
+            echo "wasm-pack already installed: $(wasm-pack --version)"
+          else
+            cargo install wasm-pack
+          fi
 
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
@@ -1662,7 +1184,13 @@ jobs:
           packages: 'ndk;27.0.12077973'
 
       - name: Install cargo-ndk
-        run: cargo install cargo-ndk || true
+        # M-C5: 同 wasm-pack，先检查再安装，避免静默吞错
+        run: |
+          if command -v cargo-ndk > /dev/null 2>&1; then
+            echo "cargo-ndk already installed: $(cargo-ndk --version)"
+          else
+            cargo install cargo-ndk
+          fi
 
       - name: Build Android .so (aarch64 + x86_64)
         # cargo-ndk 自动配置 NDK linker，构建两个 ABI 的 cdylib 产物。
@@ -1761,6 +1289,12 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Select Xcode (latest)
+        id: setup-xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: 'latest'
+
       - name: 缓存 DerivedData 和 SPM
         # 缓存 Xcode 构建产物和 Swift Package Manager 依赖，
         # 基于锁文件生成 cache key，支持部分命中回退
@@ -1771,7 +1305,7 @@ jobs:
             ~/Library/Developer/Xcode/DerivedData
             ~/Library/Caches/org.swift.swiftpm
             .build
-          key: ${{ runner.os }}-xcode-watch-widget-${{ hashFiles('Packages/AetherCore/Package.resolved', 'Aether.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+          key: ${{ runner.os }}-xcode-${{ steps.setup-xcode.outputs.xcode-version }}-watch-widget-${{ hashFiles('Packages/AetherCore/Package.resolved', 'Aether.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
           restore-keys: |
             ${{ runner.os }}-xcode-watch-widget-
 
@@ -1780,11 +1314,6 @@ jobs:
         with:
           name: aether-core-xcframework
           path: Packages/AetherCore
-
-      - name: Select Xcode (latest)
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: 'latest'
 
       # target 完整性验证：检查 Watch/Widget 目录、核心源文件、scheme 注册与 entitlements App Group 配置
       - name: Verify Watch/Widget targets

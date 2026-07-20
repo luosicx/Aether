@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import os
 import AetherFoundation
 import AetherServices
 
@@ -104,14 +105,34 @@ final class SettingsViewModel {
     }
 
     /// Day 15 / Task 5: 非敏感字段写入 UserDefaults，userToken 写入 Keychain。
+    ///
+    /// P1-11 (H-S5): 比较新旧 token，若不同则更新 `tokenIssuedAt` 为当前时间，作为客户端 TTL 检查的起点。
+    /// - 新 token 非空且与旧 token 不同 → tokenIssuedAt = Date()
+    /// - 新 token 与旧 token 相同 → 保留原 tokenIssuedAt
+    /// - 新 token 为空 → tokenIssuedAt = nil（清空时一并清除签发时间）
     func saveBFFConfig() {
+        // P1-11: 读取 Keychain 中的旧 token，与新 token 比较以决定是否更新签发时间
+        let oldToken = KeychainManager.shared.read(key: BFFConfig.userTokenKeychainAccount) ?? ""
+        if bffConfig.userToken != oldToken {
+            // Token 变更：非空时记录签发时间，空时清除
+            bffConfig.tokenIssuedAt = bffConfig.userToken.isEmpty ? nil : Date()
+        }
         if let data = try? JSONEncoder().encode(bffConfig.nonSensitive) {
             UserDefaults.standard.set(data, forKey: BFFConfig.userDefaultsKey)
+        } else {
+            // 编码失败：非敏感字段保留旧值
+            Logger.storage.error("BFF 非敏感配置编码失败，UserDefaults 保留旧值")
         }
-        try? KeychainManager.shared.save(
-            key: BFFConfig.userTokenKeychainAccount,
-            value: bffConfig.userToken
-        )
+        do {
+            try KeychainManager.shared.save(
+                key: BFFConfig.userTokenKeychainAccount,
+                value: bffConfig.userToken
+            )
+        } catch {
+            // userToken 写入 Keychain 失败：下次启动会读到旧 token，可能导致静默登出
+            // 至少记录日志便于排查；上层 saveMessage 由调用方决定是否提示
+            Logger.storage.error("BFF userToken 写入 Keychain 失败 (下次启动可能静默登出): \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     /// Task 5: 若 UserDefaults 中仍遗留旧版完整 BFFConfig（含 userToken），
@@ -122,13 +143,23 @@ final class SettingsViewModel {
         guard let legacy = try? JSONDecoder().decode(BFFConfig.self, from: data) else { return }
 
         if !legacy.userToken.isEmpty {
-            try? KeychainManager.shared.save(
-                key: BFFConfig.userTokenKeychainAccount,
-                value: legacy.userToken
-            )
+            do {
+                try KeychainManager.shared.save(
+                    key: BFFConfig.userTokenKeychainAccount,
+                    value: legacy.userToken
+                )
+            } catch {
+                // 旧版 userToken 迁移到 Keychain 失败：UserDefaults 中的 userToken 仍存在
+                // 下次启动会再次尝试迁移；若用户已重新登录，新 token 会覆盖旧值
+                Logger.storage.error("BFF 旧版 userToken 迁移到 Keychain 失败 (下次启动重试): \(error.localizedDescription, privacy: .public)")
+            }
         }
         if let newData = try? JSONEncoder().encode(legacy.nonSensitive) {
             UserDefaults.standard.set(newData, forKey: BFFConfig.userDefaultsKey)
+        } else {
+            // 非敏感字段编码失败：UserDefaults 仍保留旧版完整配置（含 userToken）
+            // 下次启动会再次尝试迁移
+            Logger.storage.error("BFF 旧版配置迁移: 非敏感字段编码失败，UserDefaults 仍保留旧版完整配置")
         }
     }
 
@@ -221,7 +252,12 @@ final class SettingsViewModel {
     func updateSystemPrompt(in conversation: Conversation?, modelContext: ModelContext?) {
         guard let conv = conversation else { return }
         conv.systemPrompt = systemPrompt
-        try? modelContext?.save()
+        do {
+            try modelContext?.save()
+        } catch {
+            // 系统提示词回写持久化失败：下次进入会话回退旧值
+            Logger.storage.error("系统提示词回写持久化失败 (下次进入会话回退旧值): \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     // MARK: - 工具启用状态

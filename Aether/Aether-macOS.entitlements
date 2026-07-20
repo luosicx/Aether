@@ -2,8 +2,22 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- App Sandbox 故意禁用：Aether 的核心能力是 AI 驱动的系统自动化（AppleScript /
+	     Terminal / File / Screenshot / InputAutomation / Safari / Finder 等工具）。
+	     启用 sandbox 会让 7 个 macOS 独有工具失效，破坏核心产品定位。
+	     替代安全控制（已落地）：
+	     1. ToolRegistry.defaultDisabledTools：6 个高危工具默认禁用（需用户主动授权）
+	     2. ToolRegistry.sensitiveTools：13 个敏感工具/子操作需显式授权
+	     3. ToolAuthorization：用户单次/始终授权弹窗
+	     4. PromptInjectionDetector：提示注入检测
+	     5. ToolAuditLogger：工具调用审计日志（写入 Caches）
+	     见 doc/ARCHITECTURE.md §4 工具能力章节。 -->
 	<key>com.apple.security.app-sandbox</key>
 	<false/>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.aether.app</string>
+	</array>
 	<key>com.apple.security.automation.apple-events</key>
 	<true/>
 	<key>com.apple.security.files.user-selected.read-write</key>

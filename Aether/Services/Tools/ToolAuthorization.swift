@@ -1,4 +1,5 @@
 import Foundation
+import os.locking
 #if os(iOS)
 import UIKit
 #else
@@ -15,13 +16,26 @@ enum ToolAuthorizationResult: Sendable, Equatable {
 
 /// 敏感/高危工具的运行时授权组件。
 /// 在调用可能泄露隐私或影响系统的工具前，强制弹出用户确认。
+///
+/// P1-4: 原实现使用 `private(set) var sessionAuthorizations / alwaysAuthorized` 暴露可变状态，
+/// 类标记 `@unchecked Sendable` 但跨 actor 读写无同步保护，存在数据竞争。
+/// 现改用 `OSAllocatedUnfairLock` 包裹两个 Set<String>，既保留单例 + @unchecked Sendable 模式，
+/// 又满足 Swift 6 严格并发要求。
 final class ToolAuthorization: @unchecked Sendable {
     static let shared = ToolAuthorization()
 
-    /// 本次启动内已授权（允许一次）的工具名集合
-    private(set) var sessionAuthorizations: Set<String> = []
-    /// 用户选择「始终允许」的工具名集合
-    private(set) var alwaysAuthorized: Set<String> = []
+    /// 本次启动内已授权（允许一次）的工具名集合。用锁保护跨 actor 读写。
+    private let sessionAuthorizationsLock = OSAllocatedUnfairLock(initialState: Set<String>())
+    /// 用户选择「始终允许」的工具名集合。同上，用锁保护。
+    private let alwaysAuthorizedLock = OSAllocatedUnfairLock(initialState: Set<String>())
+
+    /// 暴露给外部的只读快照（用于 DebugInfo / 设置页展示）
+    var sessionAuthorizations: Set<String> {
+        sessionAuthorizationsLock.withLock { $0 }
+    }
+    var alwaysAuthorized: Set<String> {
+        alwaysAuthorizedLock.withLock { $0 }
+    }
 
     /// 禁止「始终允许」的工具集合：这些工具风险过高，每次调用都必须用户确认。
     /// 包括任意 AppleScript 执行、终端命令执行和快捷指令执行。
@@ -39,10 +53,11 @@ final class ToolAuthorization: @unchecked Sendable {
 
     /// 查询某工具的当前授权状态
     func authorizationStatus(for toolName: String) -> ToolAuthorizationResult {
-        if alwaysAuthorized.contains(toolName) {
+        // 优先查询 alwaysAuthorized（持久化授权），再查询 sessionAuthorizations
+        if alwaysAuthorizedLock.withLock({ $0.contains(toolName) }) {
             return .authorized(sessionOnly: false)
         }
-        if sessionAuthorizations.contains(toolName) {
+        if sessionAuthorizationsLock.withLock({ $0.contains(toolName) }) {
             return .authorized(sessionOnly: true)
         }
         return .denied
@@ -128,7 +143,7 @@ final class ToolAuthorization: @unchecked Sendable {
 
     /// 授予指定工具本次启动内有效授权
     func grantSessionAuthorization(toolName: String) {
-        sessionAuthorizations.insert(toolName)
+        sessionAuthorizationsLock.withLock { $0.insert(toolName) }
     }
 
     /// 授予指定工具持久化授权，并写入 UserDefaults
@@ -138,8 +153,8 @@ final class ToolAuthorization: @unchecked Sendable {
 
     /// 撤销指定工具的所有授权（本次启动 + 持久化），并清理 UserDefaults
     func revokeAuthorization(toolName: String) {
-        sessionAuthorizations.remove(toolName)
-        alwaysAuthorized.remove(toolName)
+        sessionAuthorizationsLock.withLock { $0.remove(toolName) }
+        alwaysAuthorizedLock.withLock { $0.remove(toolName) }
         UserDefaults.standard.removeObject(forKey: "\(alwaysAuthorizedKeyPrefix)\(toolName)")
     }
 }
@@ -154,7 +169,7 @@ private extension ToolAuthorization {
                     UserDefaults.standard.removeObject(forKey: key)
                     continue
                 }
-                alwaysAuthorized.insert(toolName)
+                alwaysAuthorizedLock.withLock { $0.insert(toolName) }
             }
         }
     }
@@ -162,7 +177,7 @@ private extension ToolAuthorization {
     func grantAlways(_ toolName: String) {
         // 高危工具禁止持久化授权，每次调用都必须用户确认
         guard !neverAlwaysAllow.contains(toolName) else { return }
-        alwaysAuthorized.insert(toolName)
+        alwaysAuthorizedLock.withLock { $0.insert(toolName) }
         UserDefaults.standard.set(true, forKey: "\(alwaysAuthorizedKeyPrefix)\(toolName)")
     }
 
@@ -174,7 +189,7 @@ private extension ToolAuthorization {
         })
         if isSensitive {
             alert.addAction(UIAlertAction(title: "允许一次", style: .default) { [weak self] _ in
-                self?.sessionAuthorizations.insert(toolName)
+                self?.grantSessionAuthorization(toolName: toolName)
                 completion(.authorized(sessionOnly: true))
             })
             alert.addAction(UIAlertAction(title: "始终允许", style: .default) { [weak self] _ in
@@ -183,7 +198,7 @@ private extension ToolAuthorization {
             })
         } else {
             alert.addAction(UIAlertAction(title: "确认", style: .default) { [weak self] _ in
-                self?.sessionAuthorizations.insert(toolName)
+                self?.grantSessionAuthorization(toolName: toolName)
                 completion(.authorized(sessionOnly: true))
             })
         }
@@ -226,7 +241,7 @@ private extension ToolAuthorization {
         case .alertFirstButtonReturn:
             completion(.denied)
         case .alertSecondButtonReturn:
-            sessionAuthorizations.insert(toolName)
+            grantSessionAuthorization(toolName: toolName)
             completion(.authorized(sessionOnly: true))
         case .alertThirdButtonReturn where isSensitive:
             grantAlways(toolName)

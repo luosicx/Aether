@@ -5,6 +5,11 @@ import AetherRustC
 ///
 /// 所有 C ABI 返回的字符串均通过 `aether_free_string` 显式释放（见 `takeString`）。
 /// `AetherSseState` 由 Rust 拥有，`deinit` 时调用 `aether_sse_state_free` 释放。
+///
+/// 线程安全契约：实例应仅在单一 actor / 串行上下文中使用（如每个 LLM client
+/// 持有自己的 `SSEParser` 实例）。`parseWithTools` 使用 Rust 侧 `state` 累积
+/// 跨 chunk 状态，跨 actor 共享需在调用点加 NSLock。
+/// `extractContent` / `parseChunk` 是纯函数，无状态依赖，可并发调用。
 public final class AetherRustSSEParser: @unchecked Sendable {
     private let state: OpaquePointer
 

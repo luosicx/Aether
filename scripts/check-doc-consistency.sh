@@ -10,15 +10,28 @@ echo ""
 
 # 1. 从代码中统计实际数字
 # i18n key 数（xcstrings JSON 中 "strings" 下的条目数）
-I18N_KEYS=$(python3 -c "import json; data=json.load(open('Aether/Resources/Localizable.xcstrings')); print(len(data.get('strings',{})))" 2>/dev/null || echo "0")
+# M-C12: 原 `|| echo "0"` 在 python3 失败时会产生 "0\n0"（python 输出 + echo 输出），
+#        导致后续算术运算报 "syntax error: invalid arithmetic operator"。
+#        改用 `|| true`：保留 python 的 stdout（失败时为空），再在算术运算前用 ${VAR:-0} 兜底。
+I18N_KEYS=$(python3 -c "import json; data=json.load(open('Aether/Resources/Localizable.xcstrings')); print(len(data.get('strings',{})))" 2>/dev/null || true)
+I18N_KEYS=${I18N_KEYS:-0}
 
 # 工具数（跨平台工具 + macOS 独有工具）
-CROSS_TOOLS=$(grep -c '^\s*register(tool:' Aether/Services/Tools/ToolRegistry.swift 2>/dev/null || echo "0")
-MACOS_TOOLS=$(grep -c '^\s*register(tool:' Aether/Services/Tools/ToolRegistry+macOS.swift 2>/dev/null || echo "0")
+# 注：ToolRegistry.swift 中 registerBatch 内部的 `register(tool: tool)` 是辅助调用，不算工具注册；
+# 用精确匹配 `register(tool: <TypeName>())` 形式才能准确计数。
+# M-C12: grep -c 在无匹配时退出码 1 + stdout "0"，`|| echo "0"` 会产生 "0\n0" 触发算术错误。
+#        改用 `|| true` 保留 grep 的 "0" 输出。
+CROSS_TOOLS=$(grep -cE '^\s*register\(tool:\s*[A-Z][A-Za-z0-9_]*\(\)\)' Aether/Services/Tools/ToolRegistry.swift 2>/dev/null || true)
+CROSS_TOOLS=${CROSS_TOOLS:-0}
+MACOS_TOOLS=$(grep -cE '^\s*register\(tool:\s*[A-Z][A-Za-z0-9_]*\(\)\)' Aether/Services/Tools/ToolRegistry+macOS.swift 2>/dev/null || true)
+MACOS_TOOLS=${MACOS_TOOLS:-0}
 TOOL_COUNT=$((CROSS_TOOLS + MACOS_TOOLS))
 
-# 测试数
-TEST_COUNT=$(grep -r "func test" AetherTests/ 2>/dev/null | grep -c "func test" || echo "0")
+# 测试数：精确匹配 XCTest 测试方法定义 `func testXxx(`，避免匹配注释或 helper
+# 注：grep -E | wc -l 模式下，grep 无匹配退出 1，pipefail 让管道退出 1，
+#     `|| true` 防止 set -e 退出脚本，wc -l 输出 "0" 被保留。
+TEST_COUNT=$(grep -rhE '^\s*func test\w+\s*\(' AetherTests/ 2>/dev/null | wc -l | tr -d ' ' || true)
+TEST_COUNT=${TEST_COUNT:-0}
 
 echo "代码统计:"
 echo "  i18n keys: $I18N_KEYS"

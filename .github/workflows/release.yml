@@ -28,17 +28,30 @@ jobs:
     outputs:
       version: ${{ steps.v.outputs.version }}
       tag: ${{ steps.v.outputs.tag }}
+      is_prerelease: ${{ steps.prerelease.outputs.is_prerelease }}
     steps:
       - id: v
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag }}
         run: |
-          if [ -n "${{ github.event.inputs.tag }}" ]; then
-            VERSION="${{ github.event.inputs.tag }}"
+          if [ -n "$INPUT_TAG" ]; then
+            VERSION="$INPUT_TAG"
           else
             VERSION="${GITHUB_REF_NAME#v}"
           fi
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
           echo "Releasing version: ${VERSION} (tag: v${VERSION})"
+
+      - name: Determine prerelease status
+        id: prerelease
+        run: |
+          TAG="${{ github.ref_name }}"
+          if [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-(rc|beta|alpha)[0-9]* ]]; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+          fi
 
   # ============================================================
   # iOS: 构建 iOS Simulator .app（无签名，仅用于模拟器调试）
@@ -77,23 +90,27 @@ jobs:
           fi
           echo "Found app: $APP_PATH"
           cd "$(dirname "$APP_PATH")"
-          ditto -c -k --keepParent Aether.app "$GITHUB_WORKSPACE/Aether-iOS-${{ needs.meta.outputs.version }}-simulator.zip"
+          ditto -c -k --keepParent Aether.app "$GITHUB_WORKSPACE/Aether-iOS-${{ needs.meta.outputs.version }}.zip"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
           name: ios-app
-          path: Aether-iOS-${{ needs.meta.outputs.version }}-simulator.zip
+          path: Aether-iOS-${{ needs.meta.outputs.version }}.zip
           if-no-files-found: error
           retention-days: 14
 
   # ============================================================
-  # macOS: 使用 scripts/build-dmg.sh 产出 unsigned .dmg
+  # macOS: 使用 scripts/build-dmg.sh 产出 .dmg（根据 secrets 自动选择签名/未签名模式）
   # ============================================================
   build-macos:
     needs: meta
     runs-on: macos-15
     timeout-minutes: 45
+    outputs:
+      sign-mode:
+        description: 'Signing mode (signed or unsigned)'
+        value: ${{ steps.sign-mode.outputs.mode }}
     steps:
       - uses: actions/checkout@v5
 
@@ -102,26 +119,51 @@ jobs:
         with:
           xcode-version: 'latest'
 
-      - name: Build unsigned .dmg
+      - name: Determine signing mode
+        id: sign-mode
+        run: |
+          if [ -n "${{ secrets.DEVELOPER_ID_APPLICATION }}" ] && \
+             [ -n "${{ secrets.APPLE_ID }}" ] && \
+             [ -n "${{ secrets.APP_SPECIFIC_PASSWORD }}" ] && \
+             [ -n "${{ secrets.TEAM_ID }}" ]; then
+            echo "mode=signed" >> $GITHUB_OUTPUT
+            echo "suffix=" >> $GITHUB_OUTPUT
+          else
+            echo "mode=unsigned" >> $GITHUB_OUTPUT
+            echo "suffix=-unsigned" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build and package DMG
+        env:
+          DEVELOPER_ID_APPLICATION: ${{ secrets.DEVELOPER_ID_APPLICATION }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APP_SPECIFIC_PASSWORD: ${{ secrets.APP_SPECIFIC_PASSWORD }}
+          TEAM_ID: ${{ secrets.TEAM_ID }}
         run: |
           chmod +x scripts/build-dmg.sh
-          ./scripts/build-dmg.sh --unsigned --app-version ${{ needs.meta.outputs.version }}
+          if [ "${{ steps.sign-mode.outputs.mode }}" = "signed" ]; then
+            ./scripts/build-dmg.sh --signed --notarize --app-version ${{ needs.meta.outputs.version }}
+          else
+            ./scripts/build-dmg.sh --unsigned --app-version ${{ needs.meta.outputs.version }}
+          fi
 
       - name: Rename to canonical filename
         run: |
-          SRC=$(find build/dmg -maxdepth 1 -name 'Aether-*unsigned.dmg' -type f | head -1)
+          VERSION="${{ needs.meta.outputs.version }}"
+          SUFFIX="${{ steps.sign-mode.outputs.suffix }}"
+          SRC=$(find build/dmg -maxdepth 1 -name "Aether-${VERSION}${SUFFIX}.dmg" -type f | head -1)
           if [ -z "$SRC" ]; then
-            echo "ERROR: unsigned dmg not found in build/dmg"
+            echo "ERROR: dmg not found in build/dmg (expected Aether-${VERSION}${SUFFIX}.dmg)"
             ls -la build/dmg
             exit 1
           fi
-          cp "$SRC" "Aether-macOS-${{ needs.meta.outputs.version }}-unsigned.dmg"
+          cp "$SRC" "Aether-macOS-${VERSION}${SUFFIX}.dmg"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
           name: macos-dmg
-          path: Aether-macOS-${{ needs.meta.outputs.version }}-unsigned.dmg
+          path: Aether-macOS-${{ needs.meta.outputs.version }}${{ steps.sign-mode.outputs.suffix }}.dmg
           if-no-files-found: error
           retention-days: 14
 
@@ -144,14 +186,14 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
       - name: Generate Gradle Wrapper
         working-directory: android
-        run: gradle wrapper --gradle-version 8.7
+        run: gradle wrapper --gradle-version 8.10
 
       - name: Build Release APK
         working-directory: android
@@ -209,7 +251,7 @@ jobs:
         run: |
           $version = "${{ needs.meta.outputs.version }}"
           $source = "windows/publish"
-          $dest = "Aether-Windows-${version}-win-x64.zip"
+          $dest = "Aether-Windows-${version}-x64.zip"
           if (-Not (Test-Path $source)) {
             Write-Error "publish folder not found: $source"
             exit 1
@@ -221,7 +263,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: windows-zip
-          path: Aether-Windows-${{ needs.meta.outputs.version }}-win-x64.zip
+          path: Aether-Windows-${{ needs.meta.outputs.version }}-x64.zip
           if-no-files-found: error
           retention-days: 14
 
@@ -236,9 +278,10 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Setup Node.js
+        # D-1: Node.js 20 已于 2026-04-30 EOL，升级到 22 LTS（向后兼容）
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Install dependencies
         working-directory: CloudflareWorkers
@@ -246,9 +289,13 @@ jobs:
           if [ -f package.json ]; then npm install --no-audit --no-fund || true; fi
 
       - name: Run tests (best-effort)
+        # M-C6: 原 `continue-on-error: true` + `|| true` 双重吞错，测试失败时 step 状态
+        # 仍为 success，开发者无法从 CI 状态判断 BFF 测试是否通过。
+        # 移除 `|| true`，保留 continue-on-error: true（发布流程不阻塞），
+        # 让 step 状态正确反映测试结果，便于发布后追踪。
         working-directory: CloudflareWorkers
         continue-on-error: true
-        run: npm test || true
+        run: npm test
 
       - name: Package BFF source
         run: |
@@ -320,51 +367,50 @@ jobs:
           echo "=== Downloaded release assets ==="
           ls -lh release-assets/
 
+      - name: Generate SHA256 checksums
+        run: |
+          cd release-assets/
+          for f in *; do
+            if [ -f "$f" ]; then
+              shasum -a 256 "$f" > "$f.sha256"
+            fi
+          done
+          echo "Generated SHA256 files:"
+          ls -lh *.sha256
+
       - name: Extract release notes from CHANGELOG.md
         id: notes
         run: |
           VERSION="${{ needs.meta.outputs.version }}"
-          # 从 doc/CHANGELOG.md 中提取 1.0.0 段落（从 "## [1.0.0]" 到下一个 "## "）
-          # 若未找到则回退为通用模板
-          NOTES=$(python3 - "$VERSION" <<'PYEOF'
-          import sys, re, pathlib
-          version = sys.argv[1]
-          changelog = pathlib.Path("doc/CHANGELOG.md")
-          if not changelog.exists():
-              print(f"## Aether v{version}")
-              sys.exit(0)
-          text = changelog.read_text(encoding="utf-8")
-          # 匹配 ## [1.0.0] 或 ## 1.0.0
-          m = re.search(rf"(?m)^## (?:\[)?{re.escape(version)}(?:\])?[^\n]*\n(?:(?!^## ).)+", text, re.S)
-          if m:
-              # 去掉首部 "## [1.0.0] ..." 行，保留正文
-              body = re.sub(rf"(?m)^## (?:\[)?{re.escape(version)}(?:\])?[^\n]*\n", "", m.group(0))
-              print(body.strip())
-          else:
-              print(f"## Aether v{version}")
-          PYEOF
-          )
+          NOTES=$(python3 scripts/extract-release-notes.py "$VERSION")
           {
             echo "notes<<EOF"
             echo "$NOTES"
             echo "EOF"
           } >> $GITHUB_OUTPUT
 
+      - name: Append unsigned notice
+        if: needs.build-macos.outputs.sign-mode == 'unsigned'
+        run: |
+          echo "" >> /tmp/release-notes.md
+          echo "⚠️ macOS DMG 未签名，首次打开需右键 → 打开绕过 Gatekeeper" >> /tmp/release-notes.md
+
       - name: Create GitHub Release and upload assets
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.meta.outputs.tag }}
-          name: Aether v${{ needs.meta.outputs.version }}
+          name: Aether v${{ needs.meta.outputs.version }}${{ needs.meta.outputs.is_prerelease == 'true' && ' (Pre-Release)' || '' }}
           body: ${{ steps.notes.outputs.notes }}
           draft: false
-          prerelease: false
+          prerelease: ${{ needs.meta.outputs.is_prerelease }}
           generate_release_notes: false
           files: |
-            release-assets/Aether-iOS-${{ needs.meta.outputs.version }}-simulator.zip
-            release-assets/Aether-macOS-${{ needs.meta.outputs.version }}-unsigned.dmg
+            release-assets/Aether-iOS-${{ needs.meta.outputs.version }}.zip
+            release-assets/Aether-macOS-*.dmg
             release-assets/Aether-Android-${{ needs.meta.outputs.version }}.apk
-            release-assets/Aether-Windows-${{ needs.meta.outputs.version }}-win-x64.zip
+            release-assets/Aether-Windows-${{ needs.meta.outputs.version }}-x64.zip
             release-assets/Aether-BFF-${{ needs.meta.outputs.version }}.zip
             release-assets/Aether-${{ needs.meta.outputs.version }}-source.tar.gz
             release-assets/Aether-${{ needs.meta.outputs.version }}-source.zip
+            release-assets/*.sha256
           fail_on_unmatched_files: false

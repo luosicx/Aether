@@ -10,8 +10,26 @@ import ActivityKit
 #endif
 
 /// 非隔离的通知观察者持有者，用于在 deinit 中安全移除观察者。
+///
+/// P1-5: 原实现 `var token: NSObjectProtocol?` 跨 actor 读写无同步保护。
+/// ChatViewModel 的 init 在 @MainActor 上写 token，但 deinit 在 nonisolated 上下文读 token，
+/// 存在数据竞争。用 NSLock 包裹 token 字段（NSObjectProtocol 非 Sendable，不能用 OSAllocatedUnfairLock<State>）。
 private final class ErrorObserver: @unchecked Sendable {
-    var token: NSObjectProtocol?
+    private var _token: NSObjectProtocol?
+    private let lock = NSLock()
+
+    var token: NSObjectProtocol? {
+        get {
+            lock.lock()
+            defer { lock.unlock() }
+            return _token
+        }
+        set {
+            lock.lock()
+            defer { lock.unlock() }
+            _token = newValue
+        }
+    }
 }
 
 /// 核心 ViewModel，管理聊天消息、流式输出、工具调用、RAG 检索、语音输入输出、灵动岛 Live Activity。
@@ -545,7 +563,14 @@ final class ChatViewModel {
         let storage = ChatStorage(modelContext: modelContext)
         // Task 21: 使用 ChatStorage.forkConversation 创建分叉对话
         // 设置 parentConversationID / parentMessageID 并复制所有消息字段
-        return try? storage.forkConversation(from: conversation, at: fromMessage.id)
+        do {
+            return try storage.forkConversation(from: conversation, at: fromMessage.id)
+        } catch {
+            // 分叉失败：UI 仅表现为「未创建分叉」，用户无法区分失败与无操作
+            // 记录日志便于排查 forkConversation 内部数据问题
+            Logger.chat.error("对话分叉失败 (fromMessageId=\(fromMessage.id, privacy: .public)): \(error.localizedDescription, privacy: .public)")
+            return nil
+        }
     }
 
     /// Task 6: 消息处理主流程（状态机编排）。
@@ -647,17 +672,33 @@ final class ChatViewModel {
         // Day 17: 注入健康上下文（最近 24h 睡眠/心率/步数）
         #if os(iOS)
         // S1066: 合并嵌套 if
-        if injectHealthContext, let healthService = healthKitService, healthService.isAuthorized,
-           let summary = try? await healthService.fetchDailySummary() {
-            let healthLine = String(format: NSLocalizedString("用户最近 24h：%@", comment: ""), String(format: NSLocalizedString("睡眠 %.1fh，心率均值 %.0fbpm，步数 %d", comment: ""), summary.sleepHours, summary.avgHeartRate, summary.stepCount))
-            effectiveSystemPrompt = (effectiveSystemPrompt.isEmpty ? "" : effectiveSystemPrompt + "\n") + healthLine
+        if injectHealthContext, let healthService = healthKitService, healthService.isAuthorized {
+            // P2-2: 将 try? 改为 do/catch + Logger.warning，便于诊断 HealthKit 失败原因
+            let summary: HealthDailySummary?
+            do {
+                summary = try await healthService.fetchDailySummary()
+            } catch {
+                Logger.chat.warning("fetchDailySummary 失败：\(error.localizedDescription, privacy: .public)")
+                summary = nil
+            }
+            if let summary = summary {
+                let healthLine = String(format: NSLocalizedString("用户最近 24h：%@", comment: ""), String(format: NSLocalizedString("睡眠 %.1fh，心率均值 %.0fbpm，步数 %d", comment: ""), summary.sleepHours, summary.avgHeartRate, summary.stepCount))
+                effectiveSystemPrompt = (effectiveSystemPrompt.isEmpty ? "" : effectiveSystemPrompt + "\n") + healthLine
+            }
         }
         #endif
 
         // Task 8: 注入语义记忆检索（可选，semanticMemoryStore 为 nil 时跳过）
         // 检索与当前查询相关的记忆并追加到 systemPrompt 末尾
         if let memoryStore = semanticMemoryStore {
-            let memories = (try? await memoryStore.retrieveRelevantMemories(query: text)) ?? []
+            // P2-2: 将 try? 改为 do/catch + Logger.warning，便于诊断记忆检索失败原因
+            let memories: [Memory]
+            do {
+                memories = try await memoryStore.retrieveRelevantMemories(query: text)
+            } catch {
+                Logger.chat.warning("retrieveRelevantMemories 失败，已降级为空数组：\(error.localizedDescription, privacy: .public)")
+                memories = []
+            }
             let memoryText = memoryStore.formatMemoriesForPrompt(memories)
             if !memoryText.isEmpty {
                 effectiveSystemPrompt = (effectiveSystemPrompt.isEmpty ? "" : effectiveSystemPrompt + "\n") + memoryText
@@ -672,7 +713,13 @@ final class ChatViewModel {
         // 在 token 截断前压缩历史消息，保留重要消息与近期消息，旧消息摘要化
         let conversationMessages: [ChatMessage]
         if let contextManager = contextWindowManager {
-            conversationMessages = (try? await contextManager.compress(messages: conversation.messages, maxTokens: tokenLimit)) ?? conversation.messages
+            // P2-2: 将 try? 改为 do/catch + Logger.warning，便于诊断压缩失败原因
+            do {
+                conversationMessages = try await contextManager.compress(messages: conversation.messages, maxTokens: tokenLimit)
+            } catch {
+                Logger.chat.warning("contextManager.compress 失败，已降级为原始消息：\(error.localizedDescription, privacy: .public)")
+                conversationMessages = conversation.messages
+            }
         } else {
             conversationMessages = conversation.messages
         }
@@ -729,7 +776,15 @@ final class ChatViewModel {
             currentCitations = []
             // 仅在非工具模式下需要 embedding（缓存用）；工具模式下不查不写缓存
             if !toolsEnabled {
-                ctx.queryEmbedding = (try? await ctx.llmClient.embed(texts: [ctx.text], apiKey: ctx.apiKey)).flatMap { $0.first } ?? []
+                // P2-2: 将 try? 改为 do/catch + Logger.warning，便于诊断 embedding 失败原因
+                let embeddings: [[Float]]
+                do {
+                    embeddings = try await ctx.llmClient.embed(texts: [ctx.text], apiKey: ctx.apiKey)
+                } catch {
+                    Logger.chat.warning("llmClient.embed 失败，已降级为空 embedding：\(error.localizedDescription, privacy: .public)")
+                    embeddings = []
+                }
+                ctx.queryEmbedding = embeddings.first ?? []
             }
         }
     }
@@ -888,7 +943,13 @@ final class ChatViewModel {
                 let arguments: String
             }
             let stored = toolCalls.map { StoredToolCall(id: $0.id, type: $0.type, name: $0.name, arguments: $0.arguments) }
-            return try? JSONEncoder().encode(stored)
+            do {
+                return try JSONEncoder().encode(stored)
+            } catch {
+                // toolCalls 编码失败：toolCallData 留空，LLM 多轮调用上下文丢失
+                Logger.chat.error("持久化 assistant 消息: toolCalls 编码失败: \(error.localizedDescription, privacy: .public)")
+                return nil
+            }
         }()
         let assistantMsg = ChatMessage(role: "assistant", content: chunkContent, toolCallData: toolCallsData)
         assistantMsg.conversation = ctx.conversation

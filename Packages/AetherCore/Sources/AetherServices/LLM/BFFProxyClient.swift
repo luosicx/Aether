@@ -5,25 +5,43 @@ import AetherFoundation
 /// 将设备端请求转发到 BFF 网关（Cloudflare Workers），由服务端持有上游 API Key，
 /// 设备仅携带 X-BFF-Token 鉴权。请求体结构与 DeepSeekClient 一致，SSE 解析复用 SSEParser。
 /// nonisolated 设计允许跨 actor 调用。
+///
+/// P1-12 (H-S1): 当 `config.pinnedSPKIHashes` 非空时，自动创建带 `CertificatePinningDelegate`
+/// 的 URLSession 启用 SSL Pinning（防止 MITM）。pin 为空时使用注入的 session（默认 .shared）。
 nonisolated public final class BFFProxyClient: LLMProvider, @unchecked Sendable {
     /// 路由目标上游供应商（写入 X-Provider Header，服务端据此选择上游 key/endpoint）
     private let provider: ModelProvider
-    /// BFF 配置（endpoint / token / 限流参数）
+    /// BFF 配置（endpoint / token / 限流参数 / SSL pin）
     private let config: BFFConfig
-    /// URLSession（默认 .shared，可注入用于测试）
+    /// URLSession（启用 Pinning 时为带 delegate 的实例；否则使用注入的 session）
     private let session: URLSession
     /// SSE 流解析器
     private let parser = SSEParser()
+    /// Pinning delegate 强引用，防止 URLSession 释放后被回收（仅 Pinning 启用时持有）
+    private let pinningDelegate: CertificatePinningDelegate?
 
     /// 构造 BFF 代理客户端
     /// - Parameters:
     ///   - provider: 路由目标供应商
-    ///   - config: BFF 配置
-    ///   - session: URLSession（默认 .shared）
+    ///   - config: BFF 配置（含 pinnedSPKIHashes）
+    ///   - session: URLSession（默认 .shared；当 config.pinnedSPKIHashes 非空时本参数被忽略，
+    ///     改用带 CertificatePinningDelegate 的新实例）
     public init(provider: ModelProvider, config: BFFConfig, session: URLSession = .shared) {
         self.provider = provider
         self.config = config
-        self.session = session
+        // P1-12: 配置了 SPKI pin 时创建带 delegate 的 URLSession
+        if config.isSSLPinningEnabled {
+            let delegate = CertificatePinningDelegate(pinnedHashes: config.pinnedSPKIHashes)
+            self.pinningDelegate = delegate
+            self.session = URLSession(
+                configuration: .default,
+                delegate: delegate,
+                delegateQueue: nil
+            )
+        } else {
+            self.pinningDelegate = nil
+            self.session = session
+        }
     }
 
     /// 纯文本 chat 流，返回 AsyncStream<String>，逐 chunk yield 文本内容
@@ -49,6 +67,14 @@ nonisolated public final class BFFProxyClient: LLMProvider, @unchecked Sendable 
     /// 注意：BFF 模式下 apiKey 参数不使用（服务端持有上游 key）。
     public func embed(texts: [String], apiKey: String) async throws -> [[Float]] {
         guard !texts.isEmpty else { return [] }
+        // P1-11 (H-S5): 客户端 TTL 检查——Token 过期则拒绝发送请求
+        if config.isTokenExpired {
+            let err = LLMError.llmErrorOccurred(NSLocalizedString("BFF Token 已过期，请在设置中重新设置", comment: ""))
+            await MainActor.run {
+                NotificationCenter.default.post(name: .llmErrorOccurred, object: nil, userInfo: ["error": err])
+            }
+            throw err
+        }
         // BFF 模式下 apiKey 不使用（服务端持有上游 key）
         let body: [String: Any] = [
             "model": provider.defaultEmbeddingModel,
@@ -153,6 +179,15 @@ nonisolated public final class BFFProxyClient: LLMProvider, @unchecked Sendable 
     /// 发送纯文本 chat 请求并流式解析 SSE。HTTP 错误发通知并 finish。
     /// 逐行解析 `data: ` 前缀，跳过 [DONE]，yield content。
     private func sendRequest(body: ChatRequestBody, apiKey: String, continuation: AsyncStream<String>.Continuation) async {
+        // P1-11 (H-S5): 客户端 TTL 检查——Token 过期则不发请求，发通知并 finish
+        if config.isTokenExpired {
+            let err = LLMError.llmErrorOccurred(NSLocalizedString("BFF Token 已过期，请在设置中重新设置", comment: ""))
+            await MainActor.run {
+                NotificationCenter.default.post(name: .llmErrorOccurred, object: nil, userInfo: ["error": err])
+            }
+            continuation.finish()
+            return
+        }
         // BFF 模式下 apiKey 不使用（服务端持有上游 key）
         guard let endpointURL = config.endpointURL,
               let url = URL(string: endpointURL.appending(path: "v1/chat/completions").absoluteString) else {
@@ -247,6 +282,15 @@ nonisolated public final class BFFProxyClient: LLMProvider, @unchecked Sendable 
 
     /// 发送带工具的 chat 请求并流式解析 SSE。用 SSEParser.parseWithToolAccumulation 累积 tool_calls。
     private func sendRequestWithTools(body: ChatRequestBody, apiKey: String, continuation: AsyncStream<ParsedChunk>.Continuation) async {
+        // P1-11 (H-S5): 客户端 TTL 检查——Token 过期则不发请求，发通知并 finish
+        if config.isTokenExpired {
+            let err = LLMError.llmErrorOccurred(NSLocalizedString("BFF Token 已过期，请在设置中重新设置", comment: ""))
+            await MainActor.run {
+                NotificationCenter.default.post(name: .llmErrorOccurred, object: nil, userInfo: ["error": err])
+            }
+            continuation.finish()
+            return
+        }
         // BFF 模式下 apiKey 不使用（服务端持有上游 key）
         guard let endpointURL = config.endpointURL,
               let url = URL(string: endpointURL.appending(path: "v1/chat/completions").absoluteString),

@@ -27,9 +27,9 @@ Aether v1.0.0 首次以多平台形式发布，覆盖 iOS / macOS / Android / Wi
 | 产物 | 平台 | 文件名 | 说明 |
 | --- | --- | --- | --- |
 | iOS Simulator App | iOS 17+ | `Aether-iOS-1.0.0-simulator.zip` | 无签名 simulator 包，仅供模拟器调试 |
-| macOS DMG | macOS 14+ | `Aether-macOS-1.0.0-unsigned.dmg` | 无签名 `.dmg`，需手动允许运行 |
+| macOS DMG | macOS 14+ | `Aether-macOS-1.0.0[-unsigned].dmg` | 签名模式由 CI secrets 自动判断（4 个 secrets 齐全时签名+公证，否则 unsigned），未签名版本需手动允许运行 |
 | Android APK | Android API 29+ | `Aether-Android-1.0.0.apk` | Release 构建配置 + debug 签名 |
-| Windows Zip | Windows 10/11 x64 | `Aether-Windows-1.0.0-win-x64.zip` | .NET 8 自包含，无需运行时依赖 |
+| Windows Zip | Windows 10/11 x64 | `Aether-Windows-1.0.0-x64.zip` | .NET 8 自包含，无需运行时依赖 |
 | BFF 源码包 | Cloudflare Workers | `Aether-BFF-1.0.0.zip` | `wrangler deploy` 部署 |
 | 源码归档 | 通用 | `Aether-1.0.0-source.tar.gz` / `.zip` | 标签指向的完整源码 |
 
@@ -57,7 +57,7 @@ Aether v1.0.0 首次以多平台形式发布，覆盖 iOS / macOS / Android / Wi
 - USAGE.md 新增 macOS 系统集成与性能监控章节
 - MANUAL_TEST_CHECKLIST.md 手测项四字段结构化（前置条件 / 操作步骤 / 预期结果 / 失败排查）
 - ReleaseChecklist.md 新增 4.4-4.7 审计项（多平台构建 / 工具数 / 测试规模 / 文档完整性）
-- **完整国际化补全**：`Localizable.xcstrings` 从 55 核心 key 扩展至 887 keys，覆盖 Views / ViewModels / Services / AppIntents / Core；新增 `scripts/` 提取/翻译/合并工具链
+- **完整国际化补全**：`Localizable.xcstrings` 从 55 核心 key 扩展至 888 keys，覆盖 Views / ViewModels / Services / AppIntents / Core；新增 `scripts/` 提取/翻译/合并工具链
 - **无障碍全面增强**：7 个核心视图新增约 75 个 `accessibilityLabel` / `accessibilityHint` / `accessibilityIdentifier`
 - **项目截图**：`screenshots/` 新增 8 张 iOS / macOS 核心页面截图
 - **后续规划文档**：新增 `doc/ROADMAP.md`、`doc/OPTIMIZATION.md`

@@ -105,11 +105,13 @@ actor MLXInferenceEngine {
             isLoaded = true
             lastLoadError = nil
         } catch {
-            lastLoadError = .loadFailed(error.localizedDescription)
-            throw OnDeviceError.loadFailed(error.localizedDescription)
+            // P2-3: 携带 underlying 保留原始 Error 上下文，避免 error.localizedDescription 丢失类型信息
+            lastLoadError = .loadFailedWithCause(message: error.localizedDescription, underlying: error)
+            throw OnDeviceError.loadFailedWithCause(message: error.localizedDescription, underlying: error)
         }
         #else
         // 占位：mlx-swift 未集成时（模拟器或未添加 SPM 依赖），无法真正加载模型
+        // 无底层 error 可携带，使用向后兼容的 loadFailed(String) 变体
         lastLoadError = .loadFailed(NSLocalizedString("mlx-swift 未集成，端侧推理不可用", comment: ""))
         throw OnDeviceError.loadFailed(NSLocalizedString("mlx-swift 未集成，端侧推理不可用", comment: ""))
         #endif
@@ -288,8 +290,9 @@ actor MLXInferenceEngine {
             self.isLoaded = true
             self.lastLoadError = nil
         } catch {
-            self.lastLoadError = .loadFailed(error.localizedDescription)
-            throw OnDeviceError.loadFailed(error.localizedDescription)
+            // P2-3: 携带 underlying 保留原始 Error 上下文，避免 error.localizedDescription 丢失类型信息
+            self.lastLoadError = .loadFailedWithCause(message: error.localizedDescription, underlying: error)
+            throw OnDeviceError.loadFailedWithCause(message: error.localizedDescription, underlying: error)
         }
     }
 

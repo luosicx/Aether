@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import os
 import AetherServices
 
 /// 记忆管理服务，封装 Memory 的存储、语义检索（基于 embedding 相似度）与关键词搜索。@MainActor 隔离。
@@ -102,7 +103,9 @@ final class MemoryService {
         do {
             try await store.upsert(id: memory.id, embedding: memory.embedding, metadata: metadata)
         } catch {
-            // 静默降级：VectorStore 写入失败不影响主流程
+            // 静默降级：VectorStore 写入失败不影响主流程，但记录日志便于排查
+            // 「记忆存在但语义检索召回不到」类问题。SwiftData 主表已写入，用户体验不受影响。
+            Logger.memory.error("VectorStore upsert 失败 (memoryId=\(memory.id, privacy: .public)): \(error.localizedDescription, privacy: .public)")
         }
     }
 

@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import os
 
 /// Task 20 阶段 3: 检查点管理器（@MainActor，与 AgentTask 同隔离）。
 ///
@@ -109,8 +110,11 @@ final class CheckpointManager {
         do {
             try modelContext.save()
         } catch {
-            // 持久化失败：记录但不抛错（避免阻塞执行流程）
-            // 上层可通过 task.checkpointAt 判断是否成功
+            // 持久化失败：记录但不抛错（避免阻塞执行流程）。
+            // 注意：上层无法仅凭 task.checkpointAt 判断持久化是否真正落盘，
+            // 因为 recordCheckpoint 已更新内存中的 task 字段；此处记录日志便于
+            // 后续诊断「恢复失败 / 状态不一致」问题。
+            Logger.agent.error("检查点持久化失败: \(error.localizedDescription, privacy: .public)")
         }
     }
 }

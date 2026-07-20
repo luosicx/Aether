@@ -11,8 +11,8 @@
 
 - iOS / iPad / macOS 三端原生 SwiftUI 渲染，`#if os(iOS)` 条件编译优雅降级
 - **25 个工具**（14 跨平台 + 11 macOS 独有），ReAct 循环最大 5 轮
-- **8 种语言** i18n（zh-Hans / zh-Hant / en / ja / ko / fr / de / es），887 keys
-- **2092 UT** + 30 UIT，0 failures / 0 skips
+- **8 种语言** i18n（zh-Hans / zh-Hant / en / ja / ko / fr / de / es），888 keys
+- **2771 UT** + 30 UIT，0 failures / 0 skips
 - 多 Provider（DeepSeek / Qwen / MLX 端侧）+ SmartRouter + Fallback 自动降级
 - SwiftLint + SwiftFormat 代码质量工具链，CI 集成脚本
 - **Watch App 源代码**就绪（`AetherWatch/`，⚠️ 需手动创建 Xcode target）

@@ -35,6 +35,7 @@ help: ## Show available targets
 	@echo "General:"
 	@echo "  make clean             Clean build artifacts"
 	@echo "  make all               Build Apple + Android"
+	@echo "  make install-hooks     Install Git pre-commit hooks (P1-13)"
 
 # ============================================================
 # Apple (iOS / macOS / Watch / Widget)
@@ -115,7 +116,7 @@ test-rust:
 # General
 # ============================================================
 
-.PHONY: clean all
+.PHONY: clean all install-hooks
 
 clean:
 	@./scripts/build.sh clean
@@ -123,3 +124,13 @@ clean:
 
 all: build-ios build-macos build-android
 	@echo "All platform builds completed."
+
+# P1-13 (H-C1): 安装 Git pre-commit hooks
+# 检查大文件、私钥泄露、合并冲突标记、SwiftLint/SwiftFormat 校验
+# 替代方案：使用 Python pre-commit 框架（见 .pre-commit-config.yaml）
+install-hooks:
+	@bash scripts/install-git-hooks.sh
+	@echo ""
+	@echo "Git hooks 安装完成。提交代码前将自动运行检查。"
+	@echo "卸载：rm .git/hooks/pre-commit"
+	@echo "替代方案（Python pre-commit）：见 .pre-commit-config.yaml"

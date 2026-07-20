@@ -16,4 +16,10 @@ extension Logger {
     static let network = Logger(subsystem: "com.aether.app", category: "network")
     /// 工具模块：ToolRegistry 及各工具执行日志
     static let tools = Logger(subsystem: "com.aether.app", category: "tools")
+    /// 记忆模块：MemoryService、VectorStore、AgingCompactor 等
+    static let memory = Logger(subsystem: "com.aether.app", category: "memory")
+    /// MCP 模块：MCPClient、MCPClientManager、MCPSecurity 等
+    static let mcp = Logger(subsystem: "com.aether.app", category: "mcp")
+    /// Agent 模块：AgentOrchestrator、DAGExecutionEngine、CheckpointManager 等
+    static let agent = Logger(subsystem: "com.aether.app", category: "agent")
 }

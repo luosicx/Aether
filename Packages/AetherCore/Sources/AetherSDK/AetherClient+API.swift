@@ -182,7 +182,8 @@ extension AetherClient {
         } catch let error as AetherError {
             throw error
         } catch {
-            throw AetherError.ragRetrievalFailed(reason: error.localizedDescription)
+            // P2-3: 携带 underlying 保留原始 Error 上下文
+            throw AetherError.ragRetrievalFailedWithCause(reason: error.localizedDescription, underlying: error)
         }
     }
 }

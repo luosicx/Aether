@@ -61,6 +61,8 @@ final class ToolAuditLogger {
             try handle.close()
         } catch {
             // 审计日志写入失败静默处理，避免影响主流程。
+            // 审计日志已通过 OSLog（os_log）记录，文件写失败不影响 OSLog 检索
+            Logger.tools.error("工具审计日志文件写入失败: \(error.localizedDescription, privacy: .public)")
         }
     }
 }

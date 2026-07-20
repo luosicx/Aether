@@ -67,7 +67,7 @@
 - [ ] ToolRegistry.swift 注册数验证：14 个跨平台工具无条件注册，11 个 macOS 独有工具用 `#if os(macOS)` 条件注册
 
 ### 4.3 测试规模
-- [ ] UT 用例数：2092
+- [ ] UT 用例数：2771
 - [ ] UIT 用例数：30
 - [ ] iOS UT 运行：`xcodebuild test -destination 'platform=iOS Simulator,name=iPhone 17'` 全部通过（0 skipped，0 failures）
 - [ ] UIT 运行全部通过（0 failures）
@@ -94,7 +94,7 @@
 
 ## 4.8 国际化与无障碍审计
 
-- [ ] `Localizable.xcstrings` 包含 887 keys，8 种语言（zh-Hans / zh-Hant / en / ja / ko / fr / de / es）翻译完整
+- [ ] `Localizable.xcstrings` 包含 888 keys，8 种语言（zh-Hans / zh-Hant / en / ja / ko / fr / de / es）翻译完整
 - [ ] 设置 → 语言切换（9 选项：跟随系统 + 8 种语言）后重启，各语言界面无残留中文
 - [ ] VoiceOver 可朗读设置页所有 Toggle / Picker / Button
 - [ ] 所有关键交互控件存在 `accessibilityIdentifier`（供 UITest 使用，当前覆盖 13 个元素）
@@ -151,8 +151,8 @@
 ## 4.12 测试规模审计
 
 ### 单元测试（UT）
-- [ ] UT 用例数 = 2092（2092 pass / 0 skip / 0 failures）
-- [ ] UT 文件数 = 115
+- [ ] UT 用例数 = 2771（2771 pass / 0 skip / 0 failures）
+- [ ] UT 文件数 = 157
 - [ ] 验证命令：
   ```bash
   xcodebuild test \
@@ -162,7 +162,7 @@
     -only-testing:AetherTests \
     CODE_SIGNING_ALLOWED=NO 2>&1 | tail -5
   ```
-- [ ] 预期输出包含：`Executed 2092 tests, with 0 failures, 0 skipped`
+- [ ] 预期输出包含：`Executed 2771 tests, with 0 failures, 0 skipped`
 
 ### UI 测试（UIT）
 - [ ] UIT 用例数 = 30（30 pass / 0 skip / 0 failures）
@@ -363,7 +363,97 @@
 - [ ] 动态字体（Dynamic Type）适配正常
 - [ ] 高对比度模式 UI 可读
 
-## 6. 提交审核
+## 6. 产物命名规则
+
+为统一各平台 Release 资产命名，便于用户识别与脚本化校验，所有 Release 产物遵循以下规则。
+
+### 6.1 命名格式
+
+```
+Aether-{Platform}-{version}[-{qualifier}].{ext}
+```
+
+- `Platform`：iOS / macOS / Android / Windows / BFF
+- `version`：与 tag 版本号一致（如 `1.2.0`）
+- `qualifier`：可选，仅在区分构建变体时使用（如 `-unsigned` / `-x64`）
+- `ext`：文件扩展名（zip / dmg / apk / tar.gz）
+
+### 6.2 各平台产物
+
+| 平台 | 文件名 | 说明 |
+| --- | --- | --- |
+| iOS | `Aether-iOS-{version}.zip` | iOS Simulator 构建产物 |
+| macOS | `Aether-macOS-{version}.dmg` | 签名 + 公证模式 |
+| macOS | `Aether-macOS-{version}-unsigned.dmg` | 未签名模式（qualifier=`-unsigned`） |
+| Android | `Aether-Android-{version}.apk` | |
+| Windows | `Aether-Windows-{version}-x64.zip` | qualifier=`-x64` |
+| BFF | `Aether-BFF-{version}.zip` | |
+| Source | `Aether-{version}-source.tar.gz` | 源码 tarball |
+| Source | `Aether-{version}-source.zip` | 源码 zip |
+
+### 6.3 校验文件
+
+每个 Release 资产附带同名 `.sha256` 校验文件（如 `Aether-macOS-1.2.0.dmg.sha256`），内容为对应文件的 SHA256 哈希值，格式兼容 `shasum -c` 命令（详见第 8 节）。
+
+## 7. macOS DMG 签名与公证
+
+### 7.1 CI 自动判断逻辑
+
+`release.yml` 的 `build-macos` job 根据仓库 Secrets 配置自动判断签名模式：
+
+- 当仓库配置了以下 4 个 secrets 时，自动调用 `./scripts/build-dmg.sh --signed --notarize`：
+  - `DEVELOPER_ID_APPLICATION`
+  - `APPLE_ID`
+  - `APP_SPECIFIC_PASSWORD`
+  - `TEAM_ID`
+- 否则回退至 unsigned 模式，调用 `./scripts/build-dmg.sh --unsigned`
+
+### 7.2 产物命名
+
+| 模式 | 产物文件名 |
+| --- | --- |
+| 签名 + 公证 | `Aether-macOS-{version}.dmg` |
+| 未签名 | `Aether-macOS-{version}-unsigned.dmg` |
+
+### 7.3 未签名模式 Release 备注
+
+未签名模式下，Release body 中包含以下提示：
+
+> ⚠️ macOS DMG 未签名，首次打开需右键 → 打开绕过 Gatekeeper
+
+### 7.4 启用签名模式
+
+在仓库 Settings → Secrets and variables → Actions 中配置以下 4 个 secrets 即可启用签名与公证：
+
+| Secret | 说明 |
+| --- | --- |
+| `DEVELOPER_ID_APPLICATION` | 签名身份，如 `Developer ID Application: Your Name (TEAMID)` |
+| `APPLE_ID` | Apple ID 账号邮箱 |
+| `APP_SPECIFIC_PASSWORD` | 在 https://appleid.apple.com 生成的 App-Specific Password |
+| `TEAM_ID` | Apple Developer Team ID |
+
+配置完成后，推送 `v*` tag 触发 release.yml 将自动产出签名与公证的 DMG；未配置 secrets 时自动回退 unsigned 模式，Release notes 中标注"未签名版本"。
+
+## 8. 产物 SHA256 校验
+
+每个 Release 资产附 `.sha256` 校验文件，用户下载产物后可执行校验命令验证完整性。
+
+### 8.1 校验命令
+
+下载产物与对应 `.sha256` 文件后，执行：
+
+```bash
+shasum -a 256 -c Aether-macOS-1.2.0.dmg.sha256
+# 预期输出：Aether-macOS-1.2.0.dmg: OK
+```
+
+### 8.2 说明
+
+- 校验文件格式兼容 `shasum -c` 命令，无需手动比对哈希值
+- 各平台通用：iOS / macOS / Android / Windows / BFF / Source 资产均附 `.sha256`
+- 若校验失败（输出 `FAILED`），请重新下载产物并再次校验
+
+## 9. 提交审核
 
 - [ ] 在 App Store Connect 选择构建版本 → 添加审核备注
 - [ ] 审核备注中说明：测试账号（如有）/ 触发特定功能的方法（如端侧模型下载）/ HealthKit 测试方式

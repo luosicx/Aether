@@ -69,6 +69,11 @@ public final class AetherRustSandboxModule: @unchecked Sendable {
 }
 
 /// 沙箱运行时实例（持有 store + instance）。
+///
+/// 线程安全契约：实例应仅在单一 actor 中使用（如 `PluginSandbox`）。
+/// 跨 actor 共享需在调用点加 NSLock，否则并发 `callJson` 会破坏 WASM store
+/// 状态（fuel / 线性内存 / 调用栈）。Rust FFI 层（`aether_sandbox_call_json`）
+/// 未加 Mutex，依赖外部串行化。
 public final class AetherRustSandboxInstance: @unchecked Sendable {
     fileprivate let handle: OpaquePointer
 
