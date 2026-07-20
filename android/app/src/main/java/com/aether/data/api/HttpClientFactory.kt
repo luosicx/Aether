@@ -1,5 +1,6 @@
 package com.aether.data.api
 
+import com.aether.app.BuildConfig
 import io.ktor.client.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.logging.*
