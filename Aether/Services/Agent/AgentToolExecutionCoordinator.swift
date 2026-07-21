@@ -1,18 +1,23 @@
 import Foundation
 
-/// Task 20 阶段 2: 工具执行协调器（actor 串行化）。
+/// Task 20 阶段 2: Agent DAG 工具执行协调器（actor 串行化）。
 ///
 /// 防止并行 DAG 节点同时调用 `ToolRegistry.shared.execute` 导致的工具状态不一致。
 /// 所有工具调用经此 actor 串行化排队，保证同一时刻仅一个工具执行。
+///
+/// 命名说明：P2-6 Task 10 新增 `ToolExecutionCoordinator`（@MainActor final class）
+/// 用于 ChatViewModel ReAct 工具执行循环；为避免同模块同名冲突，本 actor 类重命名为
+/// `AgentToolExecutionCoordinator`，语义更聚焦（服务于 Agent DAG 执行引擎）。
+/// 影响范围：`DAGExecutionEngine` 与其测试，行为零变化。
 ///
 /// 设计要点：
 /// - `actor` 隔离：天然串行化，无需额外锁
 /// - 复用 `ToolRegistry.shared` 单例，不替换底层工具注册机制
 /// - 调用日志通过 `ToolAuditLogger`（如存在）记录，便于追踪
-actor ToolExecutionCoordinator {
+actor AgentToolExecutionCoordinator {
 
     /// 共享实例（默认使用）
-    static let shared = ToolExecutionCoordinator()
+    static let shared = AgentToolExecutionCoordinator()
 
     /// 工具执行计数（用于审计与测试）
     private(set) var executionCount: Int = 0
@@ -22,7 +27,7 @@ actor ToolExecutionCoordinator {
     private var history: [ToolExecutionRecord] = []
     private let historyLimit = 100
 
-    /// 创建 ToolExecutionCoordinator（显式声明以便在 @MainActor 测试上下文中创建实例）
+    /// 创建 AgentToolExecutionCoordinator（显式声明以便在 @MainActor 测试上下文中创建实例）
     init() {
         // actor 隔离的默认构造器，所有属性已有初始值；
         // actor 默认 init 非 Sendable 时不便跨隔离域调用，故显式声明。

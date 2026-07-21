@@ -1,7 +1,7 @@
 import XCTest
 @testable import Aether
 
-/// Task 20 阶段 2: ToolExecutionCoordinator 单元测试。
+/// Task 20 阶段 2: AgentToolExecutionCoordinator 单元测试。
 ///
 /// 覆盖：
 /// - actor 初始状态（executionCount=0, currentToolName=nil, isIdle=true）
@@ -10,15 +10,19 @@ import XCTest
 /// - 历史记录环形缓冲（100 条上限）
 /// - reset() 清空状态
 /// - ToolExecutionRecord 字段（toolName/startedAt/finishedAt/success/error/duration）
+///
+/// 命名说明：P2-6 Task 10 新增 `ToolExecutionCoordinator`（@MainActor final class）用于
+/// ChatViewModel ReAct 工具执行循环；本测试类对应 actor 版本，重命名为
+/// `AgentToolExecutionCoordinatorTests` 以匹配被测类 `AgentToolExecutionCoordinator`。
 @MainActor
-final class ToolExecutionCoordinatorTests: XCTestCase {
+final class AgentToolExecutionCoordinatorTests: XCTestCase {
 
     /// 共享实例在跨测试间累积状态，使用独立实例避免互相干扰
-    private var coordinator: ToolExecutionCoordinator!
+    private var coordinator: AgentToolExecutionCoordinator!
 
     override func setUp() async throws {
         try await super.setUp()
-        coordinator = ToolExecutionCoordinator()
+        coordinator = AgentToolExecutionCoordinator()
     }
 
     override func tearDown() async throws {

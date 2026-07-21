@@ -561,16 +561,164 @@ flowchart LR
 
 ### 3.4 ViewModels 层
 
-ViewModels 文件数无新增（仍为 4 个），但内部字段与编排逻辑随 Day 12–20 扩展。
+ViewModels 文件数无新增（仍为 4 个），但内部字段与编排逻辑随 Day 12–20 扩展。P2-6 进一步将 ChatViewModel 中职责清晰的子模块抽取为 10 个 Coordinator（详见 3.4b）。
 
 | 文件 | 职责 |
 |------|------|
-| `ViewModels/ChatViewModel.swift` | 核心 `@Observable @MainActor` ViewModel，管理消息列表 / 流式输出 / 工具调用 / RAG 检索 / 语音 / 灵动岛，编排 ReAct 循环与缓存读写；新增字段：`modelProvider` / `bffConfig` / `onDeviceConfig` / `ttsConfig` / `healthInsights` / `messageFeedbacks`；新增逻辑：SmartRouter 选择 provider、NetworkMonitor 监听断网切换端侧、BFF 启用时走 BFFProxyClient。 |
+| `ViewModels/ChatViewModel.swift` | 核心 `@Observable @MainActor` ViewModel。**P2-6 重构后为 Facade**：保留为 View 入口（`@State` / `@Bindable` 注入），方法体委托给 10 个 Coordinator（详见 3.4b）。原始 1253 行降至 690 行，直接依赖的 Service 数从 30+ 降至 15 以下（通过 Coordinator 间接依赖）。仍负责 `processMessage` 状态机编排（preparing → ragRetrieving → cacheChecking → llmStreaming ↔ toolCalling → finishing）与 `sendMessage` / `sendMessageConfirmed` / `switchTo` / `regenerateResponse` / `branch` 等 View 入口方法；`@Observable` 状态属性由 Coordinator 通过 `@MainActor` 闭包回调同步（如 `onIsRecordingChange` / `onFeedbackStatesChange` / `onCurrentCitationsChange`），保持单向数据流。 |
 | `ViewModels/ConversationListVM.swift` | 会话列表 ViewModel，管理会话 CRUD 与置顶排序；新增编辑模式（多选 / 全选 / 删除选中）与 `cleanupEmptyConversations` 批量清理。 |
 | `ViewModels/KnowledgeBaseVM.swift` | 知识库 ViewModel，管理文档索引与删除。 |
 | `ViewModels/SettingsViewModel.swift` | 设置 ViewModel，管理 API Key 保存/删除（按 provider 隔离）、用户偏好读写、TTS 配置 / BFF 配置 / OnDevice 配置 / Health 授权状态读写。 |
 
 > **Agent 模块说明**：Agent 模块（AgentOrchestrator / GoalDecomposer / AgentRole）为完整实现但尚未接入生产 ChatViewModel，保留以备未来接入。
+
+### 3.4b Coordinators 层（P2-6 ChatViewModel 拆分）
+
+P2-6 重构将 ChatViewModel 中职责清晰的子模块抽取为 10 个 Coordinator，每个承担单一职责，通过构造器注入到 ChatViewModel，ChatViewModel 保留为 View 入口的 Facade。所有 Coordinator 显式标注 `@MainActor` 或 `Sendable`，跨 actor 回调通过 `@MainActor` 闭包传递。`CoordinatorProtocol` 为占位协议（`@MainActor protocol Coordinator: AnyObject {}`），便于未来扩展通用能力（如生命周期管理、日志埋点）。
+
+| Coordinator | 文件 | 职责 | 依赖 Service / Repository | 并发隔离 |
+|------------|------|------|--------------------------|---------|
+| `VoiceCoordinator` | `Aether/Coordinators/VoiceCoordinator.swift` | STT 启停 + TTS 朗读切换 + 朗读完成回调（`onSpeakFinished` 清空 speakingMessageId / `onRecognized` 实时写入 inputText） | `VoiceService`（构造器注入，与 SettingsView 共享同一实例） | `@MainActor` |
+| `LiveActivityCoordinator` | `Aether/Coordinators/LiveActivityCoordinator.swift` | iOS 灵动岛 Live Activity 全生命周期（start / update / end），封装 `Activity<TimerActivityAttributes>` 引用，已启动时再调用为 no-op | ActivityKit（iOS-only，无其他 Service 依赖） | `@MainActor`，整个类型 `#if os(iOS)` 包裹 |
+| `FeedbackCoordinator` | `Aether/Coordinators/FeedbackCoordinator.swift` | 反馈状态（`feedbackStates`）+ Toast 提示（`feedbackToast`，2s 自动清除，新点击取消未触发的清除 Task）+ 持久化（`saveFeedback` / `updateFeedback` 触发 RAG chunk 权重调整） | `ChatStorage`（按需构造，传入 ModelContext） | `@MainActor` |
+| `WatchQuickChatCoordinator` | `Aether/Coordinators/WatchQuickChatCoordinator.swift` | 监听 `.wcQuickChatReceived` 通知，桥接 Watch 快速对话消息到 ChatViewModel.`pendingWatchMessage` | `NotificationCenter`（间接依赖 `WatchConnectivityService` 广播通知） | `@unchecked Sendable`（NSLock 包裹 `NSObjectProtocol` token，支持跨 actor 读写） |
+| `HealthContextInjector` | `Aether/Coordinators/HealthContextInjector.swift` | iOS HealthKit 上下文注入：构建最近 24h 健康摘要片段（睡眠 / 心率 / 步数），追加到 systemPrompt 末尾；未授权 / 未启用 / 服务为 nil / fetch 抛错时返回空字符串优雅降级 | `HealthKitService`（通过闭包读取，nil 时降级为空字符串） | `@MainActor`，整个类型 `#if os(iOS)` 包裹 |
+| `NetworkFallbackCoordinator` | `Aether/Coordinators/NetworkFallbackCoordinator.swift` | 网络监听（订阅 `NetworkMonitor.statusStream`，断网切端侧 / 联网切回）+ 端侧 ↔ 云端 provider 切换（`switchToOnDevice` / `switchToOriginalProvider`）+ Provider 工厂（BFF / Fallback / 直连三种路径）+ SmartRouter 模型名映射（`mapModelName`） | `NetworkMonitor.shared` / `ModelProviderFactory` / `FallbackLLMProvider` / `BFFProxyClient` / `DeepSeekClient` | `@MainActor` |
+| `RetrievalCoordinator` | `Aether/Coordinators/RetrievalCoordinator.swift` | RAG 检索（`handleRAGRetrieving`）+ 语义缓存读写（`checkCache` / `writeCache`，仅非工具模式）+ embedding 降级（DeepSeek 不支持 embedding 时设置错误并清空 citations）+ `ragService` / `ragEmbeddingProvider` 按 `selectedProvider` 懒加载缓存（provider 变化时自动失效重建） | `RAGService` / `SemanticCache`（构造器注入）/ `EmbeddingService` / `KeychainManager.shared` / `DeepSeekClient`（兜底） | `@MainActor` |
+| `PromptBuilder` | `Aether/Coordinators/PromptBuilder.swift` | systemPrompt 构建（base + 【用户偏好】 + 【AI人设】）+ token 截断（`limitTokens`，从尾部累加保留最近消息） | 纯值类型（struct），无 Service 依赖 | 纯值类型（struct），无并发隔离标注（纯函数式逻辑） |
+| `InjectionGuard` | `Aether/Coordinators/InjectionGuard.swift` | 提示注入检测弹窗（`detect` 调用 `PromptInjectionDetector.isSuspicious`）+ 决策回调（`setDecisionHandler` / `proceed` / `cancel` 三态机，包装闭包路由到 proceed/cancel） | `PromptInjectionDetector`（静态调用） | `@MainActor` |
+| `ToolExecutionCoordinator` | `Aether/Coordinators/ToolExecutionCoordinator.swift` | ReAct 工具执行循环：编码 toolCalls 持久化 assistant 消息（含 toolCallData）、逐个执行工具（启用检查 / 授权确认 / 超时保护 `withThrowingTaskGroup` / 审计日志 / 成功通知 / 失败埋点）、追加 tool 结果消息、重置下一轮 apiMessages；`ToolStep` / `ToolStepStatus` 类型迁移至此，ChatViewModel 通过 typealias 兼容 | `ToolRegistry.shared` / `ToolAuthorization.shared` / `ToolAuditLogger.shared` / `NotificationService.shared` / `TelemetryService.shared` | `@MainActor` |
+
+**关键设计要点**：
+
+- **Facade 模式**：ChatViewModel 保留为 View 入口（`@State` / `@Bindable` 注入），方法体委托给 Coordinator（如 `toggleVoiceInput()` → `voiceCoordinator.toggleVoiceInput()`）。原始 1253 行降至 690 行，直接依赖的 Service 数从 30+ 降至 15 以下（通过 Coordinator 间接依赖）。
+- **iOS-only Coordinator**：`LiveActivityCoordinator` 与 `HealthContextInjector` 整个类型用 `#if os(iOS)` 包裹，macOS 编译时无符号泄漏；ChatViewModel 调用处亦用 `#if os(iOS)` 守卫。
+- **闭包回调同步 @Observable**：Coordinator 不直接持有 ChatViewModel 的 `@Observable` 属性，通过构造器注入的 `@MainActor` 闭包回调同步状态（如 `onIsRecordingChange` / `onFeedbackStatesChange` / `onCurrentCitationsChange` / `onToolStepAppend`），保持单向数据流，便于测试隔离。
+- **闭包防循环引用**：所有 Coordinator 闭包使用 `[weak self]` 防止循环引用（VoiceCoordinator / InjectionGuard / 各闭包回调）；VoiceCoordinator 在 init 中注册 `voiceService.onSpeakFinished` / `voiceService.onRecognized` 闭包。
+- **状态查询闭包**：Coordinator 读取 ChatViewModel 状态时通过查询闭包（如 `selectedProviderProvider` / `ragEnabledProvider` / `toolsEnabledProvider` / `isRecordingProvider`），避免反向持有 ViewModel。
+- **PromptBuilder 例外**：作为纯值类型 struct 不需要 Coordinator 协议（无生命周期管理需求），ChatViewModel 持有 `private let promptBuilder = PromptBuilder()`，`limitTokens` / `buildEffectiveSystemPrompt` 直接转发。
+- **WatchQuickChatCoordinator 例外**：标注 `@unchecked Sendable` 而非 `@MainActor`（与 ChatViewModel 私有 `ErrorObserver` 一致），用 NSLock 包裹 `NSObjectProtocol` token（非 Sendable），init 在 `@MainActor` 上写 token，deinit 在 nonisolated 上下文读 token，故用 NSLock 同步。
+
+#### ChatViewModel → Coordinator → Service 依赖图
+
+下图使用 PlantUML 展示 ChatViewModel 作为 Facade 转发逻辑到 10 个 Coordinator，Coordinator 再依赖具体 Service 的三层依赖关系。`#if os(iOS)` 守卫的 Coordinator 用 note 标注，macOS 编译时排除。
+
+```plantuml
+@startuml
+title ChatViewModel Coordinator 架构图
+skinparam componentStyle rectangle
+skinparam shadowing false
+skinparam noteBackgroundColor #FFF7E6
+
+package "ChatViewModel (Facade)" as Facade {
+  [ChatViewModel] as CVM
+}
+
+package "Coordinators" as Coords {
+  [VoiceCoordinator] as VC
+  [LiveActivityCoordinator] as LAC
+  [FeedbackCoordinator] as FC
+  [WatchQuickChatCoordinator] as WQC
+  [HealthContextInjector] as HCI
+  [NetworkFallbackCoordinator] as NFC
+  [RetrievalCoordinator] as RC
+  [PromptBuilder] as PB
+  [InjectionGuard] as IG
+  [ToolExecutionCoordinator] as TEC
+}
+
+package "Services" as Services {
+  [VoiceService] as VS
+  [ActivityKit] as AK
+  [ChatStorage] as CS
+  [WatchConnectivityService] as WCS
+  [HealthKitService] as HKS
+  [NetworkMonitor] as NM
+  [ModelProviderFactory] as MPF
+  [FallbackLLMProvider] as FLP
+  [BFFProxyClient] as BPC
+  [RAGService] as RS
+  [SemanticCache] as SC
+  [EmbeddingService] as ES
+  [KeychainManager] as KM
+  [DeepSeekClient] as DSC
+  [PromptInjectionDetector] as PID
+  [ToolRegistry] as TR
+  [ToolAuthorization] as TA
+  [ToolAuditLogger] as TAL
+  [NotificationService] as NS
+  [TelemetryService] as TS
+}
+
+' ChatViewModel → Coordinator（Facade 转发）
+CVM --> VC
+CVM --> LAC
+CVM --> FC
+CVM --> WQC
+CVM --> HCI
+CVM --> NFC
+CVM --> RC
+CVM --> PB
+CVM --> IG
+CVM --> TEC
+
+' Coordinator → Service
+VC --> VS
+LAC --> AK
+FC --> CS
+WQC --> WCS : .wcQuickChatReceived 通知
+HCI --> HKS
+NFC --> NM
+NFC --> MPF
+MPF --> FLP
+MPF --> BPC
+MPF --> DSC
+RC --> RS
+RC --> SC
+RC --> ES
+RC --> KM
+RS --> ES
+ES --> DSC
+IG --> PID
+TEC --> TR
+TEC --> TA
+TEC --> TAL
+TEC --> NS
+TEC --> TS
+
+note right of LAC
+  #if os(iOS)
+  macOS 不编译
+end note
+
+note right of HCI
+  #if os(iOS)
+  macOS 不编译
+end note
+
+note right of WQC
+  @unchecked Sendable
+  NSLock 包裹 token
+end note
+
+note right of PB
+  纯值类型 struct
+  无 Service 依赖
+end note
+
+note right of CVM
+  Facade：1253 → 690 行
+  直接 Service 依赖 30+ → < 15
+end note
+
+@enduml
+```
+
+**依赖关系说明**：
+- **ChatViewModel → Coordinator**：10 条转发边。ChatViewModel 在 `init` 末尾构造所有 Coordinator 并捕获 `self`（隐式解包可选 `!` 以便构造），方法体直接转发（如 `toggleVoiceInput` / `submitFeedback` / `handleFeedback` / `switchToOnDevice` / `handleRAGRetrieving` / `handleToolCalling` / `limitTokens` / `buildEffectiveSystemPrompt` 等）。
+- **Coordinator → Service**：每个 Coordinator 通过构造器注入或 `.shared` 单例访问 Service。`RetrievalCoordinator` 与 `NetworkFallbackCoordinator` 依赖较多 Service，因为承担 RAG 检索 + 缓存 + Provider 工厂的核心数据通路职责。
+- **跨 Coordinator 协作**：Coordinator 之间不直接通信，全部通过 ChatViewModel 编排（如 `handleFinishing` 读取 `networkFallbackCoordinator.lastUsedProvider` 写入 DebugInfo，并调用 `retrievalCoordinator.writeCache`）。
+- **iOS-only 隔离**：`LiveActivityCoordinator`（依赖 ActivityKit）与 `HealthContextInjector`（依赖 HealthKitService）整个类型 `#if os(iOS)` 包裹，ChatViewModel 中的 `liveActivityCoordinator` 属性与 `startLiveActivity` / `updateLiveActivity` / `endLiveActivity` 调用处亦用 `#if os(iOS)` 守卫，macOS 编译无符号泄漏。
 
 ### 3.5 Views 层（6 个子模块）
 
@@ -1232,7 +1380,7 @@ stateDiagram-v2
 | PerformanceMonitor | `Services/Performance/PerformanceMonitor.swift` | iOS 17.0+ / macOS 14.0+ |
 | PrivacyInfo.xcprivacy | `Resources/PrivacyInfo.xcprivacy` | iOS 17.0+ / macOS 14.0+ / Xcode 16+（App Store 审核要求） |
 | AttributedString（Markdown） | `Views/Chat/Markdown*.swift` / `CodeSyntaxHighlighter.swift` | iOS 17.0+ / macOS 14.0+ / Foundation |
-| XCTest | `AetherTests/` 157 文件（2792 用例） | Xcode 16+ / Swift 5.9+ |
+| XCTest | `AetherTests/` 157 文件（2881 用例） | Xcode 16+ / Swift 5.9+ |
 | XCUITest | `AetherUITests/` 7 文件（30 用例） | Xcode 16+ / Swift 5.9+ |
 | GitHub Actions | `.github/workflows/ci.yml` | macos-14 runner / Xcode 16+ |
 | CoreLocation | CLLocationManager + CLGeocoder | LocationTool 定位与反地理编码 | iOS 17.0+ / macOS 14.0+ / CoreLocation.framework |
@@ -1255,7 +1403,7 @@ stateDiagram-v2
 ### 7.1 单元测试（UT）
 
 - **Target**：`AetherTests`
-- **规模**：157 个测试文件，2792 用例（2792 pass / 0 skip / 0 failures）
+- **规模**：157 个测试文件，2881 用例（2881 pass / 0 skip / 0 failures）
 - **分层覆盖**：
 
 | 层级 | 测试文件 | 文件数 | 核心断言数（约） | skip 原因 |
@@ -1489,6 +1637,18 @@ Aether/
 │       ├── TTSConfig.swift
 │       ├── TTSVoiceCatalog.swift
 │       └── VoiceService.swift
+├── Coordinators/                  # P2-6: ChatViewModel 拆分的 10 个 Coordinator
+│   ├── CoordinatorProtocol.swift
+│   ├── FeedbackCoordinator.swift
+│   ├── HealthContextInjector.swift       # iOS（#if os(iOS)）
+│   ├── InjectionGuard.swift
+│   ├── LiveActivityCoordinator.swift     # iOS（#if os(iOS)）
+│   ├── NetworkFallbackCoordinator.swift
+│   ├── PromptBuilder.swift               # 纯值类型 struct
+│   ├── RetrievalCoordinator.swift
+│   ├── ToolExecutionCoordinator.swift
+│   ├── VoiceCoordinator.swift
+│   └── WatchQuickChatCoordinator.swift   # @unchecked Sendable
 ├── ViewModels/
 │   ├── ChatViewModel.swift
 │   ├── ConversationListVM.swift
@@ -1546,7 +1706,7 @@ CloudflareWorkers/               # BFF 代理网关
 ├── worker.js
 └── wrangler.toml
 
-AetherTests/                  # 157 个 UT 文件 / 2792 用例
+AetherTests/                  # 157 个 UT 文件 / 2881 用例
 ├── APIConfigTests.swift
 ├── AlarmToolTests.swift
 ├── BFFProxyClientTests.swift

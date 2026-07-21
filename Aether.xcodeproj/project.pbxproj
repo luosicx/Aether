@@ -69,7 +69,7 @@
 		1A2B3C4D5E6F000000000003 /* StepCardViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F000000000004 /* StepCardViewTests.swift */; };
 		1A2B3C4D5E6F000000000005 /* TaskListViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2B3C4D5E6F000000000006 /* TaskListViewTests.swift */; };
 		1A40A9E029B1F8049C8CAC5B /* VoiceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE8DB28D8FFBC3A0CF4F73E9 /* VoiceService.swift */; };
-		1AA9C874395CBE151D286DDC /* ToolExecutionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100B00106 /* ToolExecutionCoordinator.swift */; };
+		1AA9C874395CBE151D286DDC /* AgentToolExecutionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100B00106 /* AgentToolExecutionCoordinator.swift */; };
 		1B13984EF7390DA7D4716B58 /* MessageBubble.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAEAA99571B9AD360158318A /* MessageBubble.swift */; };
 		1B2A3D9D9D40C694DA1C2C7F /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F6A7B8C9D0E1F2A3 /* Localizable.xcstrings */; };
 		1C4E4E55C94FA33B562F19FA /* VoiceServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 878C578467218EC7BC842C1D /* VoiceServiceTests.swift */; };
@@ -298,7 +298,7 @@
 		9A1B2C3D4E5F607100C00002 /* GoalDecomposerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100C00001 /* GoalDecomposerTests.swift */; };
 		9A1B2C3D4E5F607100C00101 /* AgentOrchestratorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100C00100 /* AgentOrchestratorTests.swift */; };
 		9A1B2C3D4E5F607100C0AA0B /* AgentRoleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100C0010B /* AgentRoleTests.swift */; };
-		9A1B2C3D4E5F607100C0AA0C /* ToolExecutionCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100C0010C /* ToolExecutionCoordinatorTests.swift */; };
+		9A1B2C3D4E5F607100C0AA0C /* AgentToolExecutionCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100C0010C /* AgentToolExecutionCoordinatorTests.swift */; };
 		9A2FB94014AAB58646BE865F /* OpenURLTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = 047BEBEE5AAFC1C10EFEADBD /* OpenURLTool.swift */; };
 		9D8179E78F0D0C9F47E00C54 /* HealthInsightWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 026C84A7B07AFEEBDBF03513 /* HealthInsightWidget.swift */; };
 		9DD5DF2C426E1E1A1FA02AB1 /* MCPConfigFileLoaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5918211A175B010A0EB3BA06 /* MCPConfigFileLoaderTests.swift */; };
@@ -314,6 +314,38 @@
 		A1B2C3D4E5F6071809AB2001 /* ToolAuthorizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB2002 /* ToolAuthorizationTests.swift */; };
 		A1B2C3D4E5F6071809AB2003 /* ChatViewModelToolSecurityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB2004 /* ChatViewModelToolSecurityTests.swift */; };
 		A1B2C3D4E5F6071809AB2009 /* ToolAuditLoggerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB200A /* ToolAuditLoggerTests.swift */; };
+		A1B2C3D4E5F6071809AB3001 /* CoordinatorProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB3003 /* CoordinatorProtocol.swift */; };
+		A1B2C3D4E5F6071809AB3002 /* CoordinatorProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB3003 /* CoordinatorProtocol.swift */; };
+		A1B2C3D4E5F6071809AB3005 /* VoiceCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB3007 /* VoiceCoordinator.swift */; };
+		A1B2C3D4E5F6071809AB3006 /* VoiceCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB3007 /* VoiceCoordinator.swift */; };
+		A1B2C3D4E5F6071809AB3008 /* VoiceCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB3009 /* VoiceCoordinatorTests.swift */; };
+		A1B2C3D4E5F6071809AB300B /* LiveActivityCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB300D /* LiveActivityCoordinator.swift */; };
+		A1B2C3D4E5F6071809AB300C /* LiveActivityCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB300D /* LiveActivityCoordinator.swift */; };
+		A1B2C3D4E5F6071809AB300E /* LiveActivityCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB300F /* LiveActivityCoordinatorTests.swift */; };
+		A1B2C3D4E5F6071809AB3010 /* FeedbackCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB3012 /* FeedbackCoordinator.swift */; };
+		A1B2C3D4E5F6071809AB3011 /* FeedbackCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB3012 /* FeedbackCoordinator.swift */; };
+		A1B2C3D4E5F6071809AB3013 /* FeedbackCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB3014 /* FeedbackCoordinatorTests.swift */; };
+		A1B2C3D4E5F6071809AB3015 /* WatchQuickChatCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB3017 /* WatchQuickChatCoordinator.swift */; };
+		A1B2C3D4E5F6071809AB3016 /* WatchQuickChatCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB3017 /* WatchQuickChatCoordinator.swift */; };
+		A1B2C3D4E5F6071809AB3018 /* WatchQuickChatCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB3019 /* WatchQuickChatCoordinatorTests.swift */; };
+		A1B2C3D4E5F6071809AB301A /* HealthContextInjector.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB301C /* HealthContextInjector.swift */; };
+		A1B2C3D4E5F6071809AB301B /* HealthContextInjector.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB301C /* HealthContextInjector.swift */; };
+		A1B2C3D4E5F6071809AB301D /* HealthContextInjectorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB301E /* HealthContextInjectorTests.swift */; };
+		A1B2C3D4E5F6071809AB301F /* NetworkFallbackCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB3021 /* NetworkFallbackCoordinator.swift */; };
+		A1B2C3D4E5F6071809AB3020 /* NetworkFallbackCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB3021 /* NetworkFallbackCoordinator.swift */; };
+		A1B2C3D4E5F6071809AB3022 /* NetworkFallbackCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB3023 /* NetworkFallbackCoordinatorTests.swift */; };
+		A1B2C3D4E5F6071809AB3024 /* RetrievalCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB3025 /* RetrievalCoordinator.swift */; };
+		A1B2C3D4E5F6071809AB3026 /* RetrievalCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB3025 /* RetrievalCoordinator.swift */; };
+		A1B2C3D4E5F6071809AB3028 /* RetrievalCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB3029 /* RetrievalCoordinatorTests.swift */; };
+		A1B2C3D4E5F6071809AB302B /* PromptBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB302A /* PromptBuilder.swift */; };
+		A1B2C3D4E5F6071809AB302C /* PromptBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB302A /* PromptBuilder.swift */; };
+		A1B2C3D4E5F6071809AB302E /* PromptBuilderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB302D /* PromptBuilderTests.swift */; };
+		A1B2C3D4E5F6071809AB302F /* InjectionGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB3031 /* InjectionGuard.swift */; };
+		A1B2C3D4E5F6071809AB3030 /* InjectionGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB3031 /* InjectionGuard.swift */; };
+		A1B2C3D4E5F6071809AB3032 /* InjectionGuardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB3033 /* InjectionGuardTests.swift */; };
+		A1B2C3D4E5F6071809AB3034 /* ToolExecutionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB3036 /* ToolExecutionCoordinator.swift */; };
+		A1B2C3D4E5F6071809AB3035 /* ToolExecutionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB3036 /* ToolExecutionCoordinator.swift */; };
+		A1B2C3D4E5F6071809AB3037 /* ToolExecutionCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB3038 /* ToolExecutionCoordinatorTests.swift */; };
 		A1B2C3D4E5F6A7B8C9D0E1F5 /* OnDeviceModelDownloaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3E4D5C6B7A89012FEDCBA98 /* OnDeviceModelDownloaderTests.swift */; };
 		A1E2F3A4B5C6D7E8F9A0B1CB /* DesignSystemTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1E2F3A4B5C6D7E8F9A0B1CA /* DesignSystemTests.swift */; };
 		A2E32ED4E295C38A968596EC /* DAGExecutionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100B00109 /* DAGExecutionEngine.swift */; };
@@ -456,7 +488,7 @@
 		DEADBEEF0011223344550C01 /* MenuBarUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEADBEEF0011223344550C02 /* MenuBarUITests.swift */; };
 		DEE5BD736EBF937FF3437B98 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8DEC7FB7EDCBF9E610EA1C1D /* Assets.xcassets */; };
 		E09F2F60710E5F8A1E9F5CB5 /* ToolRegistryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C41ED6555734365803CF2CE4 /* ToolRegistryTests.swift */; };
-		E10D1F61DF4FEEEBAF96ABAA /* ToolExecutionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100B00106 /* ToolExecutionCoordinator.swift */; };
+		E10D1F61DF4FEEEBAF96ABAA /* AgentToolExecutionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100B00106 /* AgentToolExecutionCoordinator.swift */; };
 		E1F2A3B4C5D6004100000002 /* CodeSyntaxHighlighterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F2A3B4C5D6004100000001 /* CodeSyntaxHighlighterTests.swift */; };
 		E1F2A3B4C5D6004200000002 /* MarkdownTableParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F2A3B4C5D6004200000001 /* MarkdownTableParserTests.swift */; };
 		E1F2A3B4C5D6004300000002 /* RemoteConfigTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F2A3B4C5D6004300000001 /* RemoteConfigTests.swift */; };
@@ -735,7 +767,7 @@
 		9A1B2C3D4E5F607100B00103 /* HeuristicRules.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HeuristicRules.swift; sourceTree = "<group>"; };
 		9A1B2C3D4E5F607100B00104 /* HierarchicalDecomposer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HierarchicalDecomposer.swift; sourceTree = "<group>"; };
 		9A1B2C3D4E5F607100B00105 /* NodeStateMachine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NodeStateMachine.swift; sourceTree = "<group>"; };
-		9A1B2C3D4E5F607100B00106 /* ToolExecutionCoordinator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ToolExecutionCoordinator.swift; sourceTree = "<group>"; };
+		9A1B2C3D4E5F607100B00106 /* AgentToolExecutionCoordinator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AgentToolExecutionCoordinator.swift; sourceTree = "<group>"; };
 		9A1B2C3D4E5F607100B00107 /* RetryPolicy.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RetryPolicy.swift; sourceTree = "<group>"; };
 		9A1B2C3D4E5F607100B00108 /* CheckpointManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CheckpointManager.swift; sourceTree = "<group>"; };
 		9A1B2C3D4E5F607100B00109 /* DAGExecutionEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DAGExecutionEngine.swift; sourceTree = "<group>"; };
@@ -753,7 +785,7 @@
 		9A1B2C3D4E5F607100C00109 /* InterventionPanelTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InterventionPanelTests.swift; sourceTree = "<group>"; };
 		9A1B2C3D4E5F607100C0010A /* AgentPerformanceBaselineTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AgentPerformanceBaselineTests.swift; sourceTree = "<group>"; };
 		9A1B2C3D4E5F607100C0010B /* AgentRoleTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AgentRoleTests.swift; sourceTree = "<group>"; };
-		9A1B2C3D4E5F607100C0010C /* ToolExecutionCoordinatorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ToolExecutionCoordinatorTests.swift; sourceTree = "<group>"; };
+		9A1B2C3D4E5F607100C0010C /* AgentToolExecutionCoordinatorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AgentToolExecutionCoordinatorTests.swift; sourceTree = "<group>"; };
 		9B123FE212059452CCDD5542 /* SwiftDataConversationRepository.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SwiftDataConversationRepository.swift; sourceTree = "<group>"; };
 		9B934C7EDB02B4785F3611AF /* WindowManagementToolTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WindowManagementToolTests.swift; sourceTree = "<group>"; };
 		9CE113344D50D981745BB070 /* AvatarView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AvatarView.swift; sourceTree = "<group>"; };
@@ -768,6 +800,27 @@
 		A1B2C3D4E5F6071809AB2002 /* ToolAuthorizationTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ToolAuthorizationTests.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6071809AB2004 /* ChatViewModelToolSecurityTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChatViewModelToolSecurityTests.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6071809AB200A /* ToolAuditLoggerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ToolAuditLoggerTests.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6071809AB3003 /* CoordinatorProtocol.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CoordinatorProtocol.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6071809AB3007 /* VoiceCoordinator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VoiceCoordinator.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6071809AB3009 /* VoiceCoordinatorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VoiceCoordinatorTests.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6071809AB300D /* LiveActivityCoordinator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LiveActivityCoordinator.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6071809AB300F /* LiveActivityCoordinatorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LiveActivityCoordinatorTests.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6071809AB3012 /* FeedbackCoordinator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FeedbackCoordinator.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6071809AB3014 /* FeedbackCoordinatorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FeedbackCoordinatorTests.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6071809AB3017 /* WatchQuickChatCoordinator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WatchQuickChatCoordinator.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6071809AB3019 /* WatchQuickChatCoordinatorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WatchQuickChatCoordinatorTests.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6071809AB301C /* HealthContextInjector.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HealthContextInjector.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6071809AB301E /* HealthContextInjectorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HealthContextInjectorTests.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6071809AB3021 /* NetworkFallbackCoordinator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NetworkFallbackCoordinator.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6071809AB3023 /* NetworkFallbackCoordinatorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NetworkFallbackCoordinatorTests.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6071809AB3025 /* RetrievalCoordinator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RetrievalCoordinator.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6071809AB3029 /* RetrievalCoordinatorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RetrievalCoordinatorTests.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6071809AB302A /* PromptBuilder.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PromptBuilder.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6071809AB302D /* PromptBuilderTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PromptBuilderTests.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6071809AB3031 /* InjectionGuard.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InjectionGuard.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6071809AB3033 /* InjectionGuardTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InjectionGuardTests.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6071809AB3036 /* ToolExecutionCoordinator.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ToolExecutionCoordinator.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6071809AB3038 /* ToolExecutionCoordinatorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ToolExecutionCoordinatorTests.swift; sourceTree = "<group>"; };
 		A1E2F3A4B5C6D7E8F9A0B1C4 /* AetherIcons.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AetherIcons.swift; sourceTree = "<group>"; };
 		A1E2F3A4B5C6D7E8F9A0B1C6 /* AetherIconRenderer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AetherIconRenderer.swift; sourceTree = "<group>"; };
 		A1E2F3A4B5C6D7E8F9A0B1CA /* DesignSystemTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DesignSystemTests.swift; sourceTree = "<group>"; };
@@ -1263,6 +1316,7 @@
 				E8963E701464DE79C35DC787 /* Models */,
 				2ACF0AA55B1482F75AE19D59 /* Services */,
 				2705985E27E4F25E014CD6BC /* ViewModels */,
+				A1B2C3D4E5F6071809AB3004 /* Coordinators */,
 				C204ADAE35CA296E8E13DDC3 /* Views */,
 				BACA63852F4908DC131BD174 /* Resources */,
 				6A05E4495E06A02A87FCB5D4 /* AppIntents */,
@@ -1542,7 +1596,7 @@
 				9A1B2C3D4E5F607100B00103 /* HeuristicRules.swift */,
 				9A1B2C3D4E5F607100B00104 /* HierarchicalDecomposer.swift */,
 				9A1B2C3D4E5F607100B00105 /* NodeStateMachine.swift */,
-				9A1B2C3D4E5F607100B00106 /* ToolExecutionCoordinator.swift */,
+				9A1B2C3D4E5F607100B00106 /* AgentToolExecutionCoordinator.swift */,
 				9A1B2C3D4E5F607100B00107 /* RetryPolicy.swift */,
 				9A1B2C3D4E5F607100B00108 /* CheckpointManager.swift */,
 				9A1B2C3D4E5F607100B00109 /* DAGExecutionEngine.swift */,
@@ -1574,7 +1628,7 @@
 				9A1B2C3D4E5F607100C00109 /* InterventionPanelTests.swift */,
 				9A1B2C3D4E5F607100C0010A /* AgentPerformanceBaselineTests.swift */,
 				9A1B2C3D4E5F607100C0010B /* AgentRoleTests.swift */,
-				9A1B2C3D4E5F607100C0010C /* ToolExecutionCoordinatorTests.swift */,
+				9A1B2C3D4E5F607100C0010C /* AgentToolExecutionCoordinatorTests.swift */,
 			);
 			path = Agent;
 			sourceTree = "<group>";
@@ -1691,6 +1745,7 @@
 				B783E98BBE62523C208F4F9D /* Chat */,
 				26A1B2C3D4E5F6000100A010 /* Personalization */,
 				C00F1C5197F7DD548B7DA4C3 /* Plugin */,
+				A1B2C3D4E5F6071809AB300A /* Coordinators */,
 				A1B2C3D4E5F6071809AB1003 /* PromptInjectionDetectorTests.swift */,
 				FB80A30E3C8A4992AE56E69E /* SSEParserRustTests.swift */,
 				5B60E99A6BF94565B2B517B2 /* Sha256RustTests.swift */,
@@ -1703,12 +1758,47 @@
 			path = AetherTests;
 			sourceTree = "<group>";
 		};
+		A1B2C3D4E5F6071809AB300A /* Coordinators */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3D4E5F6071809AB3009 /* VoiceCoordinatorTests.swift */,
+				A1B2C3D4E5F6071809AB300F /* LiveActivityCoordinatorTests.swift */,
+				A1B2C3D4E5F6071809AB3014 /* FeedbackCoordinatorTests.swift */,
+				A1B2C3D4E5F6071809AB3019 /* WatchQuickChatCoordinatorTests.swift */,
+				A1B2C3D4E5F6071809AB301E /* HealthContextInjectorTests.swift */,
+				A1B2C3D4E5F6071809AB3023 /* NetworkFallbackCoordinatorTests.swift */,
+				A1B2C3D4E5F6071809AB3029 /* RetrievalCoordinatorTests.swift */,
+				A1B2C3D4E5F6071809AB302D /* PromptBuilderTests.swift */,
+				A1B2C3D4E5F6071809AB3033 /* InjectionGuardTests.swift */,
+				A1B2C3D4E5F6071809AB3038 /* ToolExecutionCoordinatorTests.swift */,
+			);
+			path = Coordinators;
+			sourceTree = "<group>";
+		};
 		A1B2C3D4E5F6071809AB1000 /* Security */ = {
 			isa = PBXGroup;
 			children = (
 				A1B2C3D4E5F6071809AB1001 /* PromptInjectionDetector.swift */,
 			);
 			path = Security;
+			sourceTree = "<group>";
+		};
+		A1B2C3D4E5F6071809AB3004 /* Coordinators */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3D4E5F6071809AB3003 /* CoordinatorProtocol.swift */,
+				A1B2C3D4E5F6071809AB3007 /* VoiceCoordinator.swift */,
+				A1B2C3D4E5F6071809AB300D /* LiveActivityCoordinator.swift */,
+				A1B2C3D4E5F6071809AB3012 /* FeedbackCoordinator.swift */,
+				A1B2C3D4E5F6071809AB3017 /* WatchQuickChatCoordinator.swift */,
+				A1B2C3D4E5F6071809AB301C /* HealthContextInjector.swift */,
+				A1B2C3D4E5F6071809AB3021 /* NetworkFallbackCoordinator.swift */,
+				A1B2C3D4E5F6071809AB3025 /* RetrievalCoordinator.swift */,
+				A1B2C3D4E5F6071809AB302A /* PromptBuilder.swift */,
+				A1B2C3D4E5F6071809AB3031 /* InjectionGuard.swift */,
+				A1B2C3D4E5F6071809AB3036 /* ToolExecutionCoordinator.swift */,
+			);
+			path = Coordinators;
 			sourceTree = "<group>";
 		};
 		A1E2F3A4B5C6D7E8F9A0B1D0 /* DesignSystem */ = {
@@ -2294,6 +2384,17 @@
 				7B3170EB27D7D57919C0BF0D /* ToolRegistry.swift in Sources */,
 				094CA54CD185E912332FEF4A /* VoiceService.swift in Sources */,
 				605D0D30983C90E538E8C1BA /* ChatViewModel.swift in Sources */,
+				A1B2C3D4E5F6071809AB3002 /* CoordinatorProtocol.swift in Sources */,
+				A1B2C3D4E5F6071809AB3005 /* VoiceCoordinator.swift in Sources */,
+				A1B2C3D4E5F6071809AB300B /* LiveActivityCoordinator.swift in Sources */,
+				A1B2C3D4E5F6071809AB3010 /* FeedbackCoordinator.swift in Sources */,
+				A1B2C3D4E5F6071809AB3015 /* WatchQuickChatCoordinator.swift in Sources */,
+				A1B2C3D4E5F6071809AB301A /* HealthContextInjector.swift in Sources */,
+				A1B2C3D4E5F6071809AB301F /* NetworkFallbackCoordinator.swift in Sources */,
+				A1B2C3D4E5F6071809AB3024 /* RetrievalCoordinator.swift in Sources */,
+				A1B2C3D4E5F6071809AB302B /* PromptBuilder.swift in Sources */,
+				A1B2C3D4E5F6071809AB302F /* InjectionGuard.swift in Sources */,
+				A1B2C3D4E5F6071809AB3034 /* ToolExecutionCoordinator.swift in Sources */,
 				4D467C32B0D0798F9AA14A5F /* ConversationListVM.swift in Sources */,
 				0E24A18783283A486456D174 /* SettingsViewModel.swift in Sources */,
 				0E1E710B452A46DCCBE1F2DB /* ChatView.swift in Sources */,
@@ -2381,7 +2482,7 @@
 				0ED457DE9677AB0E6BDD0564 /* HeuristicRules.swift in Sources */,
 				173CD203ED04CC1D5A756D5F /* HierarchicalDecomposer.swift in Sources */,
 				A6C71EEF990F21045D3157B8 /* NodeStateMachine.swift in Sources */,
-				1AA9C874395CBE151D286DDC /* ToolExecutionCoordinator.swift in Sources */,
+				1AA9C874395CBE151D286DDC /* AgentToolExecutionCoordinator.swift in Sources */,
 				3BBD803243133C3F5DBF8BBA /* RetryPolicy.swift in Sources */,
 				8D7FA63EC977931900D0BF6A /* CheckpointManager.swift in Sources */,
 				400FC21AEC493329DF506E61 /* DAGExecutionEngine.swift in Sources */,
@@ -2455,6 +2556,16 @@
 				A1B2C3D4E5F6071809AB2003 /* ChatViewModelToolSecurityTests.swift in Sources */,
 				752BE95DA53BA27016059599 /* NotificationServiceTests.swift in Sources */,
 				1C4E4E55C94FA33B562F19FA /* VoiceServiceTests.swift in Sources */,
+				A1B2C3D4E5F6071809AB3008 /* VoiceCoordinatorTests.swift in Sources */,
+				A1B2C3D4E5F6071809AB300E /* LiveActivityCoordinatorTests.swift in Sources */,
+				A1B2C3D4E5F6071809AB3013 /* FeedbackCoordinatorTests.swift in Sources */,
+				A1B2C3D4E5F6071809AB3018 /* WatchQuickChatCoordinatorTests.swift in Sources */,
+				A1B2C3D4E5F6071809AB301D /* HealthContextInjectorTests.swift in Sources */,
+				A1B2C3D4E5F6071809AB3022 /* NetworkFallbackCoordinatorTests.swift in Sources */,
+				A1B2C3D4E5F6071809AB3028 /* RetrievalCoordinatorTests.swift in Sources */,
+				A1B2C3D4E5F6071809AB302E /* PromptBuilderTests.swift in Sources */,
+				A1B2C3D4E5F6071809AB3032 /* InjectionGuardTests.swift in Sources */,
+				A1B2C3D4E5F6071809AB3037 /* ToolExecutionCoordinatorTests.swift in Sources */,
 				84B130A2073A3D550F160B8F /* ChatStorageTests.swift in Sources */,
 				119F3C302AD2D99B3654BF38 /* SwiftDataRepositoryTests.swift in Sources */,
 				5B8EC03649D2964330656F02 /* ChatMessageTests.swift in Sources */,
@@ -2570,7 +2681,7 @@
 				4CF3AB4DB02467898455DE0D /* MCPSettingsViewTests.swift in Sources */,
 				CC4CF23DC148EF5F47786036 /* TrustBoundaryTests.swift in Sources */,
 				9A1B2C3D4E5F607100C0AA0B /* AgentRoleTests.swift in Sources */,
-				9A1B2C3D4E5F607100C0AA0C /* ToolExecutionCoordinatorTests.swift in Sources */,
+				9A1B2C3D4E5F607100C0AA0C /* AgentToolExecutionCoordinatorTests.swift in Sources */,
 				ABCDEF000000000000000027 /* MCPServerGroupingTests.swift in Sources */,
 				ABCDEF000000000000000029 /* MCPToolAdapterTests.swift in Sources */,
 				ABCDEF00000000000000002B /* MCPResourceServiceTests.swift in Sources */,
@@ -2627,6 +2738,17 @@
 				1416F36242879524A51D0E48 /* ToolRegistry.swift in Sources */,
 				1A40A9E029B1F8049C8CAC5B /* VoiceService.swift in Sources */,
 				FF5A811C084882FF122B23D1 /* ChatViewModel.swift in Sources */,
+				A1B2C3D4E5F6071809AB3001 /* CoordinatorProtocol.swift in Sources */,
+				A1B2C3D4E5F6071809AB3006 /* VoiceCoordinator.swift in Sources */,
+				A1B2C3D4E5F6071809AB300C /* LiveActivityCoordinator.swift in Sources */,
+				A1B2C3D4E5F6071809AB3011 /* FeedbackCoordinator.swift in Sources */,
+				A1B2C3D4E5F6071809AB3016 /* WatchQuickChatCoordinator.swift in Sources */,
+				A1B2C3D4E5F6071809AB301B /* HealthContextInjector.swift in Sources */,
+				A1B2C3D4E5F6071809AB3020 /* NetworkFallbackCoordinator.swift in Sources */,
+				A1B2C3D4E5F6071809AB3026 /* RetrievalCoordinator.swift in Sources */,
+				A1B2C3D4E5F6071809AB302C /* PromptBuilder.swift in Sources */,
+				A1B2C3D4E5F6071809AB3030 /* InjectionGuard.swift in Sources */,
+				A1B2C3D4E5F6071809AB3035 /* ToolExecutionCoordinator.swift in Sources */,
 				DD660D079476A7E0D7585A51 /* ConversationListVM.swift in Sources */,
 				00ABA2F53753AF032C09B19F /* SettingsViewModel.swift in Sources */,
 				F443134AC026AB531EA4A52D /* ChatView.swift in Sources */,
@@ -2706,7 +2828,7 @@
 				7FAFD7EE70F5017C027FBA2A /* HeuristicRules.swift in Sources */,
 				FE991243964C4CA7B50838C8 /* HierarchicalDecomposer.swift in Sources */,
 				D21A105BB90115567E5E76B4 /* NodeStateMachine.swift in Sources */,
-				E10D1F61DF4FEEEBAF96ABAA /* ToolExecutionCoordinator.swift in Sources */,
+				E10D1F61DF4FEEEBAF96ABAA /* AgentToolExecutionCoordinator.swift in Sources */,
 				8091B16FF09935BB50659B4A /* RetryPolicy.swift in Sources */,
 				5943A167086D9EABF59AD45E /* CheckpointManager.swift in Sources */,
 				A2E32ED4E295C38A968596EC /* DAGExecutionEngine.swift in Sources */,
