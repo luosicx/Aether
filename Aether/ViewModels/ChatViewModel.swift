@@ -633,7 +633,8 @@ final class ChatViewModel {
             Task.detached { await TelemetryService.shared.track(.fallbackTriggered(from: fromProvider, to: toProvider, reason: "primary_no_output")) }
         }
         let latencyMs = ctx.llmStartTime.map { Int(Date().timeIntervalSince($0) * 1000) } ?? 0  // Day 14: LLM 响应埋点（latencyMs / success / 估算输出 token 数）
-        Task.detached { await TelemetryService.shared.track(.llmResponse(latencyMs: latencyMs, success: !ctx.fullResponse.isEmpty, outputTokens: ctx.fullResponse.count / 4)) }
+        let fullResponse = ctx.fullResponse
+        Task.detached { await TelemetryService.shared.track(.llmResponse(latencyMs: latencyMs, success: !fullResponse.isEmpty, outputTokens: fullResponse.count / 4)) }
         let assistantMsg = ChatMessage(role: "assistant", content: ctx.fullResponse)
         assistantMsg.conversation = ctx.conversation
         ctx.conversation.messages.append(assistantMsg)
