@@ -417,7 +417,7 @@ final class DAGExecutionEngineTests: XCTestCase {
 
     // MARK: - 工具调用路径
 
-    /// 带 toolName 的节点：通过 ToolExecutionCoordinator 执行
+    /// 带 toolName 的节点：通过 AgentToolExecutionCoordinator 执行
     func testRunNodeWithToolName() async throws {
         let task = makeTask()
         let sub = SubTask(title: "工具任务", toolName: "get_current_time", order: 0)
@@ -428,7 +428,7 @@ final class DAGExecutionEngineTests: XCTestCase {
 
         try await engine.run(task, executor: executor)
 
-        // ToolExecutionCoordinator.shared 在测试环境调用未注册工具会失败重试用尽
+        // AgentToolExecutionCoordinator.shared 在测试环境调用未注册工具会失败重试用尽
         // 这里只验证不崩溃且状态正确（应为 failed 或 completed）
         XCTAssertTrue(task.subTasks[0].status == .failed || task.subTasks[0].status == .completed)
     }

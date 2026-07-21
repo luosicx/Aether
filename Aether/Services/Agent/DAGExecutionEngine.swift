@@ -9,7 +9,7 @@ import AetherFoundation
 /// - 获取所有 `dependencies` 均为 `completed`/`skipped` 的 `pending` 节点
 /// - 使用 `TaskGroup` 并行提交执行（最大并发 4，通过 semaphore 控制）
 /// - 通过 `NodeStateMachine`（actor）管理状态迁移
-/// - 通过 `ToolExecutionCoordinator`（actor）串行化工具调用
+/// - 通过 `AgentToolExecutionCoordinator`（actor）串行化工具调用
 /// - 跳过 failed 节点的下游依赖（自动级联 skipped）
 /// - 提供进度回调（@MainActor 闭包）
 ///
@@ -57,7 +57,7 @@ final class DAGExecutionEngine {
     /// 节点状态机（actor，线程安全）
     private let stateMachine: NodeStateMachine
     /// 工具执行协调器（actor，串行化工具调用）
-    private let toolCoordinator: ToolExecutionCoordinator
+    private let toolCoordinator: AgentToolExecutionCoordinator
     /// 重试策略
     private let retryPolicy: RetryPolicy
     /// 检查点管理器
@@ -82,7 +82,7 @@ final class DAGExecutionEngine {
     ///   - retryPolicy: 重试策略（可选，默认 `.defaultPolicy`）
     ///   - checkpointManager: 检查点管理器（可选，默认新建）
     init(stateMachine: NodeStateMachine? = nil,
-         toolCoordinator: ToolExecutionCoordinator = ToolExecutionCoordinator.shared,
+         toolCoordinator: AgentToolExecutionCoordinator = AgentToolExecutionCoordinator.shared,
          retryPolicy: RetryPolicy = .defaultPolicy,
          checkpointManager: CheckpointManager? = nil) {
         self.stateMachine = stateMachine ?? NodeStateMachine()
