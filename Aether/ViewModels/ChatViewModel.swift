@@ -173,7 +173,7 @@ final class ChatViewModel {
             onDidFallbackLastRequestChange: { [weak self] value in self?.didFallbackLastRequest = value }
         )
         retrievalCoordinator = RetrievalCoordinator(
-            cache: cache,
+            cache: self.cache,
             selectedProviderProvider: { [weak self] in self?.selectedProvider ?? .deepseek },
             ragEnabledProvider: { [weak self] in self?.ragEnabled ?? false },
             toolsEnabledProvider: { [weak self] in self?.toolsEnabled ?? false },
@@ -628,7 +628,9 @@ final class ChatViewModel {
             networkFallbackCoordinator.updateDidFallbackLastRequest(fallback.didFallback)
         }
         if didFallbackLastRequest {  // Day 14: fallback 触发埋点
-            Task.detached { await TelemetryService.shared.track(.fallbackTriggered(from: selectedProvider.displayName, to: lastUsedProvider?.displayName ?? "unknown", reason: "primary_no_output")) }
+            let fromProvider = selectedProvider.displayName
+            let toProvider = lastUsedProvider?.displayName ?? "unknown"
+            Task.detached { await TelemetryService.shared.track(.fallbackTriggered(from: fromProvider, to: toProvider, reason: "primary_no_output")) }
         }
         let latencyMs = ctx.llmStartTime.map { Int(Date().timeIntervalSince($0) * 1000) } ?? 0  // Day 14: LLM 响应埋点（latencyMs / success / 估算输出 token 数）
         Task.detached { await TelemetryService.shared.track(.llmResponse(latencyMs: latencyMs, success: !ctx.fullResponse.isEmpty, outputTokens: ctx.fullResponse.count / 4)) }
