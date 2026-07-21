@@ -61,7 +61,7 @@ final class ChatViewModel {
     var showInjectionWarning: Bool = false              // P2-6 Task 9: InjectionGuard 写入，弹窗显示状态
     var injectionWarningMessage: String = ""            // Task 7: 提示注入检测弹窗提示文案
     @ObservationIgnored
-    var pendingInjectionDecision: (@MainActor (Bool) -> Void)?  // View 调用路由到 InjectionGuard.proceed()/cancel()
+    var pendingInjectionDecision: InjectionDecisionHandler?  // View 调用路由到 InjectionGuard.proceed()/cancel()
     var pendingWatchMessage: String?                    // Task 4: Watch 发来的快速对话消息（非 nil 时 ChatView 写入并发送）
 
     // 测试性调整：client / cache 暴露为 internal 支持注入（默认 DeepSeekClient() / SemanticCache() 兜底）

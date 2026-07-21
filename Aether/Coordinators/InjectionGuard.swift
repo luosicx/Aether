@@ -22,6 +22,10 @@ import AetherServices
 ///
 /// 并发边界：本类标注 `@MainActor`，所有闭包在主 actor 上调用；
 /// 闭包使用 `[weak self]` 防止循环引用（与 VoiceCoordinator 同模式）。
+/// 用户决策回调类型：参数 true=继续发送 / false=取消。
+/// 使用 typealias 显式标注 @MainActor，避免在嵌套类型签名中重复书写 `@MainActor (Bool) -> Void` 导致语法歧义。
+typealias InjectionDecisionHandler = @MainActor (Bool) -> Void
+
 @MainActor
 final class InjectionGuard: Coordinator {
     /// showInjectionWarning 变更回调（ChatViewModel 设置，更新 @Observable var showInjectionWarning）
@@ -30,12 +34,12 @@ final class InjectionGuard: Coordinator {
     private let onInjectionWarningMessageChange: (String) -> Void
     /// pendingInjectionDecision 变更回调（ChatViewModel 设置，更新 @Observable var pendingInjectionDecision）
     /// 暴露的闭包为包装闭包：调用 wrapper(true) → proceed()，调用 wrapper(false) → cancel()
-    private let onPendingInjectionDecisionChange: (@MainActor ((Bool) -> Void)?) -> Void
+    private let onPendingInjectionDecisionChange: (InjectionDecisionHandler?) -> Void
 
     /// 真正的决策回调（由 ChatViewModel 在 setDecisionHandler 中注入）。
     /// proceed/cancel 触发后调用，参数 true=继续发送 / false=取消。
     @ObservationIgnored
-    private var decisionHandler: (@MainActor (Bool) -> Void)?
+    private var decisionHandler: InjectionDecisionHandler?
 
     /// 构造器
     /// - Parameters:
@@ -44,7 +48,7 @@ final class InjectionGuard: Coordinator {
     ///   - onPendingInjectionDecisionChange: pendingInjectionDecision 变更回调（@MainActor）
     init(onShowInjectionWarningChange: @escaping (Bool) -> Void,
          onInjectionWarningMessageChange: @escaping (String) -> Void,
-         onPendingInjectionDecisionChange: @escaping (@MainActor ((Bool) -> Void)?) -> Void) {
+         onPendingInjectionDecisionChange: @escaping (InjectionDecisionHandler?) -> Void) {
         self.onShowInjectionWarningChange = onShowInjectionWarningChange
         self.onInjectionWarningMessageChange = onInjectionWarningMessageChange
         self.onPendingInjectionDecisionChange = onPendingInjectionDecisionChange
@@ -68,7 +72,7 @@ final class InjectionGuard: Coordinator {
     /// 同时通过 onPendingInjectionDecisionChange 暴露一个包装闭包给外部（View 调用入口），
     /// 包装闭包会按 Bool 参数路由到 proceed()/cancel()，从而完成状态清理与 handler 触发。
     /// - Parameter handler: 用户决策回调。proceed 时调用 handler(true)；cancel 时调用 handler(false)。
-    func setDecisionHandler(_ handler: @MainActor @escaping (Bool) -> Void) {
+    func setDecisionHandler(_ handler: @escaping InjectionDecisionHandler) {
         decisionHandler = handler
         // 包装闭包：View 调用 pendingInjectionDecision?(bool) 时路由到 proceed/cancel
         let wrapper: @MainActor (Bool) -> Void = { [weak self] shouldContinue in

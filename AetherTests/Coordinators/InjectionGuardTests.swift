@@ -21,10 +21,10 @@ final class InjectionGuardTests: XCTestCase {
     private func makeGuard() -> (guard: InjectionGuard,
                                  showWarning: NonIsolatedBox<Bool>,
                                  warningMessage: NonIsolatedBox<String>,
-                                 pendingDecision: NonIsolatedBox<(@MainActor (Bool) -> Void)?>) {
+                                 pendingDecision: NonIsolatedBox<InjectionDecisionHandler?>) {
         let showWarningBox = NonIsolatedBox<Bool>(false)
         let warningMessageBox = NonIsolatedBox<String>("")
-        let pendingDecisionBox = NonIsolatedBox<(@MainActor (Bool) -> Void)?>(nil)
+        let pendingDecisionBox = NonIsolatedBox<InjectionDecisionHandler?>(nil)
         let g = InjectionGuard(
             onShowInjectionWarningChange: { showWarningBox.value = $0 },
             onInjectionWarningMessageChange: { warningMessageBox.value = $0 },
