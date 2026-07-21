@@ -39,6 +39,17 @@ final class RetrievalCoordinatorTests: XCTestCase {
 
     // MARK: - 辅助
 
+    /// RetrievalCoordinator 测试夹具：构造 coordinator 同时持有闭包回调写入的 Box，便于断言。
+    /// 使用 struct 而非多元组返回，避免触发 SwiftLint large_tuple（warning 阈值 4）。
+    private struct RetrievalFixture {
+        let coordinator: RetrievalCoordinator
+        let currentCitations: NonIsolatedBox<[DocumentChunk]>
+        let errorMessage: NonIsolatedBox<String?>
+        let selectedProvider: NonIsolatedBox<ModelProvider>
+        let ragEnabled: NonIsolatedBox<Bool>
+        let toolsEnabled: NonIsolatedBox<Bool>
+    }
+
     /// 构造一个 RetrievalCoordinator 并捕获闭包回调值，便于断言。
     /// selectedProvider / ragEnabled / toolsEnabled 通过 NonIsolatedBox 持有以模拟 ChatViewModel 的 @Observable 属性。
     private func makeCoordinator(
@@ -47,12 +58,7 @@ final class RetrievalCoordinatorTests: XCTestCase {
         toolsEnabled: Bool = false,
         cache: SemanticCache = SemanticCache(),
         ragService: RAGService? = nil
-    ) -> (coordinator: RetrievalCoordinator,
-          currentCitations: NonIsolatedBox<[DocumentChunk]>,
-          errorMessage: NonIsolatedBox<String?>,
-          selectedProviderBox: NonIsolatedBox<ModelProvider>,
-          ragEnabledBox: NonIsolatedBox<Bool>,
-          toolsEnabledBox: NonIsolatedBox<Bool>) {
+    ) -> RetrievalFixture {
         let selectedBox = NonIsolatedBox<ModelProvider>(selectedProvider)
         let ragEnabledBox = NonIsolatedBox<Bool>(ragEnabled)
         let toolsEnabledBox = NonIsolatedBox<Bool>(toolsEnabled)
@@ -67,7 +73,14 @@ final class RetrievalCoordinatorTests: XCTestCase {
             onErrorMessageChange: { errorBox.value = $0 },
             ragService: ragService
         )
-        return (coordinator, citationsBox, errorBox, selectedBox, ragEnabledBox, toolsEnabledBox)
+        return RetrievalFixture(
+            coordinator: coordinator,
+            currentCitations: citationsBox,
+            errorMessage: errorBox,
+            selectedProvider: selectedBox,
+            ragEnabled: ragEnabledBox,
+            toolsEnabled: toolsEnabledBox
+        )
     }
 
     // MARK: - RAG 检索
@@ -80,49 +93,49 @@ final class RetrievalCoordinatorTests: XCTestCase {
         let mock = MockLLMProvider()
         mock.embedResult = [[0.1, 0.2, 0.3]]
         let ragService = RAGService(embeddingService: EmbeddingService(client: mock))
-        let (coordinator, _, errorBox, _, _, _) = makeCoordinator(
+        let fx = makeCoordinator(
             selectedProvider: .deepseek,
             ragEnabled: true,
             ragService: ragService
         )
 
         // DeepSeek + Qwen Key 应降级到 .qwen
-        XCTAssertEqual(coordinator.ragEmbeddingProvider, .qwen,
+        XCTAssertEqual(fx.coordinator.ragEmbeddingProvider, .qwen,
                        "DeepSeek + Qwen Key 时应降级到 .qwen 进行 embedding")
 
-        let (ragContext, embedding) = await coordinator.handleRAGRetrieving(
+        let (ragContext, embedding) = await fx.coordinator.handleRAGRetrieving(
             text: "你好", modelContext: context, llmClient: mock, apiKey: ""
         )
 
         // 空 ModelContext 无文档分块，context 为空但 embedding 已计算
         XCTAssertTrue(ragContext.isEmpty, "无文档分块时 context 应为空")
         XCTAssertEqual(embedding, [0.1, 0.2, 0.3], "应返回 mock embedding（Qwen embedding 调用成功）")
-        XCTAssertNil(errorBox.value, "Qwen Key 已配置且 embedding 成功时不应设置 errorMessage")
+        XCTAssertNil(fx.errorMessage.value, "Qwen Key 已配置且 embedding 成功时不应设置 errorMessage")
     }
 
     /// RAG 开启 + DeepSeek provider 无 Qwen Key 时应设置 embedding 不支持错误并清空 citations。
     func testRAGRetrievingDeepSeekNoQwenKeySetsEmbeddingError() async throws {
         // 不预置 Qwen Key（setUp 已用 InMemoryKeychainBackend 重置）
-        let (coordinator, citationsBox, errorBox, _, _, _) = makeCoordinator(
+        let fx = makeCoordinator(
             selectedProvider: .deepseek,
             ragEnabled: true
         )
 
-        XCTAssertEqual(coordinator.ragEmbeddingProvider, .deepseek,
+        XCTAssertEqual(fx.coordinator.ragEmbeddingProvider, .deepseek,
                        "DeepSeek 无 Qwen Key 时 ragEmbeddingProvider 应回退到 .deepseek")
 
-        let (ragContext, embedding) = await coordinator.handleRAGRetrieving(
+        let (ragContext, embedding) = await fx.coordinator.handleRAGRetrieving(
             text: "你好", modelContext: context, llmClient: MockLLMProvider(), apiKey: ""
         )
 
         XCTAssertEqual(ragContext, "", "降级守卫触发时 context 应为空")
         XCTAssertTrue(embedding.isEmpty, "降级守卫触发时 embedding 应为空")
         XCTAssertEqual(
-            errorBox.value,
+            fx.errorMessage.value,
             NSLocalizedString("DeepSeek 不支持知识库嵌入，请在设置中配置 Qwen API Key 或切换供应商为 Qwen", comment: ""),
             "应设置 embedding 不支持错误"
         )
-        XCTAssertTrue(citationsBox.value.isEmpty, "降级时应清空 currentCitations")
+        XCTAssertTrue(fx.currentCitations.value.isEmpty, "降级时应清空 currentCitations")
     }
 
     /// RAG 开启 + Qwen provider 时应尝试调用 Qwen embedding（ragEmbeddingProvider 应为 .qwen）。
@@ -132,16 +145,16 @@ final class RetrievalCoordinatorTests: XCTestCase {
         let mock = MockLLMProvider()
         mock.embedResult = [[0.4, 0.5, 0.6]]
         let ragService = RAGService(embeddingService: EmbeddingService(client: mock))
-        let (coordinator, _, _, _, _, _) = makeCoordinator(
+        let fx = makeCoordinator(
             selectedProvider: .qwen,
             ragEnabled: true,
             ragService: ragService
         )
 
-        XCTAssertEqual(coordinator.ragEmbeddingProvider, .qwen,
+        XCTAssertEqual(fx.coordinator.ragEmbeddingProvider, .qwen,
                        "Qwen provider 时 ragEmbeddingProvider 应为 .qwen")
 
-        let (ragContext, embedding) = await coordinator.handleRAGRetrieving(
+        let (ragContext, embedding) = await fx.coordinator.handleRAGRetrieving(
             text: "你好", modelContext: context, llmClient: mock, apiKey: ""
         )
         // 空 ModelContext 无文档分块，context 为空但 embedding 已计算（说明尝试了 Qwen embedding）
@@ -151,18 +164,18 @@ final class RetrievalCoordinatorTests: XCTestCase {
 
     /// RAG 关闭时应清空 currentCitations（即使预置了非空值）。
     func testRAGDisabledClearsCitations() async throws {
-        let (coordinator, citationsBox, _, _, _, _) = makeCoordinator(
+        let fx = makeCoordinator(
             selectedProvider: .onDevice,
             ragEnabled: false
         )
         // 预置非空 citations
-        citationsBox.value = [DocumentChunk(content: "旧引用1"), DocumentChunk(content: "旧引用2")]
+        fx.currentCitations.value = [DocumentChunk(content: "旧引用1"), DocumentChunk(content: "旧引用2")]
 
-        let _ = await coordinator.handleRAGRetrieving(
+        let _ = await fx.coordinator.handleRAGRetrieving(
             text: "你好", modelContext: context, llmClient: MockLLMProvider(), apiKey: ""
         )
 
-        XCTAssertTrue(citationsBox.value.isEmpty, "RAG 关闭时 currentCitations 应被清空")
+        XCTAssertTrue(fx.currentCitations.value.isEmpty, "RAG 关闭时 currentCitations 应被清空")
     }
 
     // MARK: - 缓存查询
@@ -173,14 +186,14 @@ final class RetrievalCoordinatorTests: XCTestCase {
         let embedding: [Float] = [1.0, 0.0, 0.0]
         cache.set(query: "你好", embedding: embedding, response: "cached-reply")
 
-        let (coordinator, _, _, _, _, _) = makeCoordinator(
+        let fx = makeCoordinator(
             selectedProvider: .onDevice,
             ragEnabled: false,
             toolsEnabled: false,
             cache: cache
         )
 
-        let cached = coordinator.checkCache(query: "你好", embedding: embedding)
+        let cached = fx.coordinator.checkCache(query: "你好", embedding: embedding)
         XCTAssertEqual(cached, "cached-reply", "缓存命中应返回缓存的 response")
     }
 
@@ -190,14 +203,14 @@ final class RetrievalCoordinatorTests: XCTestCase {
         let embedding: [Float] = [1.0, 0.0, 0.0]
         // 不预置缓存条目
 
-        let (coordinator, _, _, _, _, _) = makeCoordinator(
+        let fx = makeCoordinator(
             selectedProvider: .onDevice,
             ragEnabled: false,
             toolsEnabled: false,
             cache: cache
         )
 
-        let cached = coordinator.checkCache(query: "你好", embedding: embedding)
+        let cached = fx.coordinator.checkCache(query: "你好", embedding: embedding)
         XCTAssertNil(cached, "缓存未命中应返回 nil，调用方继续走 LLM")
     }
 
@@ -207,14 +220,14 @@ final class RetrievalCoordinatorTests: XCTestCase {
     func testCacheNotWrittenWhenToolsEnabled() {
         let cache = SemanticCache()
         let embedding: [Float] = [0.5, 0.5, 0.0]
-        let (coordinator, _, _, _, _, _) = makeCoordinator(
+        let fx = makeCoordinator(
             selectedProvider: .onDevice,
             ragEnabled: false,
             toolsEnabled: true,
             cache: cache
         )
 
-        coordinator.writeCache(query: "你好", embedding: embedding, response: "工具模式回复")
+        fx.coordinator.writeCache(query: "你好", embedding: embedding, response: "工具模式回复")
 
         let cached = cache.get(query: "你好", embedding: embedding)
         XCTAssertNil(cached, "工具模式启用时不应写入缓存")
@@ -224,14 +237,14 @@ final class RetrievalCoordinatorTests: XCTestCase {
     func testCacheNotWrittenWhenResponseEmpty() {
         let cache = SemanticCache()
         let embedding: [Float] = [1.0, 0.0, 0.0]
-        let (coordinator, _, _, _, _, _) = makeCoordinator(
+        let fx = makeCoordinator(
             selectedProvider: .onDevice,
             ragEnabled: false,
             toolsEnabled: false,
             cache: cache
         )
 
-        coordinator.writeCache(query: "你好", embedding: embedding, response: "")
+        fx.coordinator.writeCache(query: "你好", embedding: embedding, response: "")
 
         let cached = cache.get(query: "你好", embedding: embedding)
         XCTAssertNil(cached, "空响应不应写入缓存")
@@ -240,14 +253,14 @@ final class RetrievalCoordinatorTests: XCTestCase {
     /// 空 queryEmbedding 不写入缓存。
     func testEmptyQueryEmbeddingDoesNotWriteCache() {
         let cache = SemanticCache()
-        let (coordinator, _, _, _, _, _) = makeCoordinator(
+        let fx = makeCoordinator(
             selectedProvider: .onDevice,
             ragEnabled: false,
             toolsEnabled: false,
             cache: cache
         )
 
-        coordinator.writeCache(query: "你好", embedding: [], response: "回复")
+        fx.coordinator.writeCache(query: "你好", embedding: [], response: "回复")
 
         let cached = cache.get(query: "你好", embedding: [])
         XCTAssertNil(cached, "空 embedding 时不应写入缓存")
@@ -259,13 +272,13 @@ final class RetrievalCoordinatorTests: XCTestCase {
     func testEmptyEmbedResultFallsBackToLLM() async throws {
         let mock = MockLLMProvider()
         mock.embedResult = [[]]  // 空向量
-        let (coordinator, _, _, _, _, _) = makeCoordinator(
+        let fx = makeCoordinator(
             selectedProvider: .onDevice,
             ragEnabled: false,
             toolsEnabled: false
         )
 
-        let (ragContext, embedding) = await coordinator.handleRAGRetrieving(
+        let (ragContext, embedding) = await fx.coordinator.handleRAGRetrieving(
             text: "你好", modelContext: context, llmClient: mock, apiKey: ""
         )
 
@@ -277,13 +290,13 @@ final class RetrievalCoordinatorTests: XCTestCase {
     func testEmbedMultipleVectorsUsesFirstEmbedding() async throws {
         let mock = MockLLMProvider()
         mock.embedResult = [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]
-        let (coordinator, _, _, _, _, _) = makeCoordinator(
+        let fx = makeCoordinator(
             selectedProvider: .onDevice,
             ragEnabled: false,
             toolsEnabled: false
         )
 
-        let (ragContext, embedding) = await coordinator.handleRAGRetrieving(
+        let (ragContext, embedding) = await fx.coordinator.handleRAGRetrieving(
             text: "你好", modelContext: context, llmClient: mock, apiKey: ""
         )
 

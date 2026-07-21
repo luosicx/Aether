@@ -10,16 +10,22 @@ final class VoiceCoordinatorTests: XCTestCase {
 
     // MARK: - 辅助
 
+    /// VoiceCoordinator 测试夹具：构造 coordinator 同时持有闭包回调写入的 Box，便于断言。
+    /// 使用 struct 而非多元组返回，避免触发 SwiftLint large_tuple（warning 阈值 4）。
+    private struct VoiceFixture {
+        let coordinator: VoiceCoordinator
+        let isRecording: NonIsolatedBox<Bool>
+        let speakingMessageId: NonIsolatedBox<UUID?>
+        let inputText: NonIsolatedBox<String>
+        let errorMessage: NonIsolatedBox<String?>
+    }
+
     /// 构造一个 VoiceCoordinator 并捕获闭包回调值，便于断言。
     /// isRecordingProvider 默认从 isRecordingBox 读取，模拟 ChatViewModel 的 @Observable var isRecording。
     private func makeCoordinator(
         voiceService: VoiceService = VoiceService(),
         ttsConfig: TTSConfig = .defaultValue
-    ) -> (coordinator: VoiceCoordinator,
-          isRecording: NonIsolatedBox<Bool>,
-          speakingMessageId: NonIsolatedBox<UUID?>,
-          inputText: NonIsolatedBox<String>,
-          errorMessage: NonIsolatedBox<String?>) {
+    ) -> VoiceFixture {
         let isRecordingBox = NonIsolatedBox<Bool>(false)
         let speakingBox = NonIsolatedBox<UUID?>(nil)
         let inputTextBox = NonIsolatedBox<String>("")
@@ -33,7 +39,13 @@ final class VoiceCoordinatorTests: XCTestCase {
             onInputTextChange: { inputTextBox.value = $0 },
             onErrorMessageChange: { errorBox.value = $0 }
         )
-        return (coordinator, isRecordingBox, speakingBox, inputTextBox, errorBox)
+        return VoiceFixture(
+            coordinator: coordinator,
+            isRecording: isRecordingBox,
+            speakingMessageId: speakingBox,
+            inputText: inputTextBox,
+            errorMessage: errorBox
+        )
     }
 
     // MARK: - toggleVoiceInput
@@ -48,20 +60,20 @@ final class VoiceCoordinatorTests: XCTestCase {
         )
         let voiceService = VoiceService()
         voiceService.recognizerAvailabilityCheck = { true }
-        let (coordinator, isRecordingBox, _, _, errorBox) = makeCoordinator(voiceService: voiceService)
+        let fx = makeCoordinator(voiceService: voiceService)
 
-        coordinator.toggleVoiceInput()
+        fx.coordinator.toggleVoiceInput()
 
         // 轮询等待异步 Task 完成：成功时 isRecording=true，失败时 errorMessage 被设置
         for _ in 0..<50 {
-            if isRecordingBox.value == true || errorBox.value != nil { break }
+            if fx.isRecording.value == true || fx.errorMessage.value != nil { break }
             try await Task.sleep(nanoseconds: 100_000_000) // 0.1s
         }
 
-        if let err = errorBox.value {
+        if let err = fx.errorMessage.value {
             throw XCTSkip("音频会话不可用，跳过录音启动测试：\(err)")
         }
-        XCTAssertEqual(isRecordingBox.value, true,
+        XCTAssertEqual(fx.isRecording.value, true,
                        "toggleVoiceInput 应启动录音并通过 onIsRecordingChange 通知 true")
     }
 
@@ -70,13 +82,13 @@ final class VoiceCoordinatorTests: XCTestCase {
     /// toggleVoiceInput 通过 isRecordingProvider 闭包读取该值，走停止分支。
     func testToggleVoiceInputStopsRecording() {
         let voiceService = VoiceService()
-        let (coordinator, isRecordingBox, _, _, _) = makeCoordinator(voiceService: voiceService)
+        let fx = makeCoordinator(voiceService: voiceService)
         // 预置录音状态为 true（模拟 ChatViewModel.isRecording=true）
-        isRecordingBox.value = true
+        fx.isRecording.value = true
 
-        coordinator.toggleVoiceInput()
+        fx.coordinator.toggleVoiceInput()
 
-        XCTAssertEqual(isRecordingBox.value, false,
+        XCTAssertEqual(fx.isRecording.value, false,
                        "录音中再次 toggle 应停止并通过 onIsRecordingChange 通知 false")
     }
 
@@ -89,18 +101,18 @@ final class VoiceCoordinatorTests: XCTestCase {
         )
         let voiceService = VoiceService()
         voiceService.recognizerAvailabilityCheck = { false }
-        let (coordinator, isRecordingBox, _, _, errorBox) = makeCoordinator(voiceService: voiceService)
+        let fx = makeCoordinator(voiceService: voiceService)
 
-        coordinator.toggleVoiceInput()
+        fx.coordinator.toggleVoiceInput()
 
         // 轮询等待异步 Task 完成（requestPermission + startRecording 抛错路径）
         for _ in 0..<50 {
-            if errorBox.value != nil { break }
+            if fx.errorMessage.value != nil { break }
             try await Task.sleep(nanoseconds: 100_000_000) // 0.1s
         }
 
-        XCTAssertNotNil(errorBox.value, "识别器不可用时应通过 onErrorMessageChange 通知错误")
-        XCTAssertEqual(isRecordingBox.value, false,
+        XCTAssertNotNil(fx.errorMessage.value, "识别器不可用时应通过 onErrorMessageChange 通知错误")
+        XCTAssertEqual(fx.isRecording.value, false,
                        "不可用时 isRecording 应保持 false")
     }
 
@@ -108,30 +120,30 @@ final class VoiceCoordinatorTests: XCTestCase {
 
     /// toggleSpeak 同 id 第二次调用应停止朗读并通过 onSpeakingMessageIdChange(nil) 清空
     func testToggleSpeakSameIdStops() {
-        let (coordinator, _, speakingBox, _, _) = makeCoordinator()
+        let fx = makeCoordinator()
         let id = UUID()
 
-        coordinator.toggleSpeak(messageId: id, content: "hello")
-        XCTAssertEqual(speakingBox.value, id,
+        fx.coordinator.toggleSpeak(messageId: id, content: "hello")
+        XCTAssertEqual(fx.speakingMessageId.value, id,
                        "首次 toggleSpeak 应通过 onSpeakingMessageIdChange 通知 id")
 
-        coordinator.toggleSpeak(messageId: id, content: "hello")
-        XCTAssertNil(speakingBox.value,
+        fx.coordinator.toggleSpeak(messageId: id, content: "hello")
+        XCTAssertNil(fx.speakingMessageId.value,
                      "同 id 第二次 toggleSpeak 应停止并通知 nil")
     }
 
     /// toggleSpeak 不同 id 调用应切换 speakingMessageId
     func testToggleSpeakDifferentIdSwitches() {
-        let (coordinator, _, speakingBox, _, _) = makeCoordinator()
+        let fx = makeCoordinator()
         let id1 = UUID()
         let id2 = UUID()
 
-        coordinator.toggleSpeak(messageId: id1, content: "hello")
-        XCTAssertEqual(speakingBox.value, id1,
+        fx.coordinator.toggleSpeak(messageId: id1, content: "hello")
+        XCTAssertEqual(fx.speakingMessageId.value, id1,
                        "首次 toggleSpeak 应通知 id1")
 
-        coordinator.toggleSpeak(messageId: id2, content: "world")
-        XCTAssertEqual(speakingBox.value, id2,
+        fx.coordinator.toggleSpeak(messageId: id2, content: "world")
+        XCTAssertEqual(fx.speakingMessageId.value, id2,
                        "切换到不同 id 应通知 id2")
     }
 
@@ -140,26 +152,26 @@ final class VoiceCoordinatorTests: XCTestCase {
     /// voiceService.onSpeakFinished 触发时应清空 speakingMessageId（验证 VoiceCoordinator 在 init 中注册回调）
     func testOnSpeakFinishedClearsSpeakingMessageId() {
         let voiceService = VoiceService()
-        let (coordinator, _, speakingBox, _, _) = makeCoordinator(voiceService: voiceService)
+        let fx = makeCoordinator(voiceService: voiceService)
         let id = UUID()
 
-        coordinator.toggleSpeak(messageId: id, content: "hello")
-        XCTAssertEqual(speakingBox.value, id, "前置：toggleSpeak 应设置 speakingMessageId")
+        fx.coordinator.toggleSpeak(messageId: id, content: "hello")
+        XCTAssertEqual(fx.speakingMessageId.value, id, "前置：toggleSpeak 应设置 speakingMessageId")
 
         voiceService.onSpeakFinished?()
 
-        XCTAssertNil(speakingBox.value,
+        XCTAssertNil(fx.speakingMessageId.value,
                      "onSpeakFinished 应通过 onSpeakingMessageIdChange 通知 nil")
     }
 
     /// voiceService.onRecognized 触发时应通过 onInputTextChange 更新 inputText（验证回调注册）
     func testOnRecognizedUpdatesInputText() {
         let voiceService = VoiceService()
-        let (_, _, _, inputTextBox, _) = makeCoordinator(voiceService: voiceService)
+        let fx = makeCoordinator(voiceService: voiceService)
 
         voiceService.onRecognized?("识别结果文本")
 
-        XCTAssertEqual(inputTextBox.value, "识别结果文本",
+        XCTAssertEqual(fx.inputText.value, "识别结果文本",
                        "onRecognized 应通过 onInputTextChange 通知识别结果")
     }
 }

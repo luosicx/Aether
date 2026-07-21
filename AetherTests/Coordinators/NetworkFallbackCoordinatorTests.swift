@@ -16,15 +16,21 @@ final class NetworkFallbackCoordinatorTests: XCTestCase {
 
     // MARK: - 辅助
 
+    /// NetworkFallbackCoordinator 测试夹具：构造 coordinator 同时持有闭包回调写入的 Box，便于断言。
+    /// 使用 struct 而非多元组返回，避免触发 SwiftLint large_tuple（warning 阈值 4）。
+    private struct NetworkFallbackFixture {
+        let coordinator: NetworkFallbackCoordinator
+        let selectedProvider: NonIsolatedBox<ModelProvider>
+        let currentNetworkStatus: NonIsolatedBox<NetworkStatus>
+        let lastUsedProvider: NonIsolatedBox<ModelProvider?>
+        let didFallbackLastRequest: NonIsolatedBox<Bool>
+    }
+
     /// 构造一个 NetworkFallbackCoordinator 并捕获闭包回调值，便于断言。
     /// selectedProvider 初值由参数指定（默认 .deepseek），由 NonIsolatedBox 持有以模拟 ChatViewModel 的 @Observable var selectedProvider。
     private func makeCoordinator(
         initialSelectedProvider: ModelProvider = .deepseek
-    ) -> (coordinator: NetworkFallbackCoordinator,
-          selectedProvider: NonIsolatedBox<ModelProvider>,
-          currentNetworkStatus: NonIsolatedBox<NetworkStatus>,
-          lastUsedProvider: NonIsolatedBox<ModelProvider?>,
-          didFallbackLastRequest: NonIsolatedBox<Bool>) {
+    ) -> NetworkFallbackFixture {
         let selectedBox = NonIsolatedBox<ModelProvider>(initialSelectedProvider)
         let networkStatusBox = NonIsolatedBox<NetworkStatus>(.online)
         let lastUsedBox = NonIsolatedBox<ModelProvider?>(nil)
@@ -36,59 +42,65 @@ final class NetworkFallbackCoordinatorTests: XCTestCase {
             onLastUsedProviderChange: { lastUsedBox.value = $0 },
             onDidFallbackLastRequestChange: { didFallbackBox.value = $0 }
         )
-        return (coordinator, selectedBox, networkStatusBox, lastUsedBox, didFallbackBox)
+        return NetworkFallbackFixture(
+            coordinator: coordinator,
+            selectedProvider: selectedBox,
+            currentNetworkStatus: networkStatusBox,
+            lastUsedProvider: lastUsedBox,
+            didFallbackLastRequest: didFallbackBox
+        )
     }
 
     // MARK: - switchToOnDevice / switchToOriginalProvider
 
     /// switchToOnDevice：从 .deepseek 切换到 .onDevice 时应保存原 provider 并通知 .onDevice。
     func testSwitchToOnDeviceSavesOriginalProvider() {
-        let (coordinator, selectedBox, _, _, _) = makeCoordinator(initialSelectedProvider: .deepseek)
+        let fx = makeCoordinator(initialSelectedProvider: .deepseek)
 
-        coordinator.switchToOnDevice()
+        fx.coordinator.switchToOnDevice()
 
-        XCTAssertEqual(selectedBox.value, .onDevice,
+        XCTAssertEqual(fx.selectedProvider.value, .onDevice,
                        "switchToOnDevice 应通过 onSelectedProviderChange 通知 .onDevice")
-        XCTAssertEqual(coordinator.originalSelectedProvider, .deepseek,
+        XCTAssertEqual(fx.coordinator.originalSelectedProvider, .deepseek,
                        "原 provider .deepseek 应被保存到 originalSelectedProvider")
     }
 
     /// switchToOriginalProvider：处于 .onDevice 且有保存的原 provider 时应恢复并清空 originalSelectedProvider。
     func testSwitchToOriginalProviderRestoresOriginal() {
-        let (coordinator, selectedBox, _, _, _) = makeCoordinator(initialSelectedProvider: .deepseek)
+        let fx = makeCoordinator(initialSelectedProvider: .deepseek)
 
         // 前置：先切到端侧，保存原 provider
-        coordinator.switchToOnDevice()
-        XCTAssertEqual(coordinator.originalSelectedProvider, .deepseek, "前置：原 provider 已保存")
-        XCTAssertEqual(selectedBox.value, .onDevice, "前置：selectedProvider 已切到 .onDevice")
+        fx.coordinator.switchToOnDevice()
+        XCTAssertEqual(fx.coordinator.originalSelectedProvider, .deepseek, "前置：原 provider 已保存")
+        XCTAssertEqual(fx.selectedProvider.value, .onDevice, "前置：selectedProvider 已切到 .onDevice")
 
-        coordinator.switchToOriginalProvider()
+        fx.coordinator.switchToOriginalProvider()
 
-        XCTAssertEqual(selectedBox.value, .deepseek,
+        XCTAssertEqual(fx.selectedProvider.value, .deepseek,
                        "switchToOriginalProvider 应通过 onSelectedProviderChange 恢复 .deepseek")
-        XCTAssertNil(coordinator.originalSelectedProvider,
+        XCTAssertNil(fx.coordinator.originalSelectedProvider,
                      "恢复后 originalSelectedProvider 应清空")
     }
 
     /// switchToOnDevice 守卫：已处于 .onDevice 时不应重复保存原 provider，也不应触发回调。
     func testSwitchToOnDeviceGuardWhenAlreadyOnDevice() {
-        let (coordinator, selectedBox, _, _, _) = makeCoordinator(initialSelectedProvider: .onDevice)
+        let fx = makeCoordinator(initialSelectedProvider: .onDevice)
 
-        coordinator.switchToOnDevice()
+        fx.coordinator.switchToOnDevice()
 
-        XCTAssertEqual(selectedBox.value, .onDevice,
+        XCTAssertEqual(fx.selectedProvider.value, .onDevice,
                        "已是 .onDevice 时 selectedProvider 应保持不变（不触发回调）")
-        XCTAssertNil(coordinator.originalSelectedProvider,
+        XCTAssertNil(fx.coordinator.originalSelectedProvider,
                      "已是 .onDevice 时不应保存原 provider")
     }
 
     /// switchToOriginalProvider 守卫：非 .onDevice 状态时不应触发恢复。
     func testSwitchToOriginalProviderGuardWhenNotOnDevice() {
-        let (coordinator, selectedBox, _, _, _) = makeCoordinator(initialSelectedProvider: .qwen)
+        let fx = makeCoordinator(initialSelectedProvider: .qwen)
 
-        coordinator.switchToOriginalProvider()
+        fx.coordinator.switchToOriginalProvider()
 
-        XCTAssertEqual(selectedBox.value, .qwen,
+        XCTAssertEqual(fx.selectedProvider.value, .qwen,
                        "非 .onDevice 时 selectedProvider 应保持不变（不触发回调）")
     }
 
@@ -97,10 +109,10 @@ final class NetworkFallbackCoordinatorTests: XCTestCase {
     /// onDevice + toolsEnabled + online → 降级到 fallback provider（onDevice.fallback = .deepseek）。
     /// 端侧推理不支持工具调用，在线时需切到云端 fallback 以支持 function calling。
     func testEffectiveProviderForRequestOnDeviceWithToolsDegradesToFallback() {
-        let (coordinator, _, _, _, _) = makeCoordinator(initialSelectedProvider: .onDevice)
+        let fx = makeCoordinator(initialSelectedProvider: .onDevice)
         // currentNetworkStatus 默认为 .online（init 初值）
 
-        let result = coordinator.effectiveProviderForRequest(
+        let result = fx.coordinator.effectiveProviderForRequest(
             selectedProvider: .onDevice, toolsEnabled: true
         )
 
@@ -112,11 +124,11 @@ final class NetworkFallbackCoordinatorTests: XCTestCase {
 
     /// BFF 启用且无注入 client 时，工厂应返回 BFFProxyClient 实例。
     func testMakeLLMProviderBFFPath() {
-        let (coordinator, _, _, _, _) = makeCoordinator(initialSelectedProvider: .deepseek)
+        let fx = makeCoordinator(initialSelectedProvider: .deepseek)
         var bffConfig = BFFConfig.default
         bffConfig.enabled = true
 
-        let provider = coordinator.makeLLMProvider(
+        let provider = fx.coordinator.makeLLMProvider(
             selectedProvider: .deepseek,
             fallbackProvider: nil,
             bffConfig: bffConfig,
@@ -130,9 +142,9 @@ final class NetworkFallbackCoordinatorTests: XCTestCase {
 
     /// fallbackProvider 非空且无注入 client 时，工厂应返回 FallbackLLMProvider 装饰实例。
     func testMakeLLMProviderFallbackPath() {
-        let (coordinator, _, _, _, _) = makeCoordinator(initialSelectedProvider: .deepseek)
+        let fx = makeCoordinator(initialSelectedProvider: .deepseek)
 
-        let provider = coordinator.makeLLMProvider(
+        let provider = fx.coordinator.makeLLMProvider(
             selectedProvider: .deepseek,
             fallbackProvider: .qwen,
             bffConfig: .default,
@@ -149,24 +161,24 @@ final class NetworkFallbackCoordinatorTests: XCTestCase {
     /// mapModelName：把 SmartRouter 输出的 "deepseek-chat" / "deepseek-reasoner"
     /// 映射到各 provider 的对应模型名；未知模型名原样返回。
     func testMapModelNameSmartRouter() {
-        let (coordinator, _, _, _, _) = makeCoordinator()
+        let fx = makeCoordinator()
 
         // deepseek-chat 映射到各 provider 的 defaultChatModel
-        XCTAssertEqual(coordinator.mapModelName("deepseek-chat", for: .deepseek), "deepseek-chat",
+        XCTAssertEqual(fx.coordinator.mapModelName("deepseek-chat", for: .deepseek), "deepseek-chat",
                        "deepseek + deepseek-chat → deepseek-chat")
-        XCTAssertEqual(coordinator.mapModelName("deepseek-chat", for: .qwen), "qwen-plus",
+        XCTAssertEqual(fx.coordinator.mapModelName("deepseek-chat", for: .qwen), "qwen-plus",
                        "qwen + deepseek-chat → qwen-plus")
-        XCTAssertEqual(coordinator.mapModelName("deepseek-chat", for: .onDevice), "llama-3.2-1b-instruct",
+        XCTAssertEqual(fx.coordinator.mapModelName("deepseek-chat", for: .onDevice), "llama-3.2-1b-instruct",
                        "onDevice + deepseek-chat → llama-3.2-1b-instruct")
 
         // deepseek-reasoner 映射到各 provider 的 defaultReasonerModel
-        XCTAssertEqual(coordinator.mapModelName("deepseek-reasoner", for: .deepseek), "deepseek-reasoner",
+        XCTAssertEqual(fx.coordinator.mapModelName("deepseek-reasoner", for: .deepseek), "deepseek-reasoner",
                        "deepseek + deepseek-reasoner → deepseek-reasoner")
-        XCTAssertEqual(coordinator.mapModelName("deepseek-reasoner", for: .qwen), "qwq-32b",
+        XCTAssertEqual(fx.coordinator.mapModelName("deepseek-reasoner", for: .qwen), "qwq-32b",
                        "qwen + deepseek-reasoner → qwq-32b")
 
         // 未知模型名应原样返回
-        XCTAssertEqual(coordinator.mapModelName("custom-model-v1", for: .deepseek), "custom-model-v1",
+        XCTAssertEqual(fx.coordinator.mapModelName("custom-model-v1", for: .deepseek), "custom-model-v1",
                        "未知模型名应原样返回")
     }
 
@@ -176,15 +188,15 @@ final class NetworkFallbackCoordinatorTests: XCTestCase {
     func testNetworkMonitoringUpdatesCurrentNetworkStatus() async throws {
         // 先停止监控器，避免其它测试残留状态干扰
         await NetworkMonitor.shared.stop()
-        let (coordinator, _, networkStatusBox, _, _) = makeCoordinator()
+        let fx = makeCoordinator()
 
-        coordinator.startNetworkMonitoring()
+        fx.coordinator.startNetworkMonitoring()
 
         // 轮询等待 networkStatusTask 启动并同步状态
         var synced = false
         for _ in 0..<50 {
             let monitorStatus = await NetworkMonitor.shared.currentStatus
-            if coordinator.currentNetworkStatus == monitorStatus {
+            if fx.coordinator.currentNetworkStatus == monitorStatus {
                 synced = true
                 break
             }
@@ -192,11 +204,11 @@ final class NetworkFallbackCoordinatorTests: XCTestCase {
         }
         XCTAssertTrue(synced,
                       "网络监控启动后 currentNetworkStatus 应与 NetworkMonitor.shared.currentStatus 一致")
-        XCTAssertEqual(networkStatusBox.value, coordinator.currentNetworkStatus,
+        XCTAssertEqual(fx.currentNetworkStatus.value, fx.coordinator.currentNetworkStatus,
                        "应通过 onCurrentNetworkStatusChange 闭包通知外部状态")
 
         // 清理：取消 task 并停止监控器
-        coordinator.networkStatusTask?.cancel()
+        fx.coordinator.networkStatusTask?.cancel()
         await NetworkMonitor.shared.stop()
     }
 
@@ -205,11 +217,11 @@ final class NetworkFallbackCoordinatorTests: XCTestCase {
     /// 注入 client 时工厂直接返回注入实例，不调用 ModelProviderFactory.make(.onDevice)（避免 fatalError）。
     /// 这是 onDevice provider 能跳过 apiKey 检查的前提：注入的 mock client 不需要 apiKey。
     func testOnDeviceProviderSkipsAPIKeyCheck() {
-        let (coordinator, _, _, _, _) = makeCoordinator(initialSelectedProvider: .onDevice)
+        let fx = makeCoordinator(initialSelectedProvider: .onDevice)
         let mock = MockLLMProvider()
         mock.chatChunks = ["端侧回复"]
 
-        let provider = coordinator.makeLLMProvider(
+        let provider = fx.coordinator.makeLLMProvider(
             selectedProvider: .onDevice,
             fallbackProvider: nil,
             bffConfig: .default,

@@ -30,7 +30,7 @@ final class InjectionGuard: Coordinator {
     private let onInjectionWarningMessageChange: (String) -> Void
     /// pendingInjectionDecision 变更回调（ChatViewModel 设置，更新 @Observable var pendingInjectionDecision）
     /// 暴露的闭包为包装闭包：调用 wrapper(true) → proceed()，调用 wrapper(false) → cancel()
-    private let onPendingInjectionDecisionChange: (@MainActor (@MainActor (Bool) -> Void)?) -> Void
+    private let onPendingInjectionDecisionChange: (@MainActor ((Bool) -> Void)?) -> Void
 
     /// 真正的决策回调（由 ChatViewModel 在 setDecisionHandler 中注入）。
     /// proceed/cancel 触发后调用，参数 true=继续发送 / false=取消。
@@ -44,7 +44,7 @@ final class InjectionGuard: Coordinator {
     ///   - onPendingInjectionDecisionChange: pendingInjectionDecision 变更回调（@MainActor）
     init(onShowInjectionWarningChange: @escaping (Bool) -> Void,
          onInjectionWarningMessageChange: @escaping (String) -> Void,
-         onPendingInjectionDecisionChange: @escaping (@MainActor (@MainActor (Bool) -> Void)?) -> Void) {
+         onPendingInjectionDecisionChange: @escaping (@MainActor ((Bool) -> Void)?) -> Void) {
         self.onShowInjectionWarningChange = onShowInjectionWarningChange
         self.onInjectionWarningMessageChange = onInjectionWarningMessageChange
         self.onPendingInjectionDecisionChange = onPendingInjectionDecisionChange
