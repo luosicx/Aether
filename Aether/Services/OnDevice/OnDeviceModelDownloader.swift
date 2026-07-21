@@ -1,5 +1,6 @@
 import Foundation
 import CryptoKit
+import os
 import AetherFoundation
 import AetherRust
 
@@ -76,20 +77,38 @@ actor OnDeviceModelDownloader {
         lastError = nil
 
         // 创建本地模型目录
-        try? FileManager.default.createDirectory(at: destinationDirectory, withIntermediateDirectories: true)
+        do {
+            try FileManager.default.createDirectory(at: destinationDirectory, withIntermediateDirectories: true)
+        } catch {
+            // 目录创建失败：后续下载写入会失败，提前中止并提示用户
+            // 不静默吞错，避免下游错误难追溯
+            Logger.app.error("本地模型目录创建失败 (path=\(destinationDirectory.path, privacy: .public)): \(error.localizedDescription, privacy: .public)")
+            lastError = .modelNotFound(destinationDirectory)
+            isDownloading = false
+            return
+        }
 
         // 小体积配置文件列表（快速下载，不追踪进度）
         let configFiles = ["config.json", "tokenizer_config.json", "special_tokens_map.json", "tokenizer.json"]
 
         for file in configFiles {
-            let hfURL = URL(string: "https://huggingface.co/\(repo)/resolve/main/\(file)")!
+            // 安全构造 URL：repo/file 含非法字符时降级为错误，避免强制解包崩溃
+            guard let hfURL = makeHuggingFaceURL(repo: repo, file: file) else {
+                lastError = .invalidURL
+                isDownloading = false
+                return
+            }
             let destURL = destinationDirectory.appendingPathComponent(file)
             var failed = await downloadFile(url: hfURL, to: destURL)
 
             // 镜像回退
             if failed, let mirror = mirrorRepo {
                 lastError = nil
-                let msURL = URL(string: "https://www.modelscope.cn/api/v1/models/\(mirror)/repo?Revision=master&FilePath=\(file)")!
+                guard let msURL = makeModelScopeURL(repo: mirror, file: file) else {
+                    lastError = .invalidURL
+                    isDownloading = false
+                    return
+                }
                 failed = await downloadFile(url: msURL, to: destURL)
             }
 
@@ -100,7 +119,11 @@ actor OnDeviceModelDownloader {
         }
 
         // 大体积权重文件：model.safetensors（使用 performDownload 以获取进度回调与 SHA256 校验）
-        let modelFileURL = URL(string: "https://huggingface.co/\(repo)/resolve/main/model.safetensors")!
+        guard let modelFileURL = makeHuggingFaceURL(repo: repo, file: "model.safetensors") else {
+            lastError = .invalidURL
+            isDownloading = false
+            return
+        }
         let modelDestURL = destinationDirectory.appendingPathComponent("model.safetensors")
 
         let modelFailed = await performDownload(url: modelFileURL, to: modelDestURL, expectedSHA256: expectedSHA256)
@@ -112,13 +135,46 @@ actor OnDeviceModelDownloader {
                 isDownloading = true
                 progress = 0.0
                 lastError = nil
-                let msURL = URL(string: "https://www.modelscope.cn/api/v1/models/\(mirror)/repo?Revision=master&FilePath=model.safetensors")!
+                guard let msURL = makeModelScopeURL(repo: mirror, file: "model.safetensors") else {
+                    lastError = .invalidURL
+                    isDownloading = false
+                    return
+                }
                 await performDownload(url: msURL, to: modelDestURL, expectedSHA256: expectedSHA256)
             }
         }
 
         progress = 1.0
         isDownloading = false
+    }
+
+    /// 构造 HuggingFace 下载 URL，对 path 组件做百分号编码。
+    /// - Parameters:
+    ///   - repo: 仓库 ID（如 "mlx-community/Llama-3.2-1B-Instruct-4bit"）
+    ///   - file: 文件名（如 "config.json" / "model.safetensors"）
+    /// - Returns: URL 构造失败返回 nil
+    private func makeHuggingFaceURL(repo: String, file: String) -> URL? {
+        var components = URLComponents(string: "https://huggingface.co")
+        let encodedRepo = repo.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? repo
+        let encodedFile = file.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? file
+        components?.path = "/\(encodedRepo)/resolve/main/\(encodedFile)"
+        return components?.url
+    }
+
+    /// 构造 ModelScope 镜像下载 URL，对 query 参数做百分号编码。
+    /// - Parameters:
+    ///   - repo: 镜像仓库 ID
+    ///   - file: 文件名
+    /// - Returns: URL 构造失败返回 nil
+    private func makeModelScopeURL(repo: String, file: String) -> URL? {
+        var components = URLComponents(string: "https://www.modelscope.cn")
+        let encodedRepo = repo.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? repo
+        components?.path = "/api/v1/models/\(encodedRepo)/repo"
+        components?.queryItems = [
+            URLQueryItem(name: "Revision", value: "master"),
+            URLQueryItem(name: "FilePath", value: file)
+        ]
+        return components?.url
     }
 
     /// 执行单次下载尝试，返回是否失败（lastError 非空即视为失败）。
@@ -220,7 +276,7 @@ actor OnDeviceModelDownloader {
 
     /// 删除本地模型文件。
     /// - Parameter url: 模型文件路径
-    /// - Throws: 文件删除失败时抛出 OnDeviceError.loadFailed
+    /// - Throws: 文件删除失败时抛出 OnDeviceError.loadFailedWithCause
     func deleteModel(at url: URL) throws {
         guard FileManager.default.fileExists(atPath: url.path) else {
             throw OnDeviceError.modelNotFound(url)
@@ -228,7 +284,11 @@ actor OnDeviceModelDownloader {
         do {
             try FileManager.default.removeItem(at: url)
         } catch {
-            throw OnDeviceError.loadFailed(String(format: NSLocalizedString("删除模型文件失败：%@", comment: ""), error.localizedDescription))
+            // P2-3: 携带 underlying 保留原始 Error 上下文
+            throw OnDeviceError.loadFailedWithCause(
+                message: String(format: NSLocalizedString("删除模型文件失败：%@", comment: ""), error.localizedDescription),
+                underlying: error
+            )
         }
     }
 

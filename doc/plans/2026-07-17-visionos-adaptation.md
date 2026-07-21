@@ -22,7 +22,7 @@ Aether 现已覆盖 iOS / iPad / macOS 三端原生 SwiftUI，使用 `#if os(iOS
 | Xcode target | Aether-iOS / Aether-macOS / Watch / Widgets | `Aether.xcodeproj` | 无 visionOS target |
 | UI 组件 | `MessageBubble` / `ChatView` 等 2D 组件 | `Aether/Views/Chat/` | 无 3D 空间化 |
 | 设计令牌 | `LiquidGlass` / `DeepSpace` 等色板 | `ColorTokens.swift` | 已可复用，未做 depth |
-| 平台工具 | 26 个工具，11 个 macOS 独有 | `ToolRegistry.swift` | visionOS 工具完全缺失 |
+| 平台工具 | 25 个工具，11 个 macOS 独有 | `ToolRegistry.swift` | visionOS 工具完全缺失 |
 | 手势交互 | 触摸 / 鼠标 / 键盘 | `ChatInputBar.swift` | 无 pinch / gaze |
 | 资源 | `Assets.xcassets` 8 语本地化 | `Resources/` | 需补 visionOS 适配 |
 

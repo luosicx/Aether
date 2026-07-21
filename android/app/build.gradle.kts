@@ -7,12 +7,12 @@ plugins {
 
 android {
     namespace = "com.aether.app"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.aether.app"
         minSdk = 29
-        targetSdk = 34
+        targetSdk = 35
         versionCode = 100
         versionName = "1.0.0"
         // BFF 端点配置（可在 build.gradle 中覆盖）
@@ -81,7 +81,7 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
     testImplementation("androidx.room:room-testing:2.6.1")
-    testImplementation("org.robolectric:robolectric:4.12.2")
+    testImplementation("org.robolectric:robolectric:4.14.1")
     testImplementation("io.ktor:ktor-client-mock:2.3.12")
     testImplementation("androidx.test:core:1.5.0")
 }

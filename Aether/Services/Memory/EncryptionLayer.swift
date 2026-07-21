@@ -12,7 +12,11 @@ import Security
 /// 安全性：
 /// - Keychain 标记 `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`，仅本机解锁后可用。
 /// - nonce 由 CryptoKit 自动生成并附在 sealed box 中。
-/// - 默认关闭，用户主动在设置页启用。
+/// - 默认启用：实例化时自动从 Keychain 加载或生成主密钥，确保用户 Memory 数据（向量+元数据）
+///   落盘即加密，避免明文泄露风险。用户可在设置页主动关闭。
+///
+/// P1-10 (H-S4): 原实现 `isEnabled = false` 默认关闭，导致 Memory 数据明文存储在磁盘上，
+/// 设备丢失或被入侵时存在隐私泄露风险。现改为默认启用，并在 init 中自动调用 enable()。
 final class EncryptionLayer {
     /// Keychain 中保存主密钥的 account key
     static let keychainAccount = "aether.memory.encryption.key"
@@ -23,16 +27,24 @@ final class EncryptionLayer {
     /// Keychain 管理器（生产用 KeychainManager.shared，测试可注入）
     private let keychain: KeychainManager
 
-    /// 是否已启用加密（默认关闭）
-    private(set) var isEnabled: Bool = false
+    /// 是否已启用加密（默认启用，init 中尝试加载/生成密钥；失败时回退为 false）
+    private(set) var isEnabled: Bool = true
 
     /// 当前主密钥（启用后加载）
     private var key: SymmetricKey?
 
     /// 创建 EncryptionLayer 实例
     /// - Parameter keychain: Keychain 管理器，nil 时使用单例
+    ///
+    /// P1-10: 初始化时自动调用 `enable()` 加载或生成主密钥，使加密默认生效。
+    /// 如果 Keychain 不可用（如测试环境、设备异常），自动降级为禁用状态，
+    /// 调用方可通过 `isEnabled` 判断实际状态。
     init(keychain: KeychainManager = .shared) {
         self.keychain = keychain
+        if !enable() {
+            // Keychain 不可用时降级为禁用，避免后续 encrypt 抛错
+            self.isEnabled = false
+        }
     }
 
     // MARK: - 启用 / 禁用

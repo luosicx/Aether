@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import os
 import AetherFoundation
 import AetherServices
 
@@ -47,7 +48,12 @@ final class KnowledgeBaseVM {
         let descriptor = FetchDescriptor<DocumentChunk>(
             sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
         )
-        guard let chunks = try? modelContext.fetch(descriptor) else {
+        // P2-2: 将 try? 改为 do/catch + Logger.warning，便于诊断加载失败原因
+        let chunks: [DocumentChunk]
+        do {
+            chunks = try modelContext.fetch(descriptor)
+        } catch {
+            Logger.storage.warning("KnowledgeBaseVM.load: fetch DocumentChunk 失败，已降级为空列表：\(error.localizedDescription, privacy: .public)")
             documents = []
             return
         }
@@ -69,9 +75,23 @@ final class KnowledgeBaseVM {
         let descriptor = FetchDescriptor<DocumentChunk>(
             predicate: #Predicate { $0.source == source }
         )
-        guard let chunks = try? modelContext.fetch(descriptor) else { return }
+        // P2-2: 将 try? 改为 do/catch + Logger.warning，便于诊断删除查询失败原因
+        let chunks: [DocumentChunk]
+        do {
+            chunks = try modelContext.fetch(descriptor)
+        } catch {
+            Logger.storage.warning("deleteDocument: fetch 失败，已跳过删除 (source=\(source, privacy: .public))：\(error.localizedDescription, privacy: .public)")
+            return
+        }
         for chunk in chunks { modelContext.delete(chunk) }
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+        } catch {
+            // 删除持久化失败：内存中 modelContext.delete 已执行但未落盘，
+            // 下次启动会重试删除（DocumentChunk 仍在但 UI 已移除）。
+            // 同时记录日志便于排查「幽灵分块」类问题。
+            Logger.storage.error("知识库删除文档持久化失败 (source=\(source, privacy: .public)): \(error.localizedDescription, privacy: .public)")
+        }
         documents.removeAll { $0.source == source }
     }
 

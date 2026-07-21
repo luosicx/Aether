@@ -197,6 +197,31 @@ final class SettingsViewModelTests: XCTestCase {
         XCTAssertEqual(vm.bffConfig.embedRateLimitPerMin, 30, "embedRateLimitPerMin 应保持一致")
     }
 
+    /// P1-11 (H-S5): saveBFFConfig 在 token 变更时应记录 tokenIssuedAt
+    func testSaveBFFConfigUpdatesTokenIssuedAtOnTokenChange() {
+        // 首次保存：token 从空 → 非空，应记录签发时间
+        vm.bffConfig.userToken = "new-token-abc"
+        XCTAssertNil(vm.bffConfig.tokenIssuedAt, "保存前 tokenIssuedAt 应为 nil")
+        vm.saveBFFConfig()
+        XCTAssertNotNil(vm.bffConfig.tokenIssuedAt, "token 变更后 tokenIssuedAt 应被记录")
+
+        // 重新加载：tokenIssuedAt 应持久化到 UserDefaults 并能恢复
+        vm.bffConfig = .default
+        vm.loadBFFConfig()
+        XCTAssertEqual(vm.bffConfig.userToken, "new-token-abc", "userToken 应持久化")
+        XCTAssertNotNil(vm.bffConfig.tokenIssuedAt, "loadBFFConfig 后 tokenIssuedAt 应保留")
+
+        // 再次保存相同 token：tokenIssuedAt 不应更新（保持原值）
+        let firstIssuedAt = vm.bffConfig.tokenIssuedAt
+        vm.saveBFFConfig()
+        XCTAssertEqual(vm.bffConfig.tokenIssuedAt, firstIssuedAt, "相同 token 不应更新签发时间")
+
+        // 清空 token：tokenIssuedAt 应清除
+        vm.bffConfig.userToken = ""
+        vm.saveBFFConfig()
+        XCTAssertNil(vm.bffConfig.tokenIssuedAt, "清空 token 后 tokenIssuedAt 应为 nil")
+    }
+
     /// loadBFFConfig 无缓存数据时应回退到默认值
     func testLoadBFFConfigWithNoDataFallsBackToDefault() {
         // 确保无缓存（setUp 已清理，这里再次确认）

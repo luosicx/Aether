@@ -24,9 +24,17 @@ final class EncryptionLayerTests: XCTestCase {
 
     // MARK: - 启用 / 禁用
 
-    /// 默认状态应为禁用
-    func testDefaultDisabled() {
-        XCTAssertFalse(layer.isEnabled, "EncryptionLayer 默认应禁用")
+    /// 默认状态：init 自动调用 enable 加载/生成密钥，isEnabled 应为 true（P1-10）
+    /// 注：setUp 中已 clearKey，新实例 init 时 Keychain 无密钥，会自动生成新密钥
+    func testDefaultEnabledAfterInit() {
+        let newLayer = EncryptionLayer()
+        XCTAssertTrue(newLayer.isEnabled, "EncryptionLayer 默认应启用（init 自动 enable）")
+        newLayer.clearKey()  // 清理新实例生成的密钥，避免污染其他测试
+    }
+
+    /// clearKey 后应处于禁用状态（保留以验证 clearKey 语义）
+    func testStateAfterClearKey() {
+        XCTAssertFalse(layer.isEnabled, "clearKey 后应禁用")
     }
 
     /// enable() 应成功并设置 isEnabled=true

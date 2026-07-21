@@ -220,6 +220,12 @@ public struct ToolDef: Codable {
 
 /// 动态类型包装器，用于 ToolDef.parameters 的 JSON Schema 字典
 /// （Swift Codable 不直接支持 [String: Any]，用此包装器实现动态编解码）
+///
+/// 线程安全契约：`value` 类型为 `Any`，编译器无法验证 Sendable。
+/// 实际使用中 `value` 仅可为 JSON 兼容的值类型（`Int / Double / Bool / String /
+/// [AnyCodable] / [String: AnyCodable]`），均 Sendable。**禁止**包装非 Sendable
+/// 引用类型（如 `NSObject`、闭包），否则跨 actor 传递存在数据竞争。
+/// 长期重构方向：用 `JSONValue` enum 替代 `Any`，让编译器静态验证 Sendable。
 public struct AnyCodable: Codable, @unchecked Sendable {
     public let value: Any
 

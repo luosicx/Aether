@@ -26,14 +26,21 @@ final class PreferenceExtractor {
     enum PreferenceExtractionError: Error, LocalizedError {
         /// LLM 返回内容为空
         case emptyResponse
-        /// 无法从响应中提取 JSON 数组
+        /// 无法从响应中提取 JSON 数组（向后兼容变体，不保留原始 Error 上下文）
         case invalidJSON(String)
+        /// 无法从响应中提取 JSON 数组，携带错误信息与底层错误。
+        /// - Parameters:
+        ///   - detail: 用户可见的错误信息（通常含 `error.localizedDescription`）
+        ///   - underlying: 原始底层错误（如解码错误），保留用于诊断
+        case invalidJSONWithCause(detail: String, underlying: Error)
 
         var errorDescription: String? {
             switch self {
             case .emptyResponse:
                 return "LLM 返回内容为空，无法解析偏好"
             case .invalidJSON(let detail):
+                return "LLM 返回内容无法解析为偏好数组：\(detail)"
+            case .invalidJSONWithCause(let detail, _):
                 return "LLM 返回内容无法解析为偏好数组：\(detail)"
             }
         }
@@ -147,7 +154,11 @@ final class PreferenceExtractor {
         do {
             return try decoder.decode([PreferenceExtraction].self, from: data)
         } catch {
-            throw PreferenceExtractionError.invalidJSON("解码失败：\(error.localizedDescription)")
+            // P2-3: 携带 underlying 保留原始 Error 上下文
+            throw PreferenceExtractionError.invalidJSONWithCause(
+                detail: "解码失败：\(error.localizedDescription)",
+                underlying: error
+            )
         }
     }
 

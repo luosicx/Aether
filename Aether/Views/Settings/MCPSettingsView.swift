@@ -1,4 +1,5 @@
 import SwiftUI
+import os
 import AetherFoundation
 
 /// MCP Server 管理设置页。
@@ -348,6 +349,7 @@ struct MCPSettingsView: View {
             UserDefaults.standard.set(data, forKey: storageKey)
         } catch {
             // 编码失败时忽略（MCPConfig 的 Codable 实现应保证不失败）
+            Logger.mcp.error("MCP 配置保存失败 (编码失败，旧配置保留): \(error.localizedDescription, privacy: .public)")
         }
     }
 }

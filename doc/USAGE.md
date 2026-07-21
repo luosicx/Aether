@@ -168,7 +168,7 @@ open Aether.xcodeproj
   - 超时后抛出 `ToolTimeout` 错误，**标记该工具 `status = failed` 后继续下一轮 ReAct**，不中断循环
 - **对应代码**：`Aether/ViewModels/ChatViewModel.swift`、`Aether/Services/Tools/ToolRegistry.swift`、`Aether/Views/Chat/StepCardView.swift`
 
-> 全部 24 个工具（按 macOS 计；iOS 13 个）的能力清单见 [§6 工具能力清单](#6-工具能力清单)。
+> 全部 25 个工具（按 macOS 计；iOS 14 个）的能力清单见 [§6 工具能力清单](#6-工具能力清单)。
 
 > **对应代码文件**：`Aether/Services/Tools/ToolRegistry.swift`、`Aether/ViewModels/ChatViewModel.swift`、`Aether/Views/Chat/StepCardView.swift`
 > **常见问题**：工具执行失败时查看 `StepCardView` 的 Observation 字段定位错误；若循环达到 `maxReActLoops = 5` 仍无最终回复会提示「工具调用循环超过 5 轮，已中止」；单工具超时（默认 15 秒）会标记 `status = failed` 后继续下一轮，不中断循环。
@@ -511,7 +511,7 @@ open Aether.xcodeproj
 2. 选择「跟随系统 / 简体中文 / 繁体中文 / 英文 / 日文 / 韩文 / 法文 / 德文 / 西班牙文」。
 3. 点击「完成」，按提示重启 App 生效。
 
-> **i18n 覆盖**：`Localizable.xcstrings` String Catalog 当前包含 **387 个 key**，覆盖 Views / ViewModels / Services / AppIntents / Core 全部用户可见文本，提供 **8 种语言**翻译：zh-Hans（源语言）/ zh-Hant / en / ja / ko / fr / de / es。
+> **i18n 覆盖**：`Localizable.xcstrings` String Catalog 当前包含 **888 个 key**，覆盖 Views / ViewModels / Services / AppIntents / Core 全部用户可见文本，提供 **8 种语言**翻译：zh-Hans（源语言）/ zh-Hant / en / ja / ko / fr / de / es。
 
 对应代码：`Aether/Services/Language/LanguageManager.swift`、`Aether/Views/Settings/SettingsView.swift`、`Aether/Resources/Localizable.xcstrings`。
 
@@ -639,10 +639,10 @@ Rust `aether-core-ffi` 通过 `AetherRustBin` xcframework 提供跨平台统一�
 
 ## 6. 工具能力清单
 
-开启「启用工具调用」后（见 [4.4](#44-工具调用-react)），LLM 通过 ReAct 循环调用以下工具。共 **24 个工具**（按 macOS 计；iOS 仅注册其中 13 个）。
+开启「启用工具调用」后（见 [4.4](#44-工具调用-react)），LLM 通过 ReAct 循环调用以下工具。共 **25 个工具**（按 macOS 计；iOS 仅注册其中 14 个）。
 
 > **平台可用性**：
-> - **跨平台（iOS + macOS）**：4 原有 + 6 跨平台新增 + 3 快捷指令 = **13 个**，两端均可用
+> - **跨平台（iOS + macOS）**：4 原有 + 6 跨平台新增 + 3 快捷指令 = **14 个**（ClipboardTool 注册 Read+Write 两项），两端均可用
 > - **macOS 独有**：**11 个**，用 `#if os(macOS)` 条件编译，iOS 上 `ToolRegistry` 不注册，LLM 不会看到其定义
 
 > **工具项中文化展示**：在「设置 → 用户偏好 → 偏好工具」列表中，工具项以**中文描述**展示（如「获取当前设备地理位置与逆地理编码结果」），而非英文函数名（如 `get_location`），便于用户直观理解每个工具的用途。选中偏好工具后，注入到 system prompt 中的仍是**英文函数名**（如「偏好工具：get_location、get_weather」），以便 LLM 识别与调用。下方清单中「函数」列对应 LLM 实际调用的英文函数名。
@@ -693,7 +693,7 @@ Rust `aether-core-ffi` 通过 `AetherRustBin` xcframework 提供跨平台统一�
 | 23 | ListShortcutsTool | `list_shortcuts` | 列出快捷指令；macOS 用 `shortcuts list`，iOS 不支持返回提示 |
 | 24 | CreateShortcutTool | `create_shortcut` | 创建快捷指令（参数 `name` + `action`（`open_url` / `run_script` / `show_text` / `copy_to_clipboard`）+ `url` / `script` / `text`）；构建 `WFWorkflow` plist 生成 `.shortcut` 文件，用 `NSWorkspace.open` 让 Shortcuts 应用导入 |
 
-> **说明**：iOS 上可用工具 = 4 原有 + 6 跨平台 + 3 快捷指令 = **13 个**；macOS 独有 11 个在 iOS 不可用。
+> **说明**：iOS 上可用工具 = 4 原有 + 6 跨平台 + 3 快捷指令 = **14 个**（ClipboardTool 注册 Read+Write 两项）；macOS 独有 11 个在 iOS 不可用。
 
 - **对应代码**：`Aether/Services/Tools/ToolRegistry.swift` 及 `Aether/Services/Tools/*` 各工具实现
 
@@ -712,7 +712,7 @@ xcodebuild build \
   -configuration Debug \
   CODE_SIGNING_ALLOWED=NO
 
-# 2. 运行 UT（2092 用例，0 skip）
+# 2. 运行 UT（2771 用例，0 skip）
 xcodebuild test \
   -project Aether.xcodeproj \
   -scheme Aether-iOS \
@@ -740,7 +740,7 @@ xcodebuild test \
 
 | 测试套件 | 用例总数 | skipped | failures |
 |---|---|---|---|
-| UT（`AetherTests`） | 2092 | 0 | 0 |
+| UT（`AetherTests`） | 2771 | 0 | 0 |
 | UIT（`AetherUITests`） | 30 | 0 | 0 |
 
 ### skipped 原因
@@ -851,7 +851,7 @@ GitHub Actions 配置文件：`.github/workflows/ci.yml`
 
 ### Q10: UIT 测试不稳定？
 
-**A**：`contextMenu` 长按触发、Picker 导航式选项、邮件 composer 在模拟器上行为有差异，已用 `throw XCTSkip` 兜底跳过不稳定用例。**底层逻辑已由 UT 覆盖**（`ChatStorageTests` / `ConversationListVMTests` / `TTSConfigTests` / `TTSVoiceCatalogTests` 等）。当前 UIT 规模 30 用例（0 skip，0 failures），UT 规模 2092 用例（0 skip，0 failures）。
+**A**：`contextMenu` 长按触发、Picker 导航式选项、邮件 composer 在模拟器上行为有差异，已用 `throw XCTSkip` 兜底跳过不稳定用例。**底层逻辑已由 UT 覆盖**（`ChatStorageTests` / `ConversationListVMTests` / `TTSConfigTests` / `TTSVoiceCatalogTests` 等）。当前 UIT 规模 30 用例（0 skip，0 failures），UT 规模 2771 用例（0 skip，0 failures）。
 
 ### Q11: App Intents / Siri 调用无响应？
 

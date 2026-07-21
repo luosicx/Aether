@@ -50,6 +50,8 @@ final class WeatherTool: ToolProtocol, @unchecked Sendable {
                     return "未找到城市：\(trimmedCity)"
                 case .network(let message):
                     return "天气查询失败：\(message)"
+                case .networkWithCause(let reason, _):
+                    return "天气查询失败：\(reason)"
                 }
             }
         } else {
@@ -99,9 +101,26 @@ final class WeatherTool: ToolProtocol, @unchecked Sendable {
     // MARK: - 网络
 
     /// Geocoding 错误
-    private enum GeocodeError: Error {
+    private enum GeocodeError: Error, LocalizedError {
         case notFound
         case network(String)
+        /// 网络请求失败，携带原因与底层错误。
+        /// - Parameters:
+        ///   - reason: 用户可见的错误信息（通常为 `error.localizedDescription`）
+        ///   - underlying: 原始底层错误，保留用于诊断
+        case networkWithCause(reason: String, underlying: Error)
+
+        /// 用户可见的错误描述（中文本地化）。
+        var errorDescription: String? {
+            switch self {
+            case .notFound:
+                return NSLocalizedString("未找到匹配的城市", comment: "")
+            case .network(let reason):
+                return String(format: NSLocalizedString("Geocoding 网络请求失败：%@", comment: ""), reason)
+            case .networkWithCause(let reason, _):
+                return String(format: NSLocalizedString("Geocoding 网络请求失败：%@", comment: ""), reason)
+            }
+        }
     }
 
     /// 调用 Open-Meteo Geocoding API，返回首个结果 (name, latitude, longitude)
@@ -127,7 +146,8 @@ final class WeatherTool: ToolProtocol, @unchecked Sendable {
         } catch let error as GeocodeError {
             throw error
         } catch {
-            throw GeocodeError.network(error.localizedDescription)
+            // P2-3: 携带 underlying 保留原始 Error 上下文
+            throw GeocodeError.networkWithCause(reason: error.localizedDescription, underlying: error)
         }
     }
 

@@ -213,12 +213,14 @@ final class AetherClientAPITests: XCTestCase {
 
 // MARK: - Mock Embedding Provider
 
-final class MockEmbeddingProvider: AetherEmbeddingProvider, @unchecked Sendable {
+final class MockEmbeddingProvider: AetherEmbeddingProvider {
     let vectors: [[Float]]
-    var shouldThrow = false
+    /// 是否在 embed 时抛错（init 注入，编译器可自动推断 Sendable）
+    let shouldThrow: Bool
 
-    init(vectors: [[Float]]) {
+    init(vectors: [[Float]], shouldThrow: Bool = false) {
         self.vectors = vectors
+        self.shouldThrow = shouldThrow
     }
 
     func embed(texts: [String], apiKey: String) async throws -> [[Float]] {

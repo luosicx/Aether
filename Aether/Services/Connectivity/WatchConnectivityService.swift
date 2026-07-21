@@ -10,12 +10,21 @@ import WatchConnectivity
 /// - 单例 `shared`，App 启动时调用 `activate()` 激活 WCSession
 /// - 通过 NotificationCenter 广播接收到的消息，便于 ViewModel 监听
 /// - 仅 iOS 端实现 `sessionDidBecomeInactive` / `sessionDidDeactivate`
+///
+/// P1-6: 原实现 `var activeConversationId: UUID?` 跨 actor 读写无同步保护。
+/// WCSessionDelegate 回调可能在后台线程触发，与主线程 UI 调用并发写入存在数据竞争。
+/// 用 `OSAllocatedUnfairLock` 包裹 activeConversationId（UUID? 是 Sendable，符合锁约束）。
 final class WatchConnectivityService: NSObject, WCSessionDelegate {
     /// 单例
     static let shared = WatchConnectivityService()
 
-    /// 当前活跃会话 ID（由 watchOS 端同步或本端设置）
-    var activeConversationId: UUID?
+    /// 当前活跃会话 ID（由 watchOS 端同步或本端设置）。用锁保护跨 actor 读写。
+    private let activeConversationIdLock = OSAllocatedUnfairLock<UUID?>(initialState: nil)
+
+    /// 当前活跃会话 ID（线程安全读取）
+    var activeConversationId: UUID? {
+        activeConversationIdLock.withLock { $0 }
+    }
 
     /// 私有初始化，强制使用单例
     private override init() {
@@ -33,7 +42,7 @@ final class WatchConnectivityService: NSObject, WCSessionDelegate {
     /// 向 watchOS 同步当前活跃会话 ID。
     /// - Parameter id: 活跃会话 ID
     func sendActiveConversation(_ id: UUID) {
-        activeConversationId = id
+        activeConversationIdLock.withLock { $0 = id }
         guard WCSession.default.activationState == .activated else { return }
         WCSession.default.sendMessage(["action": "activeConversation", "id": id.uuidString], replyHandler: nil)
     }
@@ -71,7 +80,7 @@ final class WatchConnectivityService: NSObject, WCSessionDelegate {
         switch action {
         case "activeConversation":
             if let idStr = message["id"] as? String, let id = UUID(uuidString: idStr) {
-                activeConversationId = id
+                activeConversationIdLock.withLock { $0 = id }
                 NotificationCenter.default.post(name: .wcActiveConversationChanged, object: id)
             }
         case "quickChat":

@@ -775,4 +775,101 @@ final class BFFProxyClientTests: XCTestCase {
 
         await fulfillment(of: [expectation], timeout: 2.0)
     }
+
+    // MARK: - P1-11 (H-S5): Token 过期 TTL 检查
+
+    /// 过期 Token：chat 流应不发请求（MockURLProtocol.lastRequest 为 nil），并发 .llmErrorOccurred 通知
+    func testChatRejectsExpiredToken() async {
+        // 构造过期 token：签发时间 = 当前 - (TTL + 1)
+        let staleDate = Date().addingTimeInterval(-(BFFConfig.tokenTTLSeconds + 1))
+        let expiredConfig = BFFConfig(
+            enabled: true,
+            endpointURL: URL(string: "https://bff.example.com"),
+            userToken: "expired-token",
+            tokenIssuedAt: staleDate,
+            chatRateLimitPerMin: 20,
+            embedRateLimitPerMin: 10
+        )
+        let expiredClient = BFFProxyClient(provider: .deepseek, config: expiredConfig, session: mockSession)
+
+        MockURLProtocol.responseData = Data("data: [DONE]\n\n".utf8)
+        MockURLProtocol.statusCode = 200
+        MockURLProtocol.lastRequest = nil
+
+        let expectation = XCTNSNotificationExpectation(name: .llmErrorOccurred, object: nil)
+        nonisolated(unsafe) var capturedError: LLMError?
+        expectation.handler = { note in
+            if let err = note.userInfo?["error"] as? LLMError {
+                capturedError = err
+                return true
+            }
+            return false
+        }
+
+        let collected = await consume(stream: expiredClient.chat(messages: makeMessages(), config: .default, apiKey: ""))
+
+        XCTAssertEqual(collected, "", "过期 token 不应产生内容")
+        XCTAssertNil(MockURLProtocol.lastRequest, "过期 token 不应发送 HTTP 请求")
+
+        await fulfillment(of: [expectation], timeout: 2.0)
+        guard case .llmErrorOccurred(let msg) = capturedError else {
+            XCTFail("期望 .llmErrorOccurred，实际：\(String(describing: capturedError))")
+            return
+        }
+        XCTAssertTrue(msg.contains(NSLocalizedString("BFF Token 已过期", comment: "")),
+                      "userMessage 应含 'BFF Token 已过期'，实际：\(msg)")
+    }
+
+    /// 过期 Token：embed 应抛 LLMError，不发请求
+    func testEmbedRejectsExpiredToken() async {
+        let staleDate = Date().addingTimeInterval(-(BFFConfig.tokenTTLSeconds + 1))
+        let expiredConfig = BFFConfig(
+            enabled: true,
+            endpointURL: URL(string: "https://bff.example.com"),
+            userToken: "expired-token",
+            tokenIssuedAt: staleDate,
+            chatRateLimitPerMin: 20,
+            embedRateLimitPerMin: 10
+        )
+        let expiredClient = BFFProxyClient(provider: .deepseek, config: expiredConfig, session: mockSession)
+
+        MockURLProtocol.responseData = Data("{}".utf8)
+        MockURLProtocol.statusCode = 200
+        MockURLProtocol.lastRequest = nil
+
+        let expectation = XCTNSNotificationExpectation(name: .llmErrorOccurred, object: nil)
+        expectation.handler = { _ in true }
+
+        do {
+            _ = try await expiredClient.embed(texts: ["test"], apiKey: "")
+            XCTFail("过期 token 应抛错")
+        } catch {
+            XCTAssertTrue(error is LLMError, "应抛 LLMError，实际：\(error)")
+        }
+
+        XCTAssertNil(MockURLProtocol.lastRequest, "过期 token 不应发送 HTTP 请求")
+        await fulfillment(of: [expectation], timeout: 2.0)
+    }
+
+    /// 新鲜 Token：TTL 检查通过，应正常发送请求
+    func testChatAllowsFreshToken() async {
+        let freshConfig = BFFConfig(
+            enabled: true,
+            endpointURL: URL(string: "https://bff.example.com"),
+            userToken: "fresh-token",
+            tokenIssuedAt: Date(),
+            chatRateLimitPerMin: 20,
+            embedRateLimitPerMin: 10
+        )
+        let freshClient = BFFProxyClient(provider: .deepseek, config: freshConfig, session: mockSession)
+
+        MockURLProtocol.responseData = Data("data: [DONE]\n\n".utf8)
+        MockURLProtocol.statusCode = 200
+        MockURLProtocol.lastRequest = nil
+
+        _ = await consume(stream: freshClient.chat(messages: makeMessages(), config: .default, apiKey: ""))
+
+        XCTAssertNotNil(MockURLProtocol.lastRequest, "新鲜 token 应正常发送请求")
+        XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "X-BFF-Token"), "fresh-token")
+    }
 }

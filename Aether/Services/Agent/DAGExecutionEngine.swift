@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import os
 import AetherFoundation
 
 /// Task 20 阶段 2: 并行 DAG 执行引擎。
@@ -258,7 +259,13 @@ final class DAGExecutionEngine {
             // 若依赖中包含 failed 节点，标记为 skipped
             if !Set(sub.dependencies).isDisjoint(with: failedIDs) {
                 _ = task.updateSubTaskStatus(id: sub.id, status: .skipped, result: "依赖节点失败，自动跳过")
-                try? await stateMachine.markSkipped(sub.id)
+                do {
+                    try await stateMachine.markSkipped(sub.id)
+                } catch {
+                    // 状态机迁移失败：subTask 状态已更新但状态机未同步，
+                    // 可能导致 nextExecutableSubTasks 误判或死锁检测误报
+                    Logger.agent.warning("级联跳过: 状态机 markSkipped 失败 (nodeID=\(sub.id, privacy: .public)): \(error.localizedDescription, privacy: .public)")
+                }
                 progressed = true
             }
         }
@@ -270,7 +277,12 @@ final class DAGExecutionEngine {
     /// - Parameter nodeID: 失败节点 ID
     func skipFailedNode(task: AgentTask, nodeID: UUID) async {
         _ = task.updateSubTaskStatus(id: nodeID, status: .skipped, result: "用户跳过")
-        try? await stateMachine.markSkipped(nodeID)
+        do {
+            try await stateMachine.markSkipped(nodeID)
+        } catch {
+            // 用户操作「跳过」未被状态机记录：下次 checkpoint 恢复时节点状态可能回退
+            Logger.agent.warning("用户跳过节点: 状态机 markSkipped 失败 (nodeID=\(nodeID, privacy: .public)): \(error.localizedDescription, privacy: .public)")
+        }
         // 级联跳过下游依赖
         _ = await cascadeSkipFailed(task: task)
         await checkpointManager.checkpoint(task: task, stateMachine: stateMachine)
@@ -297,7 +309,12 @@ final class DAGExecutionEngine {
         // 将所有 pending/running 节点标记为 skipped
         for sub in task.subTasks where sub.status == .pending || sub.status == .inProgress {
             _ = task.updateSubTaskStatus(id: sub.id, status: .skipped, result: "任务取消")
-            try? await stateMachine.markSkipped(sub.id)
+            do {
+                try await stateMachine.markSkipped(sub.id)
+            } catch {
+                // 取消任务后状态机未同步：可能误报死锁或 nextExecutableSubTasks 误判
+                Logger.agent.warning("取消任务: 状态机 markSkipped 失败 (nodeID=\(sub.id, privacy: .public)): \(error.localizedDescription, privacy: .public)")
+            }
         }
         task.cancel()
         await checkpointManager.checkpoint(task: task, stateMachine: stateMachine)

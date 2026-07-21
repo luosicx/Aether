@@ -149,7 +149,11 @@ struct AetherApp: App {
             Logger.app.warning("健康洞察任务即将过期")
             task.setTaskCompleted(success: false)
         }
-        Task {
+        // P1-1/P1-2: HealthInsightGenerator 已标注 @MainActor（ModelContext 非 Sendable，
+        // 必须在创建它的 actor 上访问）。BGTask 在后台线程触发，故用 `Task { @MainActor in ... }`
+        // 将整个 ModelContext 创建 + 调用链 hop 到主线程，既满足 SwiftData 隔离规则，
+        // 又让 ModelContext 生命周期与主线程对齐。
+        Task { @MainActor in
             do {
                 let container = try ModelContainer(
                     for: Conversation.self, ChatMessage.self, DocumentChunk.self, MessageFeedback.self, HealthInsight.self, UserPreference.self, AgentTask.self, Memory.self,

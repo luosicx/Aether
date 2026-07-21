@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import os
 #if os(iOS)
 import BackgroundTasks
 #endif
@@ -97,6 +98,7 @@ final class AgingCompactor {
             try BGTaskScheduler.shared.submit(request)
         } catch {
             // 调度失败静默降级（App 前台运行时下次启动会重试）
+            Logger.app.warning("iOS 后台老化压缩任务调度失败 (下次启动重试): \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -199,10 +201,19 @@ final class AgingCompactor {
             // 从 VectorStore 移除向量
             if let factory = vectorStoreFactory {
                 let store = await factory.store()
-                try? await store.delete(id: memory.id)
+                do {
+                    try await store.delete(id: memory.id)
+                } catch {
+                    // 归档时向量删除失败：SwiftData 已设 archivedAt，下次 runCycle 会重试删除
+                    Logger.memory.warning("归档时 VectorStore 删除向量失败 (memoryId=\(memory.id, privacy: .public)): \(error.localizedDescription, privacy: .public)")
+                }
             } else {
                 let store = await VectorStoreFactory.shared.store()
-                try? await store.delete(id: memory.id)
+                do {
+                    try await store.delete(id: memory.id)
+                } catch {
+                    Logger.memory.warning("归档时 VectorStore 删除向量失败 (memoryId=\(memory.id, privacy: .public)): \(error.localizedDescription, privacy: .public)")
+                }
             }
             count += 1
         }
@@ -282,7 +293,12 @@ final class AgingCompactor {
             "createdAt": String(memory.createdAt.timeIntervalSince1970),
             "content": memory.content
         ]
-        try? await store.upsert(id: memory.id, embedding: memory.embedding, metadata: metadata)
+        do {
+            try await store.upsert(id: memory.id, embedding: memory.embedding, metadata: metadata)
+        } catch {
+            // 恢复时向量重新写入失败：SwiftData 已清除 archivedAt，下次 runCycle 会重新写入向量
+            Logger.memory.error("恢复时 VectorStore 重新写入向量失败 (memoryId=\(memory.id, privacy: .public)): \(error.localizedDescription, privacy: .public)")
+        }
         return true
     }
 }

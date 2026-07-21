@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// TTS 朗读音色配置持久化结构体。
 /// 存储用户选择的 AVSpeechSynthesisVoice 标识以及 rate / pitch / volume 参数,
@@ -48,6 +49,7 @@ struct TTSConfig: Codable, Equatable {
             UserDefaults.standard.set(data, forKey: TTSConfig.userDefaultsKey)
         } catch {
             // 编码失败:静默忽略,保留旧数据
+            Logger.app.error("TTS 配置保存失败 (编码失败，旧配置保留): \(error.localizedDescription, privacy: .public)")
         }
     }
 }

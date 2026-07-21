@@ -13,8 +13,8 @@
 | iOS Deployment Target | 17.0+ | 真机与模拟器均需 ≥ iOS 17 |
 | macOS Deployment Target | 14+ | macOS 目标平台 |
 | Git | 2.30+ | 提交与 PR |
-| Node.js（可选） | 18+ | 部署 BFF Cloudflare Workers 时使用 |
-| Android（可选） | JDK 17 / Android SDK 34 (Build Tools 34.0.0) / Gradle 8.7 | Gradle 8.7 已随仓库提交 `gradlew`，无需手动安装 |
+| Node.js（可选） | 20+ | 部署 BFF Cloudflare Workers 时使用 |
+| Android（可选） | JDK 17 / Android SDK 35 (Build Tools 35.0.0) / Gradle 8.7 | Gradle 8.7 已随仓库提交 `gradlew`，无需手动安装 |
 | Windows（可选） | .NET 8 SDK / Windows 10+ | 构建 WPF Windows 客户端时使用 |
 
 ### 1.2 获取源码
@@ -120,12 +120,12 @@ class MyService {
 
 - 单元测试（UT）放 `AetherTests/`，命名 `<ClassName>Tests.swift`
 - UI 测试（UIT）放 `AetherUITests/`，避免依赖真实网络（用 `UITEST_DISABLE_NETWORK` 启动参数桩回复）
-- 测试用例数：UT 2092 / UIT 30（每新增功能需补对应测试）
+- 测试用例数：UT 2771 / UIT 30（每新增功能需补对应测试）
 - 当前目标：0 skip；若必须跳过，需写明原因并在 Issue 跟踪
 
 ### 2.6 国际化规范
 
-- 用户可见文本必须进入 `Aether/Resources/Localizable.xcstrings`（当前 887 keys，支持 8 种语言：zh-Hans / zh-Hant / en / ja / ko / fr / de / es）。
+- 用户可见文本必须进入 `Aether/Resources/Localizable.xcstrings`（当前 888 keys，支持 8 种语言：zh-Hans / zh-Hant / en / ja / ko / fr / de / es）。
 - SwiftUI 控件直接传字符串字面量即可自动提取；动态拼接文本使用 `String(format: NSLocalizedString(...), ...)`。
 - 新增字符串后运行 `python3 scripts/extract_strings.py` 检查遗漏，并补充全部 8 种语言翻译（zh-Hans 为源语言，其余 7 种为翻译目标）。
 - App 内语言切换支持 9 个选项（跟随系统 + 8 种语言），切换后提示用户重启 App 生效。
@@ -175,6 +175,38 @@ class MyService {
 - 禁用：`wrapSingleGuards` / `wrapArguments` / `redundantParens`
 
 > **安装**：`brew install swiftformat`
+
+### 2.9 Pre-commit Hooks
+
+项目提供两种 pre-commit 安装方式，任选其一。**提交前自动检查**：大文件（>1MB）、私钥泄露、合并冲突标记、SwiftFormat/SwiftLint 校验。
+
+#### 方式 A：Git native hooks（推荐，零依赖）
+
+```bash
+make install-hooks
+```
+
+安装到 `.git/hooks/pre-commit`，卸载：`rm .git/hooks/pre-commit`。
+
+#### 方式 B：Python pre-commit 框架
+
+需先安装 Python pre-commit 框架（`pip install pre-commit`）：
+
+```bash
+pre-commit install
+# 首次运行安装所有 hooks
+pre-commit run --all-files
+```
+
+配置见 `.pre-commit-config.yaml`，包含：
+- `pre-commit-hooks v4.6.0`：trailing-whitespace / end-of-file-fixer / check-yaml / check-json / check-merge-conflict / check-added-large-files / detect-private-key / check-case-conflict
+- Local hooks：swiftformat-check / swiftlint（strict）
+
+跳过特定 hook：`SKIP=swiftlint git commit -m "..."`
+
+#### 配套：`.gitattributes`（P1-13 / H-C2）
+
+仓库根目录已配置 `.gitattributes`，标准化所有文件的行尾（LF 默认，Windows 脚本 CRLF）、文件类型（文本/二进制）、merge 策略（锁文件 `merge=ours`）、diff 行为（大文件 `-diff`）。开发者无需手动处理行尾问题。
 
 ## 3. 提交规范
 
@@ -235,7 +267,7 @@ Closes #123
    ```bash
    # 4.1 代码质量由 CI SonarQube job 检查（无需本地运行）
 
-   # 4.2 运行 UT（2092 用例，0 skip）
+   # 4.2 运行 UT（2771 用例，0 skip）
    xcodebuild test -project Aether.xcodeproj -scheme Aether-iOS \
      -destination 'platform=iOS Simulator,name=iPhone 17' \
      -only-testing:AetherTests \
@@ -272,7 +304,7 @@ Closes #123
   - **How to test**：测试步骤
   - **Checklist**：
     - [ ] 已通过 CI SonarQube 代码质量检查
-    - [ ] 已通过本地 UT (2092 用例)
+    - [ ] 已通过本地 UT (2771 用例)
     - [ ] 已通过本地 UIT (30 用例)
     - [ ] 已更新相关文档（如有用户可见变更）
     - [ ] 已补充测试用例（如有新功能）

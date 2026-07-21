@@ -96,8 +96,6 @@ struct ChatView: View {
                     chatMainContent
                 case .knowledge:
                     KnowledgeBaseView(provider: viewModel.selectedProvider)
-                case .health:
-                    HealthSettingsView(chatViewModel: viewModel)
                 }
                 #else
                 chatMainContent
@@ -109,12 +107,13 @@ struct ChatView: View {
             #endif
             .toolbar {
                 #if os(macOS)
-                // Task: macOS 分段工具栏——切换 聊天 / 知识库 / 健康
+                // Task: macOS 分段工具栏——切换 聊天 / 知识库
+                // 注：HealthKit 入口在 macOS 上隐藏（HealthKitService 整体在 #if os(iOS) 内），
+                // 仅保留 Model 注册以维持 schema 一致性。详见 project_memory.md 约束。
                 ToolbarItem(placement: .navigation) {
                     Picker("视图", selection: $selectedTab) {
                         Label("聊天", systemImage: "bubble.left").tag(ViewTab.chat)
                         Label("知识库", systemImage: "books.vertical").tag(ViewTab.knowledge)
-                        Label("健康", systemImage: "heart.text.square").tag(ViewTab.health)
                     }
                     .pickerStyle(.segmented)
                 }
@@ -397,6 +396,8 @@ struct ChatView: View {
 }
 
 /// Task: macOS 分段工具栏切换的视图标签
+/// 注：不包含 health——HealthKit 入口在 macOS 上隐藏（HealthKitService 整体在 #if os(iOS) 内），
+/// 仅保留 Model 注册以维持 schema 一致性。详见 project_memory.md 约束。
 enum ViewTab: String, CaseIterable, Hashable {
-    case chat, knowledge, health
+    case chat, knowledge
 }
