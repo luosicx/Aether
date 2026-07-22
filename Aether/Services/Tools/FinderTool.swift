@@ -87,8 +87,7 @@ final class FinderTool: ToolProtocol, @unchecked Sendable {
     /// 执行 AppleScript 脚本并返回输出，错误以字符串形式返回
     /// - Note: 本工具内 source 为常量字面量，无外部输入注入风险
     private func runAppleScript(_ source: String) -> String {
-        // NOSONAR: source 由调用方控制，本工具仅使用常量字面量脚本
-        let script = NSAppleScript(source: source)
+        let script = NSAppleScript(source: source) // NOSONAR: source 为常量字面量，无注入风险
         var errorInfo: NSDictionary?
         let output = script?.executeAndReturnError(&errorInfo)
         if let error = errorInfo {

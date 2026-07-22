@@ -30,6 +30,11 @@ actor OnDeviceModelDownloader {
     private var task: URLSessionDownloadTask?
     private var delegate: DownloadDelegate?
 
+    /// HuggingFace 模型仓库基础 URL（可配置，便于切换镜像或测试替换）
+    static let huggingFaceBaseURL = "https://huggingface.co"
+    /// ModelScope 镜像仓库基础 URL（可配置，便于切换镜像或测试替换）
+    static let modelScopeBaseURL = "https://www.modelscope.cn"
+
     /// 启动下载。下载完成后自动校验 SHA256。主地址失败且未捕获断点续传数据时回退到镜像地址。
     /// - Parameters:
     ///   - url: 模型文件远端下载地址
@@ -154,7 +159,7 @@ actor OnDeviceModelDownloader {
     ///   - file: 文件名（如 "config.json" / "model.safetensors"）
     /// - Returns: URL 构造失败返回 nil
     private func makeHuggingFaceURL(repo: String, file: String) -> URL? {
-        var components = URLComponents(string: "https://huggingface.co")
+        var components = URLComponents(string: Self.huggingFaceBaseURL)
         let encodedRepo = repo.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? repo
         let encodedFile = file.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? file
         components?.path = "/\(encodedRepo)/resolve/main/\(encodedFile)"
@@ -167,7 +172,7 @@ actor OnDeviceModelDownloader {
     ///   - file: 文件名
     /// - Returns: URL 构造失败返回 nil
     private func makeModelScopeURL(repo: String, file: String) -> URL? {
-        var components = URLComponents(string: "https://www.modelscope.cn")
+        var components = URLComponents(string: Self.modelScopeBaseURL)
         let encodedRepo = repo.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? repo
         components?.path = "/api/v1/models/\(encodedRepo)/repo"
         components?.queryItems = [

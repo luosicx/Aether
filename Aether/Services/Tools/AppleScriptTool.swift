@@ -110,8 +110,8 @@ final class AppleScriptTool: ToolProtocol, @unchecked Sendable {
             }
         }
         // 3. 通过 NSAppleScript 编译并执行脚本，错误信息写入 errorInfo
-        // NOSONAR: script 已通过 dangerousPatterns 静态拦截 do shell script/keystroke 等高危模式
-        let appleScript = NSAppleScript(source: script)
+        // 安全性说明：script 已通过 dangerousPatterns 静态拦截 do shell script/keystroke 等高危模式
+        let appleScript = NSAppleScript(source: script) // NOSONAR: script 经 dangerousPatterns + 白名单校验
         var errorInfo: NSDictionary?
         let output = appleScript?.executeAndReturnError(&errorInfo)
         if let error = errorInfo {

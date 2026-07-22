@@ -12,7 +12,7 @@ import Foundation
 /// 故用 NSLock 同步。
 final class WatchQuickChatCoordinator: @unchecked Sendable {
     /// 通知观察者 token，用 NSLock 包裹以支持跨 actor 安全读写
-    private var _token: NSObjectProtocol?
+    private var observerToken: NSObjectProtocol?
     private let lock = NSLock()
 
     /// 收到 Watch 快速对话消息时的回调（@MainActor 闭包，确保 pendingWatchMessage 在主线程更新）
@@ -23,12 +23,12 @@ final class WatchQuickChatCoordinator: @unchecked Sendable {
         get {
             lock.lock()
             defer { lock.unlock() }
-            return _token
+            return observerToken
         }
         set {
             lock.lock()
             defer { lock.unlock() }
-            _token = newValue
+            observerToken = newValue
         }
     }
 
@@ -40,7 +40,7 @@ final class WatchQuickChatCoordinator: @unchecked Sendable {
         self.onQuickChatReceived = onQuickChatReceived
         // 注册观察者：WatchConnectivityService 收到 Watch 消息后广播此通知，
         // object 字段为消息文本（String）。queue 用 OperationQueue.main 确保回调在主线程。
-        self._token = NotificationCenter.default.addObserver(
+        self.observerToken = NotificationCenter.default.addObserver(
             forName: .wcQuickChatReceived,
             object: nil,
             queue: OperationQueue.main

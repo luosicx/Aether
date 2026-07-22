@@ -125,14 +125,12 @@ final class NetworkFallbackCoordinator: Coordinator {
     ///   - selectedProvider: 当前请求实际使用的 provider（应由调用方先经 effectiveProviderForRequest 计算）
     ///   - fallbackProvider: 备用供应商（nil=不降级；非 nil 时用 FallbackLLMProvider 装饰主 provider）
     ///   - bffConfig: BFF 代理配置（启用后请求经服务端中转，上游 API Key 不落设备）
-    ///   - onDeviceConfig: 端侧推理配置（保留参数，未来扩展端侧工厂路径）
     ///   - injectedClient: 测试注入的 client（非 nil 时直接返回，绕过工厂构造）
     /// - Returns: 构造好的 LLMProvider（BFFProxyClient / FallbackLLMProvider / 直连 client / 注入 client）
     func makeLLMProvider(
         selectedProvider: ModelProvider,
         fallbackProvider: ModelProvider?,
         bffConfig: BFFConfig,
-        onDeviceConfig: OnDeviceConfig,
         injectedClient: LLMProvider?
     ) -> LLMProvider {
         // 测试侧：若注入了 client，则优先用注入的（绕过工厂）

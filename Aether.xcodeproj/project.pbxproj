@@ -364,6 +364,8 @@
 		AA8E2F66D43C247272278B9A /* DeviceInfoToolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51CA7C67CE5E48DA208A2E41 /* DeviceInfoToolTests.swift */; };
 		AABBCCDDEEFF001122334457 /* TelemetrySanitizerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDDEEFF001122334458 /* TelemetrySanitizerTests.swift */; };
 		ABCDEF00000000000000000B /* MCPClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF00000000000000000A /* MCPClientTests.swift */; };
+		A5E700000000000000000002 /* SSETransportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5E700000000000000000001 /* SSETransportTests.swift */; };
+		A5E700000000000000000004 /* StdioTransportTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5E700000000000000000003 /* StdioTransportTests.swift */; };
 		ABCDEF00000000000000000D /* ToolRegistryDynamicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF00000000000000000C /* ToolRegistryDynamicTests.swift */; };
 		ABCDEF000000000000000019 /* MCPSettingsUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000018 /* MCPSettingsUITests.swift */; };
 		ABCDEF000000000000000027 /* MCPServerGroupingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF000000000000000017 /* MCPServerGroupingTests.swift */; };
@@ -848,6 +850,8 @@
 		ABCDEF000000000000000005 /* MCPConfig.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MCPConfig.swift; sourceTree = "<group>"; };
 		ABCDEF000000000000000007 /* MCPToolAdapter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MCPToolAdapter.swift; sourceTree = "<group>"; };
 		ABCDEF00000000000000000A /* MCPClientTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MCPClientTests.swift; sourceTree = "<group>"; };
+		A5E700000000000000000001 /* SSETransportTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SSETransportTests.swift; sourceTree = "<group>"; };
+		A5E700000000000000000003 /* StdioTransportTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StdioTransportTests.swift; sourceTree = "<group>"; };
 		ABCDEF00000000000000000C /* ToolRegistryDynamicTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ToolRegistryDynamicTests.swift; sourceTree = "<group>"; };
 		ABCDEF000000000000000010 /* MCPResourceService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MCPResourceService.swift; sourceTree = "<group>"; };
 		ABCDEF000000000000000012 /* MCPPromptService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MCPPromptService.swift; sourceTree = "<group>"; };
@@ -1870,6 +1874,8 @@
 				ABCDEF00000000000000001E /* MCPToolAdapterTests.swift */,
 				ABCDEF00000000000000001B /* MCPResourceServiceTests.swift */,
 				ABCDEF00000000000000001D /* MCPPromptServiceTests.swift */,
+				A5E700000000000000000001 /* SSETransportTests.swift */,
+				A5E700000000000000000003 /* StdioTransportTests.swift */,
 			);
 			path = MCP;
 			sourceTree = "<group>";
@@ -2686,6 +2692,8 @@
 				ABCDEF000000000000000029 /* MCPToolAdapterTests.swift in Sources */,
 				ABCDEF00000000000000002B /* MCPResourceServiceTests.swift in Sources */,
 				ABCDEF00000000000000002D /* MCPPromptServiceTests.swift in Sources */,
+				A5E700000000000000000002 /* SSETransportTests.swift in Sources */,
+				A5E700000000000000000004 /* StdioTransportTests.swift in Sources */,
 				F4604345BBBD2D1C96E806DB /* PluginManagerTests.swift in Sources */,
 				CA452DC200489916F69A9AE8 /* PluginSandboxTests.swift in Sources */,
 				297A062F9A45A639E75D4BF5 /* ForkTests.swift in Sources */,

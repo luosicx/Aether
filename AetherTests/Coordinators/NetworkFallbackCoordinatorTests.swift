@@ -132,7 +132,6 @@ final class NetworkFallbackCoordinatorTests: XCTestCase {
             selectedProvider: .deepseek,
             fallbackProvider: nil,
             bffConfig: bffConfig,
-            onDeviceConfig: .default,
             injectedClient: nil
         )
 
@@ -225,7 +224,6 @@ final class NetworkFallbackCoordinatorTests: XCTestCase {
             selectedProvider: .onDevice,
             fallbackProvider: nil,
             bffConfig: .default,
-            onDeviceConfig: .default,
             injectedClient: mock
         )
 
