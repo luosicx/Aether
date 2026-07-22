@@ -1403,7 +1403,7 @@ stateDiagram-v2
 ### 7.1 单元测试（UT）
 
 - **Target**：`AetherTests`
-- **规模**：157 个测试文件，2881 用例（2881 pass / 0 skip / 0 failures）
+- **规模**：160 个测试文件，2927 用例（2927 pass / 0 skip / 0 failures）
 - **分层覆盖**：
 
 | 层级 | 测试文件 | 文件数 | 核心断言数（约） | skip 原因 |
@@ -1417,7 +1417,7 @@ stateDiagram-v2
 | Service 层 | `SSEParserTests` | 1 | 9 | — |
 | Service 层 | `SemanticCacheTests` | 1 | 6 | — |
 | Service 层 | `SemanticCacheEdgeTests` | 1 | 5 | — |
-| Service 层 | `DocumentChunkerTests` | 1 | 4 | NLTokenizer 未切分多块时 skip |
+| Service 层 | `DocumentChunkerTests` | 1 | 13 | NLTokenizer 未切分多块时 skip；含 Swift fallback 路径测试 |
 | Service 层 | `EmbeddingServiceTests` | 1 | 4 | API Key 缺失 |
 | Service 层 | `RAGServiceTests` | 1 | 6 | — |
 | Service 层 | `PDFExtractorTests` | 1 | 3 | 测试 PDF 资源缺失 |
@@ -1448,6 +1448,9 @@ stateDiagram-v2
 | Service 层 | `HealthInsightGeneratorTests` | 1 | 4 | HealthKit 授权未授予 |
 | Service 层 | `FeedbackServiceTests` | 1 | 4 | — |
 | Service 层 | `WatchConnectivityServiceTests` | 1 | 3 | 设备不支持 WatchConnectivity |
+| Service 层 | `MCPErrorTests` | 1 | 21 | — |
+| Service 层 | `SSETransportTests` | 1 | 8 | — |
+| Service 层 | `StdioTransportTests` | 1 | 8 | macOS only（`#if os(macOS)`） |
 | Model 层 | `ChatMessageTests` | 1 | 4 | — |
 | Model 层 | `ConversationModelTests` | 1 | 5 | — |
 | Model 层 | `MessageFeedbackTests` | 1 | 3 | — |
@@ -1459,7 +1462,7 @@ stateDiagram-v2
 | ViewModel 层 | `KnowledgeBaseVMTests` | 1 | 3 | — |
 | ViewModel 层 | `SettingsViewModelTests` | 1 | 4 | — |
 | 跨层 / 行为 | `ConversationActivityTests`（NSUserActivity / Handoff） | 1 | 4 | — |
-| 合计 | — | 157 | — | — |
+| 合计 | — | 160 | — | — |
 
 > **注**：核心断言数为约数（基于测试方法数与典型 XCTest 断言密度估算），实际值以代码为准。skip 用例总数为 3，分布于 Keychain / NLTokenizer / 语音识别器不可用等场景。
 
@@ -1476,6 +1479,10 @@ stateDiagram-v2
   - `FeedbackServiceTests.swift` / `MessageFeedbackTests.swift`：反馈持久化
   - `WatchConnectivityServiceTests.swift`：Watch 通信
   - `PresetPromptsTests.swift`：预设系统提示词清单（11 个角色完整性 / prompt 非空 / 角色唯一 / ≥ 150 字校验，4 用例）
+  - `MCPErrorTests.swift`：MCP 错误类型全覆盖（8 个 enum case × errorDescription / diagnosticDescription / WithCause 底层错误保留 / LocalizedError 一致性 / catch 匹配，21 用例）
+  - `SSETransportTests.swift`：SSE 传输层（init / send 未连接抛错 / HTTP 错误状态码 / disconnect 幂等 / messages 流 / handleSSEEvent 同源 endpoint 通过 + 跨域劫持拒绝，8 用例）
+  - `StdioTransportTests.swift`：stdio 传输层（macOS `#if os(macOS)`，init / connect 成功 + 无效命令抛错 / send 回显 / disconnect 清理 / messages 流 / 多行分割，8 用例）
+  - `DocumentChunkerTests.swift`（增量）：新增 9 个 Swift fallback 路径测试（`useRust` 改为 `internal static var` 支持测试注入，覆盖短文本 / 空文本 / 单字符 / 中文长文本 / chunkIndex 递增 / source 透传 / trimming / 直接调用 chunkDocumentSwift / 混合文本）
 
 - **skip 场景**：Keychain 不可用（模拟器 entitlement 限制）/ 语音识别器不可用 / NLTokenizer 未切分多块 / 权限拒绝 / HealthKit 授权未授予 / MLX 模型未下载 / 网络环境依赖等场景，用 `XCTSkip` / `XCTSkipUnless` 兜底。
 
