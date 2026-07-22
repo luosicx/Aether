@@ -1380,7 +1380,7 @@ stateDiagram-v2
 | PerformanceMonitor | `Services/Performance/PerformanceMonitor.swift` | iOS 17.0+ / macOS 14.0+ |
 | PrivacyInfo.xcprivacy | `Resources/PrivacyInfo.xcprivacy` | iOS 17.0+ / macOS 14.0+ / Xcode 16+（App Store 审核要求） |
 | AttributedString（Markdown） | `Views/Chat/Markdown*.swift` / `CodeSyntaxHighlighter.swift` | iOS 17.0+ / macOS 14.0+ / Foundation |
-| XCTest | `AetherTests/` 157 文件（2881 用例） | Xcode 16+ / Swift 5.9+ |
+| XCTest | `AetherTests/` 160 文件（2927 用例） | Xcode 16+ / Swift 5.9+ |
 | XCUITest | `AetherUITests/` 7 文件（30 用例） | Xcode 16+ / Swift 5.9+ |
 | GitHub Actions | `.github/workflows/ci.yml` | macos-14 runner / Xcode 16+ |
 | CoreLocation | CLLocationManager + CLGeocoder | LocationTool 定位与反地理编码 | iOS 17.0+ / macOS 14.0+ / CoreLocation.framework |
@@ -1713,7 +1713,7 @@ CloudflareWorkers/               # BFF 代理网关
 ├── worker.js
 └── wrangler.toml
 
-AetherTests/                  # 157 个 UT 文件 / 2881 用例
+AetherTests/                  # 160 个 UT 文件 / 2927 用例
 ├── APIConfigTests.swift
 ├── AlarmToolTests.swift
 ├── BFFProxyClientTests.swift
