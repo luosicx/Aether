@@ -201,8 +201,7 @@ actor MLXInferenceEngine {
                 do {
                     // 使用 MLX 原生流式生成：通过 perform 获取 ModelContext，
                     // 调用 MLXLMCommon.generate 获取 AsyncStream<Generation>，逐 token yield
-                    // NOSONAR: MLXLMCommon API 要求 model.perform 闭包内调用 generate 流式 API
-                    try await model.perform { context in
+                    try await model.perform { context in // NOSONAR: MLXLMCommon API 要求 model.perform 闭包内调用 generate 流式 API，嵌套层级由第三方 API 决定
                         let input = try await context.processor.prepare(input: UserInput(prompt: prompt))
                         let params = GenerateParameters(temperature: Float(temperature), maxTokens: maxTokens)
                         let tokenStream = try generate(input: input, parameters: params, context: context)

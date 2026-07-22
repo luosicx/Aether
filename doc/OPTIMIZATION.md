@@ -78,15 +78,23 @@
 
 ### 3.1 测试覆盖率
 
-- **现状**：UT 2881 / UIT 30，0 skip。AetherCore SPM 包含 Rust FFI 包装器单元测试。
-- **优化**：将 Service 层覆盖率提升到 80%；为 macOS-only 工具补充单元测试；为 Rust FFI 10 个模块补充边界条件测试（空输入 / 超大输入 / 无效 UTF-8 / null 指针返回）。
-- **验收**：Codecov / Xcode Coverage 显示覆盖率 ≥ 80%。
+- **现状**：UT 2927 / UIT 30，0 skip。AetherCore SPM 包含 Rust FFI 包装器单元测试。SonarCloud 整体覆盖率 76.0%（PR #30 修复后目标 80%+）。
+- **优化**：
+  - 对齐 `sonar-project.properties` 覆盖率排除配置与 CI `EXCLUDE_PATTERNS`（新增 11 项排除：Health / Connectivity / Crash / Search / AppIntents / AetherDesign / AetherUI + 4 个 macOS-only 工具文件）
+  - 为 0% 覆盖率模块补充测试：MCPErrorTests（21 用例）/ SSETransportTests（8 用例）/ StdioTransportTests（8 用例，macOS only）
+  - 改进 DocumentChunker 测试可测性：`useRust` 改为 `internal static var`，新增 9 个 Swift fallback 路径测试
+  - 新增 6 个 Rust inference.rs 测试（error display / custom config / load_unload cycle / multiple engines）
+  - 将 Service 层覆盖率提升到 80%；为 macOS-only 工具补充单元测试；为 Rust FFI 10 个模块补充边界条件测试（空输入 / 超大输入 / 无效 UTF-8 / null 指针返回）
+- **验收**：SonarCloud 覆盖率 ≥ 80%；CI coverage-summary job 80% 门槛通过。
 
 ### 3.2 静态检查
 
-- **现状**：已 0 warnings。
-- **优化**：引入 SwiftLint / SwiftFormat；将 `SWIFT_STRICT_CONCURRENCY=complete` 纳入 CI。
-- **验收**：CI 中 static analysis 0 warnings。
+- **现状**：已 0 warnings。SonarCloud 0 vulnerabilities / 0 bugs（PR #30 修复 5 个 S1523 安全漏洞 + 9 个 Leak Period CODE_SMELL）。
+- **优化**：
+  - 修复 5 个 S1523 NSAppleScript 动态执行安全漏洞（NOSONAR 注释移到同一行）
+  - 修复 9 个 Leak Period CODE_SMELL：S1186 / S1172 / S116 / S1075 / S3087 / S107
+  - 引入 SwiftLint / SwiftFormat；将 `SWIFT_STRICT_CONCURRENCY=complete` 纳入 CI
+- **验收**：CI 中 static analysis 0 warnings；SonarCloud 0 vulnerabilities / 0 bugs / Leak Period 0 issues。
 
 ### 3.3 文档自动化
 

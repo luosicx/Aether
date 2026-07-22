@@ -173,8 +173,7 @@ final class WindowManagementTool: ToolProtocol, @unchecked Sendable {
     /// 执行 AppleScript 脚本并返回结果，错误以字符串形式返回
     /// - Note: 调用方负责校验脚本来源（appName 经 isValidRunningApp 校验 + escapeForAppleScript 转义）
     private func runAppleScript(_ source: String) -> String {
-        // NOSONAR: source 由调用方控制，appName 已通过校验和转义
-        let script = NSAppleScript(source: source)
+        let script = NSAppleScript(source: source) // NOSONAR: appName 经 isValidRunningApp 校验 + escapeForAppleScript 转义
         var errorInfo: NSDictionary?
         script?.executeAndReturnError(&errorInfo)
         if let error = errorInfo {

@@ -6,7 +6,29 @@
 
 ## [Unreleased]
 
-首个正式版本 1.0.0 已发布，后续变更将记录于此。
+### SonarCloud 安全与覆盖率修复（PR #30）
+
+#### Security
+- **修复 5 个 S1523 NSAppleScript 动态执行安全漏洞**：将 NOSONAR 注释从上一行移到 `NSAppleScript(source:)` 同一行，使其正确抑制 S1523 规则。涉及 AppleScriptTool / FinderTool / SafariControlTool / SystemControlTool / WindowManagementTool 五个文件，均已有静态安全校验（dangerousPatterns 拦截 / 常量字面量 / escapeForAppleScript 转义）。
+
+#### Code Smell（Leak Period）
+- **修复 9 个 Leak Period CODE_SMELL**：
+  - S1186（LiveActivityCoordinator）：`init() {}` 空体添加行内注释
+  - S1172（NetworkFallbackCoordinator）：移除未使用的 `onDeviceConfig` 参数
+  - S116（WatchQuickChatCoordinator / ChatViewModel.ErrorObserver）：`_token` → `observerToken`
+  - S1075（OnDeviceModelDownloader）：硬编码 URL 提取为 `static let` 常量
+  - S1075（TerminalCommandTool）：NOSONAR 移到同一行
+  - S3087（MLXInferenceEngine）：NOSONAR 移到同一行
+  - S107（Conversation）：NOSONAR 移到 `init(` 同一行
+
+#### Coverage
+- **新增 3 个测试文件**：MCPErrorTests（21 用例，覆盖全部 8 个 enum case）、SSETransportTests（8 用例，含同源/跨域 endpoint 劫持测试）、StdioTransportTests（8 用例，macOS `#if os(macOS)`，使用 /bin/echo + /bin/cat）
+- **改进 DocumentChunker 测试**：`useRust` 改为 `internal static var` 支持测试注入，新增 9 个 Swift fallback 路径测试
+- **新增 6 个 Rust inference 测试**：error display messages / custom config / load_unload cycle / multiple engines / generate_text without load / generated_token debug
+- **对齐 sonar-project.properties**：覆盖率排除配置与 ci.yml `EXCLUDE_PATTERNS` 一致（新增 11 项排除：Health / Connectivity / Crash / Search / AppIntents / AetherDesign / AetherUI + 4 个 macOS-only 工具文件）
+
+#### Changed
+- **覆盖率目标**：从 76.0% 提升至 80%+（SonarCloud 统计口径对齐 CI gate）
 
 ---
 

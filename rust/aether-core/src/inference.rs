@@ -305,4 +305,94 @@ mod tests {
         let err = InferenceError::from(candle_core::Error::Msg("test".into()));
         assert!(matches!(err, InferenceError::Inference(_)));
     }
+
+    #[test]
+    fn generate_text_without_load_errors() {
+        let engine = InferenceEngine::new();
+        let result = engine.generate_text("hello");
+        assert!(matches!(result, Err(InferenceError::NotLoaded)));
+    }
+
+    #[test]
+    fn default_engine_is_default() {
+        let engine = InferenceEngine::default();
+        assert!(!engine.is_loaded());
+    }
+
+    #[test]
+    fn custom_config_values() {
+        let config = InferenceConfig {
+            temperature: 0.0,
+            max_tokens: 512,
+            repeat_penalty: 1.3,
+            repeat_last_n: 32,
+            top_p: 0.95,
+            seed: Some(42),
+            eos_token_id: Some(151643),
+        };
+        assert_eq!(config.temperature, 0.0);
+        assert_eq!(config.max_tokens, 512);
+        assert_eq!(config.repeat_penalty, 1.3);
+        assert_eq!(config.repeat_last_n, 32);
+        assert_eq!(config.top_p, 0.95);
+        assert_eq!(config.seed, Some(42));
+        assert_eq!(config.eos_token_id, Some(151643));
+    }
+
+    #[test]
+    fn inference_error_display_messages() {
+        assert_eq!(
+            InferenceError::Load("model not found".into()).to_string(),
+            "模型加载失败: model not found"
+        );
+        assert_eq!(
+            InferenceError::Tokenizer("invalid".into()).to_string(),
+            "tokenizer 加载失败: invalid"
+        );
+        assert_eq!(
+            InferenceError::Inference("oom".into()).to_string(),
+            "推理失败: oom"
+        );
+        assert_eq!(InferenceError::NotLoaded.to_string(), "模型未加载");
+        assert_eq!(
+            InferenceError::NotFound("/path".into()).to_string(),
+            "文件未找到: /path"
+        );
+        assert_eq!(
+            InferenceError::Unsupported("metal".into()).to_string(),
+            "不支持的操作: metal"
+        );
+    }
+
+    #[test]
+    fn load_unload_cycle() {
+        let engine = InferenceEngine::new();
+        assert!(!engine.is_loaded());
+        engine.unload();
+        assert!(!engine.is_loaded());
+        // 再次 unload 不应 panic
+        engine.unload();
+        assert!(!engine.is_loaded());
+    }
+
+    #[test]
+    fn generated_token_debug() {
+        let t = GeneratedToken {
+            text: "test".into(),
+            is_end: true,
+        };
+        let debug_str = format!("{:?}", t);
+        assert!(debug_str.contains("test"));
+        assert!(debug_str.contains("true"));
+    }
+
+    #[test]
+    fn multiple_engines_independent() {
+        let engine1 = InferenceEngine::new();
+        let engine2 = InferenceEngine::new();
+        assert!(!engine1.is_loaded());
+        assert!(!engine2.is_loaded());
+        engine1.unload();
+        assert!(!engine2.is_loaded());
+    }
 }

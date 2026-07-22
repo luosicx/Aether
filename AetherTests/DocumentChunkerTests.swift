@@ -191,6 +191,99 @@ final class DocumentChunkerTests: XCTestCase {
         }
     }
 
+    // MARK: - 纯 Swift fallback 路径（useRust = false）
+
+    /// 保存原始 useRust 值，测试后恢复，避免影响其他测试。
+    private var originalUseRust = true
+
+    override func setUp() {
+        super.setUp()
+        originalUseRust = DocumentChunker.useRust
+    }
+
+    override func tearDown() {
+        DocumentChunker.useRust = originalUseRust
+        super.tearDown()
+    }
+
+    /// Swift fallback：短文本返回 1 个 chunk
+    func testSwiftFallbackShortTextSingleChunk() {
+        DocumentChunker.useRust = false
+        let chunks = chunker.chunkDocument("Hello world.", source: "test.txt")
+        XCTAssertEqual(chunks.count, 1, "Swift fallback 短文本应返回 1 个 chunk")
+        XCTAssertEqual(chunks[0].source, "test.txt")
+    }
+
+    /// Swift fallback：空文本返回空数组
+    func testSwiftFallbackEmptyTextReturnsEmpty() {
+        DocumentChunker.useRust = false
+        let chunks = chunker.chunkDocument("", source: "empty.txt")
+        XCTAssertTrue(chunks.isEmpty, "Swift fallback 空文本应返回空数组")
+    }
+
+    /// Swift fallback：单字符文本返回 1 个 chunk
+    func testSwiftFallbackSingleCharacterText() {
+        DocumentChunker.useRust = false
+        let chunks = chunker.chunkDocument("A", source: "single.txt")
+        XCTAssertEqual(chunks.count, 1, "Swift fallback 单字符应返回 1 个 chunk")
+    }
+
+    /// Swift fallback：中文长文本应切分出多块
+    func testSwiftFallbackLongChineseTextChunks() {
+        DocumentChunker.useRust = false
+        let sentence = "这是用于测试中文长文本分块的句子，包含足够多的字符以触发切分机制。"
+        let text = (0..<100).map { _ in sentence }.joined(separator: "")
+        let chunks = chunker.chunkDocument(text, source: "chinese.txt")
+        XCTAssertGreaterThanOrEqual(chunks.count, 2, "Swift fallback 长中文文本应切分出至少 2 块")
+        for (i, chunk) in chunks.enumerated() {
+            XCTAssertEqual(chunk.chunkIndex, i, "chunkIndex 应从 0 递增")
+        }
+    }
+
+    /// Swift fallback：chunkIndex 从 0 连续递增
+    func testSwiftFallbackChunkIndexIncrement() {
+        DocumentChunker.useRust = false
+        let sentence = "测试句子用于验证 source 透传。"
+        let text = (0..<200).map { _ in sentence }.joined(separator: "")
+        let chunks = chunker.chunkDocument(text, source: "idx.txt")
+        XCTAssertFalse(chunks.isEmpty)
+        for (i, chunk) in chunks.enumerated() {
+            XCTAssertEqual(chunk.chunkIndex, i, "chunkIndex 应从 0 递增")
+        }
+    }
+
+    /// Swift fallback：source 透传
+    func testSwiftFallbackSourcePassthrough() {
+        DocumentChunker.useRust = false
+        let chunks = chunker.chunkDocument("Hello world.", source: "my-doc.pdf")
+        for chunk in chunks {
+            XCTAssertEqual(chunk.source, "my-doc.pdf", "source 应透传")
+        }
+    }
+
+    /// Swift fallback：trimming 去除首尾空白
+    func testSwiftFallbackTrimmingRemovesWhitespace() {
+        DocumentChunker.useRust = false
+        let chunks = chunker.chunkDocument("  Hello world.  ", source: "trim.txt")
+        XCTAssertEqual(chunks.count, 1)
+        XCTAssertFalse(chunks[0].content.hasPrefix(" "), "不应有前导空白")
+    }
+
+    /// Swift fallback：直接调用 chunkDocumentSwift 验证分块逻辑
+    func testChunkDocumentSwiftDirectly() {
+        let chunks = chunker.chunkDocumentSwift("Hello world. This is a test.", source: "direct.txt")
+        XCTAssertFalse(chunks.isEmpty, "直接调用 chunkDocumentSwift 应返回非空数组")
+        XCTAssertEqual(chunks[0].source, "direct.txt")
+    }
+
+    /// Swift fallback：混合中英文文本不崩溃
+    func testSwiftFallbackMixedText() {
+        DocumentChunker.useRust = false
+        let text = "Hello 世界。This is a test。这是测试。End of text。"
+        let chunks = chunker.chunkDocument(text, source: "mixed.txt")
+        XCTAssertFalse(chunks.isEmpty, "Swift fallback 混合文本应至少返回 1 个 chunk")
+    }
+
     // MARK: - Helpers
 
     /// 返回 a 末尾与 b 开头的最长公共子串长度（上限 overlapChars）

@@ -120,7 +120,7 @@ class MyService {
 
 - 单元测试（UT）放 `AetherTests/`，命名 `<ClassName>Tests.swift`
 - UI 测试（UIT）放 `AetherUITests/`，避免依赖真实网络（用 `UITEST_DISABLE_NETWORK` 启动参数桩回复）
-- 测试用例数：UT 2771 / UIT 30（每新增功能需补对应测试）
+- 测试用例数：UT 2817 / UIT 30（每新增功能需补对应测试）
 - 当前目标：0 skip；若必须跳过，需写明原因并在 Issue 跟踪
 
 ### 2.6 国际化规范
@@ -151,7 +151,7 @@ class MyService {
 
 项目根目录已配置 `.swiftlint.yml`，定义了检查目录、启用规则、禁用规则与参数阈值。
 
-**本地检查**：CI 通过 SonarQube 进行代码质量检查（见 `.github/workflows/ci.yml` 的 `code-quality` job）。
+**本地检查**：CI 通过 SonarCloud 进行代码质量检查（见 `.github/workflows/ci.yml` 的 `code-quality` job）。
 
 **配置要点**：
 - 检查目录：`Aether` / `AetherTests` / `AetherUITests`
@@ -265,7 +265,7 @@ Closes #123
    ```
 4. 编写代码 + 补充测试，确保本地通过：
    ```bash
-   # 4.1 代码质量由 CI SonarQube job 检查（无需本地运行）
+   # 4.1 代码质量由 CI SonarCloud job 检查（无需本地运行）
 
    # 4.2 运行 UT（2771 用例，0 skip）
    xcodebuild test -project Aether.xcodeproj -scheme Aether-iOS \
@@ -303,8 +303,8 @@ Closes #123
   - **Why**：变更动机（解决什么问题 / 满足什么需求）
   - **How to test**：测试步骤
   - **Checklist**：
-    - [ ] 已通过 CI SonarQube 代码质量检查
-    - [ ] 已通过本地 UT (2771 用例)
+    - [ ] 已通过 CI SonarCloud 代码质量检查
+    - [ ] 已通过本地 UT (2817 用例)
     - [ ] 已通过本地 UIT (30 用例)
     - [ ] 已更新相关文档（如有用户可见变更）
     - [ ] 已补充测试用例（如有新功能）
@@ -313,7 +313,7 @@ Closes #123
 
 - PR 自动触发 GitHub Actions CI（`.github/workflows/ci.yml`）
 - 必须 **Build 成功** + **Test 0 failures**
-- CI 通过 SonarQube 进行代码质量检查（`code-quality` job），存在 error 会阻断合并
+- CI 通过 SonarCloud 进行代码质量检查（`code-quality` job），存在 error 会阻断合并
 - Reviewer 审核通过后合并
 
 ## 5. spec 驱动开发说明

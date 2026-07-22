@@ -52,8 +52,7 @@ final class TerminalCommandTool: ToolProtocol, @unchecked Sendable {
     private static let forbiddenCharacters = CharacterSet(charactersIn: "|><;&\\`$*?(){}[]!#\n\r")
 
     /// 最小环境变量 PATH（系统标准目录，非硬编码 URI）。
-    // NOSONAR: 系统标准 PATH 目录，安全可控
-    private static let path = "/usr/bin:/bin:/usr/sbin:/sbin"
+    private static let path = "/usr/bin:/bin:/usr/sbin:/sbin" // NOSONAR: 系统标准 PATH 目录，安全可控
 
     /// 解析后的命令描述
     internal struct ParsedCommand: Equatable {

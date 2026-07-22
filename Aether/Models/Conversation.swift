@@ -99,8 +99,8 @@ final class UserPreference {
     ///   - bubbleStyle: 气泡样式，默认 "liquidGlass"
     ///   - fontSize: 字体大小，默认 16.0
     ///   - lineHeight: 行距倍数，默认 1.5
-    // NOSONAR: Swift @Model 需显式 init；10 个字段均有默认值，调用方多用默认值或部分参数
-    init(
+    // NOSONAR 注释需放在 init( 同一行才能生效
+    init( // NOSONAR: Swift @Model 需显式 init；10 个字段均有默认值，调用方多用默认值或部分参数
         preferredTone: String = "默认",
         preferredTools: [String] = [],
         customFact: String = "",

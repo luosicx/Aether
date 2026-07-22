@@ -1,6 +1,6 @@
 # Aether（以太）
 
-<!-- doc-stats: i18n=888 tools=25 tests=2881 -->
+<!-- doc-stats: i18n=888 tools=25 tests=2927 -->
 
 > 一个原生 SwiftUI AI 对话助手，支持 iOS / iPad / macOS 三端，采用**液态玻璃 + 深空主题**视觉语言。基于多 LLM Provider（DeepSeek / Qwen / BFF 代理 / 端侧 MLX），覆盖流式对话、RAG 知识库、ReAct 工具调用、语义缓存、端侧离线推理、语音合成与识别、健康洞察、灵动岛 Live Activity、Watch App、桌面 Widget、DeepLink 等能力。底层引入 Rust 核心引擎（aether-core-ffi，xcframework 分发），提供跨平台统一的高性能算法（SHA-256 哈希、Token 计数、文档分块、向量相似度、SSE 解析、WASM 沙箱、Candle 推理、令牌桶限流、敏感信息脱敏）。支持 8 种语言（简中 / 繁中 / 英 / 日 / 韩 / 法 / 德 / 西）。
 
@@ -91,7 +91,7 @@ Aether/                     # 主 App（iOS / iPad / macOS）
 AetherWatch/                # watchOS App（TabView：快速对话 / 健康洞察 / 设置）
 AetherWidgets/              # Widget Extension（QuickChat / HealthInsight / RecentConversations）
 CloudflareWorkers/          # BFF 代理层（worker.js + wrangler.toml）
-AetherTests/                # 单元测试（157 文件 / 2881 用例）
+AetherTests/                # 单元测试（160 文件 / 2927 用例）
 AetherUITests/              # UI 测试（7 文件 / 30 用例）
 ```
 

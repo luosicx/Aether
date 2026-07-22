@@ -9,7 +9,8 @@ import AetherRust
 /// 如需回退到纯 Swift 实现，将 `useRust` 置为 false 即可。
 final class DocumentChunker {
     /// 切换开关：true 走 Rust 核心，false 走下方纯 Swift 兜底实现。
-    private static let useRust = true
+    /// internal 以便单元测试注入 false 验证 Swift fallback 路径。
+    static var useRust = true
 
     /// 单块最大字符数 2048（约 1024-2048 token，安全在 Qwen 单行 8192 token 限制内）
     private let maxChars = 2048
@@ -32,7 +33,8 @@ final class DocumentChunker {
     /// 三阶段：1) 用 NLTokenizer(unit: .sentence) 按句子切分；
     /// 2) 累积句子到 maxChars，超出时落盘当前块；
     /// 3) 用前一块的 suffix(overlapChars) 作为下一块的 overlap 拼接。
-    private func chunkDocumentSwift(_ text: String, source: String) -> [DocumentChunk] {
+    /// internal 以便单元测试直接验证 Swift 分块逻辑。
+    func chunkDocumentSwift(_ text: String, source: String) -> [DocumentChunk] {
         let tokenizer = NLTokenizer(unit: .sentence)
         tokenizer.string = text
         var sentences: [String] = []

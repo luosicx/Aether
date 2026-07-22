@@ -8,12 +8,12 @@ import os
 
 /// 非隔离通知观察者持有者，deinit 中安全移除观察者。P1-5: NSLock 包裹 token（NSObjectProtocol 非 Sendable）。
 private final class ErrorObserver: @unchecked Sendable {
-    private var _token: NSObjectProtocol?
+    private var observerToken: NSObjectProtocol?
     private let lock = NSLock()
 
     var token: NSObjectProtocol? {
-        get { lock.lock(); defer { lock.unlock() }; return _token }
-        set { lock.lock(); defer { lock.unlock() }; _token = newValue }
+        get { lock.lock(); defer { lock.unlock() }; return observerToken }
+        set { lock.lock(); defer { lock.unlock() }; observerToken = newValue }
     }
 }
 
@@ -231,7 +231,6 @@ final class ChatViewModel {
             selectedProvider: effectiveProvider,
             fallbackProvider: fallbackProvider,
             bffConfig: bffConfig,
-            onDeviceConfig: onDeviceConfig,
             injectedClient: injectedClientUsed ? client : nil
         )
     }
