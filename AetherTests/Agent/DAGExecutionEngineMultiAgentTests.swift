@@ -232,7 +232,7 @@ final class DAGExecutionEngineMultiAgentTests: XCTestCase {
 
         let task = AgentTask(goal: "测试")
         let sub1 = makeSubTask(title: "研究", assignedRole: .researcher)
-        let sub2 = makeSubTask(title: "批判", assignedRole: .critic)
+        var sub2 = makeSubTask(title: "批判", assignedRole: .critic)
         sub2.dependencies = [sub1.id]
         task.updateSubTasks([sub1, sub2])
         context.insert(task)
@@ -307,8 +307,8 @@ final class DAGExecutionEngineMultiAgentTests: XCTestCase {
 
         let task = AgentTask(goal: "混合测试")
         let sub1 = makeSubTask(title: "默认任务")  // 默认 executor
-        let sub2 = makeSubTask(title: "研究任务", assignedRole: .researcher)  // 角色路由
-        let sub3 = makeSubTask(title: "协调任务", delegatedTo: coordinatorID)  // 委派
+        var sub2 = makeSubTask(title: "研究任务", assignedRole: .researcher)  // 角色路由
+        var sub3 = makeSubTask(title: "协调任务", delegatedTo: coordinatorID)  // 委派
         sub2.dependencies = [sub1.id]
         sub3.dependencies = [sub2.id]
         task.updateSubTasks([sub1, sub2, sub3])
@@ -334,7 +334,7 @@ final class DAGExecutionEngineMultiAgentTests: XCTestCase {
 
         let task = AgentTask(goal: "兼容性测试")
         let sub1 = makeSubTask(title: "任务1")
-        let sub2 = makeSubTask(title: "任务2")
+        var sub2 = makeSubTask(title: "任务2")
         sub2.dependencies = [sub1.id]
         task.updateSubTasks([sub1, sub2])
         context.insert(task)
@@ -396,7 +396,7 @@ final class DAGExecutionEngineMultiAgentTests: XCTestCase {
 
         let task = AgentTask(goal: "级联跳过测试")
         let sub1 = makeSubTask(title: "失败任务")
-        let sub2 = makeSubTask(title: "下游任务")
+        var sub2 = makeSubTask(title: "下游任务")
         sub2.dependencies = [sub1.id]
         task.updateSubTasks([sub1, sub2])
         context.insert(task)
