@@ -9,14 +9,16 @@ public struct PluginPermission: Codable, Hashable {
     /// 权限的可选描述说明
     public let description: String?
 
-    /// 权限类型枚举：覆盖网络、文件系统、剪贴板、通知、通讯录、位置
-    public enum PermissionType: String, Codable {
+    /// 权限类型枚举：覆盖网络、文件系统、剪贴板、通知、通讯录、位置、健康、相册
+    public enum PermissionType: String, Codable, CaseIterable {
         case network       // 网络访问
         case fileSystem    // 文件系统
         case clipboard      // 剪贴板
         case notifications  // 通知
         case contacts       // 通讯录
         case location       // 位置
+        case health         // 健康数据（HealthKit）
+        case photoLibrary   // 相册
     }
 
     public init(type: PermissionType, description: String? = nil) {

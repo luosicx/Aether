@@ -5,7 +5,7 @@ import Observation
 /// 插件管理器：负责插件的安装、卸载、工具加载与版本管理。
 ///
 /// 使用 @Observable 宏实现响应式，UI 可观察 installedPluginList 变化。
-/// 插件工具通过 PluginToolAdapter 适配后注册到 ToolRegistry.shared。
+/// 插件工具通过 PluginToolAdapter 适配后注册到 ToolRegistry.shared（通过 ToolRegistering 协议注入）。
 /// @MainActor 隔离，确保线程安全。
 @MainActor
 @Observable
@@ -14,6 +14,14 @@ public final class PluginManager {
     private var installedPlugins: [String: PluginManifest] = [:]
     /// 插件目录 URL（用于持久化插件文件）
     private var pluginDirectory: URL
+
+    /// 工具注册中心（由 App 启动时注入 ToolRegistry.shared，解耦 SPM 与 App 层循环依赖）。
+    /// 默认 nil：loadPluginTools/unloadPluginTools 在未注入时为 no-op。
+    nonisolated(unsafe) public static var toolRegistry: ToolRegistering?
+
+    /// 更新检查闭包（由 App 注入 PluginMarketplaceService.checkUpdate，默认返回 nil）。
+    /// 参数为插件 ID，返回新版本号（无更新返回 nil）。
+    public var updateChecker: @MainActor (String) async throws -> String? = { _ in nil }
 
     /// 初始化插件管理器，创建插件目录
     public init() {
@@ -69,7 +77,7 @@ public final class PluginManager {
     // MARK: - 工具加载 / 卸载
 
     /// 加载插件工具到 ToolRegistry。
-    /// 为插件清单中的每个工具创建 PluginToolAdapter 并注册到 ToolRegistry.shared。
+    /// 为插件清单中的每个工具创建 PluginToolAdapter 并注册到注入的 ToolRegistering。
     /// - Parameter pluginID: 插件 ID
     /// - Throws: 插件未安装时抛出错误
     public func loadPluginTools(pluginID: String) throws {
@@ -77,11 +85,13 @@ public final class PluginManager {
             throw NSError(domain: "PluginManager", code: 2,
                           userInfo: [NSLocalizedDescriptionKey: "插件 \(pluginID) 未安装"])
         }
+        guard let registry = Self.toolRegistry else {
+            // 未注入工具注册中心，跳过注册（no-op）
+            return
+        }
         for toolDef in manifest.tools {
             let adapter = PluginToolAdapter(manifest: manifest, toolDef: toolDef)
-            // TODO: ToolRegistry 尚未迁移到 AetherServices，待后续 Task 处理
-            _ = adapter
-            // ToolRegistry.shared.register(tool: adapter)
+            registry.register(tool: adapter)
         }
     }
 
@@ -93,11 +103,66 @@ public final class PluginManager {
             throw NSError(domain: "PluginManager", code: 2,
                           userInfo: [NSLocalizedDescriptionKey: "插件 \(pluginID) 未安装"])
         }
-        for toolDef in manifest.tools {
-            // TODO: ToolRegistry 尚未迁移到 AetherServices，待后续 Task 处理
-            _ = toolDef.name
-            // ToolRegistry.shared.unregister(name: toolDef.name)
+        guard let registry = Self.toolRegistry else {
+            // 未注入工具注册中心，跳关注销（no-op）
+            return
         }
+        for toolDef in manifest.tools {
+            registry.unregister(name: toolDef.name)
+        }
+    }
+
+    // MARK: - 本地插件扫描
+
+    /// 扫描插件目录（AppSupport/Plugins），加载每个子目录下的 manifest.json + 入口 JS 文件。
+    ///
+    /// 约定目录结构：
+    /// ```
+    /// AppSupport/Plugins/
+    ///   ├── plugin-a/
+    ///   │   ├── manifest.json
+    ///   │   └── main.js
+    ///   └── plugin-b/
+    ///       ├── manifest.json
+    ///       └── index.js
+    /// ```
+    /// 扫描结果会合并到 installedPlugins（已存在的 ID 覆盖为磁盘版本）。
+    /// - Returns: 成功扫描并加载的插件清单数组
+    @discardableResult
+    public func scanLocalPlugins() throws -> [PluginManifest] {
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: pluginDirectory.path) else {
+            return []
+        }
+        let subDirs = (try? fm.contentsOfDirectory(at: pluginDirectory, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles])) ?? []
+        var loaded: [PluginManifest] = []
+        let decoder = JSONDecoder()
+        for dir in subDirs where (try? dir.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
+            let manifestURL = dir.appendingPathComponent("manifest.json")
+            guard fm.fileExists(atPath: manifestURL.path),
+                  let data = try? Data(contentsOf: manifestURL),
+                  let manifest = try? decoder.decode(PluginManifest.self, from: data) else {
+                continue
+            }
+            // 校验入口 JS 文件存在
+            let entryURL = dir.appendingPathComponent(manifest.entryPoint)
+            guard fm.fileExists(atPath: entryURL.path) else {
+                continue
+            }
+            installedPlugins[manifest.id] = manifest
+            loaded.append(manifest)
+        }
+        return loaded
+    }
+
+    /// 获取插件目录下指定插件入口 JS 文件的完整 URL。
+    /// - Parameter pluginID: 插件 ID
+    /// - Returns: 入口 JS 文件 URL，插件未安装或文件不存在返回 nil
+    public func entryFileURL(for pluginID: String) -> URL? {
+        guard let manifest = installedPlugins[pluginID] else { return nil }
+        return pluginDirectory
+            .appendingPathComponent(pluginID, isDirectory: true)
+            .appendingPathComponent(manifest.entryPoint)
     }
 }
 
@@ -105,12 +170,11 @@ public final class PluginManager {
 
 extension PluginManager {
     /// 检查插件是否有版本更新。
-    /// 简化实现：返回 nil（无更新）。实际场景可请求远程注册中心获取最新版本。
+    /// 通过注入的 updateChecker 闭包查询 PluginMarketplaceService，默认返回 nil。
     /// - Parameter pluginID: 插件 ID
     /// - Returns: 新版本号字符串，无更新时返回 nil
     public func checkForUpdates(pluginID: String) async throws -> String? {
-        // 简化实现：不检查远程，直接返回 nil
-        return nil
+        return try await updateChecker(pluginID)
     }
 
     /// 热更新插件：卸载旧工具 → 替换清单 → 加载新工具。

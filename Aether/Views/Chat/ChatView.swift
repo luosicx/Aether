@@ -341,6 +341,8 @@ struct ChatView: View {
         }
         // Task 19: 响应式布局——macOS 超宽屏限制最大宽度并居中
         .responsiveLayout()
+        // v1.1 Phase D: 动态星空背景叠加
+        .background(StarfieldBackgroundView().opacity(0.4).allowsHitTesting(false))
     }
 
     /// Day 19: 创建新对话的公共逻辑（侧栏与 sheet 复用）

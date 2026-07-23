@@ -78,14 +78,17 @@
 
 ### 3.1 测试覆盖率
 
-- **现状**：UT 2927 / UIT 30，0 skip。AetherCore SPM 包含 Rust FFI 包装器单元测试。SonarCloud 整体覆盖率 76.0%（PR #30 修复后目标 80%+）。
+- **现状**：UT 3130 / UIT 30，0 skip。AetherCore SPM 包含 Rust FFI 包装器单元测试。SonarCloud 整体覆盖率 v1.0 已达 **83.79%**（PR #30 修复后由 76.0% 提升，超过原 80% 目标）。
 - **优化**：
   - 对齐 `sonar-project.properties` 覆盖率排除配置与 CI `EXCLUDE_PATTERNS`（新增 11 项排除：Health / Connectivity / Crash / Search / AppIntents / AetherDesign / AetherUI + 4 个 macOS-only 工具文件）
   - 为 0% 覆盖率模块补充测试：MCPErrorTests（21 用例）/ SSETransportTests（8 用例）/ StdioTransportTests（8 用例，macOS only）
   - 改进 DocumentChunker 测试可测性：`useRust` 改为 `internal static var`，新增 9 个 Swift fallback 路径测试
   - 新增 6 个 Rust inference.rs 测试（error display / custom config / load_unload cycle / multiple engines）
   - 将 Service 层覆盖率提升到 80%；为 macOS-only 工具补充单元测试；为 Rust FFI 10 个模块补充边界条件测试（空输入 / 超大输入 / 无效 UTF-8 / null 指针返回）
-- **验收**：SonarCloud 覆盖率 ≥ 80%；CI coverage-summary job 80% 门槛通过。
+- **验收**：
+  - **v1.0（已达成）**：SonarCloud 覆盖率 ≥ 80%（实际 83.79%）
+  - **v1.1 目标**：覆盖率 ≥ **85%**（补全 MCP / Agent / Plugin 模块测试）
+  - **v2.0 目标**：覆盖率 ≥ **90%**（覆盖跨端同步 / visionOS / 多 Agent 协作等远期方向）
 
 ### 3.2 静态检查
 
@@ -101,3 +104,35 @@
 - **现状**：文档靠人工同步。
 - **优化**：在 CI 中运行脚本提取 i18n key 数、工具数、测试数，检查与 README/ARCHITECTURE 是否一致。
 - **验收**：文档数字漂移时 CI 失败。
+
+---
+
+## 4. 远期优化方向
+
+> 以下章节面向 v1.1~v3.0+ 远期演进（详见 `doc/MASTER_PLAN.md`），描述各方向的优化目标与技术路径，**仅规划未实施**。
+
+### 4.1 端侧多模态性能优化方向
+
+- **内存预算器**：全局内存预算器协调 VLM / Whisper / SD 三类大模型同时加载时的内存使用，按设备分级配置（iPhone ≤ 3GB / iPad ≤ 6GB / Mac ≤ 8GB），超预算时按优先级卸载最低优先级模型。
+- **推理加速**：基于 Metal Performance Shaders 与 CoreML 量化推理路径加速 VLM / ASR / TTS 推理，对比 MLX 默认实现实测目标提升 ≥ 30%。
+- **模型量化**：将端侧 VLM / Whisper / SD 模型统一量化到 Q4（INT4）或 Q8（INT8），在精度可接受范围内将内存占用压缩到原模型的 25% / 50%。
+- **互斥使用**：VLM / Whisper / Stable Diffusion 三个重型模型不可同时加载到内存，通过 `MultimodalFacade` 强制串行调度，避免 OOM 导致系统终止。
+
+### 4.2 跨设备同步效率优化方向
+
+- **增量同步**：基于 `NSPersistentCloudKitContainer` 的增量同步，仅同步变更的字段与对象，避免全量拉取与重复写盘，目标同步数据量降低 ≥ 70%。
+- **冲突解决**：默认 LWW（Last-Write-Wins）+ 字段级合并策略，对关键字段（如 `Conversation.title` / `ChatMessage.content`）提供自定义合并回调，避免多端并发编辑时数据丢失。
+- **带宽控制**：仅在 Wi-Fi 网络下载大文件（如端侧模型、文档附件），蜂窝网络仅同步文本；同步传输启用 gzip 压缩，目标带宽占用降低 ≥ 50%。
+- **后台调度**：通过 `BGTaskScheduler` 注册云端同步后台任务（`com.aether.cloud-sync`），按电量与网络条件自适应调度，低电量 / 蜂窝网络下延后同步。
+
+### 4.3 插件沙箱开销优化方向
+
+- **wasmtime 预编译（AOT）**：将 WASM 插件模块在首次加载时通过 wasmtime 的 `cranelift` AOT 编译为本地机器码缓存到磁盘，后续加载直接映射，目标冷启动耗时降低 ≥ 60%。
+- **冷启动优化**：维护 WASM 实例池（按插件 manifest 缓存 1-3 个预热实例），首次调用直接复用预热线程，避免每次调用重新实例化带来的 ~80ms 延迟。
+- **内存隔离**：按插件粒度限制单插件最大内存（默认 256MB）与 CPU fuel（默认 100k instructions），通过 wasmtime `Store` 配置 `resource_limit` 强制约束，防止恶意插件耗尽系统资源。
+
+### 4.4 visionOS 渲染性能优化方向
+
+- **RealityView 优化**：对 3D 对话场景中的模型应用 LOD（Level of Detail）分级与视锥剔除（Frustum Culling），仅渲染视口内可见的高精度模型，远距离与背向模型降级为低精度或剔除。
+- **帧率保障**：默认目标 60fps，当设备负载过高时启用自适应分辨率（Dynamic Resolution Scaling），渲染分辨率从 1.0x 自适应降至 0.7x，保障 60fps 不掉帧；最低保持 30fps 流畅度下限。
+- **内存预算**：visionOS App 内存预算限制为 16GB（Apple Vision Pro 总内存 16GB，需为系统与其他 App 预留空间），通过 `MemoryBudgeter` 监控 RealityView 场景与模型资产总占用，超预算时按优先级卸载未使用的场景资产。

@@ -1,8 +1,14 @@
 # Aether（以太）
 
-<!-- doc-stats: i18n=888 tools=25 tests=2927 -->
+<!-- doc-stats: i18n=888 tools=25 tests=3130 -->
 
 > 一个原生 SwiftUI AI 对话助手，支持 iOS / iPad / macOS 三端，采用**液态玻璃 + 深空主题**视觉语言。基于多 LLM Provider（DeepSeek / Qwen / BFF 代理 / 端侧 MLX），覆盖流式对话、RAG 知识库、ReAct 工具调用、语义缓存、端侧离线推理、语音合成与识别、健康洞察、灵动岛 Live Activity、Watch App、桌面 Widget、DeepLink 等能力。底层引入 Rust 核心引擎（aether-core-ffi，xcframework 分发），提供跨平台统一的高性能算法（SHA-256 哈希、Token 计数、文档分块、向量相似度、SSE 解析、WASM 沙箱、Candle 推理、令牌桶限流、敏感信息脱敏）。支持 8 种语言（简中 / 繁中 / 英 / 日 / 韩 / 法 / 德 / 西）。
+
+## 项目愿景
+
+**v1.0 已完成核心能力交付**：覆盖 MCP 协议接入、长期记忆体系（SwiftData + 语义缓存）、Agent 多步协作编排（AgentOrchestrator / GoalDecomposer）、跨平台 AetherSDK（iOS / macOS / Android / Windows）等基础设施，已发布 v1.0.0 多平台首发版本（详见 [变更日志](doc/CHANGELOG.md)）。
+
+**远期演进方向（v1.1~v3.0+）**：规划端侧多模态（VLM / Whisper / TTS / SD）、跨设备协作（iCloud / Handoff / visionOS / Web 伴侣）、插件生态（社区市场 / 多 Agent 协作）、智能平台（Apple Intelligence / 本地 RAG / AI Workflow）五大方向，详见 [`doc/MASTER_PLAN.md`](doc/MASTER_PLAN.md)（含 Mermaid 架构图与里程碑规划）。
 
 ## 截图
 
@@ -91,7 +97,7 @@ Aether/                     # 主 App（iOS / iPad / macOS）
 AetherWatch/                # watchOS App（TabView：快速对话 / 健康洞察 / 设置）
 AetherWidgets/              # Widget Extension（QuickChat / HealthInsight / RecentConversations）
 CloudflareWorkers/          # BFF 代理层（worker.js + wrangler.toml）
-AetherTests/                # 单元测试（160 文件 / 2927 用例）
+AetherTests/                # 单元测试（181 文件 / 3130 用例）
 AetherUITests/              # UI 测试（7 文件 / 30 用例）
 ```
 
@@ -112,6 +118,21 @@ AetherUITests/              # UI 测试（7 文件 / 30 用例）
 | [BFF 部署](doc/BFF_DEPLOYMENT.md) | Cloudflare Workers 代理层部署指南 |
 | [DMG 打包](doc/DMG_PACKAGING.md) | macOS .dmg 打包与公证流程 |
 | [架构图](doc/diagrams/README.md) | PlantUML 架构图渲染说明 |
+
+## 路线图摘要
+
+> 完整路线图与里程碑详见 [`doc/ROADMAP.md`](doc/ROADMAP.md)，远期演进方向详见 [`doc/MASTER_PLAN.md`](doc/MASTER_PLAN.md)。
+
+| 版本 | 预计时间 | 关键交付 |
+|------|----------|----------|
+| v1.1 | 2026 Q4 | 智能体增强完善（MCP 生态共建 + Agent 多步协作 + 插件市场 MVP） |
+| v1.2 | 2027 Q1 | 设计升级（AnimationTokens + AetherIcons + 响应式布局 + 动态星空） |
+| v1.3 | 2027 Q2 | 端侧多模态 Phase 1（VLM 图像理解 + 跨平台 OCR + Whisper ASR） |
+| v1.5 | 2027 Q3 | 端侧多模态 Phase 2（自然 TTS + 语音克隆 + SD Mobile 图像生成） |
+| v2.0 | 2027 Q4 | 跨端协作（iCloud 同步 + Handoff + visionOS + Web 伴侣） |
+| v2.5 | 2028 Q1 | 生态扩展（社区插件市场 + 多 Agent 协作 + Android 深化） |
+| v3.0 | 2028 Q2 | 智能平台（Apple Intelligence + 本地 RAG 增强 + AI Workflow） |
+| v3.0+ | 2028 H2 | 远期探索（隐私计算 + 实时协作 + 多模态记忆） |
 
 ## 环境要求
 

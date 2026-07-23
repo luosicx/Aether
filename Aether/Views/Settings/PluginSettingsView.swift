@@ -49,10 +49,19 @@ struct PluginSettingsView: View {
                 .accessibilityLabel("安装示例插件")
                 .accessibilityHint("安装一个示例插件用于演示")
                 .accessibilityIdentifier("installSamplePluginButton")
+
+                NavigationLink {
+                    PluginMarketplaceView()
+                } label: {
+                    Label("插件市场", systemImage: "shippingbox")
+                }
+                .accessibilityLabel("插件市场")
+                .accessibilityHint("浏览并下载远程插件")
+                .accessibilityIdentifier("pluginMarketplaceLink")
             } header: {
                 Text("安装", comment: "")
             } footer: {
-                Text("安装示例插件用于演示插件系统功能。", comment: "")
+                Text("安装示例插件用于演示插件系统功能，或通过插件市场浏览远程插件。", comment: "")
                     .font(.captionAI)
             }
 
@@ -221,6 +230,8 @@ struct PluginSettingsView: View {
         case .notifications: return "bell"
         case .contacts: return "person.crop.circle"
         case .location: return "location"
+        case .health: return "heart"
+        case .photoLibrary: return "photo"
         }
     }
 
@@ -233,6 +244,8 @@ struct PluginSettingsView: View {
         case .notifications: return String(localized: "通知")
         case .contacts: return String(localized: "通讯录")
         case .location: return String(localized: "位置")
+        case .health: return String(localized: "健康数据")
+        case .photoLibrary: return String(localized: "相册")
         }
     }
 }

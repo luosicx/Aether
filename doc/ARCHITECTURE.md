@@ -15,6 +15,7 @@
 6. [技术栈映射](#6-技术栈映射)
 7. [测试架构](#7-测试架构)
 8. [目录结构](#8-目录结构)
+9. [架构演进方向](#9-架构演进方向)
 
 ---
 
@@ -1380,7 +1381,7 @@ stateDiagram-v2
 | PerformanceMonitor | `Services/Performance/PerformanceMonitor.swift` | iOS 17.0+ / macOS 14.0+ |
 | PrivacyInfo.xcprivacy | `Resources/PrivacyInfo.xcprivacy` | iOS 17.0+ / macOS 14.0+ / Xcode 16+（App Store 审核要求） |
 | AttributedString（Markdown） | `Views/Chat/Markdown*.swift` / `CodeSyntaxHighlighter.swift` | iOS 17.0+ / macOS 14.0+ / Foundation |
-| XCTest | `AetherTests/` 160 文件（2927 用例） | Xcode 16+ / Swift 5.9+ |
+| XCTest | `AetherTests/` 181 文件（3130 用例） | Xcode 16+ / Swift 5.9+ |
 | XCUITest | `AetherUITests/` 7 文件（30 用例） | Xcode 16+ / Swift 5.9+ |
 | GitHub Actions | `.github/workflows/ci.yml` | macos-14 runner / Xcode 16+ |
 | CoreLocation | CLLocationManager + CLGeocoder | LocationTool 定位与反地理编码 | iOS 17.0+ / macOS 14.0+ / CoreLocation.framework |
@@ -1403,7 +1404,7 @@ stateDiagram-v2
 ### 7.1 单元测试（UT）
 
 - **Target**：`AetherTests`
-- **规模**：160 个测试文件，2927 用例（2927 pass / 0 skip / 0 failures）
+- **规模**：181 个测试文件，3130 用例（3130 pass / 0 skip / 0 failures）
 - **分层覆盖**：
 
 | 层级 | 测试文件 | 文件数 | 核心断言数（约） | skip 原因 |
@@ -1713,7 +1714,7 @@ CloudflareWorkers/               # BFF 代理网关
 ├── worker.js
 └── wrangler.toml
 
-AetherTests/                  # 160 个 UT 文件 / 2927 用例
+AetherTests/                  # 181 个 UT 文件 / 3130 用例
 ├── APIConfigTests.swift
 ├── AlarmToolTests.swift
 ├── BFFProxyClientTests.swift
@@ -1817,3 +1818,223 @@ doc/
 README.md
 .gitignore
 ```
+
+---
+
+## 9. 架构演进方向
+
+> 本章节面向 v1.1~v3.0+ 远期演进（详见 `doc/MASTER_PLAN.md`），描述各方向的架构扩展点与关键技术决策，**仅规划未实施**。
+
+### 9.1 端侧多模态架构
+
+#### 9.1.1 VLM 集成点
+
+扩展现有 `MLXInferenceEngine`（位于 `Services/OnDevice/MLXInferenceEngine.swift`），新增 `generate(prompt:images:)` 接口支持图像输入：
+
+```swift
+extension MLXInferenceEngine {
+    func generate(prompt: String, images: [CGImage], maxTokens: Int, temperature: Float) -> AsyncStream<String>
+}
+```
+
+- 复用现有 `loadModel(path:expectedSHA256:)` 加载流程，扩展支持多模态权重（如 Llama-3.2-11B-Vision Q4 量化）。
+- 通过 `OfflineLLMProvider` 适配为 `LLMProvider` 协议，与现有 ChatViewModel 流式通路无缝衔接。
+
+#### 9.1.2 ASR / TTS 引擎抽象
+
+引入 `ASREngine` 与 `TTSEngine` 协议，解耦具体实现：
+
+```swift
+protocol ASREngine: Sendable {
+    func transcribe(audio: URL) async throws -> String
+    func streamTranscribe() -> AsyncStream<String>
+}
+
+protocol TTSEngine: Sendable {
+    func synthesize(text: String, config: TTSConfig) async throws -> Data
+}
+```
+
+- 现有 `VoiceService` 中 `SFSpeechRecognizer` 包装为 `AppleASREngine` 实现，`AVSpeechSynthesizer` 包装为 `AppleTTSEngine` 实现。
+- 新增 `WhisperASREngine`（基于 whisper.cpp Rust 绑定）与 `NaturalTTSEngine`（基于端侧 TTS 模型）作为可选实现，通过配置切换。
+
+#### 9.1.3 MultimodalFacade 统一入口
+
+引入 `MultimodalFacade`（`@MainActor`）作为多模态能力的统一入口，承担：
+
+- 模型加载调度（按优先级与内存预算加载 VLM / Whisper / SD 之一）
+- 引擎路由（按用户配置选择 ASR / TTS / VLM 实现）
+- 互斥锁（避免同时加载多个重型模型导致 OOM）
+
+```swift
+@MainActor final class MultimodalFacade {
+    func generateImage(prompt: String) async throws -> CGImage
+    func transcribe(audio: URL) async throws -> String
+    func synthesize(text: String, config: TTSConfig) async throws -> Data
+    func generateText(prompt: String, images: [CGImage]) -> AsyncStream<String>
+}
+```
+
+#### 9.1.4 内存预算器全局协调
+
+引入 `MemoryBudgeter`（`@MainActor`）作为全局内存预算器，协调 VLM / Whisper / SD 三个重型模型的加载：
+
+- 按设备分级配置预算（iPhone ≤ 3GB / iPad ≤ 6GB / Mac ≤ 8GB）
+- 跟踪已加载模型的内存占用
+- 超预算时按优先级卸载最低优先级模型
+- 与 `MultimodalFacade` 协作强制串行加载
+
+### 9.2 跨设备协同架构
+
+#### 9.2.1 NSPersistentCloudKitContainer 同步层
+
+扩展现有 `ChatStorage`（位于 `Services/Storage/ChatStorage.swift`）的 `ModelContainer` 配置：
+
+- 启用 CloudKit 同步：`ModelConfiguration(cloudKitDatabase: .private(...))`
+- 配置 `CloudKitContainer` 事件订阅，监听同步进度与冲突
+- 默认 LWW（Last-Write-Wins）+ 字段级合并策略
+- 大文件（如端侧模型、文档附件）通过 `CKAsset` 单独同步，避免阻塞 SwiftData 同步
+
+#### 9.2.2 NSUserActivity Handoff
+
+引入 `HandoffCoordinator`（`@MainActor`）基于 `NSUserActivity` 实现 Handoff：
+
+- 每个会话创建 `NSUserActivity`（`activityType = "com.aether.conversation"`，`userInfo = ["conversationId": ...]`）
+- 在 `AetherApp.swift` 中通过 `.userActivity` 与 `.continuesUserActivity` 处理 Handoff
+- 现有 `ConversationActivityTests` 已覆盖 `NSUserActivity` 序列化与恢复逻辑
+
+#### 9.2.3 visionOS RealityView 渲染层
+
+新增 `Aether/Views/VisionOS/` 目录承载 visionOS 视图：
+
+- `ImmersiveChatView`：基于 `RealityView` 的 3D 对话场景
+- `SpatialMessageBubble`：3D 消息气泡，应用 LOD 与视锥剔除
+- `SpatialInputManager`：基于 `SpatialEventGesture` 与 `SpatialTapGesture` 的空间手势输入
+- `ImmersiveSceneView`：沉浸式场景（如 Star Field 星空背景）
+- 通过 `#if os(visionOS)` 条件编译隔离
+
+#### 9.2.4 WebAssembly 客户端复用 AetherSDK
+
+引入 `web/` 目录承载 Web 伴侣 App：
+
+- 基于 `AetherSDK`（TypeScript/WebAssembly 移植）实现核心协议（`LLMProvider` / `ToolProtocol` / `MemoryService`）
+- 复用 BFF 代理层（Cloudflare Workers）作为统一后端
+- 通过 `WebSocket` 与原生 App 同步会话状态
+- 提供 Web 端访问入口，无需安装即可访问核心能力
+
+### 9.3 插件生态架构
+
+#### 9.3.1 插件 manifest 标准
+
+定义 `PluginManifest` 标准（`Codable + Sendable`）：
+
+```swift
+struct PluginManifest: Codable, Sendable {
+    let id: String                 // 唯一 ID（逆向域名，如 com.aether.plugins.weather）
+    let name: String               // 展示名
+    let version: String            // SemVer 版本
+    let author: String             // 作者
+    let description: String        // 描述
+    let permissions: [String]     // 申请的权限（如 "network" / "filesystem" / "contacts"）
+    let tools: [ToolDefinition]   // 暴露的工具列表
+    let minAppVersion: String     // 兼容的最小 App 版本
+    let wasm: WASMConfig          // WASM 模块配置（entry / memory / fuel）
+}
+```
+
+- 与现有 `wasmtime` 沙箱（`AetherRust/Sandbox.swift`）的 ABI 协议对齐
+- 通过 `ToolRegistry` 注册插件暴露的工具，与原生工具统一调度
+
+#### 9.3.2 官方市场 + GitHub 分发 + 企业私有仓库
+
+支持三种分发渠道：
+
+- **官方市场**：内置插件目录，App 内一键安装（通过 BFF 网关索引与下载）
+- **GitHub 分发**：通过 GitHub Release URL 安装，复用现有 `OnDeviceModelDownloader` 的 SHA256 校验机制
+- **企业私有仓库**：企业自建 manifest 索引服务，通过 BFF Token 鉴权访问
+
+#### 9.3.3 热更新增量下载
+
+- 基于 `bsdiff` / `bspatch` 算法生成插件 WASM 模块的增量包
+- 复用现有 `OnDeviceModelDownloader` 的断点续传机制
+- 安装前 SHA256 校验完整性，失败自动回退到上一版本
+
+#### 9.3.4 多 Agent 协作消息总线
+
+扩展现有 `AgentOrchestrator`（位于 `Services/Agent/AgentOrchestrator.swift`）支持多 Agent 协作：
+
+- 引入 `AgentMessageBus`（`actor`）作为 Agent 间通信通道
+- 每个 Agent 通过订阅 topic 接收消息，通过 publish 发布消息
+- 支持串行 / 并行协作模式，可通过配置切换
+- 与 `ToolRegistry` 集成，Agent 可调用工具执行实际操作
+
+### 9.4 visionOS 架构
+
+#### 9.4.1 AetherCore SPM 平台扩展
+
+扩展 `Packages/AetherCore/Package.swift` 支持 visionOS：
+
+```swift
+.platforms(
+    .iOS(.v17), .macOS(.v14), .visionOS(.v2)
+)
+```
+
+- 通过 `#if os(visionOS)` 条件编译隔离 visionOS 特定代码
+- `AetherRust` xcframework 新增 `xr-os-arm64` slice
+- 复用现有 iOS / macOS 全部服务层实现，仅需隔离 `ActivityKit` / `HealthKit` 等 iOS-only 框架
+
+#### 9.4.2 RealityView 3D 对话
+
+新增 `Aether/Views/VisionOS/ImmersiveChatView.swift`：
+
+- 基于 `RealityView` 渲染 3D 消息气泡与模型
+- 应用 LOD（Level of Detail）与视锥剔除优化渲染性能
+- 支持沉浸式模式（`ImmersionStyle.full`）与窗口模式（`ImmersionStyle.mixed`）切换
+- 与现有 `ChatViewModel` 通过 `@Bindable` 注入，复用业务逻辑
+
+#### 9.4.3 SpatialInputManager 空间手势
+
+引入 `SpatialInputManager`（`@MainActor`）：
+
+- 基于 `SpatialEventGesture` 监听空间事件（捏合 / 指捏 / 眼神注视）
+- 基于 `SpatialTapGesture` 处理空间点击
+- 转换为 `ChatViewModel` 的语义动作（如「捏合」→ 「发送」 / 「指捏」→ 「录音」）
+- 与 `VoiceCoordinator` 协作，提供空间手势 + 语音输入的组合交互
+
+#### 9.4.4 ImmersiveSceneView 沉浸式场景
+
+新增 `Aether/Views/VisionOS/ImmersiveSceneView.swift`：
+
+- 渲染 Aether 品牌「深空主题」3D 场景（星空 / 流动光带 / 液态玻璃材质）
+- 与 `ChatViewModel.streamingText` 联动，AI 回复时场景粒子流动加速
+- 通过 `MemoryBudgeter` 监控场景资产内存占用，超预算时降级为低精度 LOD
+- 与 `LiveActivityCoordinator`（iOS）形成互补，visionOS 上以沉浸式场景替代灵动岛
+
+#### 9.4.5 ToolRegistry + visionOS 平台条件注册
+
+扩展 `ToolRegistry`（位于 `Services/Tools/ToolRegistry.swift`）支持 visionOS 平台条件注册：
+
+```swift
+init() {
+    // 跨平台工具
+    register(tool: AlarmTool())
+    register(tool: ReminderTool())
+    // ... 14 个跨平台工具
+
+    #if os(macOS)
+    // macOS 独有 11 个工具
+    register(tool: AppleScriptTool())
+    // ...
+    #endif
+
+    #if os(visionOS)
+    // visionOS 独有工具（如 SpatialAnchorTool / RoomMappingTool）
+    register(tool: SpatialAnchorTool())
+    register(tool: RoomMappingTool())
+    #endif
+}
+```
+
+- visionOS 独有工具复用 `#if os(visionOS)` 条件编译模式，与 macOS 独有工具的注册模式保持一致
+- `ToolDefinition` 的 JSON Schema 不需修改，LLM 端无感知

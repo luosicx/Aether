@@ -86,6 +86,8 @@ struct SettingsView: View {
                 .keyboardShortcut(.escape, modifiers: [])
                 .opacity(0)
         }
+        // v1.1 Phase D: 动态星空背景叠加
+        .background(StarfieldBackgroundView().opacity(0.4).allowsHitTesting(false))
         .onAppear { handleAppear() }
         .onDisappear { handleDisappear() }
         .alert("语言", isPresented: $showRestartAlert) {

@@ -158,6 +158,9 @@ extension AetherApp {
 
         // Task 5: 启动时迁移可能遗留的 BFF Token 到 Keychain
         SettingsViewModel.migrateLegacyBFFConfigIfNeeded()
+
+        // v1.1 Phase C: 注入 ToolRegistry 到 PluginManager，使插件工具可注册到工具注册中心
+        PluginToolRegistryBridge.setup()
     }
 }
 

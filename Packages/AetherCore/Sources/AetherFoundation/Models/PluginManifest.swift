@@ -22,6 +22,23 @@ public struct PluginManifest: Codable, Identifiable, Hashable {
     public var permissions: [PluginPermission]
     /// 入口点（JS 脚本路径或 URL）
     public var entryPoint: String
+    /// 依赖的其他插件 ID
+    public var dependencies: [String]
+    /// 生命周期钩子
+    public var hooks: [PluginHook]
+    /// 下载地址
+    public var downloadURL: URL?
+    /// Ed25519 签名
+    public var signature: String?
+    /// 最低 App 版本要求
+    public var minAppVersion: String?
+
+    /// PluginManifest 默认解码时使用的 CodingKeys
+    enum CodingKeys: String, CodingKey {
+        case id, name, version, author, description
+        case tools, permissions, entryPoint
+        case dependencies, hooks, downloadURL, signature, minAppVersion
+    }
 
     public init(
         id: String,
@@ -31,7 +48,12 @@ public struct PluginManifest: Codable, Identifiable, Hashable {
         description: String,
         tools: [PluginToolDef],
         permissions: [PluginPermission],
-        entryPoint: String
+        entryPoint: String,
+        dependencies: [String] = [],
+        hooks: [PluginHook] = [],
+        downloadURL: URL? = nil,
+        signature: String? = nil,
+        minAppVersion: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -41,6 +63,48 @@ public struct PluginManifest: Codable, Identifiable, Hashable {
         self.tools = tools
         self.permissions = permissions
         self.entryPoint = entryPoint
+        self.dependencies = dependencies
+        self.hooks = hooks
+        self.downloadURL = downloadURL
+        self.signature = signature
+        self.minAppVersion = minAppVersion
+    }
+
+    /// 自定义解码：兼容旧版本 manifest（缺失新字段时使用默认值）
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        version = try container.decode(String.self, forKey: .version)
+        author = try container.decode(String.self, forKey: .author)
+        description = try container.decode(String.self, forKey: .description)
+        tools = try container.decode([PluginToolDef].self, forKey: .tools)
+        permissions = try container.decode([PluginPermission].self, forKey: .permissions)
+        entryPoint = try container.decode(String.self, forKey: .entryPoint)
+        // 新字段：缺失时回退默认值，保证向后兼容
+        dependencies = try container.decodeIfPresent([String].self, forKey: .dependencies) ?? []
+        hooks = try container.decodeIfPresent([PluginHook].self, forKey: .hooks) ?? []
+        downloadURL = try container.decodeIfPresent(URL.self, forKey: .downloadURL)
+        signature = try container.decodeIfPresent(String.self, forKey: .signature)
+        minAppVersion = try container.decodeIfPresent(String.self, forKey: .minAppVersion)
+    }
+
+    /// 自定义编码：仅编码非 nil 字段（downloadURL / signature / minAppVersion 可选）
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(name, forKey: .name)
+        try container.encode(version, forKey: .version)
+        try container.encode(author, forKey: .author)
+        try container.encode(description, forKey: .description)
+        try container.encode(tools, forKey: .tools)
+        try container.encode(permissions, forKey: .permissions)
+        try container.encode(entryPoint, forKey: .entryPoint)
+        try container.encode(dependencies, forKey: .dependencies)
+        try container.encode(hooks, forKey: .hooks)
+        try container.encodeIfPresent(downloadURL, forKey: .downloadURL)
+        try container.encodeIfPresent(signature, forKey: .signature)
+        try container.encodeIfPresent(minAppVersion, forKey: .minAppVersion)
     }
 
     /// 插件工具定义：名称、描述、JSON Schema 参数
