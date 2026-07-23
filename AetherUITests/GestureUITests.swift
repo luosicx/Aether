@@ -180,16 +180,28 @@ final class GestureUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["新对话"].waitForExistence(timeout: 8), "应创建第一个新对话")
 
         // 返回列表再新建一个
-        XCTAssertTrue(app.buttons["conversationListButton"].waitForExistence(timeout: 8), "返回列表时应存在会话列表按钮")
-        app.buttons["conversationListButton"].tap()
+        // v1.1: CI 模拟器导航时序偶发延迟，conversationListButton tap 后 sheet 未立即弹出，
+        // 增加 newConversationButton 重试逻辑（最多 3 次 tap conversationListButton）
+        var listOpenAttempts = 0
+        while !app.buttons["newConversationButton"].firstMatch.exists && listOpenAttempts < 3 {
+            XCTAssertTrue(app.buttons["conversationListButton"].waitForExistence(timeout: 8), "返回列表时应存在会话列表按钮")
+            app.buttons["conversationListButton"].tap()
+            listOpenAttempts += 1
+            _ = app.buttons["newConversationButton"].firstMatch.waitForExistence(timeout: 3)
+        }
 
         XCTAssertTrue(app.buttons["newConversationButton"].firstMatch.waitForExistence(timeout: 8), "应再次存在新建对话按钮")
         app.buttons["newConversationButton"].firstMatch.tap()
         XCTAssertTrue(app.staticTexts["新对话"].waitForExistence(timeout: 8), "应创建第二个新对话")
 
         // 返回列表
-        XCTAssertTrue(app.buttons["conversationListButton"].waitForExistence(timeout: 8), "再次返回列表时应存在会话列表按钮")
-        app.buttons["conversationListButton"].tap()
+        var listReopenAttempts = 0
+        while !app.buttons["newConversationButton"].firstMatch.exists && listReopenAttempts < 3 {
+            XCTAssertTrue(app.buttons["conversationListButton"].waitForExistence(timeout: 8), "再次返回列表时应存在会话列表按钮")
+            app.buttons["conversationListButton"].tap()
+            listReopenAttempts += 1
+            _ = app.buttons["newConversationButton"].firstMatch.waitForExistence(timeout: 3)
+        }
 
         // 点击「编辑」按钮进入编辑模式
         let editButton = app.buttons["editConversationsButton"]

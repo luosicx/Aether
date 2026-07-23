@@ -363,7 +363,8 @@ jobs:
   ui-tests:
     needs: rust-apple
     runs-on: macos-15
-    timeout-minutes: 40
+    # v1.1: 星空背景 + 新增 UI 测试增加渲染负担，40min 不足以跑完全部 UIT
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
 

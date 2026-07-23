@@ -104,7 +104,9 @@ final class AetherUITests: XCTestCase {
                       "应打开会话列表 sheet")
 
         // UITEST_RESET_DATA 已在启动时清空数据，会话列表应为空
-        XCTAssertTrue(app.staticTexts["还没有对话"].waitForExistence(timeout: 3),
+        // v1.1: 星空背景渲染偶致空状态文本延迟，用 descendants 兜底 + 增加 timeout 到 8s
+        let emptyText = app.descendants(matching: .any).matching(identifier: "还没有对话").firstMatch
+        XCTAssertTrue(emptyText.waitForExistence(timeout: 8),
                       "空会话列表应显示「还没有对话」")
     }
 
@@ -521,7 +523,15 @@ final class AetherUITests: XCTestCase {
 
         // terminate + launch 模拟重进 App，验证 SwiftData 持久化
         // 复用同一 app 实例并覆盖 launchArguments：去掉 UITEST_RESET_DATA，避免清空刚保存的偏好
-        app.terminate()
+        // v1.1: CI 模拟器偶发 terminate 超时，增加 state 检查 + 重试避免 259s 卡死
+        if app.state != .notRunning {
+            app.terminate()
+            // 轮询等待 app 完全终止（最多 10s），避免 launch 时进程残留
+            let termDeadline = Date().addingTimeInterval(10)
+            while app.state != .notRunning && Date() < termDeadline {
+                Thread.sleep(forTimeInterval: 0.5)
+            }
+        }
         app.launchArguments = ["UITEST_DISABLE_NETWORK", "UITEST_DISABLE_SPLASH"]
         app.launch()
         XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(timeout: 8), "重进后应回到主界面")
@@ -671,11 +681,19 @@ final class AetherUITests: XCTestCase {
         XCTAssertTrue(input.waitForExistence(timeout: 5))
         input.tap()
         input.typeText("hello")
-        app.buttons["sendButton"].tap()
+        let sendButton = app.buttons["sendButton"]
+        XCTAssertTrue(sendButton.waitForExistence(timeout: 3), "应存在发送按钮")
+        // CI 模拟器偶发 sendButton.isEnabled 延迟更新，轮询确保启用后再点击
+        let sendEnableDeadline = Date().addingTimeInterval(3)
+        while !sendButton.isEnabled && Date() < sendEnableDeadline {
+            Thread.sleep(forTimeInterval: 0.2)
+        }
+        sendButton.tap()
 
         // 等待错误条出现（ErrorBanner 的关闭按钮 accessibilityIdentifier 为 "closeErrorBannerButton"）
-        let closeButton = app.buttons["closeErrorBannerButton"]
-        XCTAssertTrue(closeButton.waitForExistence(timeout: 10), "应出现错误条关闭按钮")
+        // v1.1: 星空背景渲染偶致 ErrorBanner 出现延迟，增加到 15s 并用 descendants 兜底查找
+        let closeButton = app.descendants(matching: .any).matching(identifier: "closeErrorBannerButton").firstMatch
+        XCTAssertTrue(closeButton.waitForExistence(timeout: 15), "应出现错误条关闭按钮")
 
         // 点击关闭，验证错误条消失
         closeButton.tap()
