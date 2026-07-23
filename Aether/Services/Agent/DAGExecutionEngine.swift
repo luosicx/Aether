@@ -17,6 +17,13 @@ import AetherFoundation
 /// - `AgentOrchestrator.executeAll()` 内部委托给 `DAGExecutionEngine.run(_:)`
 /// - 引擎不持有 `currentTask`，由 orchestrator 注入
 /// - 引擎对外接口为 `run(_:)`，不暴露内部状态
+///
+/// v1.1 Phase B: 多 Agent 路由与委派
+/// - `NodeExecutor` 闭包由 `AgentOrchestrator` 注入，内部按 `subTask.assignedRole`
+///   路由到对应 `AgentInstance` 执行
+/// - 若 `subTask.delegatedTo` 非空，executor 通过 `AgentMessageBus` 发送委派请求
+///   并等待结果返回后继续执行
+/// - `messageBus` 属性可选（nil 时回退到单 Agent 流程，保持向后兼容）
 @MainActor
 final class DAGExecutionEngine {
 
@@ -64,6 +71,11 @@ final class DAGExecutionEngine {
     private let checkpointManager: CheckpointManager
 
     /// 节点执行器闭包（由 AgentOrchestrator 注入，避免直接依赖 LLMProvider）
+    ///
+    /// v1.1 Phase B: executor 闭包内部按以下优先级处理：
+    /// 1. `subTask.delegatedTo` 非空 → 通过 `AgentMessageBus` 委派给目标 Agent
+    /// 2. `subTask.assignedRole` 非空 → 路由到匹配的 `AgentInstance` 执行
+    /// 3. 兜底 → 默认 executor 流程（向后兼容）
     /// - Parameter subTask: 待执行的子任务
     /// - Returns: 执行结果字符串
     typealias NodeExecutor = @Sendable (SubTask) async throws -> String
@@ -75,20 +87,31 @@ final class DAGExecutionEngine {
     /// 节点完成回调
     var onNodeCompleted: ((SubTask) -> Void)?
 
+    /// v1.1 Phase B: Agent 消息总线（可选）。
+    ///
+    /// 由 `AgentOrchestrator` 注入，executor 闭包利用此总线处理跨 Agent 委派：
+    /// - 发送 `taskDelegation` 请求到目标 Agent
+    /// - 等待 `resultDelivery` 回传结果
+    /// 为 nil 时回退到单 Agent 流程（向后兼容）。
+    var messageBus: AgentMessageBus?
+
     /// 创建 DAGExecutionEngine
     /// - Parameters:
     ///   - stateMachine: 节点状态机（可选，默认新建）
     ///   - toolCoordinator: 工具协调器（可选，默认 shared）
     ///   - retryPolicy: 重试策略（可选，默认 `.defaultPolicy`）
     ///   - checkpointManager: 检查点管理器（可选，默认新建）
+    ///   - messageBus: v1.1 Phase B Agent 消息总线（可选，默认 nil）
     init(stateMachine: NodeStateMachine? = nil,
          toolCoordinator: AgentToolExecutionCoordinator = AgentToolExecutionCoordinator.shared,
          retryPolicy: RetryPolicy = .defaultPolicy,
-         checkpointManager: CheckpointManager? = nil) {
+         checkpointManager: CheckpointManager? = nil,
+         messageBus: AgentMessageBus? = nil) {
         self.stateMachine = stateMachine ?? NodeStateMachine()
         self.toolCoordinator = toolCoordinator
         self.retryPolicy = retryPolicy
         self.checkpointManager = checkpointManager ?? CheckpointManager()
+        self.messageBus = messageBus
     }
 
     /// 执行 AgentTask 的全部子任务（DAG 并行调度）

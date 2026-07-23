@@ -6,6 +6,49 @@
 
 ## [Unreleased]
 
+### v1.1 智能体增强完善（MCP 生态共建 + Agent 多步协作 + 插件市场 MVP + 动态星空背景）
+
+#### Added — Phase A: MCP Server 反向暴露
+- **MCPServer 反向暴露**：新增 `Aether/Services/MCP/MCPServer.swift` + `MCPServerProtocol.swift`，实现 `actor MCPServer`，接收外部 MCP 客户端（如 Claude Desktop）的 JSON-RPC 2.0 请求，将 Aether 的 14 个跨平台工具反向暴露。支持 `initialize` / `tools/list` / `tools/call` / `resources/list` / `prompts/list` / `ping` 方法，按白名单过滤工具，通过 `ServerStdioTransport` 读取 stdin / 写入 stdout。
+- **MCP 设置 UI 集成**：`MCPSettingsView` 新增"暴露为 MCP Server"开关，显示已暴露工具数量与连接状态。
+- **MCPServerTests**：新增 6 个测试覆盖 tools/list 白名单过滤、tools/call 路由、resources/list、prompts/list、start/stop 生命周期。
+
+#### Added — Phase B: Agent 多步协作增强
+- **AgentInstance 独立执行单元**：新增 `Aether/Services/Agent/AgentInstance.swift`，定义 `@MainActor final class AgentInstance`（id / role / config / status / conversationHistory），`execute(subTask:llmProvider:)` 按角色 systemPrompt 构建请求并累积多轮对话历史。
+- **AgentMessageBus 消息总线**：新增 `AgentMessageBus.swift`（`actor`），基于 `AsyncStream` 实现 pub/sub 模式，支持 `taskDelegation` / `resultDelivery` / `statusUpdate` 三种消息类型，支持多订阅者与自动清理。
+- **AgentRole 角色扩展**：新增 `researcher` / `critic` / `coordinator` 三个角色，各带专属 systemPrompt。
+- **SubTask 字段扩展**：增加 `assignedRole: AgentRole?` 与 `delegatedTo: UUID?` 字段，支持跨 Agent 委派。
+- **Agent 测试**：新增 `AgentInstanceTests` / `AgentMessageBusTests` / `DAGExecutionEngineMultiAgentTests` / `AgentRoleTests` 四个测试文件。
+
+#### Added — Phase C: 插件市场 MVP
+- **PluginManifest 扩展**：新增 `dependencies` / `hooks` / `downloadURL` / `signature` / `minAppVersion` 字段；`PluginHook` 枚举定义 `onMessageReceived` / `onToolCall` / `onConversationCreated` 生命周期钩子；`PluginPermission` 扩展 `health` / `location` / `photoLibrary` 权限。
+- **PluginManager 核心修复**：`loadPluginTools` 正式注册 `PluginToolAdapter` 到 `ToolRegistry`（移除 TODO）；实现插件本地文件扫描（`AppSupport/Plugins` 目录）；`PluginToolAdapter.execute` 使用 JavaScriptCore 执行 JS 插件代码；`checkForUpdates` 接入 `PluginMarketplaceService`。
+- **PluginMarketplaceService**：新增 `Aether/Services/Plugin/PluginMarketplaceService.swift`，支持远程 manifest 列表获取、插件下载、Ed25519 签名校验、本地搜索、下载进度跟踪。
+- **PluginMarketplaceView**：新增 `Aether/Views/Plugin/PluginMarketplaceView.swift`，列表页（插件名 / 描述 / 作者 / 下载按钮）+ 详情页（manifest 全字段 / 权限列表 / 安装按钮）+ 下载进度条与错误提示。
+- **插件测试**：新增 `PluginManifestTests` / `PluginManagerTests` / `PluginMarketplaceServiceTests` / `PluginToolAdapterTests` 四个测试文件。
+
+#### Added — Phase D: 动态星空背景
+- **AnimationTokens 扩展**：新增 `starDrift`（线性漂移）与 `twinkle`（闪烁）动画 token。
+- **StarfieldBackgroundView**：新增 `Aether/Views/Components/StarfieldBackgroundView.swift`，使用 `Canvas` + `TimelineView(.animation)` 实现 GPU 加速粒子动画，80 颗粒子归一化坐标漂移与闪烁，固定种子 LCG 初始化确保可复现，`Color.starlight` 与 `Color.nebulaGlow` 双层 alpha 混色，叠加 `RadialGradient` 制造星云感。
+- **主界面集成**：`ChatView` / `ConversationList` / `SettingsView` 背景叠加 `StarfieldBackgroundView().opacity(0.4).allowsHitTesting(false)`。
+- **星空背景测试**：新增 `StarfieldBackgroundViewTests`（粒子初始化与数量）与 `AnimationTokensTests`（新增 token 存在性）两个测试文件。
+
+#### Changed
+- **测试规模**：UT 从 2927 增至 3130（+203 用例），测试文件从 160 增至 181（+21 文件）。
+
+#### Added — Phase E: 测试补充
+- **MCPServer 边界测试**：新增 8 个测试覆盖 ping 响应、notifications/initialized 无 id 通知不返回响应、非 JSON 数据忽略、缺少 method 字段忽略、tools/call 缺少 params 返回 -32602 错误码、白名单工具执行抛错返回 isError=true、errorCode 映射验证（-32601/-32602）、String 类型 id 响应。
+- **PluginMarketplaceService 边界测试**：新增 10 个测试覆盖 checkUpdate 返回新版本/无更新/找不到插件、downloadPlugin 签名校验失败/HTTP 404/HTTP 500/进度更新、fetchPluginList JSON 解码失败/清除 lastError、searchPlugins 多字段命中去重。
+- **PluginManager 边界测试**：新增 5 个测试覆盖 toolRegistry 未注入时 load/unload no-op、scanLocalPlugins 目录不存在返回空/manifest 损坏跳过、uninstall 容忍 unload 失败。
+- **PluginToolRegistryBridge 测试**：新建 3 个测试覆盖 setup 注入 ToolRegistry/幂等性/协议遵循。
+- **PluginMarketplaceView 测试**：新建 9 个测试覆盖视图实例化/PluginPermission.PermissionType 枚举完备性/searchPlugins 边界用例。
+- **PluginToolAdapter 边界测试**：新增 8 个测试覆盖 null 返回/数字 toString/空字符串/对象 toString/数组参数/Bool 参数/Nil 参数/空入口文件。
+- **AnimationTokens 边界测试**：新增 4 个测试覆盖 starDrift/twinkle 动画属性。
+- **StarfieldBackgroundView 边界测试**：新增 5 个测试覆盖 twinklePhase 范围/driftSpeed 范围/负 driftSpeed 回绕/零种子 LCG/生成器可复现性。
+- **DAGExecutionEngine 边界测试**：新增 2 个测试覆盖 messageBus=nil 回退/委派失败级联 skip。
+- **AgentMessageBus 边界测试**：新增 3 个测试覆盖订阅者自动清理/reset 后恢复/空 topic。
+- **AgentInstance 边界测试**：新增 4 个测试覆盖自定义 config.model 传递/状态枚举验证/LLM Provider 错误传播。
+
 ### SonarCloud 安全与覆盖率修复（PR #30）
 
 #### Security
@@ -29,6 +72,21 @@
 
 #### Changed
 - **覆盖率目标**：从 76.0% 提升至 80%+（SonarCloud 统计口径对齐 CI gate）
+
+### 文档刷新（Phase D：后期功能展望同步）
+
+#### Documentation
+- **ROADMAP 状态刷新**：`doc/ROADMAP.md` 标记 Phase G 16 项 + G.5 + H.4 + J.3 为 `[x]` 已完成；新增 v1.3 / v1.5 / v2.5 / v3.0+ 里程碑节点；更新技术债务与风险表，反映 v1.0 发布后的实际进展与远期规划。
+- **规划文档状态标记补全**：为 4 个规划文档（`doc/plans/` 下的 phase-g-mcp-agent-sdk / phase-h-cross-platform / phase-j-ecosystem / phase-f-design-system 文档）头部补充状态标记（`部分实施` / `仅规划`），明确实施进度与规划边界。
+- **后期功能展望文档创建**：新增 `doc/MASTER_PLAN.md`（3189 行，统合 12 份历史规划文档），覆盖 v1.1~v3.0+ 五大方向（端侧多模态 / 跨设备协作 / 插件生态 / 智能平台 / visionOS）+ Mermaid 架构图与里程碑规划。
+- **OPTIMIZATION.md 远期优化方向**：新增 `4. 远期优化方向` 章节（4.1 端侧多模态性能优化 / 4.2 跨设备同步效率优化 / 4.3 插件沙箱开销优化 / 4.4 visionOS 渲染性能优化）；更新 `3.1 测试覆盖率` 章节为 v1.0 已达 83.79% / v1.1 目标 85% / v2.0 目标 90%。
+- **README.md 项目愿景与路线图摘要**：新增「项目愿景」段落（引用 `doc/MASTER_PLAN.md`，提及 v1.0 已完成 MCP / 记忆 / Agent / SDK 核心能力）；新增「路线图摘要」表格（v1.1~v3.0+ 8 个里程碑）。
+- **ARCHITECTURE.md 架构演进方向**：新增 `9. 架构演进方向` 章节（9.1 端侧多模态架构 / 9.2 跨设备协同架构 / 9.3 插件生态架构 / 9.4 visionOS 架构），含 VLM 集成点、ASR/TTS 引擎抽象、MultimodalFacade、NSPersistentCloudKitContainer 同步层、PluginManifest 标准、RealityView 渲染层等关键技术决策与代码示例。
+
+### 规划文档统合
+
+#### Documentation
+- **规划文档统合**：将 `doc/plans/` 下 12 份历史规划文档统合为 `doc/MASTER_PLAN.md`（3189 行），原始文档已删除
 
 ---
 

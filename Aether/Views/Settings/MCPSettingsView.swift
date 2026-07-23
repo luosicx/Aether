@@ -11,6 +11,7 @@ import AetherFoundation
 /// - 删除 Server
 /// - 显示连接状态（可选，需传入 MCPClientManager）
 /// - 保存配置到 UserDefaults（JSON 编码 MCPConfig 数组）
+/// - v1.1 Phase A：暴露为 MCP Server（stdio 模式），将 Aether 工具反向暴露给 Claude Desktop 等外部客户端
 struct MCPSettingsView: View {
     /// 可选的 MCPClientManager，用于显示连接状态（nil 时仅显示启用/禁用状态）
     var clientManager: MCPClientManager?
@@ -30,11 +31,23 @@ struct MCPSettingsView: View {
     /// 待审批的 Server 信息（弹窗显示用）
     @State private var pendingPermissionInfo: PermissionPromptInfo?
 
+    /// v1.1 Phase A：是否暴露为 MCP Server（持久化到 UserDefaults "mcp.server.enabled"）
+    @State private var isServerEnabled: Bool = UserDefaults.standard.bool(forKey: "mcp.server.enabled")
+    /// MCPServer 运行状态描述（UI 显示用）
+    @State private var serverStatus: String = "未启动"
+    /// 持有的 MCPServer 实例（启动后非 nil，停止后 nil）
+    @State private var server: MCPServer?
+
     /// UserDefaults 存储键
     private let storageKey = "MCPConfigs"
+    /// MCP Server 暴露开关的持久化 key
+    private let serverEnabledKey = "mcp.server.enabled"
 
     var body: some View {
         Form {
+            // v1.1 Phase A：MCP Server 暴露开关
+            serverExposureSection
+
             // 已配置的 Server 列表
             Section {
                 if configs.isEmpty {
@@ -90,7 +103,13 @@ struct MCPSettingsView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .accessibilityIdentifier("MCPSettingsView")
-        .onAppear { loadConfigs() }
+        .onAppear {
+            loadConfigs()
+            // 若开关已持久化为开启状态，自动启动 MCPServer
+            if isServerEnabled && server == nil {
+                Task { await toggleServer(enabled: true) }
+            }
+        }
         .sheet(isPresented: $showAddSheet) {
             MCPServerEditView(config: nil) { newConfig in
                 configs.append(newConfig)
@@ -143,6 +162,69 @@ struct MCPSettingsView: View {
             Button("取消", role: .cancel) {
                 pendingDeleteConfig = nil
             }
+        }
+    }
+
+    // MARK: - MCP Server 暴露区段（v1.1 Phase A）
+
+    /// MCP Server 暴露开关区段：开启后 Aether 作为 MCP Server 通过 stdio 暴露工具给外部客户端
+    @ViewBuilder
+    private var serverExposureSection: some View {
+        Section {
+            Toggle("暴露为 MCP Server", isOn: $isServerEnabled)
+                .accessibilityLabel("暴露为 MCP Server")
+                .accessibilityHint("开启后 Aether 将作为 MCP Server 通过 stdio 暴露工具给外部客户端")
+                .accessibilityIdentifier("mcpServerExposureToggle")
+                .onChange(of: isServerEnabled) { _, newValue in
+                    UserDefaults.standard.set(newValue, forKey: serverEnabledKey)
+                    Task { await toggleServer(enabled: newValue) }
+                }
+
+            if isServerEnabled {
+                HStack {
+                    Text("状态", comment: "")
+                    Spacer()
+                    Text(serverStatus)
+                        .font(.captionAI)
+                        .foregroundStyle(.secondary)
+                }
+                HStack {
+                    Text("已暴露工具", comment: "")
+                    Spacer()
+                    Text("\(MCPServerDefaultTools.crossPlatform.count) 个跨平台工具")
+                        .font(.captionAI)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        } header: {
+            Text("MCP Server 暴露", comment: "")
+        } footer: {
+            Text("开启后，Aether 将作为 MCP Server 通过 stdio 暴露工具给外部客户端（如 Claude Desktop）。默认暴露 14 个跨平台工具，不包含 macOS 独有工具。")
+                .font(.captionAI)
+        }
+    }
+
+    /// 切换 MCP Server 启停状态
+    /// - Parameter enabled: true 启动，false 停止
+    private func toggleServer(enabled: Bool) async {
+        if enabled {
+            let transport = ServerStdioTransport()
+            let newServer = MCPServer(transport: transport)
+            do {
+                try await newServer.start()
+                server = newServer
+                serverStatus = "运行中"
+            } catch {
+                Logger.mcp.error("MCPServer 启动失败: \(error.localizedDescription, privacy: .public)")
+                serverStatus = "启动失败: \(error.localizedDescription)"
+                // 启动失败：回退开关状态
+                isServerEnabled = false
+                UserDefaults.standard.set(false, forKey: serverEnabledKey)
+            }
+        } else {
+            await server?.stop()
+            server = nil
+            serverStatus = "已停止"
         }
     }
 

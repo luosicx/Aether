@@ -183,6 +183,14 @@ struct SubTask: Codable, Identifiable, Hashable {
     var parallel: Bool
     /// Task 20: 节点深度（由 HierarchicalDecomposer 写入，根任务分解得到的为 1，再分解为 2，以此类推）
     var depth: Int
+    /// v1.1 Phase B: 节点级角色路由。
+    /// 非空时，DAG 引擎将此子任务路由到具有该角色的 AgentInstance 执行；
+    /// 为 nil 时回退到默认 executor 角色（保持单 Agent 流程向后兼容）。
+    var assignedRole: AgentRole?
+    /// v1.1 Phase B: 委派目标 Agent 实例 ID。
+    /// 非空时，DAG 引擎通过 AgentMessageBus 将子任务委派给指定 Agent 执行，
+    /// 等待结果返回后继续；为 nil 时由本机执行（保持向后兼容）。
+    var delegatedTo: UUID?
 
     /// 创建 SubTask 实例
     /// - Parameters:
@@ -193,7 +201,9 @@ struct SubTask: Codable, Identifiable, Hashable {
     ///   - order: 执行顺序，默认 0
     ///   - parallel: 是否可并行执行，默认 false
     ///   - depth: 节点深度，默认 1
-    init(title: String, description: String = "", dependencies: [UUID] = [], toolName: String? = nil, order: Int = 0, parallel: Bool = false, depth: Int = 1) {
+    ///   - assignedRole: 节点级角色路由，默认 nil
+    ///   - delegatedTo: 委派目标 Agent ID，默认 nil
+    init(title: String, description: String = "", dependencies: [UUID] = [], toolName: String? = nil, order: Int = 0, parallel: Bool = false, depth: Int = 1, assignedRole: AgentRole? = nil, delegatedTo: UUID? = nil) {
         self.id = UUID()
         self.title = title
         self.description = description
@@ -204,15 +214,18 @@ struct SubTask: Codable, Identifiable, Hashable {
         self.order = order
         self.parallel = parallel
         self.depth = depth
+        self.assignedRole = assignedRole
+        self.delegatedTo = delegatedTo
     }
 
     /// 用于 LLM 返回的 JSON 解码：id 可选以便 LLM 不返回 id 时自动生成
     /// - SeeAlso: `GoalDecomposer.parseSubTasks(from:)`
     enum CodingKeys: String, CodingKey {
-        case id, title, description, status, dependencies, toolName, result, order, parallel, depth
+        case id, title, description, status, dependencies, toolName, result, order, parallel, depth, assignedRole, delegatedTo
     }
 
-    /// 自定义解码：id 缺失时自动生成新 UUID；status 缺失时默认 .pending；parallel/depth 缺失时使用默认值
+    /// 自定义解码：id 缺失时自动生成新 UUID；status 缺失时默认 .pending；parallel/depth 缺失时使用默认值；
+    /// assignedRole/delegatedTo 缺失时默认 nil（保持向后兼容）
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
@@ -225,9 +238,11 @@ struct SubTask: Codable, Identifiable, Hashable {
         self.order = try c.decodeIfPresent(Int.self, forKey: .order) ?? 0
         self.parallel = try c.decodeIfPresent(Bool.self, forKey: .parallel) ?? false
         self.depth = try c.decodeIfPresent(Int.self, forKey: .depth) ?? 1
+        self.assignedRole = try c.decodeIfPresent(AgentRole.self, forKey: .assignedRole)
+        self.delegatedTo = try c.decodeIfPresent(UUID.self, forKey: .delegatedTo)
     }
 
-    /// 自定义编码：包含新增的 parallel/depth 字段
+    /// 自定义编码：包含新增的 parallel/depth/assignedRole/delegatedTo 字段
     func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(id, forKey: .id)
@@ -240,6 +255,8 @@ struct SubTask: Codable, Identifiable, Hashable {
         try c.encode(order, forKey: .order)
         try c.encode(parallel, forKey: .parallel)
         try c.encode(depth, forKey: .depth)
+        try c.encodeIfPresent(assignedRole, forKey: .assignedRole)
+        try c.encodeIfPresent(delegatedTo, forKey: .delegatedTo)
     }
 }
 

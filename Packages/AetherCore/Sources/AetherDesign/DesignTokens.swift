@@ -50,6 +50,10 @@ public enum AnimationTokens {
     public static let skeleton: Animation = .easeInOut(duration: 0.8).repeatForever(autoreverses: true)
     /// 闪烁光标 0.5s
     public static let blink: Animation = .easeInOut(duration: 0.5).repeatForever(autoreverses: true)
+    /// v1.1 Phase D: 星空漂移 60s（线性循环，粒子横向缓慢移动）
+    public static let starDrift: Animation = .linear(duration: 60).repeatForever(autoreverses: false)
+    /// v1.1 Phase D: 星点闪烁 2s（easeInOut 来回呼吸）
+    public static let twinkle: Animation = .easeInOut(duration: 2).repeatForever(autoreverses: true)
 }
 
 /// 按钮按压反馈样式：按下时缩小到 0.92，使用 AnimationTokens.buttonPress 动画

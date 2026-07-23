@@ -67,31 +67,38 @@
 
 ### G.1 MCP 协议接入
 
-- [ ] MCP（Model Context Protocol）客户端接入
-- [ ] 支持外部 MCP Server 动态发现与连接
-- [ ] MCP 工具自动注册到 ToolRegistry
-- [ ] MCP 资源（Resources）与提示词（Prompts）模板支持
+- [x] MCP（Model Context Protocol）客户端接入（代码：`Aether/Services/MCP/` 16 文件）
+- [x] 支持外部 MCP Server 动态发现与连接（代码：`Aether/Services/MCP/` 16 文件）
+- [x] MCP 工具自动注册到 ToolRegistry（代码：`Aether/Services/MCP/` 16 文件）
+- [x] MCP 资源（Resources）与提示词（Prompts）模板支持（代码：`Aether/Services/MCP/` 16 文件）
 
 ### G.2 长期记忆系统
 
-- [ ] 跨会话长期记忆向量库（remember / recall）
-- [ ] 用户偏好自动提取与持久化（UserPreference @Model 扩展）
-- [ ] 上下文窗口管理：重要消息压缩 + 过期消息摘要
-- [ ] 语义记忆检索：基于 embedding 相似度召回历史对话
+- [x] 跨会话长期记忆向量库（remember / recall）（代码：`Aether/Services/Memory/` 12 文件）
+- [x] 用户偏好自动提取与持久化（UserPreference @Model 扩展）（代码：`Aether/Services/Memory/` 12 文件）
+- [x] 上下文窗口管理：重要消息压缩 + 过期消息摘要（代码：`Aether/Services/Memory/` 12 文件）
+- [x] 语义记忆检索：基于 embedding 相似度召回历史对话（代码：`Aether/Services/Memory/` 12 文件）
 
 ### G.3 Agent 任务规划
 
-- [ ] 多步目标分解（Goal → SubTasks → Actions）
-- [ ] Agent 任务编排引擎（DAG 执行图）
-- [ ] 任务状态持久化与断点续执行
-- [ ] 多 Agent 协作（多个 LLM 角色分工）
+- [x] 多步目标分解（Goal → SubTasks → Actions）（代码：`Aether/Services/Agent/` 10 文件）
+- [x] Agent 任务编排引擎（DAG 执行图）（代码：`Aether/Services/Agent/` 10 文件）
+- [x] 任务状态持久化与断点续执行（代码：`Aether/Services/Agent/` 10 文件）
+- [x] 多 Agent 协作（多个 LLM 角色分工）（代码：`Aether/Services/Agent/` 10 文件）
 
 ### G.4 插件系统
 
-- [ ] 插件化工具市场（外部工具动态注册，无需重新编译）
-- [ ] 插件沙箱隔离与权限管理
+- [x] 插件化工具市场（外部工具动态注册，无需重新编译）（代码：`Aether/Services/Plugin/PluginMarketplaceService.swift` + `PluginToolRegistryBridge.swift`，v1.1 MVP）
+- [x] 插件沙箱隔离与权限管理（代码：`Packages/AetherCore/Sources/AetherServices/Plugin/`）
 - [ ] 插件版本管理与热更新
-- [ ] 社区插件分发渠道
+- [x] 社区插件分发渠道（代码：`Aether/Views/Plugin/PluginMarketplaceView.swift` + `PluginMarketplaceService.swift`，v1.1 MVP：远程 manifest 列表 + 下载 + Ed25519 签名校验）
+
+### G.5 MCP 安全加固
+
+- [x] MCP Server 签名校验（代码：`Aether/Services/MCP/` 安全加固模块）
+- [x] MCP 调用审计日志（代码：`Aether/Services/MCP/` 安全加固模块）
+- [x] MCP 工具调用速率限制（代码：`Aether/Services/MCP/` 安全加固模块）
+- [x] MCP 前缀防注入（代码：`Aether/Services/MCP/` 安全加固模块）
 
 ---
 
@@ -110,10 +117,10 @@
 ### H.2 交互升级
 
 - [ ] macOS 多窗口与拖拽支持（多对话并行）
-- [ ] 对话分支与版本管理（对话树）
-- [ ] 富媒体消息支持（卡片 / 链接预览 / 内嵌图表）
+- [x] 对话分支与版本管理（对话树）（代码：`Views/Conversation/ConversationTreeView.swift`）
+- [x] 富媒体消息支持（卡片 / 链接预览 / 内嵌图表）（代码：`Views/Chat/InlineChartView.swift` / `RichMessageCard.swift` / `LinkPreviewCard.swift`）
 - [ ] 手势快捷操作（滑动删除 / 长按菜单 / 拖拽排序）
-- [ ] macOS 菜单栏常驻模式（MenuBarExtra）
+- [x] macOS 菜单栏常驻模式（MenuBarExtra）（代码：`Views/MenuBarExtra/MenuBarPanel.swift`）
 
 ### H.3 个性化
 
@@ -121,6 +128,10 @@
 - [x] 自定义头像与 AI 人设（已完成 PhotosPicker 头像选择器）
 - [x] 对话气泡样式可选（液态玻璃 / 极简 / 卡片）（已完成气泡样式切换）
 - [x] 字体大小与行距可调（已完成字体与间距设置）
+
+### H.4 性能优化
+
+- [x] VirtualizedMessageList 虚拟化列表（代码：`Views/Chat/VirtualizedMessageList.swift`）
 
 ---
 
@@ -150,7 +161,7 @@
 
 ### J.1 跨设备同步
 
-- [ ] 对话历史 iCloud 同步（CloudKit / NSPersistentCloudKitContainer）
+- [~] 对话历史 iCloud 同步（CloudKit / NSPersistentCloudKitContainer）（代码存在但 entitlements 未配置，部分实施）
 - [ ] 跨设备连续对话（Handoff）
 - [~] watchOS 独立 App（无需 iPhone 配对）（源代码已就绪，需手动创建 Xcode target）
 - [ ] visionOS 适配（空间计算体验）
@@ -164,7 +175,7 @@
 
 ### J.3 开发者生态
 
-- [ ] Aether SDK（第三方应用集成 Aether AI 能力）
+- [x] Aether SDK（第三方应用集成 Aether AI 能力）（代码：`Packages/AetherCore/Sources/AetherSDK/` 12 文件 + Documentation.docc）
 - [x] URL Scheme 与 x-callback-url 支持（已完成 `aether://` DeepLink）
 - [ ] Shortcuts 深度集成（更多 App Intents）
 - [ ] 开发者文档与示例代码
@@ -182,7 +193,7 @@
 | 阶段 | 特征 | 状态 |
 |------|------|------|
 | v1.0 | 深空背景 + 液态玻璃卡片 + 紫蓝渐变 | ✅ 已完成 |
-| v1.1 | 动态星空背景（粒子动画）+ 毛玻璃深度分层 | 🔜 计划中 |
+| v1.1 | 动态星空背景（粒子动画）+ 毛玻璃深度分层 | ✅ 已完成 |
 | v1.2 | 流体动画（消息气泡液态进出）+ 光晕呼吸效果 | 📋 设计中 |
 | v2.0 | 全沉浸式 3D 交互（visionOS 空间计算） | 🔮 远期 |
 
@@ -200,11 +211,14 @@
 | 里程碑 | 目标 | 关键交付 | 预计版本 |
 |--------|------|----------|----------|
 | v1.0 | App Store 首发 | 工程化完善、审核通过、首版上架 | 2026 Q3 |
-| v1.1 | 智能体增强 | MCP 接入、长期记忆、Agent 规划 | 2026 Q4 |
+| v1.1 ✅ | 智能体增强完善（MCP 生态共建 + Agent 多步协作 + 插件市场 MVP） | MCP Server 反向暴露、Agent 多步协作、插件市场 MVP、动态星空背景 | 2026 Q4（已完成） |
 | v1.2 | 设计升级 | 动画统一、多窗口、个性化主题 | 2027 Q1 |
-| v1.3 | 端侧多模态 | 离线视觉/语音/图像生成 | 2027 Q2 |
+| v1.3 | 端侧多模态 Phase 1 | VLM 图像理解、跨平台 OCR、Whisper ASR | 2027 Q2 |
+| v1.5 | 端侧多模态 Phase 2 | 自然 TTS、语音克隆、SD Mobile 图像生成 | 2027 Q3 |
 | v2.0 | 跨端协作 | iCloud 同步、Web 伴侣、团队协作 | 2027 Q3 |
+| v2.5 | 生态扩展 | 社区插件市场、多 Agent 协作、Android 深化 | 2028 Q1 |
 | v3.0 | 生态平台 | SDK、插件市场、visionOS | 2028 |
+| v3.0+ | 远期探索 | 隐私计算、实时协作、多模态记忆 | 2028 下半年 |
 
 ---
 
@@ -214,16 +228,19 @@
 
 | 债务项 | 影响 | 计划 |
 |--------|------|------|
-| ChatViewModel 圈复杂度高 | processMessage 难以维护 | v1.1 重构为状态机模式 |
-| MLX 流式输出为假流式 | 端侧推理体验不佳 | v1.3 实现真 token 流式 |
 | BFF 令牌桶仅客户端 | 可被绕过 | v2.0 服务端限流强化 |
-| SwiftUI 长列表性能 | 100+ 消息可能掉帧 | v1.2 虚拟化列表 |
+| Candle iOS 受限 | iOS 端侧推理能力受限 | v1.3 评估 MLX 替代方案 |
+| Vision OCR 仅 macOS | iOS 无法离线 OCR | v1.3 跨平台 OCR 适配 |
+| Plugin 热更新未实现 | 插件版本管理占位 | v2.5 实现热更新与依赖解析 |
+| visionOS target 缺失 | 空间计算体验缺失 | v2.0 新增 visionOS target |
 
 ### 风险与应对
 
 | 风险 | 概率 | 影响 | 应对 |
 |------|------|------|------|
 | App Store 审核被拒（工具权限） | 中 | 延迟上架 | 提前与审核团队沟通，准备权限说明文档 |
-| MLX 端侧推理内存不足 | 高 | 端侧功能不可用 | 动态内存检测 + 模型降级推荐 |
-| DeepSeek API 限流 | 中 | 用户体验下降 | SmartRouter 自动切换 + 语义缓存 |
 | 多平台维护成本 | 高 | 迭代速度下降 | 抽象跨平台组件库，减少 `#if os` 分支 |
+| 端侧多模态内存预算 | 高 | 多模态并发 OOM | 全局内存预算器、超限自动降级 |
+| visionOS 生态不确定 | 中 | ROI 不足 | 共享 70% 代码、控制投入 |
+| 社区插件安全审核 | 高 | 恶意插件 | 签名校验 + 沙箱隔离 + 市场审核 |
+| Apple Intelligence API 变动 | 中 | 兜底失效 | 保留 SD 路径作为备选 |

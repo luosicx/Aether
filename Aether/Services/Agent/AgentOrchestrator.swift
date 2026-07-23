@@ -64,6 +64,20 @@ final class AgentOrchestrator {
     /// 设为 true 后，每个子任务执行完毕由 reviewer 角色审查结果，不通过则重试。
     var enableReview: Bool = false
 
+    /// v1.1 Phase B: 持有的 Agent 实例字典（ID → AgentInstance）。
+    ///
+    /// 通过 `createAgent(role:)` 创建并注册，DAG 引擎按 `subTask.assignedRole`
+    /// 或 `subTask.delegatedTo` 路由到对应实例执行。
+    /// 默认为空：未创建任何 AgentInstance 时回退到单 Agent 流程（向后兼容）。
+    private(set) var agentInstances: [UUID: AgentInstance] = [:]
+
+    /// v1.1 Phase B: 角色到 Agent 实例 ID 的快速索引（同一角色可有多个实例，取首个）。
+    /// 用于按 `subTask.assignedRole` 路由。
+    private var roleIndex: [AgentRole: UUID] = [:]
+
+    /// v1.1 Phase B: Agent 消息总线（跨 Agent 委派通信）。
+    let messageBus: AgentMessageBus = AgentMessageBus()
+
     /// 当前执行的任务
     private(set) var currentTask: AgentTask?
 
@@ -88,6 +102,8 @@ final class AgentOrchestrator {
         engine.onNodeFailed = { _ in
             // 失败时 engine 已标记 failed 状态，UI 层通过 @Published 监听
         }
+        // v1.1 Phase B: 注入消息总线供 executor 闭包处理跨 Agent 委派
+        engine.messageBus = self.messageBus
         return engine
     }()
 
@@ -126,6 +142,69 @@ final class AgentOrchestrator {
     }
 
     // MARK: - Task 10: 任务编排
+
+    // MARK: - v1.1 Phase B: 多 Agent 实例管理
+
+    /// v1.1 Phase B: 创建并注册一个 Agent 实例。
+    ///
+    /// 创建指定角色的 `AgentInstance`，加入 `agentInstances` 字典并更新角色索引。
+    /// DAG 引擎在执行时按 `subTask.assignedRole` 通过角色索引查找实例，
+    /// 或按 `subTask.delegatedTo` 直接按 ID 查找。
+    /// - Parameter role: Agent 角色
+    /// - Returns: 新建 Agent 实例的 ID
+    @discardableResult
+    func createAgent(role: AgentRole) -> UUID {
+        let instance = AgentInstance(role: role)
+        agentInstances[instance.id] = instance
+        // 角色索引：仅在该角色尚无实例时记录（取首个）
+        if roleIndex[role] == nil {
+            roleIndex[role] = instance.id
+        }
+        return instance.id
+    }
+
+    /// v1.1 Phase B: 按 ID 获取 Agent 实例
+    /// - Parameter id: Agent 实例 ID
+    /// - Returns: 对应的 AgentInstance，不存在返回 nil
+    func agentInstance(id: UUID) -> AgentInstance? {
+        agentInstances[id]
+    }
+
+    /// v1.1 Phase B: 按角色查找已注册的 Agent 实例 ID（取首个匹配）
+    /// - Parameter role: Agent 角色
+    /// - Returns: 该角色的首个实例 ID，不存在返回 nil
+    func agentID(forRole role: AgentRole) -> UUID? {
+        roleIndex[role]
+    }
+
+    /// v1.1 Phase B: 移除指定 Agent 实例
+    /// - Parameter id: Agent 实例 ID
+    func removeAgent(id: UUID) {
+        guard let instance = agentInstances.removeValue(forKey: id) else { return }
+        // 若该实例正是角色索引中的首个，重建索引
+        if roleIndex[instance.role] == id {
+            roleIndex[instance.role] = agentInstances.first(where: { $0.value.role == instance.role })?.key
+        }
+    }
+
+    /// v1.1 Phase B: 路由子任务到对应 Agent 实例执行。
+    ///
+    /// 路由策略（按优先级）：
+    /// 1. `subTask.delegatedTo` 非空：直接路由到指定 Agent 实例
+    /// 2. `subTask.assignedRole` 非空：通过角色索引查找匹配实例
+    /// 3. 兜底：返回 nil，调用方回退到默认 executor 流程（向后兼容）
+    /// - Parameter subTask: 待路由的子任务
+    /// - Returns: 匹配的 AgentInstance，无匹配返回 nil
+    func routeToAgent(subTask: SubTask) -> AgentInstance? {
+        if let delegatedID = subTask.delegatedTo, let instance = agentInstances[delegatedID] {
+            return instance
+        }
+        if let role = subTask.assignedRole, let id = roleIndex[role], let instance = agentInstances[id] {
+            return instance
+        }
+        return nil
+    }
+
 
     /// 启动任务：创建 AgentTask、使用 planner 角色分解目标、持久化
     /// - Parameters:
@@ -183,16 +262,51 @@ final class AgentOrchestrator {
     /// - 每节点完成即检查点持久化
     /// - 失败节点用尽重试后标记 failed，触发 `onNodeFailed` 回调
     /// - 跳过 failed 节点的下游依赖（自动级联 skipped）
+    ///
+    /// v1.1 Phase B: 多 Agent 路由与委派
+    /// - `subTask.assignedRole` 非空时路由到对应 AgentInstance 执行
+    /// - `subTask.delegatedTo` 非空时通过 AgentMessageBus 发送委派请求并等待结果
+    /// - 两者均为空时回退到默认 executor 流程（向后兼容）
     /// - Throws: `OrchestratorError.noActiveTask` 或子任务执行错误
     func executeAll() async throws {
         guard let task = currentTask else {
             throw OrchestratorError.noActiveTask
         }
 
+        // v1.1 Phase B: 设置委派监听器（在 dagEngine.run 之前启动，确保订阅就绪）
+        let delegationListener = startDelegationListener()
+
+        // v1.1 Phase B: 捕获 Agent 实例快照用于角色路由（@MainActor final class 为 Sendable）
+        let agentInstancesSnapshot = self.agentInstances
+        var roleMap: [AgentRole: AgentInstance] = [:]
+        for instance in agentInstancesSnapshot.values {
+            if roleMap[instance.role] == nil {
+                roleMap[instance.role] = instance
+            }
+        }
+        let bus = self.messageBus
+
         // Task 20: 委托给 DAGExecutionEngine 并行调度
         let executor: DAGExecutionEngine.NodeExecutor = { [llmProvider, agentConfig, enableReview, maxReviewRetries] subTask in
             // executor 在非 MainActor 上下文执行（保证并行）
-            // 仅捕获 Sendable 值：llmProvider / agentConfig / enableReview / maxReviewRetries
+            // 仅捕获 Sendable 值：llmProvider / agentConfig / enableReview / maxReviewRetries / roleMap / bus
+
+            // v1.1 Phase B: 优先处理委派（delegatedTo 非空）
+            if let delegatedTo = subTask.delegatedTo {
+                return try await Self.executeViaDelegation(
+                    subTask: subTask,
+                    delegatedTo: delegatedTo,
+                    messageBus: bus
+                )
+            }
+
+            // v1.1 Phase B: 角色路由（assignedRole 非空且有匹配 AgentInstance）
+            if let role = subTask.assignedRole, let instance = roleMap[role] {
+                let result = try await instance.execute(subTask: subTask, llmProvider: llmProvider)
+                return result
+            }
+
+            // 默认 executor 流程（向后兼容）
             let systemPrompt = AgentRole.executor.systemPrompt
             let userContent = """
             子任务：\(subTask.title)
@@ -254,7 +368,140 @@ final class AgentOrchestrator {
                 throw OrchestratorError.subTaskFailed(UUID(), smError.localizedDescription)
             }
         }
+
+        // v1.1 Phase B: 停止委派监听器
+        delegationListener.cancel()
     }
+
+    // MARK: - v1.1 Phase B: 委派监听与执行
+
+    /// v1.1 Phase B: 启动委派监听器，处理来自其他 Agent 的任务委派请求。
+    ///
+    /// 监听 "delegation.requests" 主题，收到 taskDelegation 消息后：
+    /// 1. 查找目标 AgentInstance
+    /// 2. 从 currentTask 中查找 SubTask
+    /// 3. 调用 AgentInstance.execute 执行
+    /// 4. 通过 messageBus 发布 resultDelivery 回传结果
+    ///
+    /// 监听器在 executeAll 结束时被取消。
+    /// - Returns: 监听器 Task（可取消）
+    private func startDelegationListener() -> Task<Void, Never> {
+        let bus = self.messageBus
+        let llm = self.llmProvider
+
+        // 先订阅再启动 Task，确保订阅就绪后才可能收到消息
+        // subscribe 是 actor 方法，await 返回时订阅已注册
+        let subscriptionTask = Task { @MainActor [weak self] in
+            guard let self = self else { return }
+            let stream = await bus.subscribe(topic: "delegation.requests")
+            for await message in stream {
+                guard Task.isCancelled == false else { break }
+                await self.handleDelegationMessage(message, bus: bus, llmProvider: llm)
+            }
+        }
+        return subscriptionTask
+    }
+
+    /// v1.1 Phase B: 处理单条委派消息
+    ///
+    /// 查找目标 Agent 与 SubTask，执行后将结果回传至 "delegation.result.<subTaskId>" 主题。
+    /// - Parameters:
+    ///   - message: 委派消息
+    ///   - bus: 消息总线
+    ///   - llmProvider: LLM 供应商
+    private func handleDelegationMessage(_ message: AgentMessage, bus: AgentMessageBus, llmProvider: LLMProvider) async {
+        guard case .taskDelegation(let subTaskId, let from, let to, _) = message else { return }
+        guard let instance = agentInstances[to] else {
+            // 目标 Agent 不存在：回传错误结果
+            await bus.publish(
+                topic: "delegation.result.\(subTaskId)",
+                message: .resultDelivery(subTaskId: subTaskId, from: to, to: from, result: "ERROR: 目标 Agent 不存在")
+            )
+            return
+        }
+        guard let task = currentTask,
+              let sub = task.subTasks.first(where: { $0.id == subTaskId }) else {
+            await bus.publish(
+                topic: "delegation.result.\(subTaskId)",
+                message: .resultDelivery(subTaskId: subTaskId, from: to, to: from, result: "ERROR: 子任务不存在")
+            )
+            return
+        }
+
+        do {
+            let result = try await instance.execute(subTask: sub, llmProvider: llmProvider)
+            await bus.publish(
+                topic: "delegation.result.\(subTaskId)",
+                message: .resultDelivery(subTaskId: subTaskId, from: to, to: from, result: result)
+            )
+        } catch {
+            await bus.publish(
+                topic: "delegation.result.\(subTaskId)",
+                message: .resultDelivery(subTaskId: subTaskId, from: to, to: from, result: "ERROR: \(error.localizedDescription)")
+            )
+        }
+    }
+
+    /// v1.1 Phase B: 通过消息总线委派子任务执行。
+    ///
+    /// 流程：
+    /// 1. 订阅结果主题 "delegation.result.<subTaskId>"（先订阅防丢失）
+    /// 2. 发布委派请求到 "delegation.requests"
+    /// 3. 等待结果回传（含 30s 超时保护）
+    /// - Parameters:
+    ///   - subTask: 待委派的子任务
+    ///   - delegatedTo: 委派目标 Agent ID
+    ///   - messageBus: 消息总线
+    /// - Returns: 委派执行结果字符串
+    /// - Throws: 委派超时或结果为空时抛出错误
+    private static func executeViaDelegation(
+        subTask: SubTask,
+        delegatedTo: UUID,
+        messageBus: AgentMessageBus
+    ) async throws -> String {
+        let resultTopic = "delegation.result.\(subTask.id)"
+
+        // 1. 先订阅结果主题（防止结果在订阅前发布导致丢失）
+        let resultStream = await messageBus.subscribe(topic: resultTopic)
+
+        // 2. 发布委派请求
+        await messageBus.publish(
+            topic: "delegation.requests",
+            message: .taskDelegation(
+                subTaskId: subTask.id,
+                from: UUID(uuidString: "00000000-0000-0000-0000-000000000000")!,
+                to: delegatedTo,
+                description: subTask.description
+            )
+        )
+
+        // 3. 等待结果（30s 超时）
+        let result: String? = await withTaskGroup(of: String?.self) { group in
+            // 结果等待子任务
+            group.addTask {
+                for await msg in resultStream {
+                    if case .resultDelivery(_, _, _, let r) = msg {
+                        return r
+                    }
+                }
+                return nil
+            }
+            // 超时子任务
+            group.addTask {
+                try? await Task.sleep(nanoseconds: 30_000_000_000)
+                return nil
+            }
+            let first = await group.next() ?? nil
+            group.cancelAll()
+            return first
+        }
+
+        guard let finalResult = result, !finalResult.hasPrefix("ERROR:") else {
+            throw AgentInstance.AgentInstanceError.emptyResponse
+        }
+        return finalResult
+    }
+
 
     /// Task 20: 静态审查方法（不依赖 self，可在非 MainActor 上下文调用）
     /// - Parameters:

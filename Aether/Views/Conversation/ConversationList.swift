@@ -301,6 +301,8 @@ struct ConversationList: View {
                 }
             }
             .responsiveLayout()
+            // v1.1 Phase D: 动态星空背景叠加
+            .background(StarfieldBackgroundView().opacity(0.4).allowsHitTesting(false))
             .navigationTitle("以太")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
