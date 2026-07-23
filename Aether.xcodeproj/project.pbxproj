@@ -461,7 +461,7 @@
 		C83689FD93839E257ACFD730 /* HealthSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E8F4E3C1B741460B7F9F2AE /* HealthSettingsView.swift */; };
 		C88BF3A589987495965AD725 /* RecallEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB12BE1C56D87D7263701844 /* RecallEngine.swift */; };
 		CA452DC200489916F69A9AE8 /* PluginSandboxTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBC8A3FFC1DE838B49C35F63 /* PluginSandboxTests.swift */; };
-		1A2B3C4D5E6F7A8B9C0D1E2F /* PluginManifestTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B3C4D5E6F7A8B9C0D1E2F3A /* PluginManifestTests.swift */; };
+		1A2B3C4D5E6F7A8B9C0D1E2F /* PluginManifestTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DEADBEEF00AABBCCDDEEFF01 /* PluginManifestTests.swift */; };
 		3C4D5E6F7A8B9C0D1E2F3A4B /* PluginMarketplaceServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D5E6F7A8B9C0D1E2F3A4B5C /* PluginMarketplaceServiceTests.swift */; };
 		5E6F7A8B9C0D1E2F3A4B5C6D /* PluginToolAdapterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F7A8B9C0D1E2F3A4B5C6D7E /* PluginToolAdapterTests.swift */; };
 		7A8B9C0D1E2F3A4B5C6D7E8F /* PluginToolRegistryBridgeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B9C0D1E2F3A4B5C6D7E8F9A /* PluginToolRegistryBridgeTests.swift */; };
@@ -1005,7 +1005,7 @@
 		E8EFEF1D661C35FC318E27BA /* ColorTokens.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ColorTokens.swift; sourceTree = "<group>"; };
 		EAC7BFFAEA942B9FD88A6E3F /* MCPSecurityTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MCPSecurityTests.swift; sourceTree = "<group>"; };
 		EBC8A3FFC1DE838B49C35F63 /* PluginSandboxTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PluginSandboxTests.swift; sourceTree = "<group>"; };
-		2B3C4D5E6F7A8B9C0D1E2F3A /* PluginManifestTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PluginManifestTests.swift; sourceTree = "<group>"; };
+		DEADBEEF00AABBCCDDEEFF01 /* PluginManifestTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PluginManifestTests.swift; sourceTree = "<group>"; };
 		4D5E6F7A8B9C0D1E2F3A4B5C /* PluginMarketplaceServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PluginMarketplaceServiceTests.swift; sourceTree = "<group>"; };
 		8B9C0D1E2F3A4B5C6D7E8F9A /* PluginToolRegistryBridgeTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PluginToolRegistryBridgeTests.swift; sourceTree = "<group>"; };
 		CAFEBABE000000000000A001 /* PluginMarketplaceViewTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PluginMarketplaceViewTests.swift; sourceTree = "<group>"; };
@@ -2021,7 +2021,7 @@
 			children = (
 				0B365152093855F97BB8E4CA /* PluginManagerTests.swift */,
 				EBC8A3FFC1DE838B49C35F63 /* PluginSandboxTests.swift */,
-				2B3C4D5E6F7A8B9C0D1E2F3A /* PluginManifestTests.swift */,
+				DEADBEEF00AABBCCDDEEFF01 /* PluginManifestTests.swift */,
 				4D5E6F7A8B9C0D1E2F3A4B5C /* PluginMarketplaceServiceTests.swift */,
 				6F7A8B9C0D1E2F3A4B5C6D7E /* PluginToolAdapterTests.swift */,
 				8B9C0D1E2F3A4B5C6D7E8F9A /* PluginToolRegistryBridgeTests.swift */,
