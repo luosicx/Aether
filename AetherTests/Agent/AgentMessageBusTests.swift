@@ -140,13 +140,16 @@ final class AgentMessageBusTests: XCTestCase {
         let bus = AgentMessageBus()
         let topic = "test.count"
 
-        XCTAssertEqual(await bus.subscriberCount(topic: topic), 0)
+        let count0 = await bus.subscriberCount(topic: topic)
+        XCTAssertEqual(count0, 0)
 
         _ = await bus.subscribe(topic: topic)
-        XCTAssertEqual(await bus.subscriberCount(topic: topic), 1)
+        let count1 = await bus.subscriberCount(topic: topic)
+        XCTAssertEqual(count1, 1)
 
         _ = await bus.subscribe(topic: topic)
-        XCTAssertEqual(await bus.subscriberCount(topic: topic), 2)
+        let count2 = await bus.subscriberCount(topic: topic)
+        XCTAssertEqual(count2, 2)
     }
 
     /// 未使用的 topic 计数应为 0
@@ -165,13 +168,17 @@ final class AgentMessageBusTests: XCTestCase {
         _ = await bus.subscribe(topic: "topic.A")
         _ = await bus.subscribe(topic: "topic.B")
 
-        XCTAssertEqual(await bus.subscriberCount(topic: "topic.A"), 1)
-        XCTAssertEqual(await bus.subscriberCount(topic: "topic.B"), 1)
+        let countA1 = await bus.subscriberCount(topic: "topic.A")
+        XCTAssertEqual(countA1, 1)
+        let countB1 = await bus.subscriberCount(topic: "topic.B")
+        XCTAssertEqual(countB1, 1)
 
         await bus.reset()
 
-        XCTAssertEqual(await bus.subscriberCount(topic: "topic.A"), 0)
-        XCTAssertEqual(await bus.subscriberCount(topic: "topic.B"), 0)
+        let countA0 = await bus.subscriberCount(topic: "topic.A")
+        XCTAssertEqual(countA0, 0)
+        let countB0 = await bus.subscriberCount(topic: "topic.B")
+        XCTAssertEqual(countB0, 0)
     }
 
     // MARK: - AgentMessage 类型
@@ -281,7 +288,8 @@ final class AgentMessageBusTests: XCTestCase {
         let topic = "test.autoRemoval"
 
         let stream = await bus.subscribe(topic: topic)
-        XCTAssertEqual(await bus.subscriberCount(topic: topic), 1, "订阅后应有 1 个订阅者")
+        let countAfterSub = await bus.subscriberCount(topic: topic)
+        XCTAssertEqual(countAfterSub, 1, "订阅后应有 1 个订阅者")
 
         // 在子任务中消费 stream，取消任务以触发 onTermination
         let consumerTask = Task {
@@ -302,13 +310,16 @@ final class AgentMessageBusTests: XCTestCase {
         let topic = "test.afterReset"
 
         _ = await bus.subscribe(topic: topic)
-        XCTAssertEqual(await bus.subscriberCount(topic: topic), 1)
+        let countBeforeReset = await bus.subscriberCount(topic: topic)
+        XCTAssertEqual(countBeforeReset, 1)
 
         await bus.reset()
-        XCTAssertEqual(await bus.subscriberCount(topic: topic), 0, "reset 后订阅者应清空")
+        let countAfterReset = await bus.subscriberCount(topic: topic)
+        XCTAssertEqual(countAfterReset, 0, "reset 后订阅者应清空")
 
         let stream = await bus.subscribe(topic: topic)
-        XCTAssertEqual(await bus.subscriberCount(topic: topic), 1, "reset 后应能重新订阅")
+        let countAfterResub = await bus.subscriberCount(topic: topic)
+        XCTAssertEqual(countAfterResub, 1, "reset 后应能重新订阅")
 
         await bus.publish(topic: topic, message: .statusUpdate(agentId: UUID(), status: .idle))
 
@@ -322,7 +333,8 @@ final class AgentMessageBusTests: XCTestCase {
         let topic = ""
 
         let stream = await bus.subscribe(topic: topic)
-        XCTAssertEqual(await bus.subscriberCount(topic: topic), 1, "空 topic 应可订阅")
+        let countEmpty = await bus.subscriberCount(topic: topic)
+        XCTAssertEqual(countEmpty, 1, "空 topic 应可订阅")
 
         await bus.publish(topic: topic, message: .statusUpdate(agentId: UUID(), status: .idle))
 
