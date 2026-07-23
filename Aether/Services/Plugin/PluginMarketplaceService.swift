@@ -89,7 +89,7 @@ final class PluginMarketplaceService {
 
             // 签名校验（配置了公钥且 manifest 带 signature 时）
             if let pubKey = publicKeyBase64, let signature = manifest.signature {
-                guard verifySignature(data: data, signature: signature, publicKeyBase64: pubKey) else {
+                guard Self.verifySignature(data: data, signature: signature, publicKeyBase64: pubKey) else {
                     throw NSError(domain: "PluginMarketplaceService", code: 2,
                                   userInfo: [NSLocalizedDescriptionKey: "插件 \(manifest.id) 签名校验失败"])
                 }

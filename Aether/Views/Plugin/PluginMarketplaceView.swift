@@ -302,7 +302,7 @@ struct PluginDetailView: View {
     @ViewBuilder
     private func infoRow(_ key: String, _ value: String) -> some View {
         HStack {
-            Text(key, comment: "")
+            Text(verbatim: key)
                 .font(.captionAI)
                 .foregroundStyle(.secondary)
             Spacer()
