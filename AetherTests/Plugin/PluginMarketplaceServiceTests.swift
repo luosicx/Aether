@@ -116,7 +116,7 @@ final class PluginMarketplaceServiceTests: XCTestCase {
     // MARK: - fetchPluginList（URLProtocol mock）
 
     /// fetchPluginList 应从远程 JSON 解码插件列表
-    func testFetchPluginListWithMockURLProtocol() async throws {
+    func testFetchPluginListWithPluginMockURLProtocol() async throws {
         let plugins = [
             makeManifest(id: "fetch-1", name: "Fetched Plugin", version: "1.0.0"),
         ]
@@ -298,11 +298,11 @@ final class PluginMarketplaceServiceTests: XCTestCase {
     /// downloadPlugin HTTP 404 应抛出错误
     func testDownloadPluginHTTP404() async {
         let downloadURL = URL(string: "https://mock.example.com/404-\(UUID().uuidString.prefix(8)).js")!
-        MockURLProtocol.mockData[downloadURL] = Data()
-        MockURLProtocol.mockStatusCode[downloadURL] = 404
+        PluginMockURLProtocol.mockData[downloadURL] = Data()
+        PluginMockURLProtocol.mockStatusCode[downloadURL] = 404
 
         let config = URLSessionConfiguration.ephemeral
-        config.protocolClasses = [MockURLProtocol.self]
+        config.protocolClasses = [PluginMockURLProtocol.self]
         let session = URLSession(configuration: config)
 
         let manifest = PluginManifest(
@@ -320,18 +320,18 @@ final class PluginMarketplaceServiceTests: XCTestCase {
             XCTAssertTrue(error.localizedDescription.contains("404"), "错误信息应包含 404")
         }
 
-        MockURLProtocol.mockStatusCode.removeValue(forKey: downloadURL)
-        MockURLProtocol.mockData.removeValue(forKey: downloadURL)
+        PluginMockURLProtocol.mockStatusCode.removeValue(forKey: downloadURL)
+        PluginMockURLProtocol.mockData.removeValue(forKey: downloadURL)
     }
 
     /// downloadPlugin HTTP 500 应抛出错误
     func testDownloadPluginHTTP500() async {
         let downloadURL = URL(string: "https://mock.example.com/500-\(UUID().uuidString.prefix(8)).js")!
-        MockURLProtocol.mockData[downloadURL] = Data()
-        MockURLProtocol.mockStatusCode[downloadURL] = 500
+        PluginMockURLProtocol.mockData[downloadURL] = Data()
+        PluginMockURLProtocol.mockStatusCode[downloadURL] = 500
 
         let config = URLSessionConfiguration.ephemeral
-        config.protocolClasses = [MockURLProtocol.self]
+        config.protocolClasses = [PluginMockURLProtocol.self]
         let session = URLSession(configuration: config)
 
         let manifest = PluginManifest(
@@ -349,8 +349,8 @@ final class PluginMarketplaceServiceTests: XCTestCase {
             XCTAssertTrue(error.localizedDescription.contains("500"), "错误信息应包含 500")
         }
 
-        MockURLProtocol.mockStatusCode.removeValue(forKey: downloadURL)
-        MockURLProtocol.mockData.removeValue(forKey: downloadURL)
+        PluginMockURLProtocol.mockStatusCode.removeValue(forKey: downloadURL)
+        PluginMockURLProtocol.mockData.removeValue(forKey: downloadURL)
     }
 
     // MARK: - downloadPlugin 进度更新
@@ -363,11 +363,11 @@ final class PluginMarketplaceServiceTests: XCTestCase {
         let downloadURL = URL(string: "https://mock.example.com/progress-\(pluginID).js")!
 
         // 配置延迟 mock 以便观察下载中状态
-        MockURLProtocol.mockData[downloadURL] = jsData
-        MockURLProtocol.mockDelay[downloadURL] = 0.3
+        PluginMockURLProtocol.mockData[downloadURL] = jsData
+        PluginMockURLProtocol.mockDelay[downloadURL] = 0.3
 
         let config = URLSessionConfiguration.ephemeral
-        config.protocolClasses = [MockURLProtocol.self]
+        config.protocolClasses = [PluginMockURLProtocol.self]
         let session = URLSession(configuration: config)
 
         let manifest = PluginManifest(
@@ -400,8 +400,8 @@ final class PluginMarketplaceServiceTests: XCTestCase {
 
         // 清理
         cleanupPluginDirectory(for: pluginID)
-        MockURLProtocol.mockData.removeValue(forKey: downloadURL)
-        MockURLProtocol.mockDelay.removeValue(forKey: downloadURL)
+        PluginMockURLProtocol.mockData.removeValue(forKey: downloadURL)
+        PluginMockURLProtocol.mockDelay.removeValue(forKey: downloadURL)
     }
 
     // MARK: - fetchPluginList 错误处理
@@ -438,7 +438,7 @@ final class PluginMarketplaceServiceTests: XCTestCase {
 
         // 更新 mock 数据为有效 JSON
         let validPlugins = [makeManifest(id: "recovery", name: "Recovery")]
-        MockURLProtocol.mockData[mockURL] = try JSONEncoder().encode(validPlugins)
+        PluginMockURLProtocol.mockData[mockURL] = try JSONEncoder().encode(validPlugins)
 
         // 第二次调用：成功
         try await service.fetchPluginList()
@@ -492,22 +492,22 @@ final class PluginMarketplaceServiceTests: XCTestCase {
         return service
     }
 
-    /// 构造使用 MockURLProtocol 的 URLSession
+    /// 构造使用 PluginMockURLProtocol 的 URLSession
     private func makeMockSession(for url: URL, data: Data, error: Error? = nil) -> URLSession {
-        MockURLProtocol.mockData[url] = data
+        PluginMockURLProtocol.mockData[url] = data
         if let error = error {
-            MockURLProtocol.mockError[url] = error
+            PluginMockURLProtocol.mockError[url] = error
         }
         let config = URLSessionConfiguration.ephemeral
-        config.protocolClasses = [MockURLProtocol.self]
+        config.protocolClasses = [PluginMockURLProtocol.self]
         return URLSession(configuration: config)
     }
 }
 
-// MARK: - MockURLProtocol
+// MARK: - PluginMockURLProtocol
 
 /// 用于 mock 网络请求的 URLProtocol 实现。
-final class MockURLProtocol: URLProtocol {
+final class PluginMockURLProtocol: URLProtocol {
     /// mock 响应数据，key 为请求 URL
     static var mockData: [URL: Data] = [:]
     /// mock 错误，key 为请求 URL
