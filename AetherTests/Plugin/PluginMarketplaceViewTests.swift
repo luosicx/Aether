@@ -119,9 +119,9 @@ final class PluginMarketplaceViewTests: XCTestCase {
     private func makeServiceWithPlugins(_ plugins: [PluginManifest]) async throws -> PluginMarketplaceService {
         let jsonData = try JSONEncoder().encode(plugins)
         let mockURL = URL(string: "https://mock.example.com/marketplace-view-registry.json")!
-        MockURLProtocol.mockData[mockURL] = jsonData
+        PluginMockURLProtocol.mockData[mockURL] = jsonData
         let config = URLSessionConfiguration.ephemeral
-        config.protocolClasses = [MockURLProtocol.self]
+        config.protocolClasses = [PluginMockURLProtocol.self]
         let session = URLSession(configuration: config)
         let service = PluginMarketplaceService(registryURL: mockURL, urlSession: session)
         try await service.fetchPluginList()
