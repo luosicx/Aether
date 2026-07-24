@@ -68,7 +68,7 @@ jobs:
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-ios,aarch64-apple-ios-sim,aarch64-apple-darwin
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim,aarch64-apple-darwin,x86_64-apple-darwin,x86_64-apple-ios-sim
 
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
@@ -82,6 +82,8 @@ jobs:
           cargo rustc -p aether-core-ffi --release --target aarch64-apple-ios --crate-type staticlib
           cargo rustc -p aether-core-ffi --release --target aarch64-apple-ios-sim --crate-type staticlib
           cargo rustc -p aether-core-ffi --release --target aarch64-apple-darwin --crate-type staticlib
+          cargo rustc -p aether-core-ffi --release --target x86_64-apple-darwin --crate-type staticlib
+          cargo rustc -p aether-core-ffi --release --target x86_64-apple-ios-sim --crate-type staticlib
 
       - name: Create xcframework
         run: |
@@ -90,7 +92,11 @@ jobs:
             -headers Packages/AetherCore/Sources/AetherRust/include \
             -library rust/target/aarch64-apple-ios-sim/release/libaether_core_ffi.a \
             -headers Packages/AetherCore/Sources/AetherRust/include \
+            -library rust/target/x86_64-apple-ios-sim/release/libaether_core_ffi.a \
+            -headers Packages/AetherCore/Sources/AetherRust/include \
             -library rust/target/aarch64-apple-darwin/release/libaether_core_ffi.a \
+            -headers Packages/AetherCore/Sources/AetherRust/include \
+            -library rust/target/x86_64-apple-darwin/release/libaether_core_ffi.a \
             -headers Packages/AetherCore/Sources/AetherRust/include \
             -output Packages/AetherCore/aether_core.xcframework
 
