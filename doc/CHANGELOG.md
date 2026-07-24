@@ -6,6 +6,8 @@
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-07-24
+
 ### v1.1 智能体增强完善（MCP 生态共建 + Agent 多步协作 + 插件市场 MVP + 动态星空背景）
 
 #### Added — Phase A: MCP Server 反向暴露

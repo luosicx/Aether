@@ -125,7 +125,7 @@ AetherUITests/              # UI 测试（7 文件 / 30 用例）
 
 | 版本 | 预计时间 | 关键交付 |
 |------|----------|----------|
-| v1.1 | 2026 Q4 | 智能体增强完善（MCP 生态共建 + Agent 多步协作 + 插件市场 MVP） |
+| v1.1 | 2026-07-24 已发布 | 智能体增强完善（MCP 生态共建 + Agent 多步协作 + 插件市场 MVP + 动态星空背景） |
 | v1.2 | 2027 Q1 | 设计升级（AnimationTokens + AetherIcons + 响应式布局 + 动态星空） |
 | v1.3 | 2027 Q2 | 端侧多模态 Phase 1（VLM 图像理解 + 跨平台 OCR + Whisper ASR） |
 | v1.5 | 2027 Q3 | 端侧多模态 Phase 2（自然 TTS + 语音克隆 + SD Mobile 图像生成） |
