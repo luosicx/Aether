@@ -54,10 +54,59 @@ jobs:
           fi
 
   # ============================================================
+  # Rust Apple xcframework：构建 iOS/macOS 共用的 Rust 静态库
+  # build-ios / build-macos 依赖此产物
+  # ============================================================
+  rust-apple:
+    name: Apple xcframework
+    needs: meta
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim,aarch64-apple-darwin
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+          key: apple-xcframework-release
+
+      - name: Build static libs
+        working-directory: rust
+        run: |
+          cargo rustc -p aether-core-ffi --release --target aarch64-apple-ios --crate-type staticlib
+          cargo rustc -p aether-core-ffi --release --target aarch64-apple-ios-sim --crate-type staticlib
+          cargo rustc -p aether-core-ffi --release --target aarch64-apple-darwin --crate-type staticlib
+
+      - name: Create xcframework
+        run: |
+          xcodebuild -create-xcframework \
+            -library rust/target/aarch64-apple-ios/release/libaether_core_ffi.a \
+            -headers Packages/AetherCore/Sources/AetherRust/include \
+            -library rust/target/aarch64-apple-ios-sim/release/libaether_core_ffi.a \
+            -headers Packages/AetherCore/Sources/AetherRust/include \
+            -library rust/target/aarch64-apple-darwin/release/libaether_core_ffi.a \
+            -headers Packages/AetherCore/Sources/AetherRust/include \
+            -output Packages/AetherCore/aether_core.xcframework
+
+      - name: Upload xcframework artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: aether-core-xcframework
+          path: Packages/AetherCore
+          if-no-files-found: error
+          retention-days: 7
+
+  # ============================================================
   # iOS: 构建 iOS Simulator .app（无签名，仅用于模拟器调试）
   # ============================================================
   build-ios:
-    needs: meta
+    needs: [meta, rust-apple]
     runs-on: macos-15
     timeout-minutes: 40
     steps:
@@ -67,6 +116,12 @@ jobs:
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: 'latest'
+
+      - name: Download xcframework
+        uses: actions/download-artifact@v7
+        with:
+          name: aether-core-xcframework
+          path: Packages/AetherCore
 
       - name: Setup iOS Simulator
         run: bash scripts/ci-setup-simulator.sh
@@ -104,7 +159,7 @@ jobs:
   # macOS: 使用 scripts/build-dmg.sh 产出 .dmg（根据 secrets 自动选择签名/未签名模式）
   # ============================================================
   build-macos:
-    needs: meta
+    needs: [meta, rust-apple]
     runs-on: macos-15
     timeout-minutes: 45
     outputs:
@@ -116,6 +171,12 @@ jobs:
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: 'latest'
+
+      - name: Download xcframework
+        uses: actions/download-artifact@v7
+        with:
+          name: aether-core-xcframework
+          path: Packages/AetherCore
 
       - name: Determine signing mode
         id: sign-mode
@@ -346,7 +407,7 @@ jobs:
   # 发布：下载所有构建产物并创建 GitHub Release
   # ============================================================
   publish-release:
-    needs: [meta, build-ios, build-macos, build-android, build-windows, build-bff, build-source]
+    needs: [meta, rust-apple, build-ios, build-macos, build-android, build-windows, build-bff, build-source]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
