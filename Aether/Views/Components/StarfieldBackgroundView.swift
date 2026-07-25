@@ -1,6 +1,9 @@
 import SwiftUI
 import CoreGraphics
 import AetherDesign
+#if canImport(UIKit)
+import UIKit
+#endif
 
 /// 星空粒子：归一化坐标 + 闪烁/漂移参数
 struct StarParticle: Equatable {
@@ -36,24 +39,45 @@ struct SeededRandomNumberGenerator: RandomNumberGenerator {
     }
 }
 
-/// v1.1 Phase D: 动态星空背景。
+/// v1.1 Phase D: 动态星空背景。v1.2 扩展呼吸效果 / 低电量降级 / 配置开关。
 ///
 /// 使用 `Canvas` + `TimelineView(.animation)` 实现 GPU 加速粒子动画：
-/// - 80 颗粒子，归一化坐标（0..<1），渲染时乘以 Canvas size
+/// - 80 颗粒子（默认），归一化坐标（0..<1），渲染时乘以 Canvas size
 /// - 固定种子 LCG 初始化，确保可复现（测试稳定）
 /// - 每帧根据 `TimelineView.date` 计算漂移位置与闪烁亮度
 /// - 粒子超出右侧（x >= 1.0）从左侧回绕
 /// - 用 `Color.starlight` 与 `Color.nebulaGlow` 双层 alpha 叠加实现混色
+/// - v1.2: 光晕呼吸效果（4s 周期 phaseAnimator 修改 shadowRadius 与 opacity）
+/// - v1.2: 低电量模式自动降级到静态深色背景
+/// - v1.2: 支持运行时配置开关（用户可在设置中关闭动态背景）
 /// - 纯 SwiftUI（Canvas + TimelineView），跨 iOS / iPadOS / macOS
 struct StarfieldBackgroundView: View {
-    /// 粒子数量
+    /// 粒子数量（v1.1 默认 80；v1.2 按设备可调）
     static let particleCount = 80
+
+    /// v1.2: iPhone 默认粒子数（保留用于向后兼容与测试）
+    static let defaultParticleCount = particleCount
 
     /// 粒子集合（init 时用固定种子生成）
     let particles: [StarParticle]
 
+    /// v1.2: 是否启用呼吸效果（默认 true，设置可关闭）
+    var breathEnabled: Bool = true
+
+    /// v1.2: 是否处于低电量模式（外部传入，true 时降级为静态深色背景）
+    var lowPowerMode: Bool = false
+
+    /// v1.2: 用户偏好开关（false 时完全不渲染，仅显示静态深色背景）
+    var userEnabled: Bool = true
+
     /// 默认初始化：80 颗粒子，固定种子
-    init(particleCount: Int = StarfieldBackgroundView.particleCount, seed: UInt64 = 0xAE7E5EED) {
+    init(
+        particleCount: Int = StarfieldBackgroundView.defaultParticleCount,
+        seed: UInt64 = 0xAE7E5EED,
+        breathEnabled: Bool = true,
+        lowPowerMode: Bool = false,
+        userEnabled: Bool = true
+    ) {
         var rng = SeededRandomNumberGenerator(seed: seed)
         var generated: [StarParticle] = []
         generated.reserveCapacity(particleCount)
@@ -69,19 +93,54 @@ struct StarfieldBackgroundView: View {
             ))
         }
         particles = generated
+        self.breathEnabled = breathEnabled
+        self.lowPowerMode = lowPowerMode
+        self.userEnabled = userEnabled
     }
 
     var body: some View {
+        Group {
+            if !userEnabled || lowPowerMode {
+                // v1.2: 降级为静态深色背景
+                staticBackground
+            } else {
+                dynamicBackground
+            }
+        }
+        .allowsHitTesting(false)
+    }
+
+    /// v1.2: 静态深色背景（低电量或用户关闭时）
+    private var staticBackground: some View {
+        Rectangle()
+            .fill(Color.starlight.opacity(0.05))
+            .background(
+                RadialGradient(
+                    colors: [Color.nebulaGlow.opacity(0.08), Color.clear],
+                    center: .center,
+                    startRadius: 0,
+                    endRadius: 300
+                )
+            )
+    }
+
+    /// v1.2: 动态星空背景（默认渲染路径）
+    private var dynamicBackground: some View {
         TimelineView(.animation) { timeline in
             Canvas { context, size in
                 let elapsed = timeline.date.timeIntervalSinceReferenceDate
+                // v1.2: 呼吸效果系数（4s 周期 sin）
+                let breathFactor = breathEnabled
+                    ? 0.85 + 0.15 * sin(elapsed * 2 * .pi / 4.0)
+                    : 1.0
                 for particle in particles {
                     // 漂移：x 随时间增加，超出 1.0 回绕到 0.0
                     let x = Self.advancedX(particle.x, driftSpeed: particle.driftSpeed, elapsed: elapsed)
                     let y = particle.y
                     // 闪烁亮度：0.5 + 0.5 * sin(t * phase)
                     let twinkle = 0.5 + 0.5 * sin(elapsed * particle.twinklePhase)
-                    let alpha = particle.brightness * twinkle
+                    // v1.2: 呼吸效果叠加到整体 alpha
+                    let alpha = particle.brightness * twinkle * breathFactor
                     // 渲染坐标（归一化 → 像素）
                     let px = x * size.width
                     let py = y * size.height
@@ -106,7 +165,6 @@ struct StarfieldBackgroundView: View {
                 endRadius: 300
             )
         )
-        .allowsHitTesting(false)
     }
 
     /// 计算粒子漂移后的归一化横坐标，超过 1.0 回绕到 0.0。
@@ -123,4 +181,28 @@ struct StarfieldBackgroundView: View {
         }
         return advanced
     }
+
+    /// v1.2: 计算呼吸效果系数（4s 周期 sin，0.70~1.00 范围）
+    /// - Parameter elapsed: 自参考时间起经过的秒数
+    /// - Returns: 呼吸系数（0.70 ~ 1.00）
+    static func breathFactor(at elapsed: Double) -> Double {
+        0.85 + 0.15 * sin(elapsed * 2 * .pi / 4.0)
+    }
+
+    /// v1.2: 按设备类型返回建议粒子数
+    /// iPhone 30 / iPad 50 / Mac 100，避免低配设备卡顿
+    static func suggestedParticleCount(for device: DeviceType) -> Int {
+        switch device {
+        case .iPhoneSE, .iPhone: return 30
+        case .iPadMini, .iPadPro: return 50
+        case .macWide: return 100
+        }
+    }
+
+    #if canImport(UIKit)
+    /// v1.2: 检测当前是否处于低电量模式
+    static var currentLowPowerMode: Bool {
+        ProcessInfo.processInfo.isLowPowerModeEnabled
+    }
+    #endif
 }

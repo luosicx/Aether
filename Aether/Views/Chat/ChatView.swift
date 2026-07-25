@@ -76,7 +76,8 @@ struct ChatView: View {
                 Button {
                     createNewConversation()
                 } label: {
-                    Image(systemName: "plus")
+                    // v1.2: 使用 AetherIcon.newConversation 替换 SF Symbol plus
+                    AetherIcon.newConversation.systemImage
                         .fontWeight(.medium)
                 }
                 .accessibilityLabel("新建对话")
@@ -122,7 +123,8 @@ struct ChatView: View {
                 ToolbarItem(placement: .topBarLeadingCompat) {
                     if horizontalSizeClass != .regular {
                         Button { showConversationList = true } label: {
-                            Image(systemName: "list.bullet")
+                            // v1.2: 使用 AetherIcon.bubble 替换 SF Symbol list.bullet
+                            AetherIcon.bubble.systemImage
                                 .font(.titleAI)
                                 .foregroundStyle(.secondary)
                         }
@@ -135,7 +137,8 @@ struct ChatView: View {
                     Button {
                         showKnowledgeBase = true
                     } label: {
-                        Image(systemName: "folder.badge.plus")
+                        // v1.2: 使用 AetherIcon.knowledge 替换 SF Symbol folder.badge.plus
+                        AetherIcon.knowledge.systemImage
                             .font(.titleAI)
                             .foregroundStyle(.secondary)
                     }
@@ -143,7 +146,8 @@ struct ChatView: View {
                     .accessibilityHint("打开知识库管理")
                     .accessibilityIdentifier("knowledgeBaseToolbarButton")
                     Button { showSettings = true } label: {
-                        Image(systemName: "gearshape")
+                        // v1.2: 使用 AetherIcon.settings 替换 SF Symbol gearshape
+                        AetherIcon.settings.systemImage
                             .font(.titleAI)
                             .foregroundStyle(.secondary)
                     }

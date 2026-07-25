@@ -6,6 +6,48 @@
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-07-25
+
+### v1.2 设计与体验升级 Phase 1（AnimationTokens 全面应用 + AetherIcons 扩展 + 响应式布局 + 星空背景扩展）
+
+#### Added — Phase A: AnimationTokens 全面应用
+- **新增动画 token**：`AnimationTokens.bubbleLiquidIn`（spring 0.5/0.7 液态进入）/ `bubbleLiquidOut`（向右滑出）/ `interactiveSpring`（按钮按压响应 0.3/0.75）/ `scrollParallax`（视差滚动 0.4s）/ `themeSmooth`（主题平滑过渡 0.3s）/ `starBreath`（4s 周期呼吸）/ `reducedMotion`（低能力降级 0.15s）共 7 个 token。
+- **AnyTransition 扩展**：新增 `bubbleLiquidIn`（scale+opacity insertion / trailing+opacity removal）与 `themeSmooth`（opacity）两个便捷过渡，便于视图层引用。
+- **ThemeManager 主题切换过渡**：`switchTheme(_:)` 与 `switchTheme(byName:)` 用 `withAnimation(AnimationTokens.themeSmooth)` 包裹赋值，SwiftUI 自动对依赖 `currentTheme` 的视图做 0.3s 平滑过渡，避免色板硬切闪烁。
+
+#### Added — Phase B: Aether 专属图标集扩展
+- **AetherIconCategory 分类**：新增 `navigation` / `feature` / `status` / `health` 四大分类枚举，所有图标带 `category` 属性归属。
+- **新增 11 个图标**：导航类 `settings` / `history` / `newConversation` / `search`；功能类 `modelDownload` / `agentCollaboration` / `marketplace`；状态类 `syncing` / `offline` / `loading` / `error`。图标集总数从 18 增至 29，覆盖 4 大类。
+- **Image(aetherIcon:) 便捷初始化器**：新增 `Image` 扩展，提供 `Image(aetherIcon: .conversation)` API，便于视图层引用 AetherIcons 资源。
+
+#### Added — Phase C: 动态星空背景扩展
+- **光晕呼吸效果**：`StarfieldBackgroundView` 新增 `breathEnabled` 参数（默认 true），用 4s 周期 sin 函数（0.85 + 0.15 * sin(2πt/4)）调整整体 alpha，呼吸系数范围 [0.70, 1.00]。
+- **低电量降级**：新增 `lowPowerMode` 参数，true 时降级为静态深色背景（仅保留 `RadialGradient` 星云感），iOS 上检测 `ProcessInfo.processInfo.isLowPowerModeEnabled`。
+- **用户配置开关**：新增 `userEnabled` 参数，false 时降级为静态深色背景，便于设置页关闭动态背景。
+- **设备粒子数建议**：新增 `suggestedParticleCount(for:)` 静态方法，iPhone 30 / iPad 50 / Mac 100，避免低配设备卡顿。
+- **breathFactor(at:) 静态方法**：暴露呼吸系数计算逻辑，便于测试与外部复用。
+
+#### Added — Phase D: 视图层适配
+- **消息气泡液态进出**：`MessageListView` 消息气泡 transition 升级为 `.asymmetric(insertion: .scale.combined(with: .opacity), removal: .move(edge: .trailing).combined(with: .opacity))`，配合 `AnimationTokens.bubbleLiquidIn` 实现"Aether 式"液态出现动效；保留 reduceMotion 分支为 `.opacity`。
+- **SF Symbols 替换为 AetherIcons**：在 `ChatView` / `ConversationList` / `MessageListView` / `PluginMarketplaceView` / `MCPSettingsView` / `InterventionPanel` / `SettingsView` 等 7 个视图中替换 10 处 `Image(systemName:)` 为 `AetherIcon.xxx.systemImage`，覆盖 search/newConversation/bubble/knowledge/settings/shortcut/tool/error/shield/exportIcon/modelDownload 等关键场景。
+
+#### Added — Phase E: 响应式布局扩展
+- **LayoutSize 枚举**：新增 `compact` / `medium` / `large` / `xl` 四档尺寸档位，按 `horizontalSizeClass` 与实际宽度联合判定；提供 `bubbleMaxWidth` / `toolbarCollapseToMenu` / `inputBarSingleLine` / `enableThreeColumn` 属性，便于视图层精细适配。
+- **LayoutStrategy 协议**：抽象布局决策（`supportsSplitView` / `splitViewStyle` / `persistentThirdColumn`），避免 iPad 分栏与 macOS 三栏共用代码相互耦合。
+- **DefaultLayoutStrategy**：基于 `LayoutSize` 的默认实现，compact 不分栏 / medium balanced / large+xl prominentDetail，仅 xl 常驻第三栏。
+- **SplitViewStyle 枚举**：`.automatic` / `.balanced` / `.prominentDetail` 三种分栏样式。
+- **UserInterfaceSizeClass**：本地封装，避免依赖 SwiftUI 平台特定 API。
+
+#### Added — Phase F: 测试补充
+- **AnimationTokens 测试**：新增 9 个测试覆盖 v1.2 新增 7 个 token 与 2 个 AnyTransition 扩展。
+- **AetherIcons 测试**：扩展 14 个测试覆盖 v1.2 新增 11 个图标的 fallbackSystemName / accessibilityLabel 契约、AetherIconCategory 4 大分类归属、Image(aetherIcon:) 初始化器不崩溃；更新 case 数量从 18 → 29。
+- **ResponsiveLayout 测试**：新建 `ResponsiveLayoutTests.swift`，覆盖 LayoutSize.resolve 判定 / bubbleMaxWidth / toolbarCollapse / inputBarSingleLine / enableThreeColumn / DeviceType 回归 / DefaultLayoutStrategy 决策 / SplitViewStyle 等价性 / UserInterfaceSizeClass 等 25 个测试。
+- **StarfieldBackgroundView 测试**：新增 13 个测试覆盖 breathFactor 边界值（t=0/1/3s）/ 范围 [0.70,1.00] / 4s 周期可重复、默认参数 / 自定义参数 / suggestedParticleCount / defaultParticleCount 兼容性。
+
+#### Changed
+- **测试规模**：UT 从 3130 增至 3193（+63 用例），测试文件从 181 增至 182（+1 文件 ResponsiveLayoutTests）。
+- **AetherDesign 模块**：新增 LayoutSize / LayoutStrategy / SplitViewStyle / DefaultLayoutStrategy / UserInterfaceSizeClass / AetherIconCategory 6 个 public 类型，扩展 AnimationTokens 7 个 token、AetherIcon 11 个 case、AnyTransition 2 个静态扩展。
+
 ## [1.1.0] - 2026-07-24
 
 ### v1.1 智能体增强完善（MCP 生态共建 + Agent 多步协作 + 插件市场 MVP + 动态星空背景）

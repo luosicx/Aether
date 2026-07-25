@@ -45,7 +45,8 @@ struct InterventionPanel: View {
         VStack(alignment: .leading, spacing: Spacing.md) {
             // 头部：失败提示
             HStack(spacing: Spacing.sm) {
-                Image(systemName: "exclamationmark.triangle.fill")
+                // v1.2: 使用 AetherIcon.error 替换 SF Symbol
+                AetherIcon.error.systemImage
                     .foregroundColor(.red)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {

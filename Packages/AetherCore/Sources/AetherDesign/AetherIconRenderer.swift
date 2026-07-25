@@ -34,6 +34,18 @@ public struct AetherIconRenderer: View {
             case .mcpSymbol: placeholderSystemImage
             case .tool: placeholderSystemImage
             case .exportIcon: placeholderSystemImage
+            // v1.2 新增图标：暂用 SF Symbol 兜底渲染，专属 SVG 资源就绪后可替换为自定义 Path
+            case .settings: placeholderSystemImage
+            case .history: placeholderSystemImage
+            case .newConversation: placeholderSystemImage
+            case .search: placeholderSystemImage
+            case .modelDownload: placeholderSystemImage
+            case .agentCollaboration: placeholderSystemImage
+            case .marketplace: placeholderSystemImage
+            case .syncing: placeholderSystemImage
+            case .offline: placeholderSystemImage
+            case .loading: placeholderSystemImage
+            case .error: placeholderSystemImage
             }
         }
         .frame(width: size, height: size)

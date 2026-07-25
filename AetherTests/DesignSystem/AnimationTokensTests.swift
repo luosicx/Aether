@@ -77,4 +77,51 @@ final class AnimationTokensTests: XCTestCase {
     func testTwinkleDurationIs2Seconds() {
         _ = AnimationTokens.twinkle
     }
+
+    // MARK: - v1.2 新增 token
+
+    /// v1.2: bubbleLiquidIn token 应存在且可解析
+    func testBubbleLiquidInTokenResolves() {
+        _ = AnimationTokens.bubbleLiquidIn
+    }
+
+    /// v1.2: bubbleLiquidOut token 应存在且可解析
+    func testBubbleLiquidOutTokenResolves() {
+        _ = AnimationTokens.bubbleLiquidOut
+    }
+
+    /// v1.2: interactiveSpring token 应存在且可解析
+    func testInteractiveSpringTokenResolves() {
+        _ = AnimationTokens.interactiveSpring
+    }
+
+    /// v1.2: scrollParallax token 应存在且可解析
+    func testScrollParallaxTokenResolves() {
+        _ = AnimationTokens.scrollParallax
+    }
+
+    /// v1.2: themeSmooth token 应存在且可解析
+    func testThemeSmoothTokenResolves() {
+        _ = AnimationTokens.themeSmooth
+    }
+
+    /// v1.2: starBreath token 应存在且可解析
+    func testStarBreathTokenResolves() {
+        _ = AnimationTokens.starBreath
+    }
+
+    /// v1.2: reducedMotion token 应存在且可解析
+    func testReducedMotionTokenResolves() {
+        _ = AnimationTokens.reducedMotion
+    }
+
+    /// v1.2: AnyTransition.bubbleLiquidIn 应可解析
+    func testAnyTransitionBubbleLiquidInResolves() {
+        _ = AnyTransition.bubbleLiquidIn
+    }
+
+    /// v1.2: AnyTransition.themeSmooth 应可解析
+    func testAnyTransitionThemeSmoothResolves() {
+        _ = AnyTransition.themeSmooth
+    }
 }

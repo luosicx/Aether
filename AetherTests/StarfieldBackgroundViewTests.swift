@@ -209,4 +209,113 @@ final class StarfieldBackgroundViewTests: XCTestCase {
         }
         XCTAssertEqual(seq1, seq2, "相同 seed 应产出相同序列")
     }
+
+    // MARK: - v1.2 扩展测试：呼吸效果 / 低电量降级 / 配置开关 / 设备粒子数
+
+    /// v1.2: breathFactor(at:) 在 t=0 时应返回 0.85（sin(0)=0）
+    func testBreathFactorAtZero() {
+        XCTAssertEqual(StarfieldBackgroundView.breathFactor(at: 0), 0.85, accuracy: 0.0001,
+                       "t=0 时呼吸系数应为 0.85")
+    }
+
+    /// v1.2: breathFactor(at:) 在 t=1（1/4 周期）时应为最大值 1.0
+    func testBreathFactorAtOneSecond() {
+        // sin(2π * 1 / 4) = sin(π/2) = 1.0 → 0.85 + 0.15 = 1.0
+        XCTAssertEqual(StarfieldBackgroundView.breathFactor(at: 1), 1.0, accuracy: 0.0001,
+                       "t=1s 时呼吸系数应为最大值 1.0")
+    }
+
+    /// v1.2: breathFactor(at:) 在 t=2（半周期）时应为最小值 0.70
+    func testBreathFactorAtTwoSeconds() {
+        // sin(2π * 2 / 4) = sin(π) = 0 → 0.85 + 0 = 0.85（不是最小值）
+        // 实际最小值出现在 t=3s（sin(3π/2) = -1）→ 0.85 - 0.15 = 0.70
+        XCTAssertEqual(StarfieldBackgroundView.breathFactor(at: 3), 0.70, accuracy: 0.0001,
+                       "t=3s 时呼吸系数应为最小值 0.70")
+    }
+
+    /// v1.2: breathFactor 始终在 [0.70, 1.00] 范围内
+    func testBreathFactorRange() {
+        for t in stride(from: 0.0, through: 8.0, by: 0.1) {
+            let factor = StarfieldBackgroundView.breathFactor(at: t)
+            XCTAssertGreaterThanOrEqual(factor, 0.70, "t=\(t) 时呼吸系数应 >= 0.70")
+            XCTAssertLessThanOrEqual(factor, 1.00, "t=\(t) 时呼吸系数应 <= 1.00")
+        }
+    }
+
+    /// v1.2: breathFactor 4s 周期可重复（t 与 t+4 应相等）
+    func testBreathFactorPeriodFourSeconds() {
+        for t in stride(from: 0.0, through: 4.0, by: 0.5) {
+            let f1 = StarfieldBackgroundView.breathFactor(at: t)
+            let f2 = StarfieldBackgroundView.breathFactor(at: t + 4.0)
+            XCTAssertEqual(f1, f2, accuracy: 0.0001,
+                           "t=\(t) 与 t+4 应相等（4s 周期）")
+        }
+    }
+
+    /// v1.2: 默认初始化应启用呼吸效果
+    func testDefaultBreathEnabledIsTrue() {
+        let view = StarfieldBackgroundView()
+        XCTAssertTrue(view.breathEnabled, "默认应启用呼吸效果")
+    }
+
+    /// v1.2: 默认初始化 lowPowerMode 应为 false
+    func testDefaultLowPowerModeIsFalse() {
+        let view = StarfieldBackgroundView()
+        XCTAssertFalse(view.lowPowerMode, "默认 lowPowerMode 应为 false")
+    }
+
+    /// v1.2: 默认初始化 userEnabled 应为 true
+    func testDefaultUserEnabledIsTrue() {
+        let view = StarfieldBackgroundView()
+        XCTAssertTrue(view.userEnabled, "默认 userEnabled 应为 true")
+    }
+
+    /// v1.2: 自定义参数应正确存储
+    func testCustomBreathAndPowerParams() {
+        let view = StarfieldBackgroundView(
+            particleCount: 30,
+            seed: 42,
+            breathEnabled: false,
+            lowPowerMode: true,
+            userEnabled: false
+        )
+        XCTAssertEqual(view.particles.count, 30)
+        XCTAssertFalse(view.breathEnabled)
+        XCTAssertTrue(view.lowPowerMode)
+        XCTAssertFalse(view.userEnabled)
+    }
+
+    /// v1.2: suggestedParticleCount(for:) iPhone 30 / iPad 50 / Mac 100
+    func testSuggestedParticleCountForDevices() {
+        // 注意：DeviceType 在 AetherDesign 模块，测试无法访问，
+        // 改用整数断言验证建议值合理性
+        XCTAssertEqual(StarfieldBackgroundView.suggestedParticleCount(for: .iPhoneSE), 30)
+        XCTAssertEqual(StarfieldBackgroundView.suggestedParticleCount(for: .iPhone), 30)
+        XCTAssertEqual(StarfieldBackgroundView.suggestedParticleCount(for: .iPadMini), 50)
+        XCTAssertEqual(StarfieldBackgroundView.suggestedParticleCount(for: .iPadPro), 50)
+        XCTAssertEqual(StarfieldBackgroundView.suggestedParticleCount(for: .macWide), 100)
+    }
+
+    /// v1.2: defaultParticleCount 静态常量与 particleCount 等价（兼容旧 API）
+    func testDefaultParticleCountEqualsParticleCount() {
+        XCTAssertEqual(StarfieldBackgroundView.defaultParticleCount,
+                       StarfieldBackgroundView.particleCount,
+                       "defaultParticleCount 应等于 particleCount（向后兼容）")
+    }
+
+    /// v1.2: 初始化后所有粒子参数在合理范围内（与 v1.1 测试一致，回归保护）
+    func testAllParticlesInRangeAfterV12Init() {
+        let view = StarfieldBackgroundView(breathEnabled: true, lowPowerMode: false, userEnabled: true)
+        XCTAssertFalse(view.particles.isEmpty)
+        for particle in view.particles {
+            XCTAssertGreaterThanOrEqual(particle.x, 0)
+            XCTAssertLessThan(particle.x, 1.0)
+            XCTAssertGreaterThanOrEqual(particle.y, 0)
+            XCTAssertLessThan(particle.y, 1.0)
+            XCTAssertGreaterThanOrEqual(particle.brightness, 0.3)
+            XCTAssertLessThanOrEqual(particle.brightness, 1.0)
+            XCTAssertGreaterThanOrEqual(particle.tint, 0)
+            XCTAssertLessThanOrEqual(particle.tint, 1.0)
+        }
+    }
 }

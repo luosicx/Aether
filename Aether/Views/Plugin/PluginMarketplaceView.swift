@@ -23,7 +23,8 @@ struct PluginMarketplaceView: View {
             // MARK: - 搜索与刷新
             Section {
                 HStack {
-                    Image(systemName: "magnifyingglass")
+                    // v1.2: 使用 AetherIcon.search 替换 SF Symbol
+                    AetherIcon.search.systemImage
                         .foregroundStyle(.secondary)
                     TextField("搜索插件", text: $searchText)
                         .textFieldStyle(.plain)
@@ -128,7 +129,8 @@ struct PluginMarketplaceView: View {
                         .frame(width: 60)
                         .accessibilityLabel("下载进度")
                 } else {
-                    Image(systemName: "arrow.down.circle")
+                    // v1.2: 使用 AetherIcon.modelDownload 替换 SF Symbol
+                    AetherIcon.modelDownload.systemImage
                         .foregroundStyle(.secondary)
                 }
             }

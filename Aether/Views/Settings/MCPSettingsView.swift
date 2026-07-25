@@ -323,7 +323,8 @@ struct MCPSettingsView: View {
                             .font(.body)
                             .foregroundStyle(.secondary)
                         Spacer()
-                        Image(systemName: "hand.raised.slash")
+                        // v1.2: 使用 AetherIcon.shield 替换 SF Symbol hand.raised.slash
+                        AetherIcon.shield.systemImage
                             .foregroundStyle(.red)
                     }
                     .accessibilityIdentifier("rejectedServerRow_\(serverID)")
