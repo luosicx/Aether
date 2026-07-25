@@ -6,17 +6,19 @@ final class MultimodalFacadeTests: XCTestCase {
 
     // MARK: - 默认引擎
 
-    func testDefaultEnginesArePlaceholder() async {
+    /// v1.4: 默认使用 Native 引擎（Vision / Speech / AVSpeech）
+    /// VoiceCloner 和 ImageGen 仍为占位（无 Apple 原生 API）
+    func testDefaultEnginesAreNative() async {
         let facade = MultimodalFacade()
         let visionName = await facade.visionEngineName
         let asrName = await facade.asrEngineName
         let ttsName = await facade.ttsEngineName
         let voiceClonerName = await facade.voiceClonerName
         let imageGenName = await facade.imageGenEngineName
-        XCTAssertTrue(visionName.contains("PlaceholderVisionEngine"))
-        XCTAssertEqual(asrName, "PlaceholderASR")
-        XCTAssertEqual(ttsName, "PlaceholderTTS")
-        XCTAssertTrue(voiceClonerName.contains("PlaceholderVoiceCloner"))
+        XCTAssertTrue(visionName.contains("NativeVisionEngine"), "v1.4 默认应使用 NativeVisionEngine")
+        XCTAssertTrue(asrName.contains("NativeASR"), "v1.4 默认应使用 NativeASREngine")
+        XCTAssertTrue(ttsName.contains("NativeTTS"), "v1.4 默认应使用 NativeTTSEngine")
+        XCTAssertTrue(voiceClonerName.contains("PlaceholderVoiceCloner"), "VoiceCloner 仍为占位")
         XCTAssertEqual(imageGenName, "PlaceholderImageGen")
     }
 
