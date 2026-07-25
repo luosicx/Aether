@@ -45,8 +45,9 @@
 - **StarfieldBackgroundView 测试**：新增 13 个测试覆盖 breathFactor 边界值（t=0/1/3s）/ 范围 [0.70,1.00] / 4s 周期可重复、默认参数 / 自定义参数 / suggestedParticleCount / defaultParticleCount 兼容性。
 
 #### Changed
-- **测试规模**：UT 从 3130 增至 3193（+63 用例），测试文件从 181 增至 182（+1 文件 ResponsiveLayoutTests）。
+- **测试规模**：UT 从 3130 增至 3183（+53 用例），测试文件从 181 增至 182（+1 文件 ResponsiveLayoutTests）。
 - **AetherDesign 模块**：新增 LayoutSize / LayoutStrategy / SplitViewStyle / DefaultLayoutStrategy / UserInterfaceSizeClass / AetherIconCategory 6 个 public 类型，扩展 AnimationTokens 7 个 token、AetherIcon 11 个 case、AnyTransition 2 个静态扩展。
+- **测试补充明细（共 +53 用例）**：AnimationTokens +9 / AetherIcons +14 / ResponsiveLayout +25 / StarfieldBackgroundView +13 - 8（v1.1 已存在的 defaultParticleCount / breathEnabled 默认值 等回归用例合并到既有测试函数，不重复计入新增）= 净 +53。
 
 ## [1.1.0] - 2026-07-24
 
