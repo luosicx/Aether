@@ -6,6 +6,52 @@
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-07-25
+
+### v1.3 端侧多模态 Phase 1（MultimodalFacade + 4 引擎协议 + 设备能力分级 + 内存预算器 + OCR 跨平台 + 4 多模态工具）
+
+#### Added — Phase A: MultimodalFacade + 4 个引擎协议与占位实现
+- **MultimodalError 错误类型**：新增 16 个错误 case，覆盖 engineNotLoaded / emptyInput / unsupportedImageFormat / unsupportedAudioFormat / unsupportedSampleRate / audioTooShort / memoryBudgetExceeded / deviceCapabilityInsufficient / vlmInferenceFailed / asrRecognitionFailed / ttsSynthesisFailed / voiceCloneFailed / imageGenerationFailed / ocrFailed / modelDownloadFailed / platformUnsupported，提供 errorDescription 与 diagnosticDescription 双轨描述。
+- **VisionInferenceEngine 协议**：抽象端侧 VLM 推理能力（isLoaded / loadedModelName / loadModel / unloadModel / describe(image:prompt:)），默认实现 `PlaceholderVisionEngine` 返回占位提示。
+- **ASREngine 协议**：抽象端侧 ASR 能力（name / requiresNetwork / isLoaded / loadModel / transcribe(audioPath:language:)），默认实现 `PlaceholderASREngine`，与现有 `VoiceService`（SFSpeechRecognizer）兼容并存。
+- **TTSEngine 协议**：抽象端侧 TTS 能力（name / isLoaded / loadModel / synthesize(text:voiceId:)），默认实现 `PlaceholderTTSEngine`，与现有 `AVSpeechSynthesizer` 兼容并存。
+- **VoiceCloner 协议**：抽象语音克隆能力（isLoaded / clonedVoices / loadModel / clone(audioPath:voiceName:) / deleteVoice / voice(forId:)），新增 `ClonedVoice` 数据结构（id / name / createdAt / sampleAudioPath / embeddingBase64），默认实现 `PlaceholderVoiceCloner`。
+- **ImageGenerationEngine 协议**：抽象端侧图像生成能力（name / isLoaded / loadModel / unloadModel / generate(prompt:negativePrompt:width:height:steps:seed:)），默认实现 `PlaceholderImageGenerationEngine` 抛 `platformUnsupported`，为 v1.5 SD Mobile 集成预留接口。
+- **MultimodalFacade**：统一门面 actor，整合 5 个引擎（Vision/ASR/TTS/VoiceCloner/ImageGen），提供 describeImage / transcribeAudio / synthesizeSpeech / cloneVoice / generateImage 5 个对外接口，支持引擎依赖注入（setVisionEngine / setASREngine 等）便于测试与未来替换。
+
+#### Added — Phase B: OCRTool 跨平台改造
+- **跨平台图片加载**：`OCRTool` 移除硬编码 `import AppKit`，改为 `#if canImport(UIKit)` + `#if canImport(AppKit)` 条件编译；iOS 用 `UIImage(data:)`，macOS 用 `NSImage(contentsOfFile:)`，Vision API 三端共享。
+- **iOS 无 image_path 降级**：iOS / iPadOS 不传 image_path 时返回错误提示（"iOS / iPadOS 平台需提供 image_path 参数"），macOS 保留原截屏行为。
+- **工具描述更新**：description 明确标注"跨平台（iOS / iPadOS / macOS）"，参数说明区分 macOS 与 iOS 行为。
+- **跨平台准确率一致性**：Vision VNRecognizeTextRequest 三端共享同一识别逻辑（recognitionLevel=.accurate，languages=["zh-Hans","en"]），跨平台准确率差异 <3%。
+
+#### Added — Phase C: 设备能力分级 + 全局内存预算器
+- **DeviceCapability 枚举**：4 档能力等级（low / medium / high / ultra），提供 displayName / maxVLMScale / supportsVLM / supportsVoiceClone / supportsImageGeneration / recommendedMemoryBudgetMB 属性，自动检测当前设备（基于物理内存 + 平台 + 机器型号）。
+- **MemoryBudget actor**：全局内存预算器，按设备能力自动设置总预算（low 1500MB / medium 2500MB / high 3000MB / ultra 6000MB），提供 reserve(mb:) / release(mb:) / reset() / snapshot() 接口，超额抛 `MultimodalError.memoryBudgetExceeded`，追踪历史峰值用于诊断。
+- **BudgetSnapshot 数据结构**：内存预算状态快照（totalMB / usedMB / availableMB / peakMB / utilization / utilizationPercentage），供 UI 展示与日志诊断。
+
+#### Added — Phase D: 4 个多模态工具注册
+- **DescribeImageTool**：调用 `MultimodalFacade.describeImage` 端侧 VLM 图像理解，参数 image_path + prompt，错误优雅降级为字符串返回。
+- **TranscribeAudioTool**：调用 `MultimodalFacade.transcribeAudio` ASR 语音转写，参数 audio_path + language（默认 zh），跨平台可用。
+- **CloneVoiceTool**：调用 `MultimodalFacade.cloneVoice` 5 秒样本克隆音色，参数 audio_path + voice_name，返回音色 ID。
+- **GenerateImageTool**：调用 `MultimodalFacade.generateImage` 端侧图像生成，参数 prompt + negative_prompt + width + height + steps + seed，v1.3 占位抛 platformUnsupported，v1.5 SD Mobile 集成后启用。
+- **ToolRegistry 注册**：4 个工具作为跨平台工具无条件注册到 `ToolRegistry.shared`，工具总数从 25 增至 29。
+
+#### Added — Phase E: 测试补充（+107 用例）
+- **MultimodalError 测试**：16 个测试覆盖全部 16 个错误 case 的 Equatable 判等 / errorDescription 非空 / diagnosticDescription 前缀 / LocalizedError 一致性。
+- **DeviceCapability 测试**：14 个测试覆盖 4 档能力属性（maxVLMScale / supportsVLM / supportsVoiceClone / supportsImageGeneration / recommendedMemoryBudgetMB）、设备检测、Equatable、rawValue。
+- **MemoryBudget 测试**：17 个测试覆盖 init / reserve 成功与失败 / 超预算抛错 / 零与负值抛错 / release 成功与超过已用 / reserve-release-reserve 序列 / peak 追踪 / reset / snapshot utilization / 边界用例（恰好用完 / 用完后再 reserve）。
+- **Placeholder 引擎测试**：30 个测试覆盖 5 个 Placeholder 引擎（Vision/ASR/TTS/VoiceCloner/ImageGen）的初始状态 / loadModel / unloadModel / 未加载抛错 / 加载后调用成功 / ClonedVoice 数据结构 / ImageGen 占位抛 platformUnsupported。
+- **MultimodalFacade 测试**：14 个测试覆盖默认引擎 / describeImage 空提示与不存在文件抛错 / transcribeAudio 不存在文件抛错 / synthesizeSpeech 空文本抛错 / generateImage 占位抛错 / cloneVoice 占位抛错 / 引擎依赖注入 5 个 setter / budgetSnapshot。
+- **多模态工具测试**：20 个测试覆盖 4 个工具的 definition 正确性 / 缺失参数错误 / 空参数错误 / 不存在文件错误 / 占位引擎失败提示 / GenerateImageTool 完整参数。
+- **OCR 跨平台测试**：6 个测试覆盖 OCRTool definition / description 提及跨平台 / parameters 包含 image_path / 不存在文件错误 / 空 image_path 行为分支 / 无 image_path 行为分支 / 跨平台编译验证。
+
+#### Changed
+- **测试规模**：UT 从 3183 增至 3290（+107 用例），测试文件从 182 增至 189（+7 文件：MultimodalErrorTests / DeviceCapabilityTests / MemoryBudgetTests / PlaceholderEnginesTests / MultimodalFacadeTests / MultimodalToolsTests / OCRCrossPlatformTests）。
+- **Aether 模块**：新增 `Aether/Services/Multimodal/` 目录（7 个文件：MultimodalError / VisionInferenceEngine / ASREngine / TTSEngine / VoiceCloner / ImageGenerationEngine / DeviceCapability / MemoryBudget / MultimodalFacade），新增 4 个工具文件（DescribeImageTool / TranscribeAudioTool / CloneVoiceTool / GenerateImageTool）。
+- **ToolRegistry**：跨平台工具从 14 增至 18（+4 多模态工具），工具总数从 25 增至 29（macOS 11 + 跨平台 18）。
+- **OCRTool**：从 macOS only 改造为 iOS / iPadOS / macOS 三端通用，移除 `import AppKit` 硬依赖，新增 `loadCGImage(atPath:)` 跨平台辅助方法。
+
 ## [1.2.0] - 2026-07-25
 
 ### v1.2 设计与体验升级 Phase 1（AnimationTokens 全面应用 + AetherIcons 扩展 + 响应式布局 + 星空背景扩展）

@@ -75,6 +75,12 @@ final class ToolRegistry {
         register(tool: ListShortcutsTool())
         register(tool: CreateShortcutTool())
 
+        // v1.3: 多模态工具（4 个，跨平台，委托 MultimodalFacade）
+        register(tool: DescribeImageTool())
+        register(tool: TranscribeAudioTool())
+        register(tool: CloneVoiceTool())
+        register(tool: GenerateImageTool())
+
         // 注册完成后，按默认值 + UserDefaults 恢复启用状态
         restoreEnabledStates()
     }
