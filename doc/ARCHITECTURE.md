@@ -30,7 +30,7 @@
 1. **流式对话**：基于 OpenAI 兼容 chat completions SSE 流式接口，逐 chunk yield 文本，前端实时打字效果展示。
 2. **多轮记忆**：SwiftData 持久化 Conversation + ChatMessage，会话级消息历史注入 LLM 上下文，支持 system prompt 自定义。
 3. **RAG 检索增强**：本地知识库（PDF/文本）→ DocumentChunker 分块 → EmbeddingService 嵌入 → 余弦相似度 topK=5 检索 → 拼 `[1][2]` 编号 prompt 注入。
-4. **ReAct 工具调用**：基于 function calling，ToolRegistry 注册 14 跨平台 + 11 macOS 独有工具（共 25 个，原 4 个 + 新增 21 个：跨平台 7 个 LocationTool / DeviceInfoTool / ClipboardTool（Read+Write 两个注册项）/ OpenURLTool / ContactsTool / WeatherTool，快捷指令 3 个 RunShortcutTool / ListShortcutsTool / CreateShortcutTool，macOS 独有 11 个 AppleScriptTool / ScreenshotTool / OCRTool / TerminalCommandTool / WindowManagementTool / AppManagementTool / FileOperationTool / FinderTool / SafariControlTool / SystemControlTool / InputAutomationTool，macOS 独有工具用 `#if os(macOS)` 条件注册），最大循环 5 轮，单工具超时 15s 不中断循环。
+4. **ReAct 工具调用**：基于 function calling，ToolRegistry 注册 18 跨平台 + 11 macOS 独有工具（共 29 个，原 4 个 + 新增 25 个：跨平台 7 个 LocationTool / DeviceInfoTool / ClipboardTool（Read+Write 两个注册项）/ OpenURLTool / ContactsTool / WeatherTool，快捷指令 3 个 RunShortcutTool / ListShortcutsTool / CreateShortcutTool，v1.3 多模态 4 个 DescribeImageTool / TranscribeAudioTool / CloneVoiceTool / GenerateImageTool，macOS 独有 11 个 AppleScriptTool / ScreenshotTool / OCRTool / TerminalCommandTool / WindowManagementTool / AppManagementTool / FileOperationTool / FinderTool / SafariControlTool / SystemControlTool / InputAutomationTool，macOS 独有工具用 `#if os(macOS)` 条件注册），最大循环 5 轮，单工具超时 15s 不中断循环。
 5. **语音输入输出**：AVAudioSession + SFSpeechRecognizer 实时语音识别写入输入框，AVSpeechSynthesizer 朗读 AI 回复。
 6. **视觉多模态**：用户从相册选择图片，base64 编码后以 `image_url` 形式嵌入 content 数组，多模态下发 LLM。
 7. **用户偏好记忆**：UserPreference @Model 持久化语气偏好 / 偏好工具 / 自定义事实，注入 systemPrompt 末尾个性化 AI 回复。
@@ -266,7 +266,7 @@ flowchart LR
 | Storage | `Services/Storage/ChatStorage.swift` | `@MainActor` SwiftData 持久化服务，封装 Conversation / ChatMessage / UserPreference 的 CRUD，含 `fetchPreference` / `savePreference` / `cleanupEmptyConversations`（批量清理空会话）。 |
 | Telemetry | `Services/Telemetry/TelemetryService.swift` | Day 14 遥测采集：收集 Provider 选择 / 路由决策 / Fallback 触发 / 缓存命中等事件，脱敏后批量上报。 |
 | Telemetry | `Services/Telemetry/LogUploader.swift` | Day 14 日志上传：脱敏后压缩上传到服务端，配合 CrashReportService 在下次启动时上报崩溃日志。 |
-| Tools | `Services/Tools/ToolRegistry.swift` | `@MainActor` 单例工具注册中心，注册 14 跨平台 + 11 macOS 独有工具（共 25 个），含 `NotificationService`（UNUserNotificationCenter 本地通知）。 |
+| Tools | `Services/Tools/ToolRegistry.swift` | `@MainActor` 单例工具注册中心，注册 18 跨平台 + 11 macOS 独有工具（共 29 个），含 `NotificationService`（UNUserNotificationCenter 本地通知）。 |
 | Tools | `Services/Tools/AlarmTool.swift` | 基于 `EventKit EKAlarm` 的闹钟工具。 |
 | Tools | `Services/Tools/ReminderTool.swift` | 基于 `EventKit EKReminder` 的提醒工具。 |
 | Voice | `Services/Voice/VoiceService.swift` | 语音服务，`AVAudioSession` + `SFSpeechRecognizer` 录音识别 + `AVSpeechSynthesizer` 朗读合成，朗读前应用 `TTSConfig`。 |
@@ -847,9 +847,9 @@ classDiagram
 ```
 
 **说明**：
-- 跨平台工具（14 个，iOS + macOS 都注册，含 ClipboardTool 注册的 Read+Write 两项）：AlarmTool / ReminderTool / DateTimeTool / CalculatorTool / LocationTool / DeviceInfoTool / ReadClipboardTool / WriteClipboardTool / OpenURLTool / ContactsTool / WeatherTool / RunShortcutTool / ListShortcutsTool / CreateShortcutTool。
+- 跨平台工具（18 个，iOS + macOS 都注册，含 ClipboardTool 注册的 Read+Write 两项 + v1.3 新增 4 个多模态工具）：AlarmTool / ReminderTool / DateTimeTool / CalculatorTool / LocationTool / DeviceInfoTool / ReadClipboardTool / WriteClipboardTool / OpenURLTool / ContactsTool / WeatherTool / RunShortcutTool / ListShortcutsTool / CreateShortcutTool / DescribeImageTool / TranscribeAudioTool / CloneVoiceTool / GenerateImageTool。
 - macOS 独有工具（11 个，`#if os(macOS)` 守卫）：AppleScriptTool / ScreenshotTool / OCRTool / TerminalCommandTool / WindowManagementTool / AppManagementTool / FileOperationTool / FinderTool / SafariControlTool / SystemControlTool / InputAutomationTool。
-- 跨平台注册 14 个、macOS 独有 11 个（共 25 个）。
+- 跨平台注册 18 个、macOS 独有 11 个（共 29 个）。
 
 ### 3.7 LLM Provider 抽象关系图
 
@@ -1381,7 +1381,7 @@ stateDiagram-v2
 | PerformanceMonitor | `Services/Performance/PerformanceMonitor.swift` | iOS 17.0+ / macOS 14.0+ |
 | PrivacyInfo.xcprivacy | `Resources/PrivacyInfo.xcprivacy` | iOS 17.0+ / macOS 14.0+ / Xcode 16+（App Store 审核要求） |
 | AttributedString（Markdown） | `Views/Chat/Markdown*.swift` / `CodeSyntaxHighlighter.swift` | iOS 17.0+ / macOS 14.0+ / Foundation |
-| XCTest | `AetherTests/` 182 文件（3183 用例） | Xcode 16+ / Swift 5.9+ |
+| XCTest | `AetherTests/` 189 文件（3290 用例） | Xcode 16+ / Swift 5.9+ |
 | XCUITest | `AetherUITests/` 7 文件（30 用例） | Xcode 16+ / Swift 5.9+ |
 | GitHub Actions | `.github/workflows/ci.yml` | macos-14 runner / Xcode 16+ |
 | CoreLocation | CLLocationManager + CLGeocoder | LocationTool 定位与反地理编码 | iOS 17.0+ / macOS 14.0+ / CoreLocation.framework |
@@ -1404,7 +1404,7 @@ stateDiagram-v2
 ### 7.1 单元测试（UT）
 
 - **Target**：`AetherTests`
-- **规模**：181 个测试文件，3130 用例（3130 pass / 0 skip / 0 failures）
+- **规模**：189 个测试文件，3290 用例（3290 pass / 0 skip / 0 failures）
 - **分层覆盖**：
 
 | 层级 | 测试文件 | 文件数 | 核心断言数（约） | skip 原因 |
@@ -1714,7 +1714,7 @@ CloudflareWorkers/               # BFF 代理网关
 ├── worker.js
 └── wrangler.toml
 
-AetherTests/                  # 182 个 UT 文件 / 3183 用例
+AetherTests/                  # 189 个 UT 文件 / 3290 用例
 ├── APIConfigTests.swift
 ├── AlarmToolTests.swift
 ├── BFFProxyClientTests.swift

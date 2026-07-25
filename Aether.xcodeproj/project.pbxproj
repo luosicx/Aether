@@ -554,6 +554,7 @@
 		FC43B08A215C8D83A1A8A3B3 /* Conversation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B387B391B8EB8B670A86B24 /* Conversation.swift */; };
 		FD5DDD17B5DDC7F6B77D72EE /* Logger+Modules.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D0132A3B5D9777CCAF8D73E /* Logger+Modules.swift */; };
 		FDD9E835432611827707B941 /* OCRTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EB060C34347D01F9378F92C /* OCRTool.swift */; };
+		A13000000000000000000070 /* OCRTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EB060C34347D01F9378F92C /* OCRTool.swift */; };
 		FE1A2B3C4D5E6F7000000001 /* MarkdownTextTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE1A2B3C4D5E6F7000000002 /* MarkdownTextTests.swift */; };
 		FE1A2B3C4D5E6F7000000003 /* ConversationListTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE1A2B3C4D5E6F7000000004 /* ConversationListTests.swift */; };
 		FE1A2B3C4D5E6F7000000005 /* MessageBubbleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE1A2B3C4D5E6F7000000006 /* MessageBubbleTests.swift */; };
@@ -570,6 +571,39 @@
 		BEEF11000000000000000008 /* AgentInstanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEF11000000000000000007 /* AgentInstanceTests.swift */; };
 		BEEF1100000000000000000A /* AgentMessageBusTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEF11000000000000000009 /* AgentMessageBusTests.swift */; };
 		BEEF1100000000000000000C /* DAGExecutionEngineMultiAgentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEEF1100000000000000000B /* DAGExecutionEngineMultiAgentTests.swift */; };
+		A13000000000000000000002 /* MultimodalError.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13000000000000000000001 /* MultimodalError.swift */; };
+		A13000000000000000000003 /* MultimodalError.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13000000000000000000001 /* MultimodalError.swift */; };
+		A13000000000000000000005 /* DeviceCapability.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13000000000000000000004 /* DeviceCapability.swift */; };
+		A13000000000000000000006 /* DeviceCapability.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13000000000000000000004 /* DeviceCapability.swift */; };
+		A13000000000000000000008 /* MemoryBudget.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13000000000000000000007 /* MemoryBudget.swift */; };
+		A13000000000000000000009 /* MemoryBudget.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13000000000000000000007 /* MemoryBudget.swift */; };
+		A1300000000000000000000B /* MultimodalFacade.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1300000000000000000000A /* MultimodalFacade.swift */; };
+		A1300000000000000000000C /* MultimodalFacade.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1300000000000000000000A /* MultimodalFacade.swift */; };
+		A1300000000000000000000E /* VisionInferenceEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1300000000000000000000D /* VisionInferenceEngine.swift */; };
+		A1300000000000000000000F /* VisionInferenceEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1300000000000000000000D /* VisionInferenceEngine.swift */; };
+		A13000000000000000000011 /* ASREngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13000000000000000000010 /* ASREngine.swift */; };
+		A13000000000000000000012 /* ASREngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13000000000000000000010 /* ASREngine.swift */; };
+		A13000000000000000000014 /* TTSEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13000000000000000000013 /* TTSEngine.swift */; };
+		A13000000000000000000015 /* TTSEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13000000000000000000013 /* TTSEngine.swift */; };
+		A13000000000000000000017 /* VoiceCloner.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13000000000000000000016 /* VoiceCloner.swift */; };
+		A13000000000000000000018 /* VoiceCloner.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13000000000000000000016 /* VoiceCloner.swift */; };
+		A1300000000000000000001A /* ImageGenerationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13000000000000000000019 /* ImageGenerationEngine.swift */; };
+		A1300000000000000000001B /* ImageGenerationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13000000000000000000019 /* ImageGenerationEngine.swift */; };
+		A1300000000000000000001D /* DescribeImageTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1300000000000000000001C /* DescribeImageTool.swift */; };
+		A1300000000000000000001E /* DescribeImageTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1300000000000000000001C /* DescribeImageTool.swift */; };
+		A13000000000000000000020 /* TranscribeAudioTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1300000000000000000001F /* TranscribeAudioTool.swift */; };
+		A13000000000000000000021 /* TranscribeAudioTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1300000000000000000001F /* TranscribeAudioTool.swift */; };
+		A13000000000000000000023 /* CloneVoiceTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13000000000000000000022 /* CloneVoiceTool.swift */; };
+		A13000000000000000000024 /* CloneVoiceTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13000000000000000000022 /* CloneVoiceTool.swift */; };
+		A13000000000000000000026 /* GenerateImageTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13000000000000000000025 /* GenerateImageTool.swift */; };
+		A13000000000000000000027 /* GenerateImageTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13000000000000000000025 /* GenerateImageTool.swift */; };
+		A13000000000000000000029 /* MultimodalErrorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13000000000000000000028 /* MultimodalErrorTests.swift */; };
+		A1300000000000000000002B /* DeviceCapabilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1300000000000000000002A /* DeviceCapabilityTests.swift */; };
+		A1300000000000000000002D /* MemoryBudgetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1300000000000000000002C /* MemoryBudgetTests.swift */; };
+		A1300000000000000000002F /* MultimodalFacadeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1300000000000000000002E /* MultimodalFacadeTests.swift */; };
+		A13000000000000000000031 /* MultimodalToolsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13000000000000000000030 /* MultimodalToolsTests.swift */; };
+		A13000000000000000000033 /* OCRCrossPlatformTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13000000000000000000032 /* OCRCrossPlatformTests.swift */; };
+		A13000000000000000000035 /* PlaceholderEnginesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13000000000000000000034 /* PlaceholderEnginesTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -1059,6 +1093,26 @@
 		BEEF11000000000000000007 /* AgentInstanceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AgentInstanceTests.swift; sourceTree = "<group>"; };
 		BEEF11000000000000000009 /* AgentMessageBusTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AgentMessageBusTests.swift; sourceTree = "<group>"; };
 		BEEF1100000000000000000B /* DAGExecutionEngineMultiAgentTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DAGExecutionEngineMultiAgentTests.swift; sourceTree = "<group>"; };
+		A13000000000000000000001 /* MultimodalError.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MultimodalError.swift; sourceTree = "<group>"; };
+		A13000000000000000000004 /* DeviceCapability.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DeviceCapability.swift; sourceTree = "<group>"; };
+		A13000000000000000000007 /* MemoryBudget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MemoryBudget.swift; sourceTree = "<group>"; };
+		A1300000000000000000000A /* MultimodalFacade.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MultimodalFacade.swift; sourceTree = "<group>"; };
+		A1300000000000000000000D /* VisionInferenceEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VisionInferenceEngine.swift; sourceTree = "<group>"; };
+		A13000000000000000000010 /* ASREngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ASREngine.swift; sourceTree = "<group>"; };
+		A13000000000000000000013 /* TTSEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TTSEngine.swift; sourceTree = "<group>"; };
+		A13000000000000000000016 /* VoiceCloner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VoiceCloner.swift; sourceTree = "<group>"; };
+		A13000000000000000000019 /* ImageGenerationEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ImageGenerationEngine.swift; sourceTree = "<group>"; };
+		A1300000000000000000001C /* DescribeImageTool.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DescribeImageTool.swift; sourceTree = "<group>"; };
+		A1300000000000000000001F /* TranscribeAudioTool.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TranscribeAudioTool.swift; sourceTree = "<group>"; };
+		A13000000000000000000022 /* CloneVoiceTool.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CloneVoiceTool.swift; sourceTree = "<group>"; };
+		A13000000000000000000025 /* GenerateImageTool.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GenerateImageTool.swift; sourceTree = "<group>"; };
+		A13000000000000000000028 /* MultimodalErrorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MultimodalErrorTests.swift; sourceTree = "<group>"; };
+		A1300000000000000000002A /* DeviceCapabilityTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DeviceCapabilityTests.swift; sourceTree = "<group>"; };
+		A1300000000000000000002C /* MemoryBudgetTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MemoryBudgetTests.swift; sourceTree = "<group>"; };
+		A1300000000000000000002E /* MultimodalFacadeTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MultimodalFacadeTests.swift; sourceTree = "<group>"; };
+		A13000000000000000000030 /* MultimodalToolsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MultimodalToolsTests.swift; sourceTree = "<group>"; };
+		A13000000000000000000032 /* OCRCrossPlatformTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OCRCrossPlatformTests.swift; sourceTree = "<group>"; };
+		A13000000000000000000034 /* PlaceholderEnginesTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlaceholderEnginesTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1322,8 +1376,25 @@
 				BB000000000000000000D010 /* Theme */,
 				F62BF6DCF3ED8FCD3AE58E39 /* Repositories */,
 				7E15004D000000000000D004 /* Export */,
+			A13000000000000000000050 /* Multimodal */,
+		);
+		path = Services;
+		sourceTree = "<group>";
+	};
+		A13000000000000000000050 /* Multimodal */ = {
+			isa = PBXGroup;
+			children = (
+				A13000000000000000000001 /* MultimodalError.swift */,
+				A13000000000000000000004 /* DeviceCapability.swift */,
+				A13000000000000000000007 /* MemoryBudget.swift */,
+				A1300000000000000000000A /* MultimodalFacade.swift */,
+				A1300000000000000000000D /* VisionInferenceEngine.swift */,
+				A13000000000000000000010 /* ASREngine.swift */,
+				A13000000000000000000013 /* TTSEngine.swift */,
+				A13000000000000000000016 /* VoiceCloner.swift */,
+				A13000000000000000000019 /* ImageGenerationEngine.swift */,
 			);
-			path = Services;
+			path = Multimodal;
 			sourceTree = "<group>";
 		};
 		2E2AF97BF7D132981AC65F6D /* Chat */ = {
@@ -1571,10 +1642,14 @@
 				A1B2C3D4E5F6071809AB1002 /* ToolAuditLogger.swift */,
 				A1B2C3D4E5F6071809AB1007 /* ToolAuthorization.swift */,
 				32B243600898D3CA4E4F334A /* ToolRegistry+macOS.swift */,
-			);
-			path = Tools;
-			sourceTree = "<group>";
-		};
+			A1300000000000000000001C /* DescribeImageTool.swift */,
+			A1300000000000000000001F /* TranscribeAudioTool.swift */,
+			A13000000000000000000022 /* CloneVoiceTool.swift */,
+			A13000000000000000000025 /* GenerateImageTool.swift */,
+		);
+		path = Tools;
+		sourceTree = "<group>";
+	};
 		6D832FC16112EEF63F4B8C17 /* OS X */ = {
 			isa = PBXGroup;
 			children = (
@@ -1816,8 +1891,23 @@
 				78DE8551234B487B959A11FD /* RedactorRustTests.swift */,
 				FF31C32D67E245369A38B5F8 /* ChunkerRustTests.swift */,
 				F7DE67C0A3A1463B8F4CFF01 /* RateLimiterRustTests.swift */,
+				A13000000000000000000060 /* Multimodal */,
 			);
 			path = AetherTests;
+			sourceTree = "<group>";
+		};
+		A13000000000000000000060 /* Multimodal */ = {
+			isa = PBXGroup;
+			children = (
+				A13000000000000000000028 /* MultimodalErrorTests.swift */,
+				A1300000000000000000002A /* DeviceCapabilityTests.swift */,
+				A1300000000000000000002C /* MemoryBudgetTests.swift */,
+				A1300000000000000000002E /* MultimodalFacadeTests.swift */,
+				A13000000000000000000030 /* MultimodalToolsTests.swift */,
+				A13000000000000000000032 /* OCRCrossPlatformTests.swift */,
+				A13000000000000000000034 /* PlaceholderEnginesTests.swift */,
+			);
+			path = Multimodal;
 			sourceTree = "<group>";
 		};
 		A1B2C3D4E5F6071809AB1000 /* Security */ = {
@@ -2614,6 +2704,19 @@
 				0E6B41F9BBC3B9D0A141C764 /* PluginMarketplaceView.swift in Sources */,
 				BEEF11000000000000000003 /* AgentInstance.swift in Sources */,
 				BEEF11000000000000000006 /* AgentMessageBus.swift in Sources */,
+				A13000000000000000000003 /* MultimodalError.swift in Sources */,
+				A13000000000000000000006 /* DeviceCapability.swift in Sources */,
+				A13000000000000000000009 /* MemoryBudget.swift in Sources */,
+				A1300000000000000000000C /* MultimodalFacade.swift in Sources */,
+				A1300000000000000000000F /* VisionInferenceEngine.swift in Sources */,
+				A13000000000000000000012 /* ASREngine.swift in Sources */,
+				A13000000000000000000015 /* TTSEngine.swift in Sources */,
+				A13000000000000000000018 /* VoiceCloner.swift in Sources */,
+				A1300000000000000000001B /* ImageGenerationEngine.swift in Sources */,
+				A1300000000000000000001E /* DescribeImageTool.swift in Sources */,
+				A13000000000000000000021 /* TranscribeAudioTool.swift in Sources */,
+				A13000000000000000000024 /* CloneVoiceTool.swift in Sources */,
+				A13000000000000000000027 /* GenerateImageTool.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2801,6 +2904,13 @@
 				A96C6919872E43629B76934E /* RedactorRustTests.swift in Sources */,
 				D63422AAA6284BC68E296D81 /* ChunkerRustTests.swift in Sources */,
 				7AF7F1A93B964C469AFBE281 /* RateLimiterRustTests.swift in Sources */,
+				A13000000000000000000029 /* MultimodalErrorTests.swift in Sources */,
+				A1300000000000000000002B /* DeviceCapabilityTests.swift in Sources */,
+				A1300000000000000000002D /* MemoryBudgetTests.swift in Sources */,
+				A1300000000000000000002F /* MultimodalFacadeTests.swift in Sources */,
+				A13000000000000000000031 /* MultimodalToolsTests.swift in Sources */,
+				A13000000000000000000033 /* OCRCrossPlatformTests.swift in Sources */,
+				A13000000000000000000035 /* PlaceholderEnginesTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2976,6 +3086,20 @@
 				8C2345DF917C65D7C42558B0 /* PluginMarketplaceView.swift in Sources */,
 				BEEF11000000000000000002 /* AgentInstance.swift in Sources */,
 				BEEF11000000000000000005 /* AgentMessageBus.swift in Sources */,
+				A13000000000000000000002 /* MultimodalError.swift in Sources */,
+				A13000000000000000000005 /* DeviceCapability.swift in Sources */,
+				A13000000000000000000008 /* MemoryBudget.swift in Sources */,
+				A1300000000000000000000B /* MultimodalFacade.swift in Sources */,
+				A1300000000000000000000E /* VisionInferenceEngine.swift in Sources */,
+				A13000000000000000000011 /* ASREngine.swift in Sources */,
+				A13000000000000000000014 /* TTSEngine.swift in Sources */,
+				A13000000000000000000017 /* VoiceCloner.swift in Sources */,
+				A1300000000000000000001A /* ImageGenerationEngine.swift in Sources */,
+				A1300000000000000000001D /* DescribeImageTool.swift in Sources */,
+				A13000000000000000000020 /* TranscribeAudioTool.swift in Sources */,
+				A13000000000000000000023 /* CloneVoiceTool.swift in Sources */,
+				A13000000000000000000026 /* GenerateImageTool.swift in Sources */,
+				A13000000000000000000070 /* OCRTool.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
