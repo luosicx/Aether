@@ -68,7 +68,9 @@ jobs:
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-ios,aarch64-apple-ios-sim,aarch64-apple-darwin,x86_64-apple-darwin,x86_64-apple-ios-sim
+          # x86_64-apple-ios-sim 在 stable channel 不可用；macos-15 runner 为 arm64，
+          # iOS Simulator 仅需 aarch64-apple-ios-sim；macOS 需 x86_64-apple-darwin 支持 Intel Mac
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim,aarch64-apple-darwin,x86_64-apple-darwin
 
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
@@ -83,7 +85,6 @@ jobs:
           cargo rustc -p aether-core-ffi --release --target aarch64-apple-ios-sim --crate-type staticlib
           cargo rustc -p aether-core-ffi --release --target aarch64-apple-darwin --crate-type staticlib
           cargo rustc -p aether-core-ffi --release --target x86_64-apple-darwin --crate-type staticlib
-          cargo rustc -p aether-core-ffi --release --target x86_64-apple-ios-sim --crate-type staticlib
 
       - name: Create xcframework
         run: |
@@ -91,8 +92,6 @@ jobs:
             -library rust/target/aarch64-apple-ios/release/libaether_core_ffi.a \
             -headers Packages/AetherCore/Sources/AetherRust/include \
             -library rust/target/aarch64-apple-ios-sim/release/libaether_core_ffi.a \
-            -headers Packages/AetherCore/Sources/AetherRust/include \
-            -library rust/target/x86_64-apple-ios-sim/release/libaether_core_ffi.a \
             -headers Packages/AetherCore/Sources/AetherRust/include \
             -library rust/target/aarch64-apple-darwin/release/libaether_core_ffi.a \
             -headers Packages/AetherCore/Sources/AetherRust/include \
@@ -140,7 +139,8 @@ jobs:
             -destination 'generic/platform=iOS Simulator' \
             -configuration Release \
             -derivedDataPath build \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO \
+            ARCHS=arm64
 
       - name: Locate and zip .app
         run: |
