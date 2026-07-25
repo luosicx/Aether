@@ -40,19 +40,21 @@ public actor MultimodalFacade {
     private let budget: MemoryBudget
 
     public init() {
-        self.visionEngine = PlaceholderVisionEngine()
-        self.asrEngine = PlaceholderASREngine()
-        self.ttsEngine = PlaceholderTTSEngine()
+        // v1.4: 默认使用 Apple 原生引擎（Vision / Speech / AVFoundation）
+        // MLX-VLM / Whisper.cpp / MLX-Voice 集成后通过 setXxxEngine 切换
+        self.visionEngine = NativeVisionEngine()
+        self.asrEngine = NativeASREngine()
+        self.ttsEngine = NativeTTSEngine()
         self.voiceCloner = PlaceholderVoiceCloner()
         self.imageGenEngine = PlaceholderImageGenerationEngine()
         self.budget = .shared
     }
 
-    /// 测试可注入的初始化器
+    /// 测试可注入的初始化器（默认参数允许回退到占位实现）
     public init(
-        visionEngine: VisionInferenceEngine = PlaceholderVisionEngine(),
-        asrEngine: ASREngine = PlaceholderASREngine(),
-        ttsEngine: TTSEngine = PlaceholderTTSEngine(),
+        visionEngine: VisionInferenceEngine = NativeVisionEngine(),
+        asrEngine: ASREngine = NativeASREngine(),
+        ttsEngine: TTSEngine = NativeTTSEngine(),
         voiceCloner: VoiceCloner = PlaceholderVoiceCloner(),
         imageGenEngine: ImageGenerationEngine = PlaceholderImageGenerationEngine(),
         budget: MemoryBudget = .shared

@@ -589,6 +589,12 @@
 		A13000000000000000000018 /* VoiceCloner.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13000000000000000000016 /* VoiceCloner.swift */; };
 		A1300000000000000000001A /* ImageGenerationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13000000000000000000019 /* ImageGenerationEngine.swift */; };
 		A1300000000000000000001B /* ImageGenerationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13000000000000000000019 /* ImageGenerationEngine.swift */; };
+		A14000000000000000000003 /* NativeVisionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A14000000000000000000002 /* NativeVisionEngine.swift */; };
+		A14000000000000000000004 /* NativeVisionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A14000000000000000000002 /* NativeVisionEngine.swift */; };
+		A14000000000000000000006 /* NativeASREngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A14000000000000000000005 /* NativeASREngine.swift */; };
+		A14000000000000000000007 /* NativeASREngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A14000000000000000000005 /* NativeASREngine.swift */; };
+		A14000000000000000000009 /* NativeTTSEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A14000000000000000000008 /* NativeTTSEngine.swift */; };
+		A1400000000000000000000A /* NativeTTSEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A14000000000000000000008 /* NativeTTSEngine.swift */; };
 		A1300000000000000000001D /* DescribeImageTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1300000000000000000001C /* DescribeImageTool.swift */; };
 		A1300000000000000000001E /* DescribeImageTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1300000000000000000001C /* DescribeImageTool.swift */; };
 		A13000000000000000000020 /* TranscribeAudioTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1300000000000000000001F /* TranscribeAudioTool.swift */; };
@@ -604,6 +610,7 @@
 		A13000000000000000000031 /* MultimodalToolsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13000000000000000000030 /* MultimodalToolsTests.swift */; };
 		A13000000000000000000033 /* OCRCrossPlatformTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13000000000000000000032 /* OCRCrossPlatformTests.swift */; };
 		A13000000000000000000035 /* PlaceholderEnginesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13000000000000000000034 /* PlaceholderEnginesTests.swift */; };
+		A1400000000000000000000D /* NativeEnginesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1400000000000000000000C /* NativeEnginesTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -1102,6 +1109,9 @@
 		A13000000000000000000013 /* TTSEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TTSEngine.swift; sourceTree = "<group>"; };
 		A13000000000000000000016 /* VoiceCloner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VoiceCloner.swift; sourceTree = "<group>"; };
 		A13000000000000000000019 /* ImageGenerationEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ImageGenerationEngine.swift; sourceTree = "<group>"; };
+		A14000000000000000000002 /* NativeVisionEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NativeVisionEngine.swift; sourceTree = "<group>"; };
+		A14000000000000000000005 /* NativeASREngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NativeASREngine.swift; sourceTree = "<group>"; };
+		A14000000000000000000008 /* NativeTTSEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NativeTTSEngine.swift; sourceTree = "<group>"; };
 		A1300000000000000000001C /* DescribeImageTool.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DescribeImageTool.swift; sourceTree = "<group>"; };
 		A1300000000000000000001F /* TranscribeAudioTool.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TranscribeAudioTool.swift; sourceTree = "<group>"; };
 		A13000000000000000000022 /* CloneVoiceTool.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CloneVoiceTool.swift; sourceTree = "<group>"; };
@@ -1113,6 +1123,7 @@
 		A13000000000000000000030 /* MultimodalToolsTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MultimodalToolsTests.swift; sourceTree = "<group>"; };
 		A13000000000000000000032 /* OCRCrossPlatformTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OCRCrossPlatformTests.swift; sourceTree = "<group>"; };
 		A13000000000000000000034 /* PlaceholderEnginesTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlaceholderEnginesTests.swift; sourceTree = "<group>"; };
+		A1400000000000000000000C /* NativeEnginesTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NativeEnginesTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1393,6 +1404,9 @@
 				A13000000000000000000013 /* TTSEngine.swift */,
 				A13000000000000000000016 /* VoiceCloner.swift */,
 				A13000000000000000000019 /* ImageGenerationEngine.swift */,
+				A14000000000000000000002 /* NativeVisionEngine.swift */,
+				A14000000000000000000005 /* NativeASREngine.swift */,
+				A14000000000000000000008 /* NativeTTSEngine.swift */,
 			);
 			path = Multimodal;
 			sourceTree = "<group>";
@@ -1906,6 +1920,7 @@
 				A13000000000000000000030 /* MultimodalToolsTests.swift */,
 				A13000000000000000000032 /* OCRCrossPlatformTests.swift */,
 				A13000000000000000000034 /* PlaceholderEnginesTests.swift */,
+				A1400000000000000000000C /* NativeEnginesTests.swift */,
 			);
 			path = Multimodal;
 			sourceTree = "<group>";
@@ -2713,6 +2728,9 @@
 				A13000000000000000000015 /* TTSEngine.swift in Sources */,
 				A13000000000000000000018 /* VoiceCloner.swift in Sources */,
 				A1300000000000000000001B /* ImageGenerationEngine.swift in Sources */,
+				A14000000000000000000003 /* NativeVisionEngine.swift in Sources */,
+				A14000000000000000000006 /* NativeASREngine.swift in Sources */,
+				A14000000000000000000009 /* NativeTTSEngine.swift in Sources */,
 				A1300000000000000000001E /* DescribeImageTool.swift in Sources */,
 				A13000000000000000000021 /* TranscribeAudioTool.swift in Sources */,
 				A13000000000000000000024 /* CloneVoiceTool.swift in Sources */,
@@ -2911,6 +2929,7 @@
 				A13000000000000000000031 /* MultimodalToolsTests.swift in Sources */,
 				A13000000000000000000033 /* OCRCrossPlatformTests.swift in Sources */,
 				A13000000000000000000035 /* PlaceholderEnginesTests.swift in Sources */,
+				A1400000000000000000000D /* NativeEnginesTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -3094,6 +3113,9 @@
 				A13000000000000000000011 /* ASREngine.swift in Sources */,
 				A13000000000000000000014 /* TTSEngine.swift in Sources */,
 				A13000000000000000000017 /* VoiceCloner.swift in Sources */,
+				A14000000000000000000004 /* NativeVisionEngine.swift in Sources */,
+				A14000000000000000000007 /* NativeASREngine.swift in Sources */,
+				A1400000000000000000000A /* NativeTTSEngine.swift in Sources */,
 				A1300000000000000000001A /* ImageGenerationEngine.swift in Sources */,
 				A1300000000000000000001D /* DescribeImageTool.swift in Sources */,
 				A13000000000000000000020 /* TranscribeAudioTool.swift in Sources */,
