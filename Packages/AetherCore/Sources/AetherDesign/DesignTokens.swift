@@ -54,6 +54,32 @@ public enum AnimationTokens {
     public static let starDrift: Animation = .linear(duration: 60).repeatForever(autoreverses: false)
     /// v1.1 Phase D: 星点闪烁 2s（easeInOut 来回呼吸）
     public static let twinkle: Animation = .easeInOut(duration: 2).repeatForever(autoreverses: true)
+
+    // MARK: - v1.2 设计与体验升级
+
+    /// 消息气泡液态进入：scale + opacity 组合，spring 0.5s damping 0.7
+    /// 用于消息气泡插入时的液态出现动效
+    public static let bubbleLiquidIn: Animation = .spring(response: 0.5, dampingFraction: 0.7)
+
+    /// 消息气泡液态退出：向右滑出 + 淡出
+    /// 用于消息气泡删除时的过渡
+    public static let bubbleLiquidOut: Animation = .easeInOut(duration: 0.25)
+
+    /// 微交互 spring：按钮按压 / 长按反馈 / 拖拽阴影
+    /// response 0.3s damping 0.75，自然回弹手感
+    public static let interactiveSpring: Animation = .spring(response: 0.3, dampingFraction: 0.75)
+
+    /// 滚动视差：缓慢 decelerate
+    public static let scrollParallax: Animation = .easeOut(duration: 0.4)
+
+    /// 主题切换平滑过渡：0.3s easeInOut，避免色板硬切闪烁
+    public static let themeSmooth: Animation = .easeInOut(duration: 0.3)
+
+    /// 星空呼吸效果：4s 周期 phaseAnimator，修改 shadowRadius 与 opacity
+    public static let starBreath: Animation = .easeInOut(duration: 4).repeatForever(autoreverses: true)
+
+    /// 低能力设备降级动画：所有 spring 替换为快速 easeInOut
+    public static let reducedMotion: Animation = .easeInOut(duration: 0.15)
 }
 
 /// 按钮按压反馈样式：按下时缩小到 0.92，使用 AnimationTokens.buttonPress 动画
@@ -64,5 +90,24 @@ public struct PressableButtonStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.92 : 1.0)
             .animation(AnimationTokens.buttonPress, value: configuration.isPressed)
+    }
+}
+
+// MARK: - v1.2: 液态过渡 AnyTransition 便捷访问
+
+public extension AnyTransition {
+    /// v1.2: 消息气泡液态进入——scale + opacity 组合
+    /// 配合 `AnimationTokens.bubbleLiquidIn` 实现"Aether 式"液态出现动效
+    static var bubbleLiquidIn: AnyTransition {
+        .asymmetric(
+            insertion: .scale.combined(with: .opacity),
+            removal: .move(edge: .trailing).combined(with: .opacity)
+        )
+    }
+
+    /// v1.2: 主题切换过渡——平滑色板过渡，避免硬切闪烁
+    /// 配合 `AnimationTokens.themeSmooth`
+    static var themeSmooth: AnyTransition {
+        .opacity
     }
 }

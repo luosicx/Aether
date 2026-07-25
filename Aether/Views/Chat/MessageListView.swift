@@ -139,7 +139,8 @@ struct MessageListView: View {
                 )
             }
         }
-        .animation(reduceMotion ? nil : AnimationTokens.messageBubble, value: viewModel.messages.count)
+        // v1.2: 升级为 bubbleLiquidIn 液态进出动画 token
+        .animation(reduceMotion ? nil : AnimationTokens.bubbleLiquidIn, value: viewModel.messages.count)
         .overlay(alignment: .bottom) {
             toastOverlay
         }
@@ -210,8 +211,8 @@ struct MessageListView: View {
             aiAvatarData: prefs?.avatarData
         )
         .transition(reduceMotion ? .opacity : .asymmetric(
-            insertion: .move(edge: .bottom).combined(with: .opacity),
-            removal: .opacity
+            insertion: .scale(scale: 0.92).combined(with: .opacity),
+            removal: .move(edge: .trailing).combined(with: .opacity)
         ))
     }
 
@@ -245,7 +246,8 @@ struct MessageListView: View {
         }
         if !viewModel.currentToolSteps.isEmpty {
             HStack(spacing: 6) {
-                Image(systemName: "wrench.and.screwdriver")
+                // v1.2: 使用 AetherIcon.tool 替换 SF Symbol
+                AetherIcon.tool.systemImage
                     .font(.captionAI)
                     .foregroundStyle(.tertiary)
                 Text("工具调用流程", comment: "")

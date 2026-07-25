@@ -90,7 +90,8 @@ struct ConversationList: View {
                         // Day 9: 搜索框
                         Section {
                             HStack {
-                                Image(systemName: "magnifyingglass")
+                                // v1.2: 使用 AetherIcon.search 替换 SF Symbol
+                                AetherIcon.search.systemImage
                                     .foregroundStyle(.secondary)
                                 TextField("搜索会话标题…", text: $searchText)
                                     #if os(iOS)
@@ -485,7 +486,8 @@ private struct ShareLinkSheet: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 20) {
-                Image(systemName: "link")
+                // v1.2: 使用 AetherIcon.shortcut 替换 SF Symbol
+                AetherIcon.shortcut.systemImage
                     .font(.system(size: 40))
                     .foregroundStyle(.tint)
                     .accessibilityHidden(true)

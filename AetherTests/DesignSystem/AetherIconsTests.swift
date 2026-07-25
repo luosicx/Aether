@@ -30,10 +30,11 @@ final class AetherIconsTests: XCTestCase {
         }
     }
 
-    /// 验证 case 数量为 18：新增/删除 case 时该测试会失败，作为变更护栏
-    func testAllCasesCountIsEighteen() {
-        XCTAssertEqual(AetherIcon.allCases.count, 18,
-                       "AetherIcon 当前应有 18 个 case")
+    /// 验证 case 数量为 29：新增/删除 case 时该测试会失败，作为变更护栏
+    /// v1.0 (8) + v1.1 (10) + v1.2 新增 (11) = 29
+    func testAllCasesCountIsTwentyNine() {
+        XCTAssertEqual(AetherIcon.allCases.count, 29,
+                       "AetherIcon 当前应有 29 个 case")
     }
 
     /// 验证 fallbackSystemName 长度合理（<= 50 字符）：SF Symbol 名称通常较短
@@ -88,6 +89,108 @@ final class AetherIconsTests: XCTestCase {
     func testSpecificCasesAccessibilityLabels() {
         XCTAssertEqual(AetherIcon.logo.accessibilityLabel, "Aether Logo")
         XCTAssertEqual(AetherIcon.knowledge.accessibilityLabel, "知识库")
+    }
+
+    // MARK: - v1.2 新增图标契约测试
+
+    /// 验证 v1.2 新增图标的 fallbackSystemName 与设计契约一致
+    func testV12NewIconsFallbackSystemNames() {
+        XCTAssertEqual(AetherIcon.settings.fallbackSystemName, "gearshape")
+        XCTAssertEqual(AetherIcon.history.fallbackSystemName, "clock.arrow.circlepath")
+        XCTAssertEqual(AetherIcon.newConversation.fallbackSystemName, "square.and.pencil")
+        XCTAssertEqual(AetherIcon.search.fallbackSystemName, "magnifyingglass")
+        XCTAssertEqual(AetherIcon.modelDownload.fallbackSystemName, "arrow.down.circle")
+        XCTAssertEqual(AetherIcon.agentCollaboration.fallbackSystemName, "person.2.wave.2")
+        XCTAssertEqual(AetherIcon.marketplace.fallbackSystemName, "cart.fill")
+        XCTAssertEqual(AetherIcon.syncing.fallbackSystemName, "arrow.triangle.2.circlepath")
+        XCTAssertEqual(AetherIcon.offline.fallbackSystemName, "wifi.slash")
+        XCTAssertEqual(AetherIcon.loading.fallbackSystemName, "progress.indicator")
+        XCTAssertEqual(AetherIcon.error.fallbackSystemName, "exclamationmark.triangle.fill")
+    }
+
+    /// 验证 v1.2 新增图标的 accessibilityLabel 非空且符合产品文案
+    func testV12NewIconsAccessibilityLabels() {
+        XCTAssertEqual(AetherIcon.settings.accessibilityLabel, "设置")
+        XCTAssertEqual(AetherIcon.history.accessibilityLabel, "历史")
+        XCTAssertEqual(AetherIcon.newConversation.accessibilityLabel, "新建对话")
+        XCTAssertEqual(AetherIcon.search.accessibilityLabel, "搜索")
+        XCTAssertEqual(AetherIcon.modelDownload.accessibilityLabel, "下载模型")
+        XCTAssertEqual(AetherIcon.agentCollaboration.accessibilityLabel, "智能体协作")
+        XCTAssertEqual(AetherIcon.marketplace.accessibilityLabel, "插件市场")
+        XCTAssertEqual(AetherIcon.syncing.accessibilityLabel, "同步中")
+        XCTAssertEqual(AetherIcon.offline.accessibilityLabel, "离线")
+        XCTAssertEqual(AetherIcon.loading.accessibilityLabel, "加载中")
+        XCTAssertEqual(AetherIcon.error.accessibilityLabel, "错误")
+    }
+
+    // MARK: - v1.2 AetherIconCategory 分类测试
+
+    /// 验证 AetherIconCategory 4 个分类全部存在
+    func testAllCategoriesExist() {
+        let categories = Set(AetherIconCategory.allCases)
+        XCTAssertEqual(categories, [.navigation, .feature, .status, .health])
+    }
+
+    /// 验证导航类图标数量为 5（bubble/history/newConversation/search/settings）
+    func testNavigationCategoryIcons() {
+        let navIcons = AetherIcon.allCases.filter { $0.category == .navigation }
+        XCTAssertEqual(navIcons.count, 5)
+        XCTAssertTrue(navIcons.contains(.bubble))
+        XCTAssertTrue(navIcons.contains(.history))
+        XCTAssertTrue(navIcons.contains(.newConversation))
+        XCTAssertTrue(navIcons.contains(.search))
+        XCTAssertTrue(navIcons.contains(.settings))
+    }
+
+    /// 验证状态类图标数量为 4（syncing/offline/loading/error）
+    func testStatusCategoryIcons() {
+        let statusIcons = AetherIcon.allCases.filter { $0.category == .status }
+        XCTAssertEqual(statusIcons.count, 4)
+        XCTAssertTrue(statusIcons.contains(.syncing))
+        XCTAssertTrue(statusIcons.contains(.offline))
+        XCTAssertTrue(statusIcons.contains(.loading))
+        XCTAssertTrue(statusIcons.contains(.error))
+    }
+
+    /// 验证健康类图标数量为 3（heartPulse/shield/mcpSymbol）
+    func testHealthCategoryIcons() {
+        let healthIcons = AetherIcon.allCases.filter { $0.category == .health }
+        XCTAssertEqual(healthIcons.count, 3)
+        XCTAssertTrue(healthIcons.contains(.heartPulse))
+        XCTAssertTrue(healthIcons.contains(.shield))
+        XCTAssertTrue(healthIcons.contains(.mcpSymbol))
+    }
+
+    /// 验证功能类图标数量为 17（29 - 5 - 4 - 3 = 17）
+    func testFeatureCategoryIcons() {
+        let featureIcons = AetherIcon.allCases.filter { $0.category == .feature }
+        XCTAssertEqual(featureIcons.count, 17)
+        XCTAssertTrue(featureIcons.contains(.logo))
+        XCTAssertTrue(featureIcons.contains(.mcp))
+        XCTAssertTrue(featureIcons.contains(.memory))
+        XCTAssertTrue(featureIcons.contains(.agent))
+        XCTAssertTrue(featureIcons.contains(.plugin))
+        XCTAssertTrue(featureIcons.contains(.modelDownload))
+        XCTAssertTrue(featureIcons.contains(.agentCollaboration))
+        XCTAssertTrue(featureIcons.contains(.marketplace))
+    }
+
+    /// 验证每个图标分类归属非空：所有 case 都能落入 4 类之一
+    func testAllIconsHaveValidCategory() {
+        for icon in AetherIcon.allCases {
+            let category = icon.category
+            XCTAssertTrue(AetherIconCategory.allCases.contains(category),
+                          "AetherIcon.\(icon) 的 category 应为 4 大类之一")
+        }
+    }
+
+    // MARK: - v1.2 Image(aetherIcon:) 便捷初始化器测试
+
+    /// 验证 Image(aetherIcon:) 初始化器对所有 case 都不崩溃
+    func testImageInitWithAetherIconAllCases() {
+        for icon in AetherIcon.allCases {
+            _ = Image(aetherIcon: icon)
+        }
     }
 
     // MARK: - FourPointStar Shape 测试

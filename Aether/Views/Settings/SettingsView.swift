@@ -1223,7 +1223,8 @@ struct SettingsView: View {
                 HStack {
                     Text("投诉反馈", comment: "")
                     Spacer()
-                    Image(systemName: "envelope")
+                    // v1.2: 使用 AetherIcon.exportIcon 替换 SF Symbol envelope
+                    AetherIcon.exportIcon.systemImage
                         .foregroundStyle(.secondary)
                 }
             }

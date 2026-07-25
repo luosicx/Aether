@@ -26,16 +26,24 @@ public final class ThemeManager {
     }
 
     /// 切换到指定主题并持久化
+    /// v1.2: 使用 `withAnimation(AnimationTokens.themeSmooth)` 包裹赋值，
+    /// SwiftUI 会自动对依赖 `currentTheme` 的所有视图做 0.3s 平滑过渡，
+    /// 避免色板硬切闪烁。
     /// - Parameter theme: 目标主题
     public func switchTheme(_ theme: AetherTheme) {
-        currentTheme = theme
+        withAnimation(AnimationTokens.themeSmooth) {
+            currentTheme = theme
+        }
     }
 
     /// 按主题名切换（便于从 UserPreference.themeName 同步）
+    /// v1.2: 同样包裹 withAnimation 实现平滑过渡
     /// - Parameter themeName: 主题名，未匹配时保持当前主题
     public func switchTheme(byName themeName: String) {
         if let theme = AetherTheme(rawValue: themeName) {
-            currentTheme = theme
+            withAnimation(AnimationTokens.themeSmooth) {
+                currentTheme = theme
+            }
         }
     }
 }
