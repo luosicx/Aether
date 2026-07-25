@@ -12,7 +12,7 @@ import AppKit
 /// 用于自动选择合适的模型规模（2B / 7B / 11B）。
 ///
 /// 设计参考 MASTER_PLAN §4.1.3：iPhone 15 Pro 自动选择 2B，Mac 选择 11B。
-public enum DeviceCapability: String, Sendable, Equatable {
+public enum DeviceCapability: String, Sendable, Equatable, CaseIterable {
     /// 低端：iPhone SE / iPhone 14 及以下，仅支持 0.5B 模型
     case low
     /// 中端：iPhone 15 / 15 Plus，支持 1B 模型

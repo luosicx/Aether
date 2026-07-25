@@ -8,11 +8,16 @@ final class MultimodalFacadeTests: XCTestCase {
 
     func testDefaultEnginesArePlaceholder() async {
         let facade = MultimodalFacade()
-        XCTAssertTrue(facade.visionEngineName.contains("PlaceholderVisionEngine"))
-        XCTAssertEqual(facade.asrEngineName, "PlaceholderASR")
-        XCTAssertEqual(facade.ttsEngineName, "PlaceholderTTS")
-        XCTAssertTrue(facade.voiceClonerName.contains("PlaceholderVoiceCloner"))
-        XCTAssertEqual(facade.imageGenEngineName, "PlaceholderImageGen")
+        let visionName = await facade.visionEngineName
+        let asrName = await facade.asrEngineName
+        let ttsName = await facade.ttsEngineName
+        let voiceClonerName = await facade.voiceClonerName
+        let imageGenName = await facade.imageGenEngineName
+        XCTAssertTrue(visionName.contains("PlaceholderVisionEngine"))
+        XCTAssertEqual(asrName, "PlaceholderASR")
+        XCTAssertEqual(ttsName, "PlaceholderTTS")
+        XCTAssertTrue(voiceClonerName.contains("PlaceholderVoiceCloner"))
+        XCTAssertEqual(imageGenName, "PlaceholderImageGen")
     }
 
     // MARK: - describeImage
@@ -124,35 +129,40 @@ final class MultimodalFacadeTests: XCTestCase {
         let facade = MultimodalFacade()
         let customEngine = PlaceholderVisionEngine()
         await facade.setVisionEngine(customEngine)
-        XCTAssertTrue(facade.visionEngineName.contains("PlaceholderVisionEngine"))
+        let name = await facade.visionEngineName
+        XCTAssertTrue(name.contains("PlaceholderVisionEngine"))
     }
 
     @MainActor
     func testSetASREngine() async {
         let facade = MultimodalFacade()
         await facade.setASREngine(PlaceholderASREngine())
-        XCTAssertEqual(facade.asrEngineName, "PlaceholderASR")
+        let name = await facade.asrEngineName
+        XCTAssertEqual(name, "PlaceholderASR")
     }
 
     @MainActor
     func testSetTTSEngine() async {
         let facade = MultimodalFacade()
         await facade.setTTSEngine(PlaceholderTTSEngine())
-        XCTAssertEqual(facade.ttsEngineName, "PlaceholderTTS")
+        let name = await facade.ttsEngineName
+        XCTAssertEqual(name, "PlaceholderTTS")
     }
 
     @MainActor
     func testSetVoiceCloner() async {
         let facade = MultimodalFacade()
         await facade.setVoiceCloner(PlaceholderVoiceCloner())
-        XCTAssertTrue(facade.voiceClonerName.contains("PlaceholderVoiceCloner"))
+        let name = await facade.voiceClonerName
+        XCTAssertTrue(name.contains("PlaceholderVoiceCloner"))
     }
 
     @MainActor
     func testSetImageGenEngine() async {
         let facade = MultimodalFacade()
         await facade.setImageGenEngine(PlaceholderImageGenerationEngine())
-        XCTAssertEqual(facade.imageGenEngineName, "PlaceholderImageGen")
+        let name = await facade.imageGenEngineName
+        XCTAssertEqual(name, "PlaceholderImageGen")
     }
 
     // MARK: - budgetSnapshot

@@ -554,6 +554,7 @@
 		FC43B08A215C8D83A1A8A3B3 /* Conversation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B387B391B8EB8B670A86B24 /* Conversation.swift */; };
 		FD5DDD17B5DDC7F6B77D72EE /* Logger+Modules.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D0132A3B5D9777CCAF8D73E /* Logger+Modules.swift */; };
 		FDD9E835432611827707B941 /* OCRTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EB060C34347D01F9378F92C /* OCRTool.swift */; };
+		A13000000000000000000070 /* OCRTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EB060C34347D01F9378F92C /* OCRTool.swift */; };
 		FE1A2B3C4D5E6F7000000001 /* MarkdownTextTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE1A2B3C4D5E6F7000000002 /* MarkdownTextTests.swift */; };
 		FE1A2B3C4D5E6F7000000003 /* ConversationListTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE1A2B3C4D5E6F7000000004 /* ConversationListTests.swift */; };
 		FE1A2B3C4D5E6F7000000005 /* MessageBubbleTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE1A2B3C4D5E6F7000000006 /* MessageBubbleTests.swift */; };
@@ -3098,6 +3099,7 @@
 				A13000000000000000000020 /* TranscribeAudioTool.swift in Sources */,
 				A13000000000000000000023 /* CloneVoiceTool.swift in Sources */,
 				A13000000000000000000026 /* GenerateImageTool.swift in Sources */,
+				A13000000000000000000070 /* OCRTool.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
