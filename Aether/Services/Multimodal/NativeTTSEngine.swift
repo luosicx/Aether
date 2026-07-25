@@ -70,11 +70,12 @@ public final class NativeTTSEngine: TTSEngine, @unchecked Sendable {
             }
 
             self.synthesizer.write(utterance) { buffer in
-                if let buffer = buffer {
+                // write 回调类型为 AVAudioBuffer?，需 cast 为 AVAudioPCMBuffer
+                if let pcmBuffer = buffer as? AVAudioPCMBuffer {
                     lock.lock()
-                    pcmBuffers.append(buffer)
+                    pcmBuffers.append(pcmBuffer)
                     lock.unlock()
-                } else {
+                } else if buffer == nil {
                     // nil 表示合成完成
                     do {
                         let wavData = try Self.encodeToWAV(buffers: pcmBuffers)
