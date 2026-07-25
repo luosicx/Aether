@@ -1890,6 +1890,14 @@
 				78DE8551234B487B959A11FD /* RedactorRustTests.swift */,
 				FF31C32D67E245369A38B5F8 /* ChunkerRustTests.swift */,
 				F7DE67C0A3A1463B8F4CFF01 /* RateLimiterRustTests.swift */,
+				A13000000000000000000060 /* Multimodal */,
+			);
+			path = AetherTests;
+			sourceTree = "<group>";
+		};
+		A13000000000000000000060 /* Multimodal */ = {
+			isa = PBXGroup;
+			children = (
 				A13000000000000000000028 /* MultimodalErrorTests.swift */,
 				A1300000000000000000002A /* DeviceCapabilityTests.swift */,
 				A1300000000000000000002C /* MemoryBudgetTests.swift */,
@@ -1898,7 +1906,7 @@
 				A13000000000000000000032 /* OCRCrossPlatformTests.swift */,
 				A13000000000000000000034 /* PlaceholderEnginesTests.swift */,
 			);
-			path = AetherTests;
+			path = Multimodal;
 			sourceTree = "<group>";
 		};
 		A1B2C3D4E5F6071809AB1000 /* Security */ = {
