@@ -146,6 +146,53 @@
 - [ ] macOS 独有工具用 `#if os(macOS)` 守卫，iOS 构建不报错
 - [ ] iOS-only 框架（BGTaskScheduler / ActivityKit / HealthKit / WatchConnectivity）用 `#if os(iOS)` 守卫，macOS 构建不报错
 
+### Windows 构建（v1.5）
+
+- [ ] 执行命令构建 Windows Debug 版本：
+  ```bash
+  cd windows && dotnet build Aether.sln -c Debug
+  ```
+- [ ] 预期输出：`Build succeeded.` / `0 Error(s)`
+- [ ] 执行命令构建 Windows Release 版本：
+  ```bash
+  cd windows && dotnet build Aether.sln -c Release
+  ```
+- [ ] 预期输出：`Build succeeded.` / `0 Error(s)`
+- [ ] 执行单元测试：
+  ```bash
+  cd windows && dotnet test Aether.sln
+  ```
+- [ ] 预期输出：`Passed: 72` / `Failed: 0`（7 个测试文件，xUnit + WpfFact）
+- [ ] Rust `aether_core_ffi.dll` 构建验证：
+  ```bash
+  cd rust/aether-core-ffi && cargo build --release --target x86_64-pc-windows-msvc
+  ```
+- [ ] 预期产物：`rust/aether-core-ffi/target/x86_64-pc-windows-msvc/release/aether_core_ffi.dll`
+- [ ] `aether_core_ffi.dll` 已复制到 Windows 项目输出目录并被 WPF 项目引用
+
+### Android 构建（v1.5）
+
+- [ ] 执行命令构建 Android Debug APK：
+  ```bash
+  cd android && ./gradlew assembleDebug
+  ```
+- [ ] 预期输出：`BUILD SUCCESSFUL`
+- [ ] 执行单元测试：
+  ```bash
+  cd android && ./gradlew testDebugUnitTest
+  ```
+- [ ] 预期输出：`Tests: 95, Failures: 0`（12 个测试文件，JUnit + Robolectric）
+- [ ] Rust `libaether_core_ffi.so` 构建（双架构）：
+  ```bash
+  cd rust/aether-core-ffi
+  cargo build --release --target aarch64-linux-android
+  cargo build --release --target x86_64-linux-android
+  ```
+- [ ] 预期产物：
+  - `rust/aether-core-ffi/target/aarch64-linux-android/release/libaether_core_ffi.so`（arm64-v8a 真机）
+  - `rust/aether-core-ffi/target/x86_64-linux-android/release/libaether_core_ffi.so`（x86_64 模拟器）
+- [ ] 两个 `.so` 已分别复制到 `android/app/src/main/jniLibs/arm64-v8a/` 与 `android/app/src/main/jniLibs/x86_64/`
+
 ## 4.11 工具数量审计
 
 - [ ] iOS 工具数 = 18（4 原有 + 6 跨平台新增 + 3 快捷指令 + 4 多模态（v1.3）+ ClipboardTool 注册 Read+Write 两项）
@@ -157,6 +204,7 @@
   ```
 - [ ] 预期：iOS 18，macOS 29
 - [ ] ToolRegistry 注册逻辑：18 个跨平台工具无条件注册 + 11 个 macOS 工具用 `#if os(macOS)` 条件注册
+- [ ] Windows / Android 平台不直接注册工具：两端通过 BFF 代理调用工具（BFF 侧复用 iOS / macOS 的 ToolRegistry 实现），客户端仅负责展示工具调用结果与 UI 交互，无需在本地维护工具注册表
 
 ## 4.12 测试规模审计
 
@@ -187,6 +235,36 @@
     CODE_SIGNING_ALLOWED=NO 2>&1 | tail -5
   ```
 - [ ] 预期输出包含：`Executed 30 tests, with 0 failures, 0 skipped`
+
+### Windows 单元测试（v1.5）
+
+- [ ] Windows 测试用例数 = 72（72 pass / 0 skip / 0 failures）
+- [ ] Windows 测试文件数 = 7（xUnit + WpfFact）
+- [ ] 验证命令：
+  ```bash
+  cd windows && dotnet test Aether.sln --logger:"console;verbosity=normal"
+  ```
+- [ ] 预期输出包含：`Passed: 72, Failed: 0, Skipped: 0`
+- [ ] 覆盖范围：MarkdownRenderer / BffConfigStore（DPAPI 加密）/ LanguageService（8 种 .resx 切换）/ ChatViewModel（SSE 流式）
+
+### Android 单元测试（v1.5）
+
+- [ ] Android 测试用例数 = 95（95 pass / 0 skip / 0 failures）
+- [ ] Android 测试文件数 = 12（JUnit + Robolectric）
+- [ ] 验证命令：
+  ```bash
+  cd android && ./gradlew testDebugUnitTest
+  ```
+- [ ] 预期输出包含：`Tests: 95, Failures: 0, Errors: 0, Skipped: 0`
+- [ ] 覆盖范围：ConversationDao / MessageDao（Room）/ MarkdownRenderer（Markwon）/ Rust JNI（4 个 native 函数 + *Safe 回退）/ LanguageManager（8 种 strings.xml 切换）
+
+### 跨平台测试汇总
+
+- [ ] iOS / macOS Swift UT = 3314（覆盖率 84.25%）
+- [ ] Windows xUnit UT = 72
+- [ ] Android JUnit UT = 95
+- [ ] iOS UIT = 30
+- [ ] 总 Coverage = 84.25%（iOS Swift + Rust core，SonarCloud 度量）
 
 ## 4.13 文档完整性审计
 
@@ -224,6 +302,28 @@
 - [ ] 13 个视图含 `accessibilityLabel`（MarkdownText / CodeBlockView / MarkdownTableView / HeadingView / ErrorOverlay / CitationCard / ConversationRow / OnDeviceModelView / KnowledgeBaseView / HealthSettingsView / PrivacyPolicyView / DocumentPickerView / PresetPrompts）
 - [ ] 13 个关键交互元素含 `accessibilityIdentifier`（sendButton / messageInputField / voiceInputButton / knowledgeBaseButton / settingsButton / conversationListButton / newConversationButton / importDocumentButton / downloadModelButton / deleteModelButton / requestHealthAuthButton / thumbsUpButton / thumbsDownButton）
 - [ ] VoiceOver 开启后能正确朗读各视图标签与提示
+
+### Windows 国际化（v1.5）
+
+- [ ] 8 种 `.resx` 资源文件存在：`zh-Hans` / `zh-Hant` / `en` / `ja` / `ko` / `fr` / `de` / `es`
+- [ ] `LanguageService` 单例可运行时切换语言，无需重启进程
+- [ ] 验证命令：
+  ```bash
+  ls windows/Aether/Resources/Strings/*.resx
+  ```
+- [ ] 预期输出包含 8 个文件：`Strings.resx`（默认）+ `Strings.zh-Hans.resx` + `Strings.zh-Hant.resx` + `Strings.en.resx` + `Strings.ja.resx` + `Strings.ko.resx` + `Strings.fr.resx` + `Strings.de.resx` + `Strings.es.resx`
+- [ ] 设置页语言切换后，所有 UI 文本立即更新（含菜单 / 设置项 / 对话气泡 / 错误提示）
+
+### Android 国际化（v1.5）
+
+- [ ] 8 种 `strings.xml` 资源存在：`zh-Hans` / `zh-Hant` / `en` / `ja` / `ko` / `fr` / `de` / `es`
+- [ ] `LanguageManager` 调用 `Activity.recreate()` 切换语言，无需重启进程
+- [ ] 验证命令：
+  ```bash
+  ls android/app/src/main/res/values*/strings.xml
+  ```
+- [ ] 预期输出包含 8 个目录：`values/`（默认 zh-Hans）+ `values-zh-rHans/` + `values-zh-rHant/` + `values-en/` + `values-ja/` + `values-ko/` + `values-fr/` + `values-de/` + `values-es/`
+- [ ] 设置页语言切换后，所有 Compose UI 文本立即更新（含会话列表 / 设置项 / 对话气泡 / 错误提示）
 
 ## 4.15 SwiftLint 静态分析
 
@@ -429,6 +529,19 @@ Aether-{Platform}-{version}[-{qualifier}].{ext}
 ### 6.3 校验文件
 
 每个 Release 资产附带同名 `.sha256` 校验文件（如 `Aether-macOS-1.2.0.dmg.sha256`），内容为对应文件的 SHA256 哈希值，格式兼容 `shasum -c` 命令（详见第 8 节）。
+
+### 6.4 v1.5.0 跨平台发布产物清单
+
+> v1.5.0 跨平台扩展发布产物明细，与 6.2 命名规则配合使用。
+
+| 平台 | 产物文件 | 内容 | 大小（约） |
+| --- | --- | --- | --- |
+| Windows | `Aether-Windows-1.5.0-x64.zip` | `Aether.exe`（WPF .NET 8 主程序）+ `aether_core_ffi.dll`（Rust FFI）+ `appsettings.json` + 8 种 `.resx` 资源 DLL | 35 MB |
+| Android | `Aether-Android-1.5.0.apk` | Kotlin + Compose 主 APK，内含 `libaether_core_ffi.so`（arm64-v8a + x86_64 双架构）+ 8 种 `strings.xml` 资源 | 12 MB |
+
+- [ ] Windows zip 解压后含 `Aether.exe` 与 `aether_core_ffi.dll`，双击 `Aether.exe` 可启动
+- [ ] Android apk 在 arm64-v8a 真机与 x86_64 模拟器均可安装运行
+- [ ] 两端产物均已生成 `.sha256` 校验文件并通过完整性校验
 
 ## 7. macOS DMG 签名与公证
 

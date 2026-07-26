@@ -54,6 +54,24 @@
 - **优化**：替换为 SwiftUI `.fileImporter`，跨平台兼容 iOS / iPad / macOS。
 - **验收**：iOS 与 macOS 均可导入 PDF / 文本文件到知识库。
 
+### 1.8 跨平台性能优化（v1.5 已交付）
+
+> v1.5.0 完成 Windows（WPF .NET 8）与 Android（Kotlin + Jetpack Compose）平台扩展，以下为各端性能优化要点。
+
+#### Windows 端（WPF .NET 8）
+
+- **MarkdownRenderer**：Markdig pipeline 单例复用（`MarkdownPipelineBuilder` 只构建一次并缓存到静态字段），避免每条消息重新构建解析管线；FlowDocument 解析结果按消息 ID 缓存到 `Dictionary<string, FlowDocument>`，列表滚动或会话切换时命中缓存直接复用，不重复触发 Markdig 解析。
+- **BffConfigStore**：DPAPI 加密（`ProtectedData.Protect` CurrentUser scope）仅在 `Save()` 写盘路径执行一次，运行时读取配置直接返回内存缓存（`_cachedConfig`），不再触发解密；配置变更通过 `INotifyPropertyChanged` 通知 UI 绑定更新。
+- **LanguageService**：单例模式（`Lazy<LanguageService>`），8 种 `.resx` 资源在首次访问时一次性加载到 `Dictionary<string, string>` 内存字典，运行时切换语言直接替换内存字典引用，无需重新读取资源文件、无需重启进程。
+- **ChatViewModel**：SSE 流式响应按 `\n\n` 增量切分，仅对新增 token 通过 `Dispatcher.Invoke` 异步更新 UI，避免每帧全量重绘 FlowDocument；TypingIndicator 独立线程心跳驱动，不阻塞 SSE 接收线程。
+
+#### Android 端（Kotlin + Jetpack Compose）
+
+- **Room 数据库**：采用「先本地后网络」模式，会话 / 消息列表优先从 Room 读取并立即渲染，再异步请求 BFF 同步增量数据，减少主线程网络等待；`ConversationEntity` 在 `isPinned` + `updatedAt` 上建立复合索引，置顶会话排序走索引扫描而非全表排序。
+- **Markwon**：Markwon 实例通过 `remember { Markwon.create(context) }` 在 Compose 顶层缓存，避免每次 `AndroidView` 重组时重新创建（Markwon 实例化含主题插件加载，开销较大）；`AetherThemePlugin` 作为单例挂载到 Application 作用域，所有 Composable 共用同一实例。
+- **Rust JNI**：4 个 native 函数（`parseWithTools` / `reset` / `cosineF64` / `redact`）均提供 `*Safe` Kotlin 回退实现，native 路径仅在真机使用（模拟器走回退避免 `UnsatisfiedLinkError` 导致 crash），native 调用统一用 `runCatching` 包裹，失败时自动降级到 `*Safe` 实现。
+- **ChatViewModel**：消息列表使用 `StateFlow<List<Message>>`，增量 `emit` 仅追加新消息而非全量替换列表引用，Compose `LazyColumn` 配合 `key { it.id }` 仅重组新增 item，避免长会话场景下全量重组。
+
 ## 2. 体验优化
 
 ### 2.1 错误提示
@@ -105,18 +123,30 @@
 - **优化**：在 CI 中运行脚本提取 i18n key 数、工具数、测试数，检查与 README/ARCHITECTURE 是否一致。
 - **验收**：文档数字漂移时 CI 失败。
 
+### 3.4 CI 性能优化（v1.5 跨平台）
+
+- **现状**：v1.5 新增 Windows / Android CI 流水线（`windows-build` job on `windows-latest` runner / `android-build` job on `ubuntu-latest` runner），首次构建未充分缓存导致耗时偏高（windows-build 2m58s / android-build 2m40s）。
+- **优化（Windows）**：
+  - **.NET NuGet 包缓存**：使用 `actions/cache@v4` 缓存 `~/.nuget/packages`，key 含 `windows/**/packages.lock.json` 与 `*.csproj` hash，命中后 `dotnet restore` 走本地缓存，跳过 nuget.org 拉取。
+  - **Rust DLL 构建缓存**：使用 `swatinem/rust-cache@v2` 缓存 `rust/aether-core-ffi/target`，避免每次重新编译 `aether_core_ffi.dll`（Release 构建约 90s → 缓存命中后 10s）。
+- **优化（Android）**：
+  - **Gradle 缓存**：使用 `actions/cache@v4` 缓存 `~/.gradle/caches` 与 `.gradle` 目录，key 含 `gradle-wrapper.properties` + `*.gradle.kts` hash，命中后跳过依赖下载。
+  - **NDK 缓存**：单独缓存 `~/Android/Sdk/ndk` 目录（NDK 下载约 600MB，缓存后跳过下载与解压）。
+  - **Rust `.so` 构建缓存**：使用 `swatinem/rust-cache@v2` 按 target（`aarch64-linux-android` / `x86_64-linux-android`）分别缓存 `rust/aether-core-ffi/target`，避免重新交叉编译 `libaether_core_ffi.so`（双架构 Release 构建约 120s → 缓存命中后 15s）。
+- **验收**：`windows-build` job 耗时由 2m58s → ≤ 1m30s（缓存命中）；`android-build` job 耗时由 2m40s → ≤ 1m20s（缓存命中）。
+
 ---
 
 ## 4. 远期优化方向
 
-> 以下章节面向 v1.5~v3.0+ 远期演进（详见 `doc/MASTER_PLAN.md`），描述各方向的优化目标与技术路径。
+> 以下章节面向 v1.6~v3.0+ 远期演进（详见 `doc/MASTER_PLAN.md`），描述各方向的优化目标与技术路径。
 > **v1.3 / v1.4 已落地**：4.1 端侧多模态性能优化的「内存预算器」与「互斥使用」已实施，详见下方说明。
 
 ### 4.1 端侧多模态性能优化方向
 
 - **内存预算器**（v1.3 已实施）：`MemoryBudget`（`public actor`，`Aether/Services/Multimodal/MemoryBudget.swift`）协调 VLM / Whisper / SD 三类大模型同时加载时的内存使用，按 `DeviceCapability` 分级配置总预算（iPhone 1.5-3GB / iPad 3GB / Mac 6GB），通过 `reserve(mb:)` / `release(mb:)` 跟踪已用 / 剩余 / 峰值，超预算时抛 `MultimodalError.memoryBudgetExceeded`。
-- **推理加速**（v1.5 规划）：基于 Metal Performance Shaders 与 CoreML 量化推理路径加速 MLX-VLM / Whisper.cpp / MLX-Voice 推理，对比 MLX 默认实现实测目标提升 ≥ 30%。v1.4 已使用 Apple 原生 Vision / Speech / AVSpeech 框架，零外部模型加载，原生路径已具备低延迟优势。
-- **模型量化**（v1.5 规划）：将端侧 MLX-VLM / Whisper.cpp / MLX-Voice / SD Mobile 模型统一量化到 Q4（INT4）或 Q8（INT8），在精度可接受范围内将内存占用压缩到原模型的 25% / 50%。
+- **推理加速**（v1.6 规划）：基于 Metal Performance Shaders 与 CoreML 量化推理路径加速 MLX-VLM / Whisper.cpp / MLX-Voice 推理，对比 MLX 默认实现实测目标提升 ≥ 30%。v1.4 已使用 Apple 原生 Vision / Speech / AVSpeech 框架，零外部模型加载，原生路径已具备低延迟优势。
+- **模型量化**（v1.6 规划）：将端侧 MLX-VLM / Whisper.cpp / MLX-Voice / SD Mobile 模型统一量化到 Q4（INT4）或 Q8（INT8），在精度可接受范围内将内存占用压缩到原模型的 25% / 50%。
 - **互斥使用**（v1.3 已实施）：VLM / Whisper / Stable Diffusion 三个重型模型不可同时加载到内存，通过 `MultimodalFacade` 强制串行调度，避免 OOM 导致系统终止。v1.4 Native 引擎无需加载模型，`isLoaded` 始终为 `true`，进一步降低互斥成本。
 
 ### 4.2 跨设备同步效率优化方向

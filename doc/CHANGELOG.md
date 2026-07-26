@@ -6,6 +6,57 @@
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-07-26
+
+### v1.5 跨平台扩展（Windows + Android 双端交付，Rust 核心通过 DLL FFI 与 JNI 多形态复用）
+
+#### Added — Windows 端（13 个 .cs 文件 / 72 个测试用例）
+- **会话列表 UI**：新增 `ConversationListViewModel` + `ConversationListPage`，支持会话加载 / 创建 / 删除 / 置顶 / 搜索全功能，基于 `ObservableCollection` 实时同步 UI。
+- **设置页 UI**：新增 `SettingsViewModel` + `SettingsPage`，配置 BFF BaseUrl / UserToken / 模型 / 主题色 / 语言，所有设置项持久化到本地。
+- **Markdown 渲染**：新增 `MarkdownRenderer.cs`，集成 Markdig 0.37.0，将 Markdown AST 自定义渲染为 WPF `FlowDocument`，支持标题 / 代码块 / 表格 / 任务列表 / 引用 / 链接 / 行内代码等元素。
+- **国际化**：新增 `LanguageService.cs` + 8 种 `.resx` 资源文件（zh-Hans / zh-Hant / en / ja / ko / fr / de / es），运行时切换语言无需重启应用。
+- **BFF 配置 + DPAPI 加密**：新增 `BffConfigStore.cs`，使用 `ProtectedData.Protect`（CurrentUser 范围）加密 UserToken，配置文件存储到 `%LOCALAPPDATA%/Aether/bff_config.json`，避免明文泄露敏感凭证。
+- **聊天 + 流式响应**：新增 `ChatViewModel.cs`，支持 SSE 流式逐 chunk 输出与 `TypingIndicator` 打字机效果，与 iOS / macOS 端体验一致。
+- **Rust FFI 桥接**：新增 `AetherNativeBridge.cs`，通过 `aether_core_ffi.dll` P/Invoke 调用 Rust 核心算法（SHA-256 / Token 计数 / 文档分块 / 向量相似度 / SSE 解析 / 脱敏等），与 Apple 端共享同一份 Rust 代码。
+
+#### Added — Android 端（22 个 .kt 文件 / 95 个测试用例）
+- **RAG 知识库 UI**：新增 `KnowledgeBaseScreen` + `KnowledgeBaseViewModel`，提供搜索框与结果列表，复用 BFF 网关的 RAG 检索能力。
+- **Health UI**：新增 `HealthScreen` + `HealthViewModel`，支持日期选择器 + 步数 / 睡眠 / 心率三指标展示与上传，与 iOS HealthKit 流程对齐。
+- **Room 数据库生产使用**：新增 `AetherDatabase.kt`（`@Database version=1`），定义 `ConversationEntity` + `MessageEntity`，Repository 层采用「先 Room 后网络」模式，离线场景下保证历史会话可读。
+- **消息长按菜单**：在 `ChatScreen.kt` 中通过 `combinedClickable` + `DropdownMenu` 实现消息上下文菜单，提供复制 / 重发 / 删除操作。
+- **Markdown 渲染**：新增 `MarkdownText.kt`，集成 Markwon 4.6.2，通过 Compose `AndroidView` 嵌入 `TextView`，含自定义 `AetherThemePlugin` 适配深空主题（代码块深色背景 / 链接色 / 引用样式）。
+- **国际化**：新增 `LanguageManager.kt` + 8 种 `strings.xml`（zh-Hans / zh-Hant / en / ja / ko / fr / de / es），切换语言时调用 `Activity.recreate()` 重建界面。
+- **Rust JNI 集成**：新增 `Redact.kt` + `SseBridge.kt` + `VectorMath.kt` 三个 Kotlin 桥接类，加载 `libaether_core_ffi.so` 调用 Rust 核心；每个桥接类配套 `*Safe` 回退方法（System.loadLibrary 失败时降级为纯 Kotlin 实现），保证设备兼容性。
+- **设置页 UI**：新增 `SettingsScreen.kt`，配置 BFF BaseUrl / UserToken / 模型 / 主题色 / 语言，与 Windows 端设置项对齐。
+
+#### Added — Rust JNI 暴露（4 个函数）
+- **`Java_com_aether_rust_SseBridge_parseWithTools`**：SSE 流解析 + `tool_call` 字段累积，返回结构化 chunk 列表供 Kotlin 侧消费。
+- **`Java_com_aether_rust_SseBridge_reset`**：重置 SSE 累积器内部状态，用于新一轮对话开始前清理。
+- **`Java_com_aether_rust_VectorMath_cosineF64`**：F64 向量余弦相似度计算，用于语义缓存命中判定与 RAG topK 检索。
+- **`Java_com_aether_rust_Redact_redact`**：敏感信息脱敏（手机号 / 邮箱 / 身份证 / 银行卡等），与 iOS / macOS 端共享同一份 Rust 实现。
+
+#### Added — CI
+- **windows-build job**：新增 Windows 端 CI 构建 job，运行 `dotnet build` + `dotnet test`，产出 win-x64 自包含压缩包，耗时约 2m58s。
+- **android-build job**：新增 Android 端 CI 构建 job，运行 `./gradlew assembleDebug` + `./gradlew testDebugUnitTest`，产出 release APK（debug 签名），耗时约 2m40s。
+
+#### Tests
+- **测试规模**：UT 从 3314 增至 3481（+167 用例：iOS/macOS 3314 基线 + Windows 72 + Android 95）。
+- **Windows 测试**：新增 `Aether.Windows.Tests` 项目（xUnit），覆盖 `ConversationListViewModelTest` / `SettingsViewModelTest` / `MarkdownRendererTest` / `LanguageServiceTest` / `BffConfigStoreTest` / `AetherApiClientTest` / `ModelsTest` 共 72 用例。
+- **Android 测试**：新增 9 个测试文件（JUnit + MockK），覆盖 `LanguageManagerTest` / `MarkdownTextTest` / `ChatViewModelDeleteTest` / `KnowledgeBaseViewModelTest` / `HealthViewModelTest` / `ConversationRepositoryRoomTest` / `RedactTest` / `VectorMathTest` / `SseBridgeTest` / `ModelsTest` / `ConversationRepositoryTest` / `BffConfigTest` 共 95 用例。
+
+#### Release
+- **PR #40**：squash merge 到 main，CI run #30188559217 全部 14 个 job 通过：
+  - windows-build：pass（2m58s）
+  - android-build：pass（2m40s）
+  - unit-tests (iOS)：pass（32m4s）
+  - unit-tests-macos：pass（1h14m10s）
+  - ui-tests：pass（21m2s）
+  - 其他 9 个 job 全部 pass
+- **Coverage**：84.25%（iOS Swift + Rust core，阈值 80%）
+- **发布时间**：2026-07-26（北京时间）
+
+---
+
 ## [1.4.0] - 2026-07-25
 
 ### v1.4 端侧多模态 Phase 1.5（Apple 原生引擎实现：NativeVision / NativeASR / NativeTTS 替换占位）

@@ -35,6 +35,8 @@
    - 4.25 [桌面 Widget](#425-桌面-widget)
    - 4.26 [DeepLink](#426-deeplink)
    - 4.27 [端侧多模态](#427-端侧多模态v13--v14)
+   - 4.28 [Windows 端](#428-windows-端)
+   - 4.29 [Android 端](#429-android-端)
 5. [多平台支持](#5-多平台支持)
 6. [工具能力清单](#6-工具能力清单)
 7. [开发工作流](#7-开发工作流)
@@ -46,6 +48,8 @@
 
 ## 1. 环境要求
 
+### 1.1 Apple 平台（iOS / iPad / macOS）
+
 | 项 | 要求 | 说明 |
 |---|---|---|
 | Xcode | 16+ | 编译 SwiftData / Observation 等新 API |
@@ -55,6 +59,30 @@
 | mlx-swift SPM 依赖 | 端侧推理可选 | 真机集成后启用 MLX，模拟器走占位实现 |
 
 > 备注：本项目依赖 SwiftUI、SwiftData、ActivityKit、HealthKit、AppIntents、AVFoundation 等系统框架，无需安装额外第三方包（除端侧推理的可选 mlx-swift）。所有依赖均通过 Swift Package / 系统库提供。
+
+### 1.2 Windows 平台
+
+| 项 | 要求 | 说明 |
+|---|---|---|
+| 操作系统 | Windows 10 / 11 x64 | 运行 WPF .NET 8 客户端 |
+| .NET SDK | 8.0+ | 编译 WPF 项目（`dotnet build` / `dotnet test`）|
+| IDE | Visual Studio 2022 或 VS Code | C# 12 + XAML 开发 |
+| Rust（可选） | 1.75+ | 构建 `aether_core_ffi.dll`：`cargo build -p aether-core-ffi --target x86_64-pc-windows-msvc --release`，输出置于 `windows/Aether.Windows/Native/` |
+
+> 备注：Windows 端基于 WPF .NET 8 构建，项目位于 `windows/`。Rust DLL 为可选依赖，缺失时 `AetherNativeBridge` 走纯 C# 回退实现（SHA-256 / Token 计数 / SSE 解析 / 向量计算）。
+
+### 1.3 Android 平台
+
+| 项 | 要求 | 说明 |
+|---|---|---|
+| Android Studio | Hedgehog（2023.1.1）+ | Jetpack Compose 开发 |
+| JDK | 17 | Gradle 8.7 + Kotlin 1.9+ 编译 |
+| Android SDK | API 29+（Build Tools 35.0.0）| minSdk 29 / targetSdk 35 |
+| Kotlin | 1.9+ | Compose + Coroutines + Flow |
+| Android NDK | r25+ | 编译 Rust .so 所需（aarch64-linux-android + x86_64-linux-android 两个 ABI）|
+| Rust（可选） | 1.75+ | 构建 `libaether_core_ffi.so`：`cargo build --target aarch64-linux-android --release` 与 `cargo build --target x86_64-linux-android --release`，输出置于 `app/src/main/jniLibs/<abi>/` |
+
+> 备注：Android 端基于 Kotlin + Jetpack Compose 构建，项目位于 `android/`。Rust .so 为可选依赖，缺失时 `Redact` / `SseBridge` / `VectorMath` 三个 JNI 包装类走纯 Kotlin 回退实现，单元测试（Robolectric）默认走回退路径。
 
 ---
 
@@ -578,18 +606,18 @@ Aether 支持 `aether://` URL Scheme 的 DeepLink：
 
 - **协议层**（v1.3）：5 个引擎协议 `VisionInferenceEngine` / `ASREngine` / `TTSEngine` / `VoiceCloner` / `ImageGenerationEngine`，定义统一的加载 / 推理接口。
 - **门面层**（v1.3）：`MultimodalFacade`（`public actor`）统一调度，5 个引擎可注入切换，4 个工具方法暴露给 `ToolRegistry`。
-- **实现层**（v1.4）：`NativeVisionEngine` / `NativeASREngine` / `NativeTTSEngine`（Apple 原生框架，默认实现）；`PlaceholderVoiceCloner` / `PlaceholderImageGenerationEngine`（仍为占位，v1.5 集成 OpenVoice / SD Mobile）。
+- **实现层**（v1.4）：`NativeVisionEngine` / `NativeASREngine` / `NativeTTSEngine`（Apple 原生框架，默认实现）；`PlaceholderVoiceCloner` / `PlaceholderImageGenerationEngine`（仍为占位，v1.6 集成 OpenVoice / SD Mobile）。
 - **基础设施**（v1.3）：`MemoryBudget`（全局内存预算器）/ `DeviceCapability`（设备能力分级）/ `MultimodalError`（16 种错误类型）。
 
 #### 4.27.2 引擎清单与平台支持
 
-| 引擎协议 | v1.3 占位 | v1.4 Native 实现 | v1.5 计划 | 平台支持 |
+| 引擎协议 | v1.3 占位 | v1.4 Native 实现 | v1.6 计划 | 平台支持 |
 |----------|----------|------------------|----------|----------|
 | `VisionInferenceEngine` | `PlaceholderVisionEngine` | `NativeVisionEngine`（Vision 框架）| `MLXVisionEngine`（MLX-VLM）| iOS / iPad / macOS |
 | `ASREngine` | `PlaceholderASREngine` | `NativeASREngine`（SFSpeech 文件识别）| `WhisperASREngine`（whisper.cpp）| iOS / iPad / macOS（需授权）|
 | `TTSEngine` | `PlaceholderTTSEngine` | `NativeTTSEngine`（AVSpeechSynthesizer.write）| `MLXVoiceTTSEngine`（MLX-Voice）| iOS / iPad / macOS |
-| `VoiceCloner` | `PlaceholderVoiceCloner` | —（仍为占位）| `OpenVoiceCloner`（OpenVoice v2）| 待 v1.5 |
-| `ImageGenerationEngine` | `PlaceholderImageGenerationEngine` | —（仍为占位）| `SDMobileEngine`（SD Mobile）| 待 v1.5 |
+| `VoiceCloner` | `PlaceholderVoiceCloner` | —（仍为占位）| `OpenVoiceCloner`（OpenVoice v2）| 待 v1.6 |
+| `ImageGenerationEngine` | `PlaceholderImageGenerationEngine` | —（仍为占位）| `SDMobileEngine`（SD Mobile）| 待 v1.6 |
 
 #### 4.27.3 LLM 工具调用入口
 
@@ -599,8 +627,8 @@ LLM 通过 ReAct 循环调用以下 4 个工具（详见 [6.5 多模态工具](#
 |------|------|----------|--------------|
 | DescribeImageTool | `describe_image` | "分析这张图片中的文字" | NativeVisionEngine 5 并发请求，按 prompt 聚焦返回 |
 | TranscribeAudioTool | `transcribe_audio` | "把这段录音转成文字" | NativeASREngine 文件识别 |
-| CloneVoiceTool | `clone_voice` | "用我的声音克隆一个音色" | Placeholder（v1.5 集成 OpenVoice）|
-| GenerateImageTool | `generate_image` | "画一只猫" | Placeholder（v1.5 集成 SD Mobile）|
+| CloneVoiceTool | `clone_voice` | "用我的声音克隆一个音色" | Placeholder（v1.6 集成 OpenVoice）|
+| GenerateImageTool | `generate_image` | "画一只猫" | Placeholder（v1.6 集成 SD Mobile）|
 
 #### 4.27.4 编程式使用
 
@@ -622,7 +650,7 @@ let transcript = try await facade.transcribeAudio(at: audioURL, language: "zh")
 let wavData = try await facade.synthesizeSpeech(text: "你好，世界", voiceId: nil)
 
 // 4. 引擎运行时切换（依赖注入）
-await facade.setVisionEngine(MLXVisionEngine())  // v1.5+
+await facade.setVisionEngine(MLXVisionEngine())  // v1.6+
 ```
 
 #### 4.27.5 内存预算查询
@@ -645,6 +673,107 @@ print("利用率：\(snapshot.utilizationPercentage)%")
   - `Aether/Services/Multimodal/MultimodalFacade.swift`：多模态门面
   - `Aether/Services/Multimodal/NativeVisionEngine.swift` / `NativeASREngine.swift` / `NativeTTSEngine.swift`：Apple 原生引擎实现
   - `Aether/Services/Multimodal/MemoryBudget.swift` / `DeviceCapability.swift` / `MultimodalError.swift`：基础设施
+
+### 4.28 Windows 端
+
+> v1.5.0 新增。Windows 端基于 WPF .NET 8 构建，项目位于 `windows/`，提供与 Apple 端对等的核心聊天体验。Rust FFI（`aether_core_ffi.dll`）为可选依赖。
+
+#### 4.28.1 启动与首次配置
+
+1. 在 `windows/` 目录下执行 `dotnet build`（或 Visual Studio 中按 F5），运行 `Aether.Windows.exe`。
+2. 启动后进入主界面，会话列表为空（与 iOS 行为一致，不主动创建会话）。
+3. 点击「设置」打开 `SettingsPage`：
+   - **BFF 代理** Section：输入 BFF URL（如 `https://aether-bff.example.com`）+ BFF Token，开启 Toggle。
+   - Token 经 **DPAPI** 加密后写入本地配置（`BffConfigStore` 调用 `System.Security.Cryptography.ProtectedData.Protect`），仅当前 Windows 用户可解密。
+4. 在「模型」Section 选择供应商与模型 ID。
+5. 点击「保存」返回主界面。
+
+#### 4.28.2 流式对话
+
+- 在底部输入框输入消息，按 Enter 或点击「发送」按钮发起请求。
+- 通过 `AetherApiClient` 走真实 SSE 流式（Rust DLL 可用时复用 `AetherNativeBridge` 的 SSE 解析），文字逐字显示。
+- 助手消息通过 `MarkdownRenderer` 渲染为 WPF `FlowDocument`，支持代码块、表格、列表、标题等。
+
+#### 4.28.3 会话列表
+
+- 点击工具栏「会话列表」打开 `ConversationListPage`。
+- 支持新建 / 切换 / 删除会话；按创建时间倒序排列。
+- 顶部搜索框实时过滤会话标题。
+
+#### 4.28.4 切换语言
+
+- 设置页「语言」Section 提供 8 种语言：简体中文 / 繁体中文 / 英文 / 日文 / 韩文 / 法文 / 德文 / 西班牙文。
+- 切换后通过 `LanguageService` 设置 `Strings.Culture = CultureInfo(<locale>)`，**立即生效，无需重启 App**。
+- 资源文件为 `windows/Aether.Windows/Properties/Strings.<locale>.resx`，共 8 种。
+
+#### 4.28.5 对应代码
+
+- `windows/Aether.Windows/Views/`：`ChatPage` / `ConversationListPage` / `SettingsPage`（XAML + 代码后置）
+- `windows/Aether.Windows/ViewModels/`：`ChatViewModel` / `ConversationListViewModel` / `SettingsViewModel`
+- `windows/Aether.Windows/Services/`：`AetherApiClient` / `BffConfigStore`（DPAPI 加密）/ `LanguageService` / `MarkdownRenderer`
+- `windows/Aether.Windows/Native/AetherNativeBridge.cs`：Rust FFI 桥接
+- `windows/Aether.Windows/Properties/Strings.*.resx`：8 种语言资源
+
+> **常见问题**：见 [Q16 Windows 端 BFF 配置如何加密](#q16-windows-端-bff-配置如何加密) / [Q17 Windows 端如何切换语言](#q17-windows-端如何切换语言) / [Q18 Windows 端 Markdown 支持哪些元素](#q18-windows-端-markdown-支持哪些元素)。
+
+### 4.29 Android 端
+
+> v1.5.0 新增。Android 端基于 Kotlin + Jetpack Compose 构建，项目位于 `android/`，提供聊天、RAG、健康洞察等核心功能。Rust JNI（`libaether_core_ffi.so`，arm64-v8a + x86_64 两个 ABI）为可选依赖。
+
+#### 4.29.1 启动与首次配置
+
+1. 在 `android/` 目录下执行 `./gradlew assembleDebug` 后安装 APK。
+2. 启动后进入主界面（`ConversationListScreen` 默认空状态）。
+3. 点击右上角「设置」打开 `SettingsScreen`：
+   - **BFF 代理** Section：输入 BFF URL + Token，开启 Toggle。
+   - 配置经 `BffConfigStore` 持久化到 `SharedPreferences`。
+4. 在「模型」Section 选择供应商与模型 ID。
+5. 返回主界面。
+
+#### 4.29.2 会话列表
+
+- 点击底部「会话」Tab 切换到 `ConversationListScreen`。
+- 会话与消息持久化在 Room 数据库（`AetherDatabase`），按创建时间倒序排列。
+- 支持新建 / 切换 / 删除会话；删除会话时通过外键 `onDelete = CASCADE` 自动清理消息。
+
+#### 4.29.3 流式对话
+
+- 在 `ChatScreen` 底部输入框输入消息，点击「发送」按钮。
+- 通过 `ChatStreamClient` 走真实 SSE 流式（Rust .so 可用时复用 `SseBridge`，否则走纯 Kotlin 回退），文字逐字显示。
+- 助手消息通过 `MarkdownText`（基于 Markwon 4.6.2）渲染，支持代码块、表格、列表、链接等。
+
+#### 4.29.4 RAG 知识库
+
+- 点击底部「知识库」Tab 进入 `KnowledgeBaseScreen`。
+- 选择 PDF 文档后调用 `KnowledgeBaseViewModel` 提取文本、分块、生成向量并写入 Room。
+- 在 `ChatScreen` 中提问，自动检索 topK 分块注入 system prompt，回复中显示引用卡片。
+
+#### 4.29.5 健康洞察
+
+- 点击底部「健康」Tab 进入 `HealthScreen`。
+- 授权后读取 Health Connect 数据，调用 LLM 生成洞察并写入 Room。
+- 列表按时间倒序展示，含免责声明「⚠️ 以上内容由 AI 生成，仅供参考，非医疗建议。」。
+
+#### 4.29.6 消息长按菜单
+
+- 在 `ChatScreen` 中**长按任意消息气泡**触发弹窗菜单：
+  - **用户消息**：复制 / 重新提问
+  - **助手消息**：复制
+
+#### 4.29.7 切换语言
+
+- 设置页「语言」Section 提供 8 种语言。
+- 切换后通过 `LanguageManager` 调用 `AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(<locale>))`，**需 recreate Activity** 才能生效。
+- 资源文件为 `android/app/src/main/res/values-<locale>/strings.xml`，共 8 种。
+
+#### 4.29.8 对应代码
+
+- `android/app/src/main/java/com/aether/app/ui/`：`chat` / `conversation` / `rag` / `health` / `settings` / `navigation` / `theme` 各模块
+- `android/app/src/main/java/com/aether/app/data/`：`api` / `db` / `model` / `repository`
+- `android/app/src/main/java/com/aether/app/rust/`：Rust JNI 桥接（`Redact` / `SseBridge` / `VectorMath`）
+- `android/app/src/main/res/values-*/strings.xml`：8 种语言资源
+
+> **常见问题**：见 [Q19 Android 端 Room 数据库如何工作](#q19-android-端-room-数据库如何工作) / [Q20 Android 端 Rust JNI 在测试中如何回退](#q20-android-端-rust-jni-在测试中如何回退) / [Q21 Android 端如何切换语言](#q21-android-端如何切换语言)。
 
 ---
 
@@ -778,8 +907,8 @@ Rust `aether-core-ffi` 通过 `AetherRustBin` xcframework 提供跨平台统一�
 |---|---|---|---|
 | 25 | DescribeImageTool | `describe_image` | 图像理解：参数 `image_path`（图片路径）+ `prompt`（文本提示，如 "描述这张图片" / "识别文字" / "检测人脸"）。底层 `NativeVisionEngine`（v1.4）基于 Vision 框架 5 个请求并发：分类（VNClassifyImageRequest）/ 人脸（VNDetectFaceRectanglesRequest）/ 矩形（VNDetectRectanglesRequest）/ 文字（VNRecognizeTextRequest，zh-Hans + en，`.accurate`）/ 条码（VNDetectBarcodesRequest）。按 prompt 关键字聚焦返回（"文字" → OCR 结果，"人脸" → 人脸数，"条码" → 条码列表，默认 → 全部汇总） |
 | 26 | TranscribeAudioTool | `transcribe_audio` | 音频转写：参数 `audio_path` + `language`（默认 "zh"）。底层 `NativeASREngine`（v1.4）基于 `SFSpeechURLRecognitionRequest` 文件识别，支持 wav / caf / m4a / mp3 / aac 格式；CI 环境识别器不可用时抛 `asrRecognitionFailed` |
-| 27 | CloneVoiceTool | `clone_voice` | 语音克隆：参数 `audio_path`（样本音频 ≥5s）+ `voice_name`（自定义音色名）。v1.3 占位实现返回 `engineNotLoaded`；v1.5 将集成 OpenVoice v2 蒸馏模型 |
-| 28 | GenerateImageTool | `generate_image` | 图像生成：参数 `prompt` + `negative_prompt` + `width`（默认 512）+ `height`（默认 512）+ `steps`（默认 20）+ `seed`。v1.3 占位实现返回 `platformUnsupported`；v1.5 将集成 SD Mobile |
+| 27 | CloneVoiceTool | `clone_voice` | 语音克隆：参数 `audio_path`（样本音频 ≥5s）+ `voice_name`（自定义音色名）。v1.3 占位实现返回 `engineNotLoaded`；v1.6 将集成 OpenVoice v2 蒸馏模型 |
+| 28 | GenerateImageTool | `generate_image` | 图像生成：参数 `prompt` + `negative_prompt` + `width`（默认 512）+ `height`（默认 512）+ `steps`（默认 20）+ `seed`。v1.3 占位实现返回 `platformUnsupported`；v1.6 将集成 SD Mobile |
 
 > **说明**：iOS 上可用工具 = 4 原有 + 6 跨平台 + 3 快捷指令 + 4 多模态 = **18 个**（ClipboardTool 注册 Read+Write 两项）；macOS 独有 11 个在 iOS 不可用。
 
@@ -980,3 +1109,43 @@ GitHub Actions 配置文件：`.github/workflows/ci.yml`
 - `reboot`
 
 命中任一模式即返回拒绝信息。此外，命令执行还有 **30 秒超时**保护，超时后中断进程。
+
+### Q16: Windows 端 BFF 配置如何加密？
+
+**A**：Windows 端使用 **DPAPI**（Windows Data Protection API）加密 BFF Token。`BffConfigStore` 通过 .NET 的 `System.Security.Cryptography.ProtectedData.Protect(..., DataProtectionScope.CurrentUser)` 方法加密，密钥绑定当前 Windows 用户账户，仅同一用户在同一台机器上可解密。配置文件位于 `%APPDATA%\Aether\bffconfig.json`，加密后的 Token 以 Base64 字符串存储。换用户或换机器解密会失败，需重新输入 Token。
+
+### Q17: Windows 端如何切换语言？
+
+**A**：进入「设置 → 语言」Section，提供 8 种语言：简体中文 / 繁体中文 / 英文 / 日文 / 韩文 / 法文 / 德文 / 西班牙文。选中后 `LanguageService` 调用 `Strings.Culture = CultureInfo(<locale>)`，**立即生效，无需重启 App**。资源文件为 `windows/Aether.Windows/Properties/Strings.<locale>.resx`，共 8 种（zh-Hans 为源语言 `Strings.resx`，其余 7 种为 `Strings.en.resx` / `Strings.ja.resx` 等）。
+
+### Q18: Windows 端 Markdown 支持哪些元素？
+
+**A**：助手消息通过 `MarkdownRenderer` 转换为 WPF `FlowDocument` 渲染，支持以下元素：
+
+1. **标题**：H1-H6，分级字号
+2. **代码块**：用 \`\`\` 包裹，含语言标签（如 \`\`\`csharp），通过 `CodeSyntaxHighlighter` 高亮，**支持 11 种语言**：Swift / Python / JavaScript / JSON / Java / Kotlin / Go / Rust / C / C++ / SQL
+3. **表格**：连续 `|` 分隔的行，渲染为 `Table` 控件，奇偶行交替背景
+4. **任务列表**：以 `- [x]` 或 `- [ ]` 开头的行，渲染为勾选框 + 文本
+5. **列表**：有序（`1.`）/ 无序（`-`）
+6. **行内元素**：粗体、斜体、行内代码、链接
+
+### Q19: Android 端 Room 数据库如何工作？
+
+**A**：`AetherDatabase` 基于 AndroidX Room 持久化库，定义在 `android/app/src/main/java/com/aether/app/data/db/AetherDatabase.kt`。包含 `ConversationDao` 与 `MessageDao` 两个 DAO，分别操作 `ConversationEntity` 与 `MessageEntity`。会话与消息为 **一对多关系**，外键 `conversationId` 配置 `onDelete = CASCADE`，删除会话时自动级联清理消息。数据库文件位于 `/data/data/com.aether.app/databases/aether.db`。`RepositorySyncManager` 提供统一的读写入口，所有 DB 操作在 `Dispatchers.IO` 上执行，并通过 `Flow` 回调 UI 层。
+
+### Q20: Android 端 Rust JNI 在测试中如何回退？
+
+**A**：Rust `libaether_core_ffi.so` 在单元测试环境（Robolectric）下不可加载，因此 `Redact` / `SseBridge` / `VectorMath` 三个 JNI 包装类在 `System.loadLibrary` 失败时回退到纯 Kotlin 实现：
+
+- 加载检测：`try { System.loadLibrary("aether_core_ffi") } catch (_: UnsatisfiedLinkError) { nativeLibLoaded = false }`
+- `Redact`：用正则表达式替代 Rust 脱敏（UUID / 邮箱 / URL / Token / 密码 / 路径 6 类模式）
+- `SseBridge`：用 Kotlin 流式字符解析替代 Rust SSE 解析（含 `tool_calls` 跨 chunk 累积）
+- `VectorMath`：用 `FloatArray` 遍历替代 Rust 向量计算（余弦相似度 + Top-K 检索）
+
+测试中所有用例均走回退路径，覆盖率与真机一致。真机上若 .so 加载成功，自动切换到 Rust 实现。
+
+### Q21: Android 端如何切换语言？
+
+**A**：进入「设置 → 语言」Section，提供 8 种语言。选中后 `LanguageManager` 调用 `AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(<locale>))` 写入，**需 recreate Activity** 才能生效。`LanguageManager` 内部会调用 `activity.recreate()` 触发重建，所有 Composable 重新组合并加载新语言的 `strings.xml`。资源文件为 `android/app/src/main/res/values-<locale>/strings.xml`，共 8 种（默认 `values/strings.xml` 为 zh-Hans 源语言）。
+
+> **注意**：与 iOS / Windows 端「立即生效，无需重启」不同，Android 端必须 recreate Activity。若切换后界面未刷新，检查 `LanguageManager` 是否已调用 `activity.recreate()`。
