@@ -1085,8 +1085,12 @@ final class VoiceServiceTests: XCTestCase {
 
     /// requestPermission 应返回 Bool 且不会阻塞主线程；在模拟器无授权弹窗时也能正常返回。
     func testRequestPermissionReturnsBoolOnSimulator() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil,
-                      "跳过：模拟器环境下 SFSpeechRecognizer.requestAuthorization 永不返回")
+        // M-C14: macOS CI runner（非模拟器）调用 SFSpeechRecognizer.requestAuthorization
+        // 会触发系统权限对话框，测试无限等待，最终导致 unit-tests-macos job 90 分钟超时被 cancelled
+        // （run #30198121175 复现）。参照 HealthContextInjectorTests 的 isCI 模式统一加 CI 跳过。
+        let isCI = ProcessInfo.processInfo.environment["CI"] != nil
+        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || isCI,
+                      "跳过：模拟器与 CI 环境下 SFSpeechRecognizer.requestAuthorization 永不返回")
         let service = VoiceService()
         let result = await service.requestPermission()
         XCTAssertTrue(result == true || result == false, "requestPermission 应返回 Bool")
