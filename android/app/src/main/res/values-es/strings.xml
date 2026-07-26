@@ -1,0 +1,102 @@
+<resources>
+    <string name="app_name">Aether</string>
+
+    <!-- Lista de conversaciones -->
+    <string name="conversation_list_title">Conversaciones</string>
+    <string name="conversation_list_new">Nueva conversación</string>
+    <string name="conversation_list_empty">No hay conversaciones</string>
+    <string name="conversation_list_empty_hint">No hay conversaciones. Toca el botón de la parte inferior derecha para empezar.</string>
+    <string name="conversation_list_delete">Eliminar</string>
+    <string name="conversation_list_pin">Fijar</string>
+    <string name="conversation_list_unpin">Desfijar</string>
+    <string name="conversation_list_pinned">Fijado</string>
+    <string name="conversation_list_start_chat">Toca para iniciar una conversación</string>
+    <string name="conversation_list_new_conversation">Nueva conversación %1$d</string>
+
+    <!-- Chat -->
+    <string name="chat_send">Enviar</string>
+    <string name="chat_input_placeholder">Escribe un mensaje…</string>
+    <string name="chat_thinking">Pensando…</string>
+    <string name="chat_copy">Copiar</string>
+    <string name="chat_retry">Reenviar</string>
+    <string name="chat_delete_message">Eliminar mensaje</string>
+    <string name="chat_delete">Eliminar</string>
+    <string name="chat_close">Cerrar</string>
+    <string name="chat_load_messages_failed">Error al cargar mensajes: %1$s</string>
+    <string name="chat_send_failed">Error al enviar: %1$s</string>
+    <string name="chat_delete_message_failed">Error al eliminar el mensaje: %1$s</string>
+    <string name="chat_knowledge_base">Base de conocimiento</string>
+    <string name="chat_settings">Ajustes</string>
+    <string name="chat_back">Atrás</string>
+
+    <!-- Ajustes -->
+    <string name="settings_title">Ajustes</string>
+    <string name="settings_bff_gateway">Pasarela BFF</string>
+    <string name="settings_bff_url">URL del endpoint BFF</string>
+    <string name="settings_bff_token">X-BFF-Token</string>
+    <string name="settings_bff_token_label">Token BFF</string>
+    <string name="settings_default_model">Modelo predeterminado</string>
+    <string name="settings_model">Modelo</string>
+    <string name="settings_show_token">Mostrar</string>
+    <string name="settings_hide_token">Ocultar</string>
+    <string name="settings_save">Guardar</string>
+    <string name="settings_back">Atrás</string>
+    <string name="settings_accent_color">Color de acento</string>
+    <string name="settings_accent_color_purple">Violeta Aether</string>
+    <string name="settings_accent_color_blue">Azul eléctrico</string>
+    <string name="settings_accent_color_glow">Brillo nebular</string>
+    <string name="settings_language">Idioma</string>
+    <string name="settings_knowledge_base">Base de conocimiento</string>
+    <string name="settings_knowledge_base_subtitle">Buscar documentos RAG</string>
+    <string name="settings_health">Salud</string>
+    <string name="settings_health_subtitle">Ver / subir datos de salud</string>
+    <string name="settings_features">Funciones</string>
+
+    <!-- Nombres de idiomas (mostrados en su propio idioma) -->
+    <string name="language_zh_hans">简体中文</string>
+    <string name="language_zh_hant">繁體中文</string>
+    <string name="language_en">English</string>
+    <string name="language_ja">日本語</string>
+    <string name="language_ko">한국어</string>
+    <string name="language_fr">Français</string>
+    <string name="language_de">Deutsch</string>
+    <string name="language_es">Español</string>
+
+    <!-- Base de conocimiento -->
+    <string name="knowledge_base_title">Base de conocimiento</string>
+    <string name="knowledge_base_search">Buscar</string>
+    <string name="knowledge_base_search_placeholder">Introduce palabras clave…</string>
+    <string name="knowledge_base_no_results">No se encontraron documentos relacionados</string>
+    <string name="knowledge_base_empty">Introduce palabras clave para buscar en la base</string>
+    <string name="knowledge_base_unnamed">Documento sin título</string>
+    <string name="knowledge_base_source">Fuente: %1$s</string>
+    <string name="knowledge_base_relevance">Relevancia: %1$.2f</string>
+    <string name="knowledge_base_retry">Reintentar</string>
+    <string name="knowledge_base_close">Cerrar</string>
+
+    <!-- Salud -->
+    <string name="health_title">Salud</string>
+    <string name="health_date_label">Fecha (aaaa-MM-dd)</string>
+    <string name="health_steps">Pasos</string>
+    <string name="health_sleep_hours">Duración del sueño</string>
+    <string name="health_resting_heart_rate">Frecuencia cardíaca en reposo</string>
+    <string name="health_upload">Subir los datos de salud de hoy</string>
+    <string name="health_hours">horas</string>
+    <string name="health_bpm">ppm</string>
+    <string name="health_steps_unit">pasos</string>
+    <string name="health_close">Cerrar</string>
+
+    <!-- Común -->
+    <string name="common_loading">Cargando…</string>
+    <string name="common_error">Algo salió mal</string>
+    <string name="common_retry">Reintentar</string>
+    <string name="common_confirm">Confirmar</string>
+    <string name="common_cancel">Cancelar</string>
+    <string name="common_close">Cerrar</string>
+
+    <!-- Mensajes de error del ViewModel -->
+    <string name="error_load_conversations_failed">Error al cargar conversaciones: %1$s</string>
+    <string name="error_create_conversation_failed">Error al crear conversación: %1$s</string>
+    <string name="error_update_failed">Error al actualizar: %1$s</string>
+    <string name="error_delete_failed">Error al eliminar: %1$s</string>
+</resources>

@@ -1,0 +1,102 @@
+<resources>
+    <string name="app_name">以太</string>
+
+    <!-- 會話列表 -->
+    <string name="conversation_list_title">會話列表</string>
+    <string name="conversation_list_new">新建會話</string>
+    <string name="conversation_list_empty">暫無會話</string>
+    <string name="conversation_list_empty_hint">暫無會話，點擊右下角開始對話</string>
+    <string name="conversation_list_delete">刪除</string>
+    <string name="conversation_list_pin">置頂</string>
+    <string name="conversation_list_unpin">取消置頂</string>
+    <string name="conversation_list_pinned">已置頂</string>
+    <string name="conversation_list_start_chat">點擊開始對話</string>
+    <string name="conversation_list_new_conversation">新會話 %1$d</string>
+
+    <!-- 聊天 -->
+    <string name="chat_send">傳送</string>
+    <string name="chat_input_placeholder">輸入訊息…</string>
+    <string name="chat_thinking">思考中…</string>
+    <string name="chat_copy">複製</string>
+    <string name="chat_retry">重發</string>
+    <string name="chat_delete_message">刪除訊息</string>
+    <string name="chat_delete">刪除</string>
+    <string name="chat_close">關閉</string>
+    <string name="chat_load_messages_failed">載入訊息失敗：%1$s</string>
+    <string name="chat_send_failed">傳送失敗：%1$s</string>
+    <string name="chat_delete_message_failed">刪除訊息失敗：%1$s</string>
+    <string name="chat_knowledge_base">知識庫</string>
+    <string name="chat_settings">設定</string>
+    <string name="chat_back">返回</string>
+
+    <!-- 設定 -->
+    <string name="settings_title">設定</string>
+    <string name="settings_bff_gateway">BFF 閘道</string>
+    <string name="settings_bff_url">BFF 端點 URL</string>
+    <string name="settings_bff_token">X-BFF-Token</string>
+    <string name="settings_bff_token_label">BFF 權杖</string>
+    <string name="settings_default_model">預設模型</string>
+    <string name="settings_model">模型</string>
+    <string name="settings_show_token">顯示</string>
+    <string name="settings_hide_token">隱藏</string>
+    <string name="settings_save">儲存</string>
+    <string name="settings_back">返回</string>
+    <string name="settings_accent_color">主題色</string>
+    <string name="settings_accent_color_purple">神秘紫</string>
+    <string name="settings_accent_color_blue">電光藍</string>
+    <string name="settings_accent_color_glow">星雲光</string>
+    <string name="settings_language">語言</string>
+    <string name="settings_knowledge_base">知識庫</string>
+    <string name="settings_knowledge_base_subtitle">搜尋 RAG 文件</string>
+    <string name="settings_health">健康洞察</string>
+    <string name="settings_health_subtitle">檢視 / 上傳健康資料</string>
+    <string name="settings_features">功能</string>
+
+    <!-- 語言名稱（以各自語言顯示） -->
+    <string name="language_zh_hans">简体中文</string>
+    <string name="language_zh_hant">繁體中文</string>
+    <string name="language_en">English</string>
+    <string name="language_ja">日本語</string>
+    <string name="language_ko">한국어</string>
+    <string name="language_fr">Français</string>
+    <string name="language_de">Deutsch</string>
+    <string name="language_es">Español</string>
+
+    <!-- 知識庫 -->
+    <string name="knowledge_base_title">知識庫</string>
+    <string name="knowledge_base_search">搜尋</string>
+    <string name="knowledge_base_search_placeholder">輸入關鍵字…</string>
+    <string name="knowledge_base_no_results">未找到相關文件</string>
+    <string name="knowledge_base_empty">輸入關鍵字搜尋知識庫</string>
+    <string name="knowledge_base_unnamed">未命名文件</string>
+    <string name="knowledge_base_source">來源：%1$s</string>
+    <string name="knowledge_base_relevance">相關度：%1$.2f</string>
+    <string name="knowledge_base_retry">重試</string>
+    <string name="knowledge_base_close">關閉</string>
+
+    <!-- 健康 -->
+    <string name="health_title">健康洞察</string>
+    <string name="health_date_label">日期 (yyyy-MM-dd)</string>
+    <string name="health_steps">步數</string>
+    <string name="health_sleep_hours">睡眠時長</string>
+    <string name="health_resting_heart_rate">靜息心率</string>
+    <string name="health_upload">上傳今日健康資料</string>
+    <string name="health_hours">小時</string>
+    <string name="health_bpm">bpm</string>
+    <string name="health_steps_unit">步</string>
+    <string name="health_close">關閉</string>
+
+    <!-- 通用 -->
+    <string name="common_loading">載入中…</string>
+    <string name="common_error">發生錯誤</string>
+    <string name="common_retry">重試</string>
+    <string name="common_confirm">確認</string>
+    <string name="common_cancel">取消</string>
+    <string name="common_close">關閉</string>
+
+    <!-- ViewModel 錯誤訊息 -->
+    <string name="error_load_conversations_failed">載入會話失敗：%1$s</string>
+    <string name="error_create_conversation_failed">建立會話失敗：%1$s</string>
+    <string name="error_update_failed">更新失敗：%1$s</string>
+    <string name="error_delete_failed">刪除失敗：%1$s</string>
+</resources>

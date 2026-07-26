@@ -27,7 +27,16 @@ class BffConfigStore(private val context: Context) {
         private val KEY_BASE_URL = stringPreferencesKey("base_url")
         private val KEY_MODEL = stringPreferencesKey("default_model")
         private val KEY_ACCENT = stringPreferencesKey("accent_color")
+        private val KEY_LANGUAGE = stringPreferencesKey("language")
         private const val KEY_USER_TOKEN = "user_token"
+
+        // 支持的语言代码列表（与 res/values-* 目录一一对应）
+        val SUPPORTED_LANGUAGES: List<String> = listOf(
+            "zh-Hans", "zh-Hant", "en", "ja", "ko", "fr", "de", "es"
+        )
+
+        // 默认语言（系统跟随 / 无配置时回退到简体中文）
+        const val DEFAULT_LANGUAGE: String = "zh-Hans"
     }
 
     // EncryptedSharedPreferences 实例（懒加载）
@@ -60,6 +69,11 @@ class BffConfigStore(private val context: Context) {
         prefs[KEY_ACCENT] ?: "purple"
     }
 
+    // 当前语言代码（如 "zh-Hans" / "en" / "ja" 等）
+    val language: Flow<String> = context.bffDataStore.data.map { prefs ->
+        prefs[KEY_LANGUAGE] ?: DEFAULT_LANGUAGE
+    }
+
     suspend fun setBaseUrl(url: String) {
         context.bffDataStore.edit { it[KEY_BASE_URL] = url }
     }
@@ -74,5 +88,14 @@ class BffConfigStore(private val context: Context) {
 
     suspend fun setAccentColor(accent: String) {
         context.bffDataStore.edit { it[KEY_ACCENT] = accent }
+    }
+
+    /**
+     * 持久化语言选择。传入代码需在 [SUPPORTED_LANGUAGES] 列表中。
+     * 调用后需重启 Activity 才能让 res/values-* 资源生效。
+     */
+    suspend fun setLanguage(code: String) {
+        val normalized = if (code in SUPPORTED_LANGUAGES) code else DEFAULT_LANGUAGE
+        context.bffDataStore.edit { it[KEY_LANGUAGE] = normalized }
     }
 }

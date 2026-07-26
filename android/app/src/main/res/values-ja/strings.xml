@@ -1,0 +1,102 @@
+<resources>
+    <string name="app_name">エーテル</string>
+
+    <!-- 会話リスト -->
+    <string name="conversation_list_title">会話リスト</string>
+    <string name="conversation_list_new">新規会話</string>
+    <string name="conversation_list_empty">会話がありません</string>
+    <string name="conversation_list_empty_hint">会話がありません。右下のボタンから始めましょう。</string>
+    <string name="conversation_list_delete">削除</string>
+    <string name="conversation_list_pin">ピン留め</string>
+    <string name="conversation_list_unpin">ピン解除</string>
+    <string name="conversation_list_pinned">ピン留め済み</string>
+    <string name="conversation_list_start_chat">タップして会話を開始</string>
+    <string name="conversation_list_new_conversation">新規会話 %1$d</string>
+
+    <!-- チャット -->
+    <string name="chat_send">送信</string>
+    <string name="chat_input_placeholder">メッセージを入力…</string>
+    <string name="chat_thinking">考え中…</string>
+    <string name="chat_copy">コピー</string>
+    <string name="chat_retry">再送信</string>
+    <string name="chat_delete_message">メッセージを削除</string>
+    <string name="chat_delete">削除</string>
+    <string name="chat_close">閉じる</string>
+    <string name="chat_load_messages_failed">メッセージの読み込みに失敗しました：%1$s</string>
+    <string name="chat_send_failed">送信に失敗しました：%1$s</string>
+    <string name="chat_delete_message_failed">メッセージの削除に失敗しました：%1$s</string>
+    <string name="chat_knowledge_base">ナレッジベース</string>
+    <string name="chat_settings">設定</string>
+    <string name="chat_back">戻る</string>
+
+    <!-- 設定 -->
+    <string name="settings_title">設定</string>
+    <string name="settings_bff_gateway">BFF ゲートウェイ</string>
+    <string name="settings_bff_url">BFF エンドポイント URL</string>
+    <string name="settings_bff_token">X-BFF-Token</string>
+    <string name="settings_bff_token_label">BFF トークン</string>
+    <string name="settings_default_model">デフォルトモデル</string>
+    <string name="settings_model">モデル</string>
+    <string name="settings_show_token">表示</string>
+    <string name="settings_hide_token">非表示</string>
+    <string name="settings_save">保存</string>
+    <string name="settings_back">戻る</string>
+    <string name="settings_accent_color">アクセントカラー</string>
+    <string name="settings_accent_color_purple">エーテルパープル</string>
+    <string name="settings_accent_color_blue">エレクトリックブルー</string>
+    <string name="settings_accent_color_glow">ネビュラグロー</string>
+    <string name="settings_language">言語</string>
+    <string name="settings_knowledge_base">ナレッジベース</string>
+    <string name="settings_knowledge_base_subtitle">RAG ドキュメントを検索</string>
+    <string name="settings_health">ヘルスインサイト</string>
+    <string name="settings_health_subtitle">ヘルスデータを表示 / アップロード</string>
+    <string name="settings_features">機能</string>
+
+    <!-- 言語名（各言語で表示） -->
+    <string name="language_zh_hans">简体中文</string>
+    <string name="language_zh_hant">繁體中文</string>
+    <string name="language_en">English</string>
+    <string name="language_ja">日本語</string>
+    <string name="language_ko">한국어</string>
+    <string name="language_fr">Français</string>
+    <string name="language_de">Deutsch</string>
+    <string name="language_es">Español</string>
+
+    <!-- ナレッジベース -->
+    <string name="knowledge_base_title">ナレッジベース</string>
+    <string name="knowledge_base_search">検索</string>
+    <string name="knowledge_base_search_placeholder">キーワードを入力…</string>
+    <string name="knowledge_base_no_results">関連ドキュメントが見つかりません</string>
+    <string name="knowledge_base_empty">キーワードを入力してナレッジベースを検索</string>
+    <string name="knowledge_base_unnamed">無題ドキュメント</string>
+    <string name="knowledge_base_source">出典：%1$s</string>
+    <string name="knowledge_base_relevance">関連度：%1$.2f</string>
+    <string name="knowledge_base_retry">再試行</string>
+    <string name="knowledge_base_close">閉じる</string>
+
+    <!-- ヘルス -->
+    <string name="health_title">ヘルスインサイト</string>
+    <string name="health_date_label">日付 (yyyy-MM-dd)</string>
+    <string name="health_steps">歩数</string>
+    <string name="health_sleep_hours">睡眠時間</string>
+    <string name="health_resting_heart_rate">安静時心拍数</string>
+    <string name="health_upload">今日のヘルスデータをアップロード</string>
+    <string name="health_hours">時間</string>
+    <string name="health_bpm">bpm</string>
+    <string name="health_steps_unit">歩</string>
+    <string name="health_close">閉じる</string>
+
+    <!-- 共通 -->
+    <string name="common_loading">読み込み中…</string>
+    <string name="common_error">エラーが発生しました</string>
+    <string name="common_retry">再試行</string>
+    <string name="common_confirm">確認</string>
+    <string name="common_cancel">キャンセル</string>
+    <string name="common_close">閉じる</string>
+
+    <!-- ViewModel エラーメッセージ -->
+    <string name="error_load_conversations_failed">会話の読み込みに失敗しました：%1$s</string>
+    <string name="error_create_conversation_failed">会話の作成に失敗しました：%1$s</string>
+    <string name="error_update_failed">更新に失敗しました：%1$s</string>
+    <string name="error_delete_failed">削除に失敗しました：%1$s</string>
+</resources>
