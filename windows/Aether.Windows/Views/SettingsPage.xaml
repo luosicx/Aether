@@ -1,0 +1,103 @@
+<Page x:Class="Aether.Windows.Views.SettingsPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:design="clr-namespace:Aether.Windows.Design"
+      xmlns:props="clr-namespace:Aether.Windows.Properties">
+
+    <Page.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+    </Page.Resources>
+
+    <Grid Background="{x:Static design:AetherColors.DeepSpace}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- 顶部栏：返回按钮 + 标题 -->
+        <Border Grid.Row="0" Padding="16,12" Background="{x:Static design:AetherColors.LiquidGlass}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Button Grid.Column="0" Content="{x:Static props:Strings.Settings_Back}" Click="OnBackClick"
+                        Foreground="{x:Static design:AetherColors.Starlight}"/>
+                <TextBlock Grid.Column="1" Text="{x:Static props:Strings.Settings_Title}" FontSize="24" FontWeight="SemiBold"
+                           Foreground="{x:Static design:AetherColors.Starlight}"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
+
+        <!-- 设置内容 -->
+        <ScrollViewer Grid.Row="1" Margin="24" VerticalScrollBarVisibility="Auto">
+            <StackPanel MaxWidth="500">
+
+                <!-- BFF BaseUrl -->
+                <TextBlock Text="{x:Static props:Strings.Settings_BffUrl}" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,4"
+                           Foreground="{x:Static design:AetherColors.Starlight}"/>
+                <TextBox Text="{Binding ViewModel.BaseUrl, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
+                         Background="#80000000" Foreground="White" Padding="8,6"
+                         Margin="0,0,0,16"/>
+
+                <!-- BFF Token -->
+                <TextBlock Text="{x:Static props:Strings.Settings_BffToken}" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,4"
+                           Foreground="{x:Static design:AetherColors.Starlight}"/>
+                <Grid Margin="0,0,0,4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <!-- PasswordBox（隐藏 Token 时显示） -->
+                    <PasswordBox x:Name="tokenBox" Grid.Column="0"
+                                 PasswordChanged="OnTokenPasswordChanged"
+                                 Background="#80000000" Foreground="White" Padding="8,6"
+                                 Visibility="{Binding ViewModel.ShowToken, Converter={StaticResource InverseBoolToVis}}"/>
+                    <!-- TextBox（显示 Token 时显示） -->
+                    <TextBox x:Name="tokenText" Grid.Column="0"
+                             TextChanged="OnTokenTextChanged"
+                             Background="#80000000" Foreground="White" Padding="8,6"
+                             Visibility="{Binding ViewModel.ShowToken, Converter={StaticResource BoolToVis}}"/>
+                    <!-- 显示 / 隐藏切换按钮 -->
+                    <Button Grid.Column="1" Content="👁" Width="36" Height="36" Margin="4,0,0,0"
+                            Command="{Binding ViewModel.ToggleTokenVisibilityCommand}"/>
+                </Grid>
+                <TextBlock Text="{x:Static props:Strings.Settings_TokenHint}"
+                           FontSize="11" Margin="0,0,0,16"
+                           Foreground="{x:Static design:AetherColors.DuskGray}"/>
+
+                <!-- 默认模型 -->
+                <TextBlock Text="{x:Static props:Strings.Settings_DefaultModel}" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,4"
+                           Foreground="{x:Static design:AetherColors.Starlight}"/>
+                <ComboBox ItemsSource="{Binding ViewModel.AvailableModels}"
+                          SelectedItem="{Binding ViewModel.DefaultModel, Mode=TwoWay}"
+                          Padding="8,6" Margin="0,0,0,16"
+                          Background="#80000000" Foreground="White"/>
+
+                <!-- 语言选择 -->
+                <TextBlock Text="{x:Static props:Strings.Settings_Language}" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,4"
+                           Foreground="{x:Static design:AetherColors.Starlight}"/>
+                <ComboBox ItemsSource="{Binding ViewModel.AvailableLanguages}"
+                          DisplayMemberPath="DisplayName"
+                          SelectedValuePath="Code"
+                          SelectedValue="{Binding ViewModel.SelectedLanguageCode, Mode=TwoWay}"
+                          Padding="8,6" Margin="0,0,0,16"
+                          Background="#80000000" Foreground="White"/>
+
+                <!-- 状态 / 错误消息 -->
+                <TextBlock Text="{Binding ViewModel.StatusMessage}" FontSize="12" Margin="0,8,0,0"
+                           Foreground="#FF22C55E"/>
+                <TextBlock Text="{Binding ViewModel.ErrorMessage}" FontSize="12" Margin="0,4,0,0"
+                           Foreground="#FFEF4444"/>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- 底部保存按钮 -->
+        <Border Grid.Row="2" Padding="16,12" Background="{x:Static design:AetherColors.LiquidGlass}">
+            <Button Content="{x:Static props:Strings.Settings_Save}" HorizontalAlignment="Right" Padding="24,8"
+                    Command="{Binding ViewModel.SaveCommand}"
+                    Foreground="{x:Static design:AetherColors.Starlight}"/>
+        </Border>
+    </Grid>
+</Page>

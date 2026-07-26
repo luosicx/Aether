@@ -15,12 +15,18 @@ import com.aether.data.api.BffConfig
 import com.aether.data.api.BffConfigStore
 import com.aether.data.api.ChatStreamClient
 import com.aether.data.api.HttpClientFactory
+import com.aether.data.db.AetherDatabase
 import com.aether.data.repository.ConversationRepository
 import com.aether.data.repository.MessageRepository
+import com.aether.data.repository.RepositorySyncManager
 import com.aether.ui.chat.ChatScreen
 import com.aether.ui.chat.ChatViewModel
 import com.aether.ui.conversation.ConversationListScreen
 import com.aether.ui.conversation.ConversationListViewModel
+import com.aether.ui.health.HealthScreen
+import com.aether.ui.health.HealthViewModel
+import com.aether.ui.rag.KnowledgeBaseScreen
+import com.aether.ui.rag.KnowledgeBaseViewModel
 import com.aether.ui.settings.SettingsScreen
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -38,6 +44,7 @@ import java.net.URLEncoder
 object ServiceLocator {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var store: BffConfigStore? = null
+    private var database: AetherDatabase? = null
 
     // 当前 BFF 配置，由 DataStore 异步加载并实时更新
     @Volatile
@@ -48,8 +55,10 @@ object ServiceLocator {
 
     fun init(context: Context) {
         if (store != null) return
-        val s = BffConfigStore(context.applicationContext)
+        val appContext = context.applicationContext
+        val s = BffConfigStore(appContext)
         store = s
+        database = AetherDatabase.get(appContext)
         scope.launch {
             s.config.collectLatest { config ->
                 bffConfig = config
@@ -60,11 +69,22 @@ object ServiceLocator {
     fun configStore(): BffConfigStore =
         store ?: error("ServiceLocator 尚未初始化，请先在 MainActivity 调用 ServiceLocator.init(context)")
 
+    private fun db(): AetherDatabase =
+        database ?: error("ServiceLocator 尚未初始化，请先在 MainActivity 调用 ServiceLocator.init(context)")
+
     // 每次访问以最新配置构造，确保设置变更立即生效；HttpClient 复用单例
     val aetherApi: AetherApi get() = AetherApi(httpClient, bffConfig)
     val chatStreamClient: ChatStreamClient get() = ChatStreamClient(httpClient, bffConfig)
-    val conversationRepository: ConversationRepository get() = ConversationRepository(aetherApi)
-    val messageRepository: MessageRepository get() = MessageRepository(aetherApi)
+
+    // 同步管理器：协调 Room 与 BFF 的后台刷新
+    val syncManager: RepositorySyncManager get() =
+        RepositorySyncManager(aetherApi, db().conversationDao(), db().messageDao())
+
+    // 仓库：先 Room 后网络
+    val conversationRepository: ConversationRepository get() =
+        ConversationRepository(aetherApi, db().conversationDao(), syncManager)
+    val messageRepository: MessageRepository get() =
+        MessageRepository(aetherApi, db().messageDao(), syncManager)
 }
 
 /** ViewModel 工厂集合 */
@@ -79,18 +99,30 @@ object ViewModels {
             ChatViewModel(ServiceLocator.chatStreamClient, ServiceLocator.messageRepository)
         }
     }
+    val knowledgeBaseFactory = viewModelFactory {
+        initializer {
+            KnowledgeBaseViewModel(ServiceLocator.aetherApi)
+        }
+    }
+    val healthFactory = viewModelFactory {
+        initializer {
+            HealthViewModel(ServiceLocator.aetherApi)
+        }
+    }
 }
 
 private object Routes {
     const val CONVERSATIONS = "conversations"
     const val CHAT = "chat/{conversationId}/{title}"
     const val SETTINGS = "settings"
+    const val KNOWLEDGE_BASE = "knowledge_base"
+    const val HEALTH = "health"
     fun chat(conversationId: String, title: String): String =
         "chat/$conversationId/${URLEncoder.encode(title, "UTF-8")}"
 }
 
 /**
- * 应用根导航：会话列表 / 聊天 / 设置三页。
+ * 应用根导航：会话列表 / 聊天 / 设置 / 知识库 / 健康洞察。
  */
 @Composable
 fun AetherApp() {
@@ -123,12 +155,29 @@ fun AetherApp() {
                 conversationTitle = title,
                 viewModel = vm,
                 onBack = { navController.popBackStack() },
-                onOpenSettings = { navController.navigate(Routes.SETTINGS) }
+                onOpenSettings = { navController.navigate(Routes.SETTINGS) },
+                onOpenKnowledgeBase = { navController.navigate(Routes.KNOWLEDGE_BASE) }
             )
         }
         composable(Routes.SETTINGS) {
             SettingsScreen(
                 store = ServiceLocator.configStore(),
+                onBack = { navController.popBackStack() },
+                onOpenKnowledgeBase = { navController.navigate(Routes.KNOWLEDGE_BASE) },
+                onOpenHealth = { navController.navigate(Routes.HEALTH) }
+            )
+        }
+        composable(Routes.KNOWLEDGE_BASE) {
+            val vm: KnowledgeBaseViewModel = viewModel(factory = ViewModels.knowledgeBaseFactory)
+            KnowledgeBaseScreen(
+                viewModel = vm,
+                onBack = { navController.popBackStack() }
+            )
+        }
+        composable(Routes.HEALTH) {
+            val vm: HealthViewModel = viewModel(factory = ViewModels.healthFactory)
+            HealthScreen(
+                viewModel = vm,
                 onBack = { navController.popBackStack() }
             )
         }

@@ -14,8 +14,8 @@
 | macOS Deployment Target | 14+ | macOS 目标平台 |
 | Git | 2.30+ | 提交与 PR |
 | Node.js（可选） | 20+ | 部署 BFF Cloudflare Workers 时使用 |
-| Android（可选） | JDK 17 / Android SDK 35 (Build Tools 35.0.0) / Gradle 8.7 | Gradle 8.7 已随仓库提交 `gradlew`，无需手动安装 |
-| Windows（可选） | .NET 8 SDK / Windows 10+ | 构建 WPF Windows 客户端时使用 |
+| Android（可选） | Android Studio Hedgehog+ / JDK 17 / Android SDK 35（Build Tools 35.0.0）/ Kotlin 1.9+ / NDK r25+ / Gradle 8.7 | Gradle 8.7 已随仓库提交 `gradlew`，无需手动安装；NDK 用于编译 Rust .so；可选 Rust 1.75+ 与 target `aarch64-linux-android` + `x86_64-linux-android` |
+| Windows（可选） | Windows 10/11 x64 / .NET 8 SDK / Visual Studio 2022 或 VS Code / Rust 1.75+（可选） | 构建 WPF Windows 客户端时使用；可选 Rust target `x86_64-pc-windows-msvc` 生成 `aether_core_ffi.dll` |
 
 ### 1.2 获取源码
 
@@ -65,6 +65,68 @@ open Aether.xcodeproj
 **清理**：`make clean`
 
 > 各 `make` 目标内部调用 `scripts/build-*.sh` / `scripts/build-*.ps1`，也可直接执行对应脚本。Android 与 Windows 构建详见 `doc/ANDROID_BUILD.md` 与 `doc/WINDOWS_BUILD.md`。
+
+### 1.6 Windows 端开发环境
+
+Windows 客户端位于 `windows/`，基于 WPF .NET 8 + C# 12 构建。
+
+**必需依赖**：
+
+- Windows 10 / 11 x64
+- .NET 8 SDK：`winget install Microsoft.DotNet.SDK.8`
+- Visual Studio 2022（含 `.NET desktop development` 工作负载）或 VS Code + C# Dev Kit 扩展
+
+**可选依赖（构建 Rust DLL）**：
+
+- Rust 1.75+：`winget install Rustlang.Rustup`
+- 添加 Windows MSVC target：`rustup target add x86_64-pc-windows-msvc`
+- 构建 DLL：`cargo build -p aether-core-ffi --target x86_64-pc-windows-msvc --release`，将生成的 `aether_core_ffi.dll` 置于 `windows/Aether.Windows/Native/`
+
+**首次构建**：
+
+```powershell
+cd windows
+dotnet build
+dotnet test   # 运行 Aether.Windows.Tests
+```
+
+> Rust DLL 缺失时 `AetherNativeBridge` 走纯 C# 回退实现，开发期可不构建 DLL。
+
+### 1.7 Android 端开发环境
+
+Android 客户端位于 `android/`，基于 Kotlin 1.9 + Jetpack Compose + Gradle 8.7 构建。
+
+**必需依赖**：
+
+- Android Studio Hedgehog（2023.1.1）+
+- JDK 17：`brew install openjdk@17`（macOS）或 `winget install Microsoft.OpenJDK.17`（Windows）
+- Android SDK API 29+（Build Tools 35.0.0）：通过 Android Studio SDK Manager 安装
+- Kotlin 1.9+（随 Android Studio 自带）
+- Android NDK r25+：通过 Android Studio SDK Manager 安装
+
+**可选依赖（构建 Rust .so）**：
+
+- Rust 1.75+
+- 添加 Android target：`rustup target add aarch64-linux-android x86_64-linux-android`
+- 安装 `cargo-ndk`：`cargo install cargo-ndk`
+- 构建 .so（两个 ABI）：
+
+  ```bash
+  cargo ndk -t arm64-v8a build -p aether-core-ffi --release
+  cargo ndk -t x86_64 build -p aether-core-ffi --release
+  ```
+
+  将生成的 `libaether_core_ffi.so` 分别置于 `android/app/src/main/jniLibs/arm64-v8a/` 与 `android/app/src/main/jniLibs/x86_64/`
+
+**首次构建**：
+
+```bash
+cd android
+./gradlew assembleDebug         # 构建 Debug APK
+./gradlew testDebugUnitTest     # 运行单元测试（Robolectric）
+```
+
+> Rust .so 缺失时 `Redact` / `SseBridge` / `VectorMath` 走纯 Kotlin 回退实现，单元测试默认走回退路径，无需构建 .so 即可跑测试。
 
 ## 2. 代码规范
 
@@ -120,7 +182,7 @@ class MyService {
 
 - 单元测试（UT）放 `AetherTests/`，命名 `<ClassName>Tests.swift`
 - UI 测试（UIT）放 `AetherUITests/`，避免依赖真实网络（用 `UITEST_DISABLE_NETWORK` 启动参数桩回复）
-- 测试用例数：UT 2817 / UIT 30（每新增功能需补对应测试）
+- 测试用例数：UT 3314 / UIT 30（每新增功能需补对应测试）
 - 当前目标：0 skip；若必须跳过，需写明原因并在 Issue 跟踪
 
 ### 2.6 国际化规范
@@ -208,6 +270,89 @@ pre-commit run --all-files
 
 仓库根目录已配置 `.gitattributes`，标准化所有文件的行尾（LF 默认，Windows 脚本 CRLF）、文件类型（文本/二进制）、merge 策略（锁文件 `merge=ours`）、diff 行为（大文件 `-diff`）。开发者无需手动处理行尾问题。
 
+### 2.10 Windows 端代码规范（C# 12 + WPF）
+
+Windows 端遵循 [Microsoft C# Coding Conventions](https://learn.microsoft.com/dotnet/csharp/fundamentals/coding-style/coding-conventions) 与 WPF MVVM 模式。
+
+**命名**：
+
+- 类型（class / struct / enum / interface / record）使用 **PascalCase**：`ChatViewModel`、`IAetherApiClient`
+- 方法 / 属性 / 事件使用 **PascalCase**：`SendMessage`、`StreamingText`
+- 局部变量 / 参数使用 **camelCase**：`messageContent`、`apiKey`
+- 私有字段使用 `_camelCase`：`_httpClient`、`_disposed`
+- 接口以 `I` 前缀：`IAetherApiClient`、`IBffConfigStore`
+- XAML 文件与控件名使用 PascalCase：`ChatPage.xaml`、`SettingsPage`
+
+**MVVM 模式**：
+
+- View（`*.xaml` + `*.xaml.cs`）仅负责 UI 绑定，不写业务逻辑
+- ViewModel（`*ViewModel.cs`）实现 `INotifyPropertyChanged` 或继承 `ObservableObject`，通过 `SetProperty(ref _field, value)` 触发属性变更通知
+- 命令使用 `RelayCommand`（CommunityToolkit.Mvvm）或自定义 `ICommand` 实现，命名 `<Action>Command`：`SendCommand`、`DeleteConversationCommand`
+- 数据绑定优先用 `Binding` 路径，避免在 code-behind 直接操作控件
+- 服务（`AetherApiClient` / `BffConfigStore` 等）通过构造函数注入，便于单元测试
+
+**异步**：
+
+- 异步方法以 `Async` 后缀命名：`SendMessageAsync`、`LoadConversationsAsync`
+- 使用 `async` / `await`，避免 `.Result` / `.Wait()` 阻塞调用
+- I/O 操作返回 `Task<T>`，事件处理返回 `async void`
+
+**XAML 规范**：
+
+- `x:Class` 与文件路径一致：`<Page x:Class="Aether.Windows.Views.ChatPage">`
+- 资源（`Style` / `DataTemplate`）优先放 `App.xaml` 或 `*/Design/DesignTokens.cs`
+- `Binding` 优先用 `Mode=TwoWay` + `UpdateSourceTrigger=PropertyChanged`
+- 控件命名使用 `x:Name` PascalCase：`MessageListBox`、`SendButton`
+
+**DPAPI 加密**：
+
+- BFF Token 等敏感信息必须经 `BffConfigStore` 通过 `ProtectedData.Protect(..., DataProtectionScope.CurrentUser)` 加密后写入配置文件，禁止明文存储。
+
+### 2.11 Android 端代码规范（Kotlin + Jetpack Compose）
+
+Android 端遵循 [Kotlin Coding Conventions](https://kotlinlang.org/docs/coding-conventions.html) 与 Jetpack Compose MVVM 模式。
+
+**命名**：
+
+- 类型（class / object / interface / enum）使用 **PascalCase**：`ChatViewModel`、`AetherApi`
+- 方法 / 属性使用 **camelCase**：`sendMessage`、`streamingText`
+- 包名全小写：`com.aether.app.ui.chat`
+- 文件名与类型名一致：`ChatViewModel.kt` 含 `class ChatViewModel`
+- Composable 函数使用 **PascalCase**：`ChatScreen`、`MessageBubble`
+
+**MVVM + Compose 模式**：
+
+- View（`*Screen.kt`）为 `@Composable` 函数，无业务逻辑，仅描述 UI
+- ViewModel（`*ViewModel.kt`）继承 `androidx.lifecycle.ViewModel`，通过 `StateFlow` / `MutableStateFlow` 暴露 UI 状态
+- 状态用 `data class` 封装：`data class ChatUiState(val messages: List<Message> = emptyList(), val inputText: String = "")`
+- 副作用（Side Effect）用 `LaunchedEffect` / `collectAsStateWithLifecycle` 处理
+- 依赖注入通过 `viewModel { ... }` 工厂或 Hilt（如启用）
+
+**协程与 Flow**：
+
+- I/O 操作用 `viewModelScope.launch { withContext(Dispatchers.IO) { ... } }`
+- 数据流用 `Flow` / `StateFlow`，UI 层用 `collectAsStateWithLifecycle()`
+- 不要在 `Main` 调度器执行阻塞操作
+
+**Room 数据库**：
+
+- `@Entity` 类名以 `Entity` 后缀：`ConversationEntity`、`MessageEntity`
+- `@Dao` 接口名以 `Dao` 后缀：`ConversationDao`、`MessageDao`
+- 外键关系明确声明 `onDelete` 策略：`ForeignKey(..., onDelete = CASCADE)`
+- 数据库操作返回 `Flow<List<T>>` 实现响应式查询
+
+**Rust JNI 桥接**：
+
+- JNI 包装类（`Redact` / `SseBridge` / `VectorMath`）在 `com.aether.app.rust` 包下
+- `System.loadLibrary` 失败时回退到纯 Kotlin 实现，**禁止假设 .so 必然加载成功**
+- 单元测试默认走回退路径，覆盖率必须与 Rust 实现路径一致
+
+**国际化**：
+
+- 用户可见文本必须进入 `res/values/strings.xml`，禁止硬编码字符串
+- 使用 `stringResource(R.string.<key>)` 在 Composable 中引用
+- 新增 key 必须同步补充 8 种语言：`values-zh-rCN`（默认）/ `values-zh-rTW` / `values-en` / `values-ja` / `values-ko` / `values-fr` / `values-de` / `values-es`
+
 ## 3. 提交规范
 
 使用 **Conventional Commits** 格式：
@@ -224,18 +369,27 @@ pre-commit run --all-files
 
 | type | 含义 | 示例 |
 |------|------|------|
-| `feat` | 新功能 | `feat(rag): 支持 Markdown 文档分块` |
-| `fix` | bug 修复 | `fix(voice): 修复 AVAudioSession 未激活崩溃` |
-| `docs` | 文档更新 | `docs(arch): 更新架构图到 Mermaid` |
-| `refactor` | 重构 | `refactor(viewmodel): 提取 ReAct 循环到独立方法` |
-| `test` | 测试相关 | `test(tool): 补充 LocationToolTests` |
-| `chore` | 构建 / 工具 / 杂项 | `chore(ci): 升级到 macos-14 runner` |
-| `perf` | 性能优化 | `perf(markdown): 加 NSCache 缓存 parseBlocks` |
+| `feat` | 新功能 | `feat(rag): 支持 Markdown 文档分块` / `feat(windows): 接入 DPAPI 加密 BFF Token` / `feat(android): 接入 Room 数据库` |
+| `fix` | bug 修复 | `fix(voice): 修复 AVAudioSession 未激活崩溃` / `fix(windows): 修复流式聊天内存泄漏` / `fix(android): 修复长按菜单不消失` |
+| `docs` | 文档更新 | `docs(arch): 更新架构图到 Mermaid` / `docs(windows): 补充 WPF 构建说明` |
+| `refactor` | 重构 | `refactor(viewmodel): 提取 ReAct 循环到独立方法` / `refactor(android): 抽取 KnowledgeBaseViewModel 公共逻辑` |
+| `test` | 测试相关 | `test(tool): 补充 LocationToolTests` / `test(windows): 补充 MarkdownRendererTest` / `test(android): 补充 SseBridgeTest` |
+| `chore` | 构建 / 工具 / 杂项 | `chore(ci): 升级到 macos-14 runner` / `chore(android): 升级 NDK r26` |
+| `perf` | 性能优化 | `perf(markdown): 加 NSCache 缓存 parseBlocks` / `perf(android): Room 查询加索引` |
 | `style` | 代码风格（不影响逻辑） | `style: 统一缩进 4 空格` |
 
 ### 3.2 scope 推荐
 
-- `rag` / `voice` / `tool` / `llm` / `bff` / `ondevice` / `health` / `intent` / `view` / `viewmodel` / `model` / `service` / `test` / `ci` / `docs` / `macos` / `ios`
+- **功能模块**：`rag` / `voice` / `tool` / `llm` / `bff` / `ondevice` / `health` / `intent` / `markdown`
+- **架构层**：`view` / `viewmodel` / `model` / `service` / `repository` / `dao`
+- **平台**（**新增跨平台**）：`ios` / `macos` / `windows` / `android`
+- **流程**：`test` / `ci` / `docs` / `arch` / `i18n`
+
+> **跨平台 scope 使用规则**：
+> - 改动仅影响单一平台时，scope 用该平台名：`feat(windows): ...` / `fix(android): ...`
+> - 改动同时影响多端共享代码（如 Rust crate `aether-core-ffi`）时，scope 用 `ffi`：`feat(ffi): 新增 Redactor 模块`
+> - 改动同时影响多端但分别提交时，拆为多个 commit：`feat(windows): ...` + `feat(android): ...`
+> - 跨平台 PR 标题用 `feat(multiplatform): ...`，body 中列出各端改动
 
 ### 3.3 示例
 
@@ -246,6 +400,27 @@ feat(voice): TTS 音色可调节
 TTSVoiceCatalog 提供系统音色目录，TTSVoicePickerView 提供试听。
 
 Closes #123
+```
+
+```
+feat(windows): 接入 DPAPI 加密 BFF Token
+
+BffConfigStore 调用 ProtectedData.Protect 加密 BFF Token，
+绑定 CurrentUser 范围，仅同一 Windows 用户可解密。
+新增 BffConfigStoreTest 覆盖加解密往返与异常路径。
+
+Closes #456
+```
+
+```
+feat(android): 接入 Room 持久化会话与消息
+
+新增 AetherDatabase / ConversationDao / MessageDao，
+外键 onDelete = CASCADE 自动级联删除。
+RepositorySyncManager 在 Dispatchers.IO 上执行所有 DB 操作，
+通过 Flow 回调 UI 层。新增 ConversationRepositoryRoomTest。
+
+Closes #789
 ```
 
 ## 4. PR 流程
@@ -267,17 +442,23 @@ Closes #123
    ```bash
    # 4.1 代码质量由 CI SonarCloud job 检查（无需本地运行）
 
-   # 4.2 运行 UT（2771 用例，0 skip）
+   # 4.2 Apple 端：运行 UT（3314 用例，0 skip）
    xcodebuild test -project Aether.xcodeproj -scheme Aether-iOS \
      -destination 'platform=iOS Simulator,name=iPhone 17' \
      -only-testing:AetherTests \
      -configuration Debug CODE_SIGNING_ALLOWED=NO
 
-   # 4.3 运行 UIT（30 用例，0 skip）
+   # 4.3 Apple 端：运行 UIT（30 用例，0 skip）
    xcodebuild test -project Aether.xcodeproj -scheme Aether-iOS \
      -destination 'platform=iOS Simulator,name=iPhone 17' \
      -only-testing:AetherUITests \
      -configuration Debug CODE_SIGNING_ALLOWED=NO
+
+   # 4.4 Windows 端：运行 dotnet test（在 windows/ 目录下）
+   cd windows && dotnet test
+
+   # 4.5 Android 端：运行单元测试（在 android/ 目录下）
+   cd android && ./gradlew testDebugUnitTest
    ```
 5. 提交（按 Conventional Commits）：
    ```bash
@@ -304,8 +485,10 @@ Closes #123
   - **How to test**：测试步骤
   - **Checklist**：
     - [ ] 已通过 CI SonarCloud 代码质量检查
-    - [ ] 已通过本地 UT (2817 用例)
-    - [ ] 已通过本地 UIT (30 用例)
+    - [ ] 已通过本地 Apple UT (3314 用例)
+    - [ ] 已通过本地 Apple UIT (30 用例)
+    - [ ] 已通过本地 Windows 测试（如涉及 `windows/`，`dotnet test`）
+    - [ ] 已通过本地 Android 测试（如涉及 `android/`，`./gradlew testDebugUnitTest`）
     - [ ] 已更新相关文档（如有用户可见变更）
     - [ ] 已补充测试用例（如有新功能）
 
@@ -314,7 +497,52 @@ Closes #123
 - PR 自动触发 GitHub Actions CI（`.github/workflows/ci.yml`）
 - 必须 **Build 成功** + **Test 0 failures**
 - CI 通过 SonarCloud 进行代码质量检查（`code-quality` job），存在 error 会阻断合并
+- 跨平台 PR：CI 必须全部 **14 个 job 通过**（含 iOS-build / macOS-build / windows-build / android-build / Rust 各 target / coverage-summary 等），Coverage 当前阈值 84.25%
 - Reviewer 审核通过后合并
+
+### 4.4 Windows 端 PR 测试要求
+
+涉及 `windows/` 改动的 PR，提交前必须本地通过：
+
+```powershell
+cd windows
+dotnet build                                      # 构建成功
+dotnet test                                        # 运行 Aether.Windows.Tests（必须 0 failures）
+```
+
+**测试覆盖要求**：
+
+- 新增 Service / ViewModel 必须补对应 `*Test.cs`（如 `BffConfigStoreTest.cs` / `SettingsViewModelTest.cs`）
+- 新增 Markdown 渲染规则必须扩展 `MarkdownRendererTest.cs`
+- 新增语言 key 必须同步补充 8 种 `Strings.*.resx`，否则 `LanguageServiceTest` 会失败
+- CI 中 `windows-build` job（`windows-latest` runner，约 2m58s）会自动跑 `dotnet test`，本地通过不代表 CI 通过（CI 会做 DPAPI / 流式 SSE 等更严格的集成测试）
+
+### 4.5 Android 端 PR 测试要求
+
+涉及 `android/` 改动的 PR，提交前必须本地通过：
+
+```bash
+cd android
+./gradlew assembleDebug                            # 构建成功
+./gradlew testDebugUnitTest                        # 运行 Robolectric 单元测试（必须 0 failures）
+```
+
+**测试覆盖要求**：
+
+- 新增 ViewModel 必须补对应 `*Test.kt`（如 `ChatViewModelDeleteTest.kt` / `HealthViewModelTest.kt`）
+- 新增 Repository / Dao 必须补 `*Test.kt`，使用 Robolectric 内存数据库（`Room.inMemoryDatabaseBuilder`）
+- 新增 Rust JNI 包装类必须补 `*Test.kt`，**测试走纯 Kotlin 回退路径**（不依赖 .so）
+- 新增 strings.xml key 必须同步补充 8 种 `values-<locale>/strings.xml`，否则 `LanguageManagerTest` 会失败
+- CI 中 `android-build` job（`ubuntu-latest` runner，约 2m40s）会自动跑 `./gradlew testDebugUnitTest`
+
+### 4.6 跨平台 PR 测试要求
+
+同时影响多端的 PR（如修改 Rust crate `aether-core-ffi`）：
+
+- **本地**：必须分别在三端跑测试（Apple UT/UIT + Windows `dotnet test` + Android `./gradlew testDebugUnitTest`）
+- **CI**：14 个 job 全部 pass，Coverage ≥ 84.25%
+- **PR 描述**：必须列出每个平台的测试结果与影响范围
+- **回滚预案**：若某端 CI 失败且无法快速修复，可在 PR 描述中说明并临时跳过该端 CI（需 Reviewer 同意），但合并后必须立即开 follow-up Issue 跟进
 
 ## 5. spec 驱动开发说明
 
@@ -349,6 +577,8 @@ Closes #123
 历史 spec 见 `.trae/specs/` 目录（44+ 个 spec 覆盖 Day 1-20 全部功能）。
 
 ## 6. Watch App 开发指南
+
+> **平台范围**：Watch App 为 **Apple 平台独有**（iOS 配套 watchOS App），Windows 端与 Android 端不提供等价能力。Watch target 仅在 macOS + Xcode 环境下构建。
 
 Aether 的 watchOS App 源代码位于 `AetherWatch/` 目录，采用 SwiftUI 原生开发，支持 watchOS 10+。
 
@@ -387,6 +617,8 @@ Watch App 源代码已就绪，但**需在 Xcode 中手动创建 target**：
 - Watch UI 应使用 `.containerRelativeFrame` 适配各表盘尺寸，避免硬编码尺寸
 
 ## 7. Widget Extension 开发指南
+
+> **平台范围**：Widget Extension 为 **Apple 平台独有**（iOS / iPadOS 主屏与今日视图，macOS 桌面 Widget），基于 WidgetKit + AppIntents 框架。Windows 端与 Android 端不提供等价能力，未来不计划移植（系统机制差异过大）。
 
 Aether 的桌面 Widget 源代码位于 `AetherWidgets/` 目录，采用 WidgetKit + AppIntents 框架。
 

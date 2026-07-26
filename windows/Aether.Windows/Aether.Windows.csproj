@@ -14,11 +14,53 @@
     <FileVersion>1.0.0.0</FileVersion>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="9.0.0" />
+    <!-- Markdig：Markdown 解析库，用于将 AI 回复渲染为 FlowDocument -->
+    <PackageReference Include="Markdig" Version="0.37.0" />
+  </ItemGroup>
+
   <!-- Rust core DLL：由 CI 构建并下载到 Native/，构建时复制到输出目录供 P/Invoke 调用。
        Condition 确保本地无 DLL 时不破坏构建（P/Invoke 侧已做 DllNotFoundException 降级）。 -->
   <ItemGroup>
     <None Include="Native\aether_core_ffi.dll" Condition="Exists('Native\aether_core_ffi.dll')">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+  </ItemGroup>
+
+  <!-- i18n 资源文件：Strings.resx 为默认（zh-Hans），其余为本地化版本。
+       显式指定 LogicalName 确保 ResourceManager("Aether.Windows.Properties.Strings", asm) 能正确加载。 -->
+  <ItemGroup>
+    <EmbeddedResource Update="Properties\Strings.resx">
+      <LogicalName>Aether.Windows.Properties.Strings.resources</LogicalName>
+      <Generator>PublicResXFileCodeGenerator</Generator>
+      <LastGenOutput>Strings.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Properties\Strings.en.resx">
+      <LogicalName>Aether.Windows.Properties.Strings.en.resources</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Properties\Strings.ja.resx">
+      <LogicalName>Aether.Windows.Properties.Strings.ja.resources</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Properties\Strings.ko.resx">
+      <LogicalName>Aether.Windows.Properties.Strings.ko.resources</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Properties\Strings.fr.resx">
+      <LogicalName>Aether.Windows.Properties.Strings.fr.resources</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Properties\Strings.de.resx">
+      <LogicalName>Aether.Windows.Properties.Strings.de.resources</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Properties\Strings.es.resx">
+      <LogicalName>Aether.Windows.Properties.Strings.es.resources</LogicalName>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Properties\Strings.zh-Hant.resx">
+      <LogicalName>Aether.Windows.Properties.Strings.zh-Hant.resources</LogicalName>
+    </EmbeddedResource>
+    <Compile Update="Properties\Strings.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Strings.resx</DependentUpon>
+    </Compile>
   </ItemGroup>
 </Project>

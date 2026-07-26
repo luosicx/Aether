@@ -1,3 +1,102 @@
 <resources>
     <string name="app_name">以太</string>
+
+    <!-- 会话列表 -->
+    <string name="conversation_list_title">会话列表</string>
+    <string name="conversation_list_new">新建会话</string>
+    <string name="conversation_list_empty">暂无会话</string>
+    <string name="conversation_list_empty_hint">暂无会话，点击右下角开始对话</string>
+    <string name="conversation_list_delete">删除</string>
+    <string name="conversation_list_pin">置顶</string>
+    <string name="conversation_list_unpin">取消置顶</string>
+    <string name="conversation_list_pinned">已置顶</string>
+    <string name="conversation_list_start_chat">点击开始对话</string>
+    <string name="conversation_list_new_conversation">新会话 %1$d</string>
+
+    <!-- 聊天 -->
+    <string name="chat_send">发送</string>
+    <string name="chat_input_placeholder">输入消息…</string>
+    <string name="chat_thinking">思考中…</string>
+    <string name="chat_copy">复制</string>
+    <string name="chat_retry">重发</string>
+    <string name="chat_delete_message">删除消息</string>
+    <string name="chat_delete">删除</string>
+    <string name="chat_close">关闭</string>
+    <string name="chat_load_messages_failed">加载消息失败：%1$s</string>
+    <string name="chat_send_failed">发送失败：%1$s</string>
+    <string name="chat_delete_message_failed">删除消息失败：%1$s</string>
+    <string name="chat_knowledge_base">知识库</string>
+    <string name="chat_settings">设置</string>
+    <string name="chat_back">返回</string>
+
+    <!-- 设置 -->
+    <string name="settings_title">设置</string>
+    <string name="settings_bff_gateway">BFF 网关</string>
+    <string name="settings_bff_url">BFF 端点 URL</string>
+    <string name="settings_bff_token">X-BFF-Token</string>
+    <string name="settings_bff_token_label">BFF Token</string>
+    <string name="settings_default_model">默认模型</string>
+    <string name="settings_model">模型</string>
+    <string name="settings_show_token">显示</string>
+    <string name="settings_hide_token">隐藏</string>
+    <string name="settings_save">保存</string>
+    <string name="settings_back">返回</string>
+    <string name="settings_accent_color">主题色</string>
+    <string name="settings_accent_color_purple">神秘紫</string>
+    <string name="settings_accent_color_blue">电光蓝</string>
+    <string name="settings_accent_color_glow">星云光</string>
+    <string name="settings_language">语言</string>
+    <string name="settings_knowledge_base">知识库</string>
+    <string name="settings_knowledge_base_subtitle">搜索 RAG 文档</string>
+    <string name="settings_health">健康洞察</string>
+    <string name="settings_health_subtitle">查看 / 上传健康数据</string>
+    <string name="settings_features">功能</string>
+
+    <!-- 语言名称（用各自语言显示） -->
+    <string name="language_zh_hans">简体中文</string>
+    <string name="language_zh_hant">繁體中文</string>
+    <string name="language_en">English</string>
+    <string name="language_ja">日本語</string>
+    <string name="language_ko">한국어</string>
+    <string name="language_fr">Français</string>
+    <string name="language_de">Deutsch</string>
+    <string name="language_es">Español</string>
+
+    <!-- 知识库 -->
+    <string name="knowledge_base_title">知识库</string>
+    <string name="knowledge_base_search">搜索</string>
+    <string name="knowledge_base_search_placeholder">输入关键词…</string>
+    <string name="knowledge_base_no_results">未找到相关文档</string>
+    <string name="knowledge_base_empty">输入关键词搜索知识库</string>
+    <string name="knowledge_base_unnamed">未命名文档</string>
+    <string name="knowledge_base_source">来源：%1$s</string>
+    <string name="knowledge_base_relevance">相关度：%1$.2f</string>
+    <string name="knowledge_base_retry">重试</string>
+    <string name="knowledge_base_close">关闭</string>
+
+    <!-- 健康 -->
+    <string name="health_title">健康洞察</string>
+    <string name="health_date_label">日期 (yyyy-MM-dd)</string>
+    <string name="health_steps">步数</string>
+    <string name="health_sleep_hours">睡眠时长</string>
+    <string name="health_resting_heart_rate">静息心率</string>
+    <string name="health_upload">上传今日健康数据</string>
+    <string name="health_hours">小时</string>
+    <string name="health_bpm">bpm</string>
+    <string name="health_steps_unit">步</string>
+    <string name="health_close">关闭</string>
+
+    <!-- 通用 -->
+    <string name="common_loading">加载中…</string>
+    <string name="common_error">出错了</string>
+    <string name="common_retry">重试</string>
+    <string name="common_confirm">确认</string>
+    <string name="common_cancel">取消</string>
+    <string name="common_close">关闭</string>
+
+    <!-- ViewModel 错误信息 -->
+    <string name="error_load_conversations_failed">加载会话失败：%1$s</string>
+    <string name="error_create_conversation_failed">创建会话失败：%1$s</string>
+    <string name="error_update_failed">更新失败：%1$s</string>
+    <string name="error_delete_failed">删除失败：%1$s</string>
 </resources>

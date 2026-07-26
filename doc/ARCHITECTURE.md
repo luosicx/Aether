@@ -1,6 +1,6 @@
 # Aether 架构文档
 
-> 本文基于 Aether 多平台项目（iOS / iPad / macOS 原生） Day 1–20 实际代码撰写，描述系统分层、模块职责、数据流与关键技术决策。
+> 本文基于 Aether 多平台项目（iOS / iPad / macOS 原生 + Windows + Android 跨平台扩展，v1.5.0 起）实际代码撰写，描述系统分层、模块职责、数据流与关键技术决策。
 > 所有引用的文件路径均与磁盘一致，技术术语保留英文原文。架构与流程图统一使用 Mermaid 描述。
 
 ---
@@ -21,7 +21,7 @@
 
 ## 1. 项目概述
 
-**项目定位**：Aether 是一款 AI Native 多平台 App（iOS / iPad / macOS 原生），基于 SwiftUI + 多 LLM Provider（DeepSeek / Qwen / 端侧 MLX）构建，覆盖流式对话、多轮记忆、RAG 检索增强、ReAct 工具调用、语音输入输出、视觉多模态、Markdown 富文本渲染、TTS 音色可调节、BFF 代理、端侧 MLX 推理、HealthKit 健康洞察、App Intents 系统集成、智能路由与 Fallback、远程配置与遥测、崩溃监控、性能监控、隐私清单等 Day 1–20 全部能力。底层引入 Rust FFI 层（aether-core-ffi）提供跨平台统一的高性能核心算法。
+**项目定位**：Aether 是一款 AI Native 多平台 App，v1.5.0 起覆盖 **iOS / iPad / macOS / Windows / Android 五端**。Apple 三端基于 SwiftUI + 多 LLM Provider（DeepSeek / Qwen / 端侧 MLX）构建，覆盖流式对话、多轮记忆、RAG 检索增强、ReAct 工具调用、语音输入输出、视觉多模态、Markdown 富文本渲染、TTS 音色可调节、BFF 代理、端侧 MLX 推理、HealthKit 健康洞察、App Intents 系统集成、智能路由与 Fallback、远程配置与遥测、崩溃监控、性能监控、隐私清单等 Day 1–20 全部能力。**v1.5.0 新增 Windows 端（WPF .NET 8 / MVVM）与 Android 端（Kotlin + Jetpack Compose / MVVM）**，两端复用同一 BFF（Cloudflare Workers）HTTP 契约，并通过 Rust 核心 `aether-core-ffi` 多形态分发（xcframework / DLL / .so）共享 SSE 解析、向量数学、敏感信息脱敏等核心算法。
 
 **核心能力清单**（20+ 项）：
 
@@ -57,7 +57,7 @@
 25. **性能监控**：`PerformanceMonitor` 记录首屏渲染 / 流式首字 / 工具执行等关键耗时指标。
 26. **网络监听自动切换**：`NetworkMonitor` 基于 `NWPathMonitor` 实时检测网络状态变化，断网时触发 OnDeviceConfig.autoSwitchOnNetworkLoss 自动切到端侧。
 27. **隐私清单与投诉反馈**：`PrivacyInfo.xcprivacy` 声明隐私 API 用途，`PrivacyPolicyView` 展示隐私政策，`FeedbackService` 提供反馈/投诉入口（持久化到 `MessageFeedback` @Model）。
-28. **多平台适配**：SwiftUI 原生渲染支持 iOS / iPad / macOS 三端，通过 `#if os(iOS)` 条件编译隔离 iOS-only 框架（BGTaskScheduler / ActivityKit / HealthKit / WatchConnectivity）让 macOS 优雅降级；macOS 加入窗口默认尺寸 1000×700、菜单栏快捷键（⌘N 新建 / ⌘K 搜索 / ⌘, 设置）、⌘Enter 发送；UIKit 组件替换为 SwiftUI 跨平台组件（DocumentPickerView 用 `.fileImporter`、FeedbackService 用 `ProcessInfo`）；SettingsView / KnowledgeBaseView 用 NavigationSplitView 双栏布局适配多平台。
+28. **多平台适配**：SwiftUI 原生渲染支持 iOS / iPad / macOS 三端，通过 `#if os(iOS)` 条件编译隔离 iOS-only 框架（BGTaskScheduler / ActivityKit / HealthKit / WatchConnectivity）让 macOS 优雅降级；macOS 加入窗口默认尺寸 1000×700、菜单栏快捷键（⌘N 新建 / ⌘K 搜索 / ⌘, 设置）、⌘Enter 发送；UIKit 组件替换为 SwiftUI 跨平台组件（DocumentPickerView 用 `.fileImporter`、FeedbackService 用 `ProcessInfo`）；SettingsView / KnowledgeBaseView 用 NavigationSplitView 双栏布局适配多平台。**v1.5.0 跨平台扩展（Windows + Android）**：Windows 端基于 WPF .NET 8（MVVM + XAML），通过 `AetherApiClient` 走 BFF HTTP 契约、`AetherNativeBridge` P/Invoke `aether_core_ffi.dll` 共享 Rust 核心；Android 端基于 Kotlin + Jetpack Compose（MVVM + Repository），通过 `AetherApi` / `ChatStreamClient` 走 BFF HTTP 契约、`rust/{SseBridge, VectorMath, Redact}` 通过 JNI 调用 `libaether_core_ffi.so` 共享 Rust 核心。两端复用 BFF 作为统一 LLM 代理，不持上游 API Key，仅持 `userToken`。
 29. **工具能力增强**：ToolRegistry 从 4 个工具扩展到 14 跨平台 + 11 macOS 独有（共 25 个），新增 21 个工具分三类：跨平台 7 个（LocationTool / DeviceInfoTool / ClipboardTool（Read+Write 两个注册项）/ OpenURLTool / ContactsTool / WeatherTool）、macOS 独有 11 个（AppleScriptTool / ScreenshotTool / OCRTool / TerminalCommandTool / WindowManagementTool / AppManagementTool / FileOperationTool / FinderTool / SafariControlTool / SystemControlTool / InputAutomationTool，用 `#if os(macOS)` 守卫）、快捷指令 3 个（RunShortcutTool / ListShortcutsTool / CreateShortcutTool，CreateShortcutTool 通过 WFWorkflow plist 生成 .shortcut 文件支持 open_url / run_script / show_text / copy_to_clipboard 四种动作）。
 30. **预设系统提示词**：`PresetPrompts.swift` 提供 11 个预设角色（默认助手 / 开发者 / 学生 / 白领 / 管理者 / 产品经理 / 写作助手 / 技术面试官 / 学习导师 / 翻译官 / 健身教练），每个含详细完整的 system prompt 文本（≥ 150 字）；SettingsView 的 `systemPromptSection` 上方新增「预设角色」Menu，选中后填入 TextEditor 保留可编辑性，复用现有「完成」按钮回写逻辑。
 31. **macOS 体验修复**：设置二级 / 三级页面导航修复（`regularLayout` detail 包 `NavigationStack`，二级页 TTS / 隐私政策 / 端侧模型管理有返回按钮）；工具项中文化（SettingsView `preferenceSection` 的 Toggle 用中文 `description` 替代英文 `name`）；macOS markdown 视觉层次修复（MessageBubble.swift NSColor shim 的 systemGray3 / 5 / 6 改为不同灰阶 separatorColor / textBackgroundColor / controlBackgroundColor）；macOS 语音朗读 UI 修复（MarkdownText 加 `parseBlocks` NSCache 缓存 countLimit=200，VoiceService 加 `@MainActor`、`didCancel` 兜底清理、voice nil 降级、移除 spokenText 死状态）；18 个工具文件 + ToolRegistry 补充文件级 / 方法级 / 行内中文注释。
@@ -66,7 +66,55 @@
 
 ## 2. 分层架构图
 
-Aether 采用 5 层分层架构（表现层 / 领域层 / 服务层 / Rust FFI 层 / 数据层），依赖方向自上而下单向流动。下图使用 Mermaid `flowchart TB` 描述，每个 subgraph 代表一个分层。
+### 2.0 跨平台架构总览（v1.5.0 起）
+
+v1.5.0 起 Aether 扩展为五端架构。Apple 三端（iOS / iPad / macOS）共用 SwiftUI + SwiftData 代码库，通过 `#if os(iOS)` 条件编译隔离平台差异；Windows 端基于 WPF .NET 8 独立实现；Android 端基于 Kotlin + Jetpack Compose 独立实现。三套客户端共享同一 BFF（Cloudflare Workers）HTTP 契约作为统一 LLM 代理，并共享同一 Rust 核心 `aether-core-ffi`（按平台分发为 xcframework / DLL / .so）以提供 SSE 解析、向量数学、敏感信息脱敏等高性能算法。
+
+```mermaid
+flowchart TB
+    subgraph Cloud["云端"]
+        BFF["BFF<br/>(Cloudflare Workers)<br/>统一 LLM 代理"]
+    end
+
+    subgraph Apple["Apple 三端（SwiftUI 共用代码库）"]
+        iOS["iOS / iPadOS"]
+        macOS["macOS"]
+    end
+
+    subgraph Win["Windows 端"]
+        WPF["WPF .NET 8<br/>(MVVM + XAML)"]
+    end
+
+    subgraph Droid["Android 端"]
+        Compose["Kotlin + Jetpack Compose<br/>(MVVM + Repository)"]
+    end
+
+    subgraph Rust["Rust 核心 (aether-core-ffi)"]
+        xcframework["xcframework<br/>(ios-arm64 / ios-arm64-simulator / macos-arm64)"]
+        DLL["aether_core_ffi.dll<br/>(Windows x64)"]
+        SO["libaether_core_ffi.so<br/>(Android arm64-v8a + x86_64)"]
+    end
+
+    BFF -->|HTTP / SSE| iOS
+    BFF -->|HTTP / SSE| macOS
+    BFF -->|HTTP / SSE| WPF
+    BFF -->|HTTP / SSE| Compose
+
+    iOS -->|Swift AetherRust 包装| xcframework
+    macOS -->|Swift AetherRust 包装| xcframework
+    WPF -->|P/Invoke AetherNativeBridge| DLL
+    Compose -->|JNI rust/{SseBridge,VectorMath,Redact}| SO
+```
+
+**关键特征**：
+
+- **统一 BFF 契约**：三套客户端复用同一 BFF HTTP 契约（`POST /chat/stream` / `GET /conversations` / `GET /messages` / `POST /rag/search` / `GET /health/summary` 等），仅持 `userToken`，不持上游 LLM API Key。
+- **Rust 核心多形态分发**：`aether-core-ffi` 编译为三种形态——xcframework（Apple 三端静态库）、`aether_core_ffi.dll`（Windows x64 动态库）、`libaether_core_ffi.so`（Android arm64-v8a + x86_64 动态库），共享 `aether-core` 算法实现（parse_with_tool_accumulation / cosine_similarity / redact 等）。
+- **三套 UI 独立实现**：SwiftUI（Apple）/ WPF XAML（Windows）/ Jetpack Compose（Android）各自使用平台原生 UI 框架，业务逻辑通过 ViewModel + Repository / Service 层与 BFF 交互。
+
+### 2.1 Apple 三端分层架构
+
+Aether Apple 三端采用 5 层分层架构（表现层 / 领域层 / 服务层 / Rust FFI 层 / 数据层），依赖方向自上而下单向流动。下图使用 Mermaid `flowchart TB` 描述，每个 subgraph 代表一个分层。
 
 ```mermaid
 flowchart TB
@@ -121,7 +169,7 @@ flowchart TB
 | Rust FFI 层 (AetherRust) | 10 个 Swift 包装器，通过 `AetherRustBin` xcframework 调用 Rust aether-core-ffi C ABI，提供高性能核心算法（Sha256 / Token / Chunker / Vector / SSE / Sandbox / Inference / RateLimiter / Redactor / FFIError） | 10 |
 | 数据层 (Models/Storage) | SwiftData `@Model`（7 实体）+ KeychainManager（API Keys）+ UserDefaults（Settings/Cache） | 7 |
 
-### 2.1 模块依赖图
+#### 2.1.1 Apple 三端模块依赖图
 
 下图使用 Mermaid `classDiagram` 展示核心 ViewModel 对 LLMProvider 协议及其 4 个实现的依赖关系。`ChatViewModel` 依赖 `LLMProvider` / `RAGService` / `ToolRegistry` 三个服务编排 ReAct 循环。
 
@@ -149,6 +197,98 @@ classDiagram
     ChatViewModel --> RAGService
     ChatViewModel --> ToolRegistry
 ```
+
+### 2.2 Windows 端分层架构（v1.5.0）
+
+Windows 端基于 WPF .NET 8 实现，采用 MVVM（ViewModel + XAML 视图）+ Services + Rust FFI（P/Invoke）三层架构。所有 LLM 调用经 BFF HTTP 契约（`AetherApiClient`），SSE 解析 / 向量数学 / 脱敏算法经 P/Invoke 调用 `aether_core_ffi.dll`（`AetherNativeBridge`），DLL 不可用时自动回退到托管实现。
+
+```mermaid
+flowchart TB
+    subgraph WinViews["表现层 (XAML Views)"]
+        ChatPage["ChatPage.xaml"]
+        ConvListPage["ConversationListPage.xaml"]
+        SettingsPage["SettingsPage.xaml"]
+        MainWindow["MainWindow.xaml"]
+    end
+    subgraph WinVM["领域层 (ViewModels)"]
+        ChatVM["ChatViewModel"]
+        ConvListVM["ConversationListViewModel"]
+        SettingsVM["SettingsViewModel"]
+    end
+    subgraph WinServices["服务层 (Services)"]
+        AetherApiClient["AetherApiClient<br/>(BFF HTTP + SSE)"]
+        BffConfigStore["BffConfigStore<br/>(JSON + DPAPI 加密)"]
+        LanguageService["LanguageService<br/>(i18n 单例)"]
+        MarkdownRenderer["MarkdownRenderer<br/>(Markdig → FlowDocument)"]
+    end
+    subgraph WinRust["Rust FFI 层 (AetherNativeBridge)"]
+        AetherNativeBridge["AetherNativeBridge<br/>P/Invoke aether_core_ffi.dll"]
+    end
+    subgraph WinData["数据层 (Models)"]
+        Models["Models.cs<br/>(Conversation / ChatMessage / ChatRequest / Memory)"]
+        Resx["Strings.Designer.cs + 8 .resx"]
+        DesignTokens["DesignTokens.cs / Converters.cs"]
+    end
+```
+
+**各层职责概览**：
+
+| 层级 | 职责 | 关键文件 |
+|------|------|----------|
+| 表现层 (XAML Views) | WPF 页面 + 数据绑定，3 个主页面（ChatPage / ConversationListPage / SettingsPage）+ MainWindow 导航壳 | `Views/ChatPage.xaml` / `ConversationListPage.xaml` / `SettingsPage.xaml` / `MainWindow.xaml` |
+| 领域层 (ViewModels) | `INotifyPropertyChanged` 状态管理 + 业务编排 | `ViewModels/ChatViewModel.cs` / `ConversationListViewModel.cs` / `SettingsViewModel.cs` |
+| 服务层 (Services) | BFF HTTP 客户端 + DPAPI 加密配置 + i18n + Markdown 渲染 | `Services/AetherApiClient.cs` / `BffConfigStore.cs` / `LanguageService.cs` / `MarkdownRenderer.cs` |
+| Rust FFI 层 | P/Invoke 桥接 `aether_core_ffi.dll`，提供 SSE 解析 / 余弦相似度 / 脱敏；DLL 不可用时返回 null / 0 / 原值兜底 | `Native/AetherNativeBridge.cs` |
+| 数据层 (Models) | 数据模型 + 多语言资源 + 设计 Token | `Models/Models.cs` / `Properties/Strings.Designer.cs` + 8 `.resx` / `Design/DesignTokens.cs` / `Converters/Converters.cs` |
+
+### 2.3 Android 端分层架构（v1.5.0）
+
+Android 端基于 Kotlin + Jetpack Compose 实现，采用 MVVM（ViewModel + Compose）+ Repository（先 Room 后网络）+ Rust JNI 三层架构。所有 LLM 调用经 BFF HTTP 契约（`AetherApi` / `ChatStreamClient`），SSE 解析 / 向量数学 / 脱敏算法经 JNI 调用 `libaether_core_ffi.so`（4 个 `Java_com_aether_rust_*` 导出函数），JNI 不可用时回退到纯 Kotlin 实现。
+
+```mermaid
+flowchart TB
+    subgraph DroidUI["表现层 (Compose Screens)"]
+        ChatScreen["ChatScreen"]
+        ConvListScreen["ConversationListScreen"]
+        SettingsScreen["SettingsScreen"]
+        KnowledgeBaseScreen["KnowledgeBaseScreen"]
+        HealthScreen["HealthScreen"]
+    end
+    subgraph DroidVM["领域层 (ViewModels)"]
+        ChatVM["ChatViewModel"]
+        ConvListVM["ConversationListViewModel"]
+        KnowledgeBaseVM["KnowledgeBaseViewModel"]
+        HealthVM["HealthViewModel"]
+    end
+    subgraph DroidRepo["Repository 层（先 Room 后网络）"]
+        ConvRepo["ConversationRepository"]
+        MsgRepo["MessageRepository"]
+        SyncMgr["RepositorySyncManager"]
+    end
+    subgraph DroidData["数据层"]
+        AetherApi["AetherApi + ChatStreamClient<br/>(Ktor BFF HTTP + SSE)"]
+        AetherDB["AetherDatabase<br/>(Room v1: ConversationEntity + MessageEntity)"]
+        BffConfigStore["BffConfigStore<br/>(DataStore + EncryptedSharedPreferences)"]
+        Models["Models.kt"]
+    end
+    subgraph DroidRust["Rust JNI 层"]
+        SseBridge["SseBridge (parseWithTools / reset)"]
+        VectorMath["VectorMath (cosineF64)"]
+        Redact["Redact (redact)"]
+    end
+```
+
+**各层职责概览**：
+
+| 层级 | 职责 | 关键文件 |
+|------|------|----------|
+| 表现层 (Compose) | Jetpack Compose 屏幕 + 状态驱动 UI，5 个主屏幕（Chat / ConversationList / Settings / KnowledgeBase / Health）+ AetherApp 导航 | `ui/chat/ChatScreen.kt` / `conversation/ConversationListScreen.kt` / `settings/SettingsScreen.kt` / `rag/KnowledgeBaseScreen.kt` / `health/HealthScreen.kt` / `navigation/AetherApp.kt` |
+| 领域层 (ViewModels) | `ViewModel` + `StateFlow` 状态管理 + 业务编排 | `ui/chat/ChatViewModel.kt` / `conversation/ConversationListViewModel.kt` / `rag/KnowledgeBaseViewModel.kt` / `health/HealthViewModel.kt` |
+| Repository 层 | 先 Room 后网络（离线优先），`RepositorySyncManager` 协调同步 | `data/repository/ConversationRepository.kt` / `MessageRepository.kt` / `RepositorySyncManager.kt` |
+| 数据层 | Ktor BFF HTTP + Room + DataStore + 模型 | `data/api/AetherApi.kt` / `ChatStreamClient.kt` / `HttpClientFactory.kt` / `BffConfig.kt` / `BffConfigStore.kt` / `data/db/AetherDatabase.kt` / `data/model/Models.kt` |
+| Rust JNI 层 | JNI 桥接 `libaether_core_ffi.so`，4 个导出函数提供 SSE 解析 / 余弦相似度 / 脱敏；JNI 不可用时回退到纯 Kotlin | `rust/SseBridge.kt` / `VectorMath.kt` / `Redact.kt` |
+
+
 
 ---
 
@@ -763,7 +903,24 @@ end note
 - **`aether-core`**（workspace member）：纯 Rust 逻辑 crate，无 unsafe，提供所有算法实现（sha256_hex / estimate_tokens / chunk_document / cosine_similarity / top_k_f32 / parse_chunk / ratelimit / redact 等）。
 - **`aether-core-ffi`**（`rust/aether-core-ffi/`）：C ABI 绑定层，所有 `unsafe` 集中于此。返回值均为 C 字符串（JSON），调用方通过 `aether_free_string` 释放。`Cargo.toml` 输出 `staticlib` / `cdylib` / `rlib` 三种 crate-type。条件编译：candle 推理排除 wasm32/android，wasmtime 沙箱排除 wasm32/iOS/android，wasm32 目标引入 `wasm-bindgen`，android 目标引入 `jni`。
 - **`cbindgen.toml`**：配置 cbindgen 生成 C 头文件，`AETHER_EXPORT` 宏在静态库中定义为空、动态库中定义为 `__attribute__((visibility("default")))`，`include_guard = "AETHER_CORE_FFI_H"`。
-- **`xcframework`**：`aether_core.xcframework` 包含 ios-arm64 / ios-arm64-simulator / macos-arm64 三个 slice，每个含 `Headers/`（`aether_core_ffi.h` + `module.modulemap`）与 `libaether_core_ffi.a`。
+- **`xcframework`**（Apple 三端）：`aether_core.xcframework` 包含 ios-arm64 / ios-arm64-simulator / macos-arm64 三个 slice，每个含 `Headers/`（`aether_core_ffi.h` + `module.modulemap`）与 `libaether_core_ffi.a`，由 Swift 侧 `AetherRust` 通过 `AetherRustBin` binaryTarget 引用。
+- **`aether_core_ffi.dll`**（Windows x64，v1.5.0 新增）：`cargo build --release --target x86_64-pc-windows-msvc` 产物，C ABI 动态库（cdylib）。C# 侧 `AetherNativeBridge.cs` 通过 P/Invoke 调用四个导出函数：`aether_sse_parse_chunk` / `aether_cosine_f32` / `aether_redact` / `aether_free_string`。`DllNotFoundException` 安全处理，DLL 不可用时返回 null / 0 / 原值，调用方自动回退到托管实现。
+- **`libaether_core_ffi.so`**（Android arm64-v8a + x86_64，v1.5.0 新增）：`cargo build --release --target aarch64-linux-android` / `--target x86_64-linux-android` 产物，JNI 动态库（cdylib + `jni = "0.21"`）。Rust 侧 `rust/aether-core-ffi/src/jni.rs` 暴露 4 个 JNI 导出函数：
+  - `Java_com_aether_rust_SseBridge_parseWithTools(JEnv, JClass, JString) -> jstring`：解析 SSE 行，使用 thread_local 累积器，返回 JSON `{"content":"...","toolCalls":[...]}`。
+  - `Java_com_aether_rust_SseBridge_reset(JEnv, JClass)`：清空 thread_local 累积器。
+  - `Java_com_aether_rust_VectorMath_cosineF64(JEnv, JClass, jdoubleArray, jdoubleArray) -> jdouble`：f64 余弦相似度计算。
+  - `Java_com_aether_rust_Redact_redact(JEnv, JClass, JString) -> jstring`：敏感信息脱敏（UUID / 邮箱 / URL / Token / 凭证 / 路径）。
+  
+  Kotlin 侧 `SseBridge` / `VectorMath` / `Redact` 三个 object 通过 `System.loadLibrary("aether_core_ffi")` 加载 .so，JNI 不可用时 `nativeLoaded = false`，`*Safe` 方法返回原值 / 0.0 兜底。
+
+**Rust 核心多形态分发总览**：
+
+| 形态 | 平台 / 架构 | crate-type | 调用方 | 安全回退 |
+|------|------------|-----------|--------|---------|
+| `aether_core.xcframework`（静态库） | iOS arm64 / iOS Simulator arm64 / macOS arm64 | staticlib | Swift `AetherRust` 包装器 | —（编译期链接） |
+| `aether_core_ffi.dll`（动态库） | Windows x64 | cdylib | C# `AetherNativeBridge` P/Invoke | `DllNotFoundException` → 返回 null / 0 / 原值 |
+| `libaether_core_ffi.so`（动态库） | Android arm64-v8a + x86_64 | cdylib + jni | Kotlin `SseBridge` / `VectorMath` / `Redact` JNI | `UnsatisfiedLinkError` → `nativeLoaded = false`，`*Safe` 方法返回原值 / 0.0 |
+| WASM 模块（cloudflare workers） | wasm32 | cdylib + wasm-bindgen | Cloudflare Workers BFF | —（服务端运行时） |
 
 ### 3.6 工具调用关系图
 
@@ -917,6 +1074,63 @@ classDiagram
 - 4 个直接实现：`DeepSeekClient`（DeepSeek 直连）/ `QwenClient`（阿里云百炼 DashScope）/ `BFFProxyClient`（Cloudflare Workers 网关中转）/ `OfflineLLMProvider`（端侧 MLX）。
 - `FallbackLLMProvider` 实现协议同时聚合两个 `LLMProvider`，主 provider 未产出则降级到 fallback；`embed` 路径不降级。
 - `ModelProviderFactory` 静态工厂：`make(_:)` 按 enum 创建直连 client；`make(bffConfig:provider:)` 在 `bffConfig.enabled` 时返回 BFFProxyClient。
+
+### 3.8 Windows 端模块职责（v1.5.0）
+
+Windows 端位于 `windows/Aether.Windows/` 目录，基于 WPF .NET 8（MVVM + XAML）实现。模块职责如下表。
+
+| 文件 | 职责 |
+|------|------|
+| `windows/Aether.Windows/Aether.Windows.csproj` | WPF .NET 8 项目文件，目标框架 `net8.0-windows`，引用 Markdig（Markdown → FlowDocument）与 `System.Security.Cryptography.ProtectedData`（DPAPI 加密）。 |
+| `windows/Aether.Windows/App.xaml.cs` | WPF Application 入口，初始化 `BffConfigStore` / `LanguageService` / `AetherApiClient` 单例，注入 MainWindow。 |
+| `windows/Aether.Windows/MainWindow.xaml.cs` | 主窗口导航壳，承载 ChatPage / ConversationListPage / SettingsPage 三个 Page 的导航。 |
+| `windows/Aether.Windows/Models/Models.cs` | 数据模型：`Conversation` / `ChatMessage` / `ChatRequest` / `Memory`，使用 `JsonPropertyName` 特性与 BFF DTO 字段一一对应。 |
+| `windows/Aether.Windows/Services/AetherApiClient.cs` | BFF HTTP 客户端：`HttpClient` + `X-BFF-Token` header，提供 `GetConversationsAsync` / `CreateConversationAsync` / `StreamChatAsync`（SSE 流式，`IAsyncEnumerable<string>`）/ `GetMessagesAsync` / `SubmitFeedbackAsync` / `CreateMemoryAsync` / `SearchMemoryAsync` 等方法；`UseRustSse` 开关切换 Rust DLL 与托管 JSON 解析路径。 |
+| `windows/Aether.Windows/Services/BffConfigStore.cs` | BFF 配置持久化：`%LOCALAPPDATA%/Aether/bff_config.json` 存 JSON，UserToken 通过 DPAPI（`CurrentUser` 范围）加密为 Base64 存储；提供 `BaseUrl` / `UserToken` / `DefaultModel` / `AccentColor` / `Language` 属性。 |
+| `windows/Aether.Windows/Services/LanguageService.cs` | i18n 单例：读取 `BffConfigStore.Language` 切换 `Strings.Designer.cs` 资源文化，支持 8 种语言（zh-Hans / zh-Hant / en / ja / ko / fr / de / es）。 |
+| `windows/Aether.Windows/Services/MarkdownRenderer.cs` | Markdown 渲染：基于 Markdig 解析 Markdown 文本生成 WPF `FlowDocument`，供 ChatMessage.MarkdownDocument 持有。 |
+| `windows/Aether.Windows/Native/AetherNativeBridge.cs` | Rust FFI P/Invoke 桥接：声明 `aether_sse_parse_chunk` / `aether_cosine_f32` / `aether_redact` / `aether_free_string` 四个 C ABI 函数，封装为 `ParseSseChunk` / `CosineF32` / `Redact` 三个友好方法；`DllNotFoundException` 安全处理，DLL 不可用时返回 null / 0 / 原值兜底。 |
+| `windows/Aether.Windows/ViewModels/ChatViewModel.cs` | 聊天 ViewModel：管理消息列表 / 流式状态 / 输入框，调用 `AetherApiClient.StreamChatAsync` 接收 SSE 流并更新 UI；`INotifyPropertyChanged` 通知。 |
+| `windows/Aether.Windows/ViewModels/ConversationListViewModel.cs` | 会话列表 ViewModel：管理会话 CRUD、置顶排序、删除选中（编辑模式），调用 `AetherApiClient.GetConversationsAsync` / `CreateConversationAsync` / `DeleteConversationAsync`。 |
+| `windows/Aether.Windows/ViewModels/SettingsViewModel.cs` | 设置 ViewModel：管理 BFF 配置（BaseUrl / UserToken / DefaultModel）读写、语言切换、主题色，调用 `BffConfigStore.SaveAsync` 持久化。 |
+| `windows/Aether.Windows/Views/ChatPage.xaml` | 聊天页面 XAML：消息列表（`ItemsControl` + `MarkdownDocument` 渲染）+ 输入框 + 发送按钮，绑定 `ChatViewModel`。 |
+| `windows/Aether.Windows/Views/ConversationListPage.xaml` | 会话列表页面 XAML：`ListView` 展示会话，绑定 `ConversationListViewModel`，支持编辑模式多选删除。 |
+| `windows/Aether.Windows/Views/SettingsPage.xaml` | 设置页面 XAML：BFF 配置 / 模型选择 / 语言 / 主题色表单，绑定 `SettingsViewModel`。 |
+| `windows/Aether.Windows/Design/DesignTokens.cs` | 设计 Token：颜色 / 字体 / 圆角 / 间距常量，对齐 Apple 端 DesignSystem 视觉。 |
+| `windows/Aether.Windows/Converters/Converters.cs` | XAML 值转换器：BoolToVisibility / ColorToBrush 等。 |
+| `windows/Aether.Windows/Properties/Strings.Designer.cs` + 8 `.resx` | 多语言资源：8 种语言（zh-Hans / zh-Hant / en / ja / ko / fr / de / es），由 `LanguageService` 动态切换。 |
+
+### 3.9 Android 端模块职责（v1.5.0）
+
+Android 端位于 `android/app/src/main/java/com/aether/` 目录，包名 `com.aether`，基于 Kotlin + Jetpack Compose（MVVM + Repository）实现。模块职责如下表。
+
+| 文件 | 职责 |
+|------|------|
+| `android/app/src/main/java/com/aether/app/MainActivity.kt` | 单 Activity 入口，承载 Compose 导航图，配置 `enableEdgeToEdge` 与状态栏样式。 |
+| `android/app/src/main/java/com/aether/ui/navigation/AetherApp.kt` | Compose 导航图：定义 Chat / ConversationList / Settings / KnowledgeBase / Health 五个目的地的 `NavHost` 路由。 |
+| `android/app/src/main/java/com/aether/data/model/Models.kt` | 数据模型：`Conversation` / `ChatMessage` / `ToolCall` / `ChatRequest` / `Memory` / `MemorySearchRequest` / `DocumentChunk` / `RagSearchRequest` / `HealthSummary`，使用 `@Serializable` 与 BFF DTO 一一对应。 |
+| `android/app/src/main/java/com/aether/data/api/AetherApi.kt` | BFF HTTP 客户端：基于 Ktor `HttpClient`，提供 `listConversations` / `createConversation` / `getConversation` / `updateConversation` / `deleteConversation` / `listMessages` / `deleteMessage` / `submitFeedback` / `listMemory` / `createMemory` / `searchMemory` / `deleteMemory` / `searchDocuments` / `uploadHealthSummary` / `getHealthSummary` 等方法；`withAuth()` 统一注入 `X-BFF-Token` header。 |
+| `android/app/src/main/java/com/aether/data/api/ChatStreamClient.kt` | SSE 流式聊天：Ktor `HttpStatement` + `response.bodyAsChannel()` 读取 SSE 行，`parseLine` 优先调用 `SseBridge.parseWithTools`（Rust JNI），失败回退到 `parseLineKotlin`（纯 Kotlin 解析 BFF 自定义 `{"type":"delta","content":"..."}` 格式），返回 `Flow<String>`。 |
+| `android/app/src/main/java/com/aether/data/api/HttpClientFactory.kt` | Ktor `HttpClient` 工厂：配置 `ContentNegotiation`（kotlinx.serialization）/ `HttpTimeout` / `UserAgent` / `Logging` 等插件。 |
+| `android/app/src/main/java/com/aether/data/api/BffConfig.kt` | BFF 配置数据类：`baseUrl`（默认 `BuildConfig.BFF_BASE_URL`）+ `userToken`（默认空串，运行时从 `BffConfigStore` 读取）。 |
+| `android/app/src/main/java/com/aether/data/api/BffConfigStore.kt` | BFF 配置持久化：非敏感数据（baseUrl / defaultModel / accentColor / language）用 `DataStore Preferences`，敏感数据（userToken）用 `EncryptedSharedPreferences`（AES256-GCM）；暴露 `Flow<BffConfig>` / `setBaseUrl` / `setUserToken` / `setLanguage` 等。 |
+| `android/app/src/main/java/com/aether/data/db/AetherDatabase.kt` | Room 数据库 v1：`ConversationEntity` + `MessageEntity` 两张表，提供 `ConversationDao` / `MessageDao`，作为离线缓存层。 |
+| `android/app/src/main/java/com/aether/data/repository/ConversationRepository.kt` | 会话 Repository：先 Room 后网络，离线优先；从 `AetherApi.listConversations` 拉取后写入 Room，下次离线读取 Room 缓存。 |
+| `android/app/src/main/java/com/aether/data/repository/MessageRepository.kt` | 消息 Repository：管理消息 CRUD 与流式追加，先 Room 后网络。 |
+| `android/app/src/main/java/com/aether/data/repository/RepositorySyncManager.kt` | Repository 同步管理器：协调 Room 与网络同步，处理冲突合并与重试。 |
+| `android/app/src/main/java/com/aether/rust/SseBridge.kt` | Rust SSE JNI 桥接：`object SseBridge` 声明 `external fun parseWithTools(line: String): String` 与 `external fun reset()`，`System.loadLibrary("aether_core_ffi")` 加载 .so；返回 `{"content":"...","toolCalls":[...]}` JSON 串。 |
+| `android/app/src/main/java/com/aether/rust/VectorMath.kt` | Rust 向量数学 JNI 桥接：`external fun cosineF64(a: DoubleArray, b: DoubleArray): Double`；`nativeLoaded` 标记加载结果，`cosineF64Safe` 在 JNI 不可用时返回 0.0。 |
+| `android/app/src/main/java/com/aether/rust/Redact.kt` | Rust 脱敏 JNI 桥接：`external fun redact(input: String): String`；`redactSafe` 在 JNI 不可用时返回原文。 |
+| `android/app/src/main/java/com/aether/ui/chat/ChatScreen.kt` | 聊天 Compose 屏幕：`LazyColumn` 消息列表 + 输入栏 + 发送按钮，状态由 `ChatViewModel` 暴露的 `StateFlow` 驱动。 |
+| `android/app/src/main/java/com/aether/ui/chat/ChatViewModel.kt` | 聊天 ViewModel：`viewModelScope.launch` 调用 `ChatStreamClient.streamChat` 收集 `Flow<String>` 并更新 UI 状态。 |
+| `android/app/src/main/java/com/aether/ui/chat/MarkdownText.kt` | Markdown 渲染：基于 Markwon（或 Compose RichText）渲染消息气泡。 |
+| `android/app/src/main/java/com/aether/ui/conversation/ConversationListScreen.kt` | 会话列表 Compose 屏幕：`LazyColumn` + 编辑模式多选删除。 |
+| `android/app/src/main/java/com/aether/ui/conversation/ConversationListViewModel.kt` | 会话列表 ViewModel：调用 `ConversationRepository` 管理会话。 |
+| `android/app/src/main/java/com/aether/ui/rag/KnowledgeBaseScreen.kt` + `KnowledgeBaseViewModel.kt` | 知识库屏幕与 ViewModel：调用 `AetherApi.searchDocuments` 进行 RAG 检索。 |
+| `android/app/src/main/java/com/aether/ui/health/HealthScreen.kt` + `HealthViewModel.kt` | 健康屏幕与 ViewModel：调用 `AetherApi.uploadHealthSummary` / `getHealthSummary`。 |
+| `android/app/src/main/java/com/aether/ui/settings/SettingsScreen.kt` | 设置 Compose 屏幕：BFF 配置 / 模型 / 语言 / 主题色表单。 |
+| `android/app/src/main/java/com/aether/ui/settings/LanguageManager.kt` | 语言管理：从 `BffConfigStore.language` 读取语言代码，应用 `AppCompatDelegate.setApplicationLocales` 切换 res/values-* 资源。 |
+| `android/app/src/main/java/com/aether/ui/theme/DesignTokens.kt` + `Theme.kt` | Material 3 主题：颜色 / 字体 / 形状 Token，支持动态颜色与深色模式。 |
 
 ---
 
@@ -1236,6 +1450,102 @@ stateDiagram-v2
     end note
 ```
 
+### 4.11 Windows 端数据流（v1.5.0）
+
+Windows 端数据流核心是 SSE 流式聊天：用户在 `ChatPage` 输入文本 → `ChatViewModel` 调用 `AetherApiClient.StreamChatAsync` 发起 `POST /chat/stream` → BFF 返回 SSE 流 → 逐行解析（`UseRustSse` 开关决定走 Rust DLL 还是托管 `JsonDocument`）→ `IAsyncEnumerable<string>` yield 给 ViewModel → `INotifyPropertyChanged` 触发 UI 更新。
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as 用户
+    participant CP as ChatPage
+    participant VM as ChatViewModel
+    participant AC as AetherApiClient
+    participant BFF as BFF Worker
+    participant RUST as AetherNativeBridge<br/>(aether_core_ffi.dll)
+
+    U->>CP: 输入文本点击发送
+    CP->>VM: SendMessage()
+    VM->>AC: StreamChatAsync(ChatRequest, ct)
+    AC->>BFF: POST /chat/stream<br/>X-BFF-Token: <userToken>
+    BFF-->>AC: SSE 流（data: {"type":"delta","content":"..."}）
+
+    loop 逐行读取 SSE
+        AC->>AC: reader.ReadLineAsync()
+        alt UseRustSse == true
+            AC->>RUST: ParseSseChunk(line)
+            RUST-->>AC: content 字符串（null 跳过）
+            alt DllNotFoundException
+                RUST-->>AC: null（回退到托管路径）
+                AC->>AC: JsonDocument.Parse(data)
+            end
+        else 托管路径（默认）
+            AC->>AC: JsonDocument.Parse(data)<br/>type=="delta" → content
+        end
+        AC-->>VM: yield content
+        VM->>CP: OnPropertyChanged → UI 刷新
+    end
+
+    AC-->>VM: 流结束（[DONE] / EOF）
+    VM->>CP: 完成
+    CP-->>U: 显示最终回复
+```
+
+**关键说明**：
+- `AetherApiClient` 默认走托管 JSON 解析路径（`JsonDocument.Parse`），`UseRustSse = true` 时切换到 Rust DLL；DLL 不可用时 `ParseSseChunk` 返回 null 自动回退。
+- BFF SSE 自定义事件格式：`data: {"type":"delta","content":"..."}`（增量）/ `data: {"type":"done"}` / `data: [DONE]`（终止）。
+- 配置变更后调用 `AetherApiClient.Refresh()` 从 `BffConfigStore` 重新读取 BaseUrl / UserToken 并更新 HttpClient 默认头。
+
+### 4.12 Android 端数据流（v1.5.0）
+
+Android 端数据流核心是 Room 缓存 + SSE 流式：用户在 `ChatScreen` 输入文本 → `ChatViewModel` 调用 `MessageRepository` → `ChatStreamClient.streamChat` 返回 `Flow<String>` → ViewModel 收集 Flow 并写入 Room（`MessageRepository`）→ `StateFlow` 驱动 Compose UI 实时刷新。SSE 解析优先走 Rust JNI（`SseBridge.parseWithTools`），JNI 不可用回退到纯 Kotlin。
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as 用户
+    participant CS as ChatScreen
+    participant VM as ChatViewModel
+    participant MR as MessageRepository
+    participant CSC as ChatStreamClient
+    participant BFF as BFF Worker
+    participant JNI as SseBridge<br/>(libaether_core_ffi.so)
+    participant Room as AetherDatabase<br/>(Room v1)
+
+    U->>CS: 输入文本点击发送
+    CS->>VM: sendMessage()
+    VM->>MR: appendUserMessage(text)
+    MR->>Room: INSERT MessageEntity(user)
+    VM->>CSC: streamChat(ChatRequest)
+    CSC->>BFF: POST /chat/stream<br/>X-BFF-Token: <userToken><br/>Accept: text/event-stream
+    BFF-->>CSC: SSE 流
+    loop 逐行读取 SSE
+        CSC->>CSC: channel.readUTF8Line()
+        alt BuildConfig.USE_RUST_SSE == true
+            CSC->>JNI: parseWithTools(line)
+            JNI-->>CSC: {"content":"...","toolCalls":[...]}
+            alt JNI 不可用
+                JNI-->>CSC: 异常 / 空串
+                CSC->>CSC: parseLineKotlin(line) 回退
+            end
+        else 纯 Kotlin（默认 / 回退）
+            CSC->>CSC: parseLineKotlin(line)
+        end
+        CSC-->>VM: Flow yield content
+        VM->>MR: appendAssistantChunk(content)
+        MR->>Room: UPDATE MessageEntity(assistant)
+        VM->>CS: StateFlow 更新 → UI 刷新
+    end
+    CSC-->>VM: Flow 关闭（[DONE]）
+    VM->>CS: 完成
+    CS-->>U: 显示最终回复
+```
+
+**关键说明**：
+- **离线优先**：`ConversationRepository` / `MessageRepository` 采用「先 Room 后网络」策略，离线时读取 Room 缓存，联网时拉取 BFF 并写入 Room 同步。
+- **Rust JNI 回退**：`ChatStreamClient.parseLine` 优先调 `SseBridge.parseWithTools`，捕获 `Throwable` 后回退到 `parseLineKotlin`；`Redact.redactSafe` / `VectorMath.cosineF64Safe` 同样在 JNI 不可用时返回原值 / 0.0。
+- **状态驱动 UI**：ViewModel 暴露 `StateFlow<ChatUiState>`，Compose 通过 `collectAsStateWithLifecycle()` 订阅，避免不必要的重组。
+
 ---
 
 ## 5. 关键设计决策
@@ -1343,6 +1653,39 @@ stateDiagram-v2
 - **共享方案**：主 App 与 Widget Extension 的 `ModelContainer` 均指向 App Group 容器目录下的同一 SQLite 数据库文件，Widget 可直接读取主 App 写入的 `Conversation` / `HealthInsight` 数据。
 - **影响范围**：`AetherApp.swift`（ModelContainer 初始化）+ Widget Extension（TimelineProvider 读取数据）。
 
+### 5.9 跨平台扩展（v1.5.0 Windows + Android）
+
+#### 决策：Windows 端选型 WPF .NET 8
+
+- **方案**：采用 WPF .NET 8（MVVM + XAML）而非 WinUI 3 / Uno Platform / MAUI。
+- **理由**：WPF 生态成熟稳定，.NET 8 LTS 长期支持；XAML + 数据绑定契合 MVVM 模式；Markdig / DPAPI / P/Invoke 等 .NET 生态库齐全；团队已有 .NET 经验可快速落地。
+- **Rust 集成**：通过 P/Invoke 调用 `aether_core_ffi.dll`（C ABI），`AetherNativeBridge` 静态类封装三个友好方法，`DllNotFoundException` 安全处理，DLL 不可用时自动回退到托管 `JsonDocument` 解析。
+- **配置持久化**：`%LOCALAPPDATA%/Aether/bff_config.json` 存 JSON，UserToken 通过 DPAPI（`ProtectedData.Protect`，`CurrentUser` 范围）加密为 Base64 存储，仅当前 Windows 用户可解密。
+- **影响范围**：`windows/Aether.Windows/` 全部 17 个源文件。
+
+#### 决策：Android 端选型 Kotlin + Jetpack Compose
+
+- **方案**：采用 Kotlin + Jetpack Compose（MVVM + Repository）而非 React Native / Flutter / 传统 View 体系。
+- **理由**：Jetpack Compose 是 Google 官方现代 UI 工具包，与 Kotlin 协程 / StateFlow 深度契合；Material 3 主题与动态颜色开箱即用；Room + DataStore + EncryptedSharedPreferences 提供完整离线优先与加密存储方案。
+- **Rust 集成**：通过 JNI 调用 `libaether_core_ffi.so`（`aether-core-ffi/src/jni.rs` 暴露 4 个 `Java_com_aether_rust_*` 函数），`SseBridge` / `VectorMath` / `Redact` 三个 Kotlin object 桥接；`nativeLoaded` 标记加载结果，JNI 不可用时 `*Safe` 方法返回原值 / 0.0。
+- **离线优先**：Room v1（`ConversationEntity` + `MessageEntity`）作为离线缓存层，`ConversationRepository` 采用「先 Room 后网络」策略；`RepositorySyncManager` 协调同步与冲突合并。
+- **配置持久化**：非敏感数据（baseUrl / defaultModel / accentColor / language）用 `DataStore Preferences`，敏感数据（userToken）用 `EncryptedSharedPreferences`（`AES256-GCM` + `AES256-SIV`）。
+- **影响范围**：`android/app/src/main/java/com/aether/` 全部 26 个源文件。
+
+#### 决策：统一 BFF HTTP 契约
+
+- **方案**：Windows 与 Android 复用与 Apple 三端相同的 BFF（Cloudflare Workers）HTTP 契约，包括 `POST /chat/stream`（SSE 流式聊天）/ `GET /conversations` / `POST /conversations` / `GET /conversations/{id}/messages` / `DELETE /messages/{id}` / `POST /messages/{id}/feedback` / `GET /memory` / `POST /memory/search` / `POST /rag/search` / `GET /health/summary/{date}` 等。
+- **理由**：单一 BFF 契约降低服务端维护成本，三套客户端可独立演进；设备端仅持 `userToken`，不持上游 LLM API Key，安全性更高。
+- **SSE 事件格式**：BFF 自定义事件格式 `data: {"type":"delta","content":"..."}` / `data: {"type":"done"}` / `data: [DONE]`，三套客户端均按此格式解析。
+- **影响范围**：`windows/Aether.Windows/Services/AetherApiClient.cs` + `android/app/src/main/java/com/aether/data/api/AetherApi.kt` + `android/app/src/main/java/com/aether/data/api/ChatStreamClient.kt` + `CloudflareWorkers/src/routes/`。
+
+#### 决策：Rust 核心多形态分发
+
+- **方案**：`aether-core-ffi` crate 编译为三种形态——`aether_core.xcframework`（Apple 三端，含 ios-arm64 / ios-arm64-simulator / macos-arm64 三架构静态库）、`aether_core_ffi.dll`（Windows x64 动态库）、`libaether_core_ffi.so`（Android arm64-v8a + x86_64 动态库）。
+- **条件编译**：`Cargo.toml` 通过 `cfg` 表达式按 target 排除依赖——candle 推理排除 wasm32 与 android；wasmtime 沙箱排除 wasm32 / iOS / Android；wasm32 引入 `wasm-bindgen`；android 引入 `jni = "0.21"`。
+- **ABI 一致性**：所有形态共享同一 `aether-core` 算法实现（`parse_with_tool_accumulation` / `cosine_similarity_f64` / `redact` 等），仅 FFI 绑定层与 JNI 导出层因平台差异独立实现。
+- **影响范围**：`rust/aether-core-ffi/Cargo.toml` + `rust/aether-core-ffi/src/{lib.rs, jni.rs, wasm.rs}` + `Packages/AetherCore/Sources/AetherRust/`（Swift 包装）+ `windows/Aether.Windows/Native/AetherNativeBridge.cs`（P/Invoke）+ `android/app/src/main/java/com/aether/rust/`（JNI）。
+
 ---
 
 ## 6. 技术栈映射
@@ -1396,6 +1739,28 @@ stateDiagram-v2
 | Rust (aether-core-ffi) | `rust/aether-core-ffi/` | C ABI 绑定层（staticlib / cdylib / rlib），条件编译支持 wasm32 / android | Rust 1.75+ |
 | cbindgen | `rust/aether-core-ffi/cbindgen.toml` | 自动生成 C 头文件 `aether_core_ffi.h` | cbindgen 0.26+ |
 | xcframework | `Packages/AetherCore/aether_core.xcframework/` | 三架构（ios-arm64 / ios-arm64-simulator / macos-arm64）静态库包 | Xcode 16+ |
+| **Windows 端技术栈** | | | |
+| WPF .NET 8 | `windows/Aether.Windows/Aether.Windows.csproj`（`net8.0-windows`） | MVVM + XAML 桌面 UI 框架，`INotifyPropertyChanged` 数据绑定 | .NET 8 LTS / Windows 10 1809+ |
+| HttpClient | `windows/Aether.Windows/Services/AetherApiClient.cs` | BFF HTTP 客户端 + SSE 流式（`IAsyncEnumerable<string>`） | .NET 8 内置 |
+| Markdig | `windows/Aether.Windows/Services/MarkdownRenderer.cs` | Markdown 解析 → WPF `FlowDocument` | Markdig 0.36+ |
+| DPAPI（ProtectedData） | `windows/Aether.Windows/Services/BffConfigStore.cs` | UserToken 加密（`CurrentUser` 范围，Base64 存储） | `System.Security.Cryptography.ProtectedData` NuGet |
+| P/Invoke | `windows/Aether.Windows/Native/AetherNativeBridge.cs` | 调用 `aether_core_ffi.dll` C ABI（`aether_sse_parse_chunk` / `aether_cosine_f32` / `aether_redact` / `aether_free_string`） | .NET 8 内置 |
+| .resx 多语言资源 | `windows/Aether.Windows/Properties/Strings.Designer.cs` + 8 `.resx` | 8 种语言（zh-Hans / zh-Hant / en / ja / ko / fr / de / es），`LanguageService` 动态切换 | .NET 8 内置 |
+| xUnit | `windows/Aether.Windows.Tests/` | 7 个测试文件 / 72 用例 | xUnit 2.6+ |
+| **Android 端技术栈** | | | |
+| Kotlin + Jetpack Compose | `android/app/build.gradle.kts` | 现代 UI 工具包 + 协程 + StateFlow | Kotlin 1.9+ / Compose BOM 2024+ / AGP 8+ |
+| Ktor Client | `android/app/src/main/java/com/aether/data/api/{AetherApi,ChatStreamClient,HttpClientFactory}.kt` | BFF HTTP + SSE 流式（`Flow<String>`） | Ktor 2.3+ |
+| kotlinx.serialization | `android/app/src/main/java/com/aether/data/model/Models.kt` | `@Serializable` 数据模型 JSON 编解码 | kotlinx.serialization 1.6+ |
+| Room | `android/app/src/main/java/com/aether/data/db/AetherDatabase.kt` | 离线缓存层（`ConversationEntity` + `MessageEntity`） | Room 2.6+ |
+| DataStore Preferences | `android/app/src/main/java/com/aether/data/api/BffConfigStore.kt` | 非敏感配置（baseUrl / model / accent / language） | DataStore 1.1+ |
+| EncryptedSharedPreferences | `android/app/src/main/java/com/aether/data/api/BffConfigStore.kt` | UserToken 加密（AES256-GCM + AES256-SIV） | `androidx.security:security-crypto` 1.1+ |
+| JNI | `android/app/src/main/java/com/aether/rust/{SseBridge,VectorMath,Redact}.kt` | 调用 `libaether_core_ffi.so`（4 个 `Java_com_aether_rust_*` 导出函数） | JDK 17+ / `jni = "0.21"`（Rust 侧） |
+| Markwon / RichText | `android/app/src/main/java/com/aether/ui/chat/MarkdownText.kt` | Markdown 渲染 | Markwon 4.x+ |
+| res/values-* 多语言资源 | `android/app/src/main/res/values-{zh-rCN,zh-rTW,en,ja,ko,fr,de,es}/strings.xml` | 8 种语言资源 | AGP 内置 |
+| JUnit + Robolectric | `android/app/src/test/java/com/aether/` | 12 个测试文件 / 95 用例 | JUnit 4.13+ / Robolectric 4.11+ |
+| **Rust 核心多形态分发** | | | |
+| aether_core_ffi.dll | `rust/aether-core-ffi/` 编译产物 | Windows x64 动态库（cdylib） | Rust 1.75+ / MSVC toolchain |
+| libaether_core_ffi.so | `rust/aether-core-ffi/` 编译产物 | Android arm64-v8a + x86_64 动态库（cdylib + jni 0.21） | Rust 1.75+ / NDK r25+ |
 
 ---
 
@@ -1523,6 +1888,48 @@ stateDiagram-v2
 | Upload artifact | `actions/upload-artifact@v4`（`if: always()`，name: `test-results-xcresult`） | GitHub Actions |
 
 - **Destination**：iPhone 17 模拟器。
+
+### 7.4 Windows 端测试架构（v1.5.0）
+
+- **Target**：`Aether.Windows.Tests`（xUnit）
+- **规模**：7 个测试文件，72 个用例
+- **位置**：`windows/Aether.Windows.Tests/`
+- **测试框架**：xUnit 2.6+，部分用例使用 `Theory` + `InlineData` 参数化
+
+| 文件 | 覆盖范围 | 备注 |
+|------|---------|------|
+| `AetherApiClientTest.cs` | BFF HTTP 客户端：会话 CRUD / 消息列表 / 反馈 / 记忆搜索 / SSE 流式 | mock HttpClient，不发真实网络请求 |
+| `BffConfigStoreTest.cs` | DPAPI 加密配置：保存 / 加载 / UserToken 加密 / 默认值回退 | 临时目录隔离测试 |
+| `ConversationListViewModelTest.cs` | 会话列表 ViewModel：CRUD / 置顶 / 删除选中 | mock AetherApiClient |
+| `LanguageServiceTest.cs` | i18n 单例：8 种语言切换 / 资源加载 | 验证 Strings.Designer.cs 资源完整性 |
+| `MarkdownRendererTest.cs` | Markdown → FlowDocument：代码块 / 表格 / 任务列表 / 标题 | 验证 Markdig 解析结果 |
+| `ModelsTest.cs` | 数据模型：JSON 序列化反序列化 / 字段映射 | 与 BFF DTO 一致性校验 |
+| `SettingsViewModelTest.cs` | 设置 ViewModel：BFF 配置读写 / 语言切换 / 主题色 | mock BffConfigStore |
+
+### 7.5 Android 端测试架构（v1.5.0）
+
+- **Target**：`android/app/src/test/`（JUnit + Robolectric）
+- **规模**：12 个测试文件，95 个用例
+- **测试框架**：JUnit 4.13+ + Robolectric 4.11+（提供 Android 框架 shadow 实现，无需真机 / 模拟器）
+
+| 文件 | 覆盖范围 | 备注 |
+|------|---------|------|
+| `data/api/BffConfigTest.kt` | BFF 配置数据类：默认值 / BuildConfig 注入 | 纯 JVM 测试 |
+| `data/model/ModelsTest.kt` | 数据模型：`@Serializable` JSON 编解码 / 字段映射 | 纯 JVM 测试 |
+| `data/repository/ConversationRepositoryTest.kt` | 会话 Repository：先 Room 后网络策略 / 离线缓存 | mock AetherApi + Room |
+| `data/repository/ConversationRepositoryRoomTest.kt` | Room 持久化：ConversationEntity CRUD / 排序 | Robolectric + 内存 Room |
+| `rust/SseBridgeTest.kt` | Rust SSE JNI：parseWithTools / reset（JNI 不可用时回退） | 纯 JVM 测试，验证回退路径 |
+| `rust/VectorMathTest.kt` | Rust 向量 JNI：cosineF64（JNI 不可用时返回 0.0） | 纯 JVM 测试 |
+| `rust/RedactTest.kt` | Rust 脱敏 JNI：redact（JNI 不可用时返回原值） | 纯 JVM 测试 |
+| `ui/chat/ChatViewModelDeleteTest.kt` | 聊天 ViewModel：消息删除 / 流式状态 | mock ChatStreamClient |
+| `ui/chat/MarkdownTextTest.kt` | Markdown 渲染：代码块 / 表格 / 任务列表 | Robolectric |
+| `ui/health/HealthViewModelTest.kt` | 健康 ViewModel：上传 / 查询健康摘要 | mock AetherApi |
+| `ui/rag/KnowledgeBaseViewModelTest.kt` | 知识库 ViewModel：RAG 检索 / 文档列表 | mock AetherApi |
+| `ui/settings/LanguageManagerTest.kt` | 语言管理：8 种语言代码切换 / 资源匹配 | Robolectric |
+
+**关键说明**：
+- **Robolectric 配置**：`android/app/src/test/resources/robolectric.properties` 配置 SDK 版本与应用包名，使 Shadow 实现匹配生产环境。
+- **JNI 回退测试**：`rust/*.Test.kt` 在纯 JVM 环境（无 `.so`）下运行，验证 `nativeLoaded = false` 时 `*Safe` 方法返回默认值的回退逻辑，确保无 `.so` 时仍可正常运行与测试。
 
 ---
 
@@ -1823,11 +2230,29 @@ README.md
 
 ## 9. 架构演进方向
 
-> 本章节面向 v1.1~v3.0+ 远期演进（详见 `doc/MASTER_PLAN.md`），描述各方向的架构扩展点与关键技术决策，**仅规划未实施**。
+> 本章节面向 v1.5~v3.0+ 远期演进（详见 `doc/MASTER_PLAN.md`），描述各方向的架构扩展点与关键技术决策。
+> **v1.3 / v1.4 已落地**：9.1 端侧多模态架构（协议抽象 + Apple 原生引擎）已实施，下方原规划保留作为 v1.5 MLX 集成参考。
 
-### 9.1 端侧多模态架构
+### 9.1 端侧多模态架构（v1.3 + v1.4 已实施）
 
-#### 9.1.1 VLM 集成点
+#### 9.1.0 当前实施状态
+
+- **v1.3 已交付**：
+  - 5 个引擎协议：`VisionInferenceEngine` / `ASREngine` / `TTSEngine` / `VoiceCloner` / `ImageGenerationEngine`（位于 `Aether/Services/Multimodal/`）
+  - `MultimodalFacade`（`public actor`）门面，5 个引擎注入接口 + 4 个工具方法 + 内存预算快照
+  - `MemoryBudget`（`public actor`）全局内存预算器，按 `DeviceCapability` 自动配置总预算（iPhone ≤ 3GB / iPad ≤ 6GB / Mac ≤ 8GB）
+  - `DeviceCapability` 设备能力分级枚举（low / medium / high / ultra）
+  - `MultimodalError` 16 种错误类型（含本地化描述 + 诊断描述）
+  - 4 个多模态工具注册到 `ToolRegistry`：`describe_image` / `transcribe_audio` / `clone_voice` / `generate_image`
+  - `OCRTool` 跨平台改造（基于 `VNRecognizeTextRequest`，zh-Hans + en，`.accurate`）
+- **v1.4 已交付**：Apple 原生引擎实现替代占位
+  - `NativeVisionEngine`：基于 Vision 框架组合 5 个请求并发执行（VNClassifyImageRequest / VNDetectFaceRectanglesRequest / VNDetectRectanglesRequest / VNRecognizeTextRequest / VNDetectBarcodesRequest），按 prompt 关键字聚焦返回
+  - `NativeASREngine`：基于 `SFSpeechURLRecognitionRequest` 文件级识别（支持 wav/caf/m4a/mp3/aac；CI 环境识别器不可用时抛 `asrRecognitionFailed`）
+  - `NativeTTSEngine`：基于 `AVSpeechSynthesizer.write` 收集 PCM Buffer 编码为 WAV（44 字节 RIFF/WAVE 头；CI 环境返回最小空 WAV 头；30s 超时保护）
+  - `MultimodalFacade.init()` 默认从 `PlaceholderXxx` 切换为 `NativeXxx`（`voiceCloner` / `imageGenEngine` 仍为占位，待 v1.5）
+- **v1.5 规划**：MLX-VLM / Whisper.cpp / MLX-Voice / OpenVoice v2 / SD Mobile 集成，Native 引擎作为 MLX 路径不可用时的兜底
+
+#### 9.1.1 VLM 集成点（v1.5 规划）
 
 扩展现有 `MLXInferenceEngine`（位于 `Services/OnDevice/MLXInferenceEngine.swift`），新增 `generate(prompt:images:)` 接口支持图像输入：
 
@@ -1839,50 +2264,83 @@ extension MLXInferenceEngine {
 
 - 复用现有 `loadModel(path:expectedSHA256:)` 加载流程，扩展支持多模态权重（如 Llama-3.2-11B-Vision Q4 量化）。
 - 通过 `OfflineLLMProvider` 适配为 `LLMProvider` 协议，与现有 ChatViewModel 流式通路无缝衔接。
+- v1.4 临时方案：`NativeVisionEngine` 通过 Vision 框架的 5 个请求提供基础图像理解（分类 / 人脸 / 矩形 / 文字 / 条码），置信度 <0.6 时可作为 MLX-VLM 路径的兜底。
 
-#### 9.1.2 ASR / TTS 引擎抽象
+#### 9.1.2 ASR / TTS 引擎抽象（v1.3 已实施 / v1.5 增强）
 
-引入 `ASREngine` 与 `TTSEngine` 协议，解耦具体实现：
+引入 `ASREngine` 与 `TTSEngine` 协议，解耦具体实现（位于 `Aether/Services/Multimodal/ASREngine.swift` / `TTSEngine.swift`）：
 
 ```swift
-protocol ASREngine: Sendable {
-    func transcribe(audio: URL) async throws -> String
-    func streamTranscribe() -> AsyncStream<String>
+public protocol ASREngine: Sendable {
+    var name: String { get }
+    var requiresNetwork: Bool { get }
+    var isLoaded: Bool { get }
+    func loadModel(at modelPath: URL) async throws
+    func transcribe(audioPath: URL, language: String) async throws -> String
 }
 
-protocol TTSEngine: Sendable {
-    func synthesize(text: String, config: TTSConfig) async throws -> Data
+public protocol TTSEngine: Sendable {
+    var name: String { get }
+    var isLoaded: Bool { get }
+    func loadModel(at modelPath: URL) async throws
+    func synthesize(text: String, voiceId: String?) async throws -> Data
 }
 ```
 
-- 现有 `VoiceService` 中 `SFSpeechRecognizer` 包装为 `AppleASREngine` 实现，`AVSpeechSynthesizer` 包装为 `AppleTTSEngine` 实现。
-- 新增 `WhisperASREngine`（基于 whisper.cpp Rust 绑定）与 `NaturalTTSEngine`（基于端侧 TTS 模型）作为可选实现，通过配置切换。
+- **v1.3 占位实现**：`PlaceholderASREngine` / `PlaceholderTTSEngine`（返回提示信息或空 Data）
+- **v1.4 Native 实现**：`NativeASREngine`（基于 `SFSpeechURLRecognitionRequest` 文件识别）/ `NativeTTSEngine`（基于 `AVSpeechSynthesizer.write` PCM 收集 + WAV 编码）
+- **v1.5 计划实现**：`WhisperASREngine`（whisper.cpp Rust 绑定）/ `MLXVoiceTTSEngine`（端侧 TTS 模型）
 
-#### 9.1.3 MultimodalFacade 统一入口
+#### 9.1.3 MultimodalFacade 统一入口（v1.3 已实施）
 
-引入 `MultimodalFacade`（`@MainActor`）作为多模态能力的统一入口，承担：
+引入 `MultimodalFacade`（`public actor`，位于 `Aether/Services/Multimodal/MultimodalFacade.swift`）作为多模态能力的统一入口，承担：
 
 - 模型加载调度（按优先级与内存预算加载 VLM / Whisper / SD 之一）
-- 引擎路由（按用户配置选择 ASR / TTS / VLM 实现）
+- 引擎路由（按用户配置选择 ASR / TTS / VLM 实现，支持运行时依赖注入切换）
 - 互斥锁（避免同时加载多个重型模型导致 OOM）
 
 ```swift
-@MainActor final class MultimodalFacade {
-    func generateImage(prompt: String) async throws -> CGImage
-    func transcribe(audio: URL) async throws -> String
-    func synthesize(text: String, config: TTSConfig) async throws -> Data
-    func generateText(prompt: String, images: [CGImage]) -> AsyncStream<String>
+public actor MultimodalFacade {
+    public static let shared = MultimodalFacade()
+    public init()  // v1.4: 默认使用 NativeVisionEngine / NativeASREngine / NativeTTSEngine + 占位 VoiceCloner / ImageGen
+
+    // 引擎切换（依赖注入）
+    public func setVisionEngine(_ engine: VisionInferenceEngine)
+    public func setASREngine(_ engine: ASREngine)
+    public func setTTSEngine(_ engine: TTSEngine)
+    public func setVoiceCloner(_ cloner: VoiceCloner)
+    public func setImageGenEngine(_ engine: ImageGenerationEngine)
+
+    // 引擎状态查询
+    public var visionEngineName: String { get }
+    public var asrEngineName: String { get }
+    public var ttsEngineName: String { get }
+    public var voiceClonerName: String { get }
+    public var imageGenEngineName: String { get }
+
+    // 工具方法
+    public func describeImage(at imagePath: URL, prompt: String) async throws -> String
+    public func transcribeAudio(at audioPath: URL, language: String = "zh") async throws -> String
+    public func synthesizeSpeech(text: String, voiceId: String? = nil) async throws -> Data
+    public func cloneVoice(audioPath: URL, voiceName: String) async throws -> ClonedVoice
+    public func clonedVoices() async -> [ClonedVoice]
+    public func deleteVoice(voiceId: String) async
+    public func generateImage(prompt: String, negativePrompt: String? = nil, width: Int = 512, height: Int = 512, steps: Int = 20, seed: UInt64? = nil) async throws -> CGImage
+
+    // 内存预算
+    public func budgetSnapshot() async -> BudgetSnapshot
 }
 ```
 
-#### 9.1.4 内存预算器全局协调
+#### 9.1.4 内存预算器全局协调（v1.3 已实施）
 
-引入 `MemoryBudgeter`（`@MainActor`）作为全局内存预算器，协调 VLM / Whisper / SD 三个重型模型的加载：
+引入 `MemoryBudget`（`public actor`，位于 `Aether/Services/Multimodal/MemoryBudget.swift`）作为全局内存预算器，协调 VLM / Whisper / SD 三个重型模型的加载：
 
-- 按设备分级配置预算（iPhone ≤ 3GB / iPad ≤ 6GB / Mac ≤ 8GB）
-- 跟踪已加载模型的内存占用
-- 超预算时按优先级卸载最低优先级模型
-- 与 `MultimodalFacade` 协作强制串行加载
+- 按设备能力自动配置总预算（iPhone ≤ 1.5-3GB / iPad ≤ 3GB / Mac ≤ 6GB，详见 `DeviceCapability.recommendedMemoryBudgetMB`）
+- 跟踪已加载模型的内存占用（`reserve(mb:)` / `release(mb:)` / `reset()`）
+- 申请超过剩余额度时抛 `MultimodalError.memoryBudgetExceeded(requestedMB:availableMB:)`
+- 通过 `snapshot()` 返回 `BudgetSnapshot`（total / used / available / peak / utilization）用于 UI 展示
+- `MultimodalFacade.budgetSnapshot()` 暴露给上层
 
 ### 9.2 跨设备协同架构
 

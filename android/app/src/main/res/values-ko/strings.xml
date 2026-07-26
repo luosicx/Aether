@@ -1,0 +1,102 @@
+<resources>
+    <string name="app_name">아에테르</string>
+
+    <!-- 대화 목록 -->
+    <string name="conversation_list_title">대화 목록</string>
+    <string name="conversation_list_new">새 대화</string>
+    <string name="conversation_list_empty">대화가 없습니다</string>
+    <string name="conversation_list_empty_hint">대화가 없습니다. 우측 하단 버튼을 눌러 시작하세요.</string>
+    <string name="conversation_list_delete">삭제</string>
+    <string name="conversation_list_pin">고정</string>
+    <string name="conversation_list_unpin">고정 해제</string>
+    <string name="conversation_list_pinned">고정됨</string>
+    <string name="conversation_list_start_chat">탭하여 대화 시작</string>
+    <string name="conversation_list_new_conversation">새 대화 %1$d</string>
+
+    <!-- 채팅 -->
+    <string name="chat_send">전송</string>
+    <string name="chat_input_placeholder">메시지 입력…</string>
+    <string name="chat_thinking">생각 중…</string>
+    <string name="chat_copy">복사</string>
+    <string name="chat_retry">재전송</string>
+    <string name="chat_delete_message">메시지 삭제</string>
+    <string name="chat_delete">삭제</string>
+    <string name="chat_close">닫기</string>
+    <string name="chat_load_messages_failed">메시지 로드 실패: %1$s</string>
+    <string name="chat_send_failed">전송 실패: %1$s</string>
+    <string name="chat_delete_message_failed">메시지 삭제 실패: %1$s</string>
+    <string name="chat_knowledge_base">지식 베이스</string>
+    <string name="chat_settings">설정</string>
+    <string name="chat_back">뒤로</string>
+
+    <!-- 설정 -->
+    <string name="settings_title">설정</string>
+    <string name="settings_bff_gateway">BFF 게이트웨이</string>
+    <string name="settings_bff_url">BFF 엔드포인트 URL</string>
+    <string name="settings_bff_token">X-BFF-Token</string>
+    <string name="settings_bff_token_label">BFF 토큰</string>
+    <string name="settings_default_model">기본 모델</string>
+    <string name="settings_model">모델</string>
+    <string name="settings_show_token">표시</string>
+    <string name="settings_hide_token">숨기기</string>
+    <string name="settings_save">저장</string>
+    <string name="settings_back">뒤로</string>
+    <string name="settings_accent_color">강조 색상</string>
+    <string name="settings_accent_color_purple">아에테르 퍼플</string>
+    <string name="settings_accent_color_blue">일렉트릭 블루</string>
+    <string name="settings_accent_color_glow">네뷸러 글로우</string>
+    <string name="settings_language">언어</string>
+    <string name="settings_knowledge_base">지식 베이스</string>
+    <string name="settings_knowledge_base_subtitle">RAG 문서 검색</string>
+    <string name="settings_health">건강 인사이트</string>
+    <string name="settings_health_subtitle">건강 데이터 보기 / 업로드</string>
+    <string name="settings_features">기능</string>
+
+    <!-- 언어 이름 (각 언어로 표시) -->
+    <string name="language_zh_hans">简体中文</string>
+    <string name="language_zh_hant">繁體中文</string>
+    <string name="language_en">English</string>
+    <string name="language_ja">日本語</string>
+    <string name="language_ko">한국어</string>
+    <string name="language_fr">Français</string>
+    <string name="language_de">Deutsch</string>
+    <string name="language_es">Español</string>
+
+    <!-- 지식 베이스 -->
+    <string name="knowledge_base_title">지식 베이스</string>
+    <string name="knowledge_base_search">검색</string>
+    <string name="knowledge_base_search_placeholder">키워드 입력…</string>
+    <string name="knowledge_base_no_results">관련 문서를 찾을 수 없습니다</string>
+    <string name="knowledge_base_empty">키워드를 입력하여 지식 베이스 검색</string>
+    <string name="knowledge_base_unnamed">제목 없는 문서</string>
+    <string name="knowledge_base_source">출처: %1$s</string>
+    <string name="knowledge_base_relevance">관련도: %1$.2f</string>
+    <string name="knowledge_base_retry">재시도</string>
+    <string name="knowledge_base_close">닫기</string>
+
+    <!-- 건강 -->
+    <string name="health_title">건강 인사이트</string>
+    <string name="health_date_label">날짜 (yyyy-MM-dd)</string>
+    <string name="health_steps">걸음 수</string>
+    <string name="health_sleep_hours">수면 시간</string>
+    <string name="health_resting_heart_rate">안정 심박수</string>
+    <string name="health_upload">오늘의 건강 데이터 업로드</string>
+    <string name="health_hours">시간</string>
+    <string name="health_bpm">bpm</string>
+    <string name="health_steps_unit">걸음</string>
+    <string name="health_close">닫기</string>
+
+    <!-- 공통 -->
+    <string name="common_loading">로딩 중…</string>
+    <string name="common_error">문제가 발생했습니다</string>
+    <string name="common_retry">재시도</string>
+    <string name="common_confirm">확인</string>
+    <string name="common_cancel">취소</string>
+    <string name="common_close">닫기</string>
+
+    <!-- ViewModel 오류 메시지 -->
+    <string name="error_load_conversations_failed">대화 로드 실패: %1$s</string>
+    <string name="error_create_conversation_failed">대화 생성 실패: %1$s</string>
+    <string name="error_update_failed">업데이트 실패: %1$s</string>
+    <string name="error_delete_failed">삭제 실패: %1$s</string>
+</resources>

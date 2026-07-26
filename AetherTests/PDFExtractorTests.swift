@@ -15,7 +15,7 @@ final class PDFExtractorTests: XCTestCase {
         try await super.setUp()
         tempPDFURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("AetherTest_\(UUID().uuidString).pdf")
-        try generateTestPDF()
+        try await generateTestPDF()
     }
 
     override func tearDown() {
@@ -47,7 +47,7 @@ final class PDFExtractorTests: XCTestCase {
 
     // MARK: - 辅助：动态生成临时 PDF
 
-    private func generateTestPDF() throws {
+    private func generateTestPDF() async throws {
         #if os(iOS)
         let pageRect = CGRect(x: 0, y: 0, width: 612, height: 792)
         let renderer = UIGraphicsPDFRenderer(bounds: pageRect)
@@ -61,13 +61,15 @@ final class PDFExtractorTests: XCTestCase {
         }
         try data.write(to: tempPDFURL)
         #else
-        // macOS: 使用 PDFKit 创建带文本的 PDF
-        let pageRect = NSRect(x: 0, y: 0, width: 612, height: 792)
-        let page = PDFPage()
-        let textView = NSTextView(frame: pageRect)
-        textView.string = fixtureText
-        textView.font = NSFont.systemFont(ofSize: 14)
-        let data = textView.dataWithPDF(inside: textView.bounds)
+        // macOS: NSTextView 等 AppKit UI 必须在主线程操作，避免
+        // "NSWindow should only be instantiated on the main thread!" 崩溃
+        let data: Data = try await MainActor.run {
+            let pageRect = NSRect(x: 0, y: 0, width: 612, height: 792)
+            let textView = NSTextView(frame: pageRect)
+            textView.string = fixtureText
+            textView.font = NSFont.systemFont(ofSize: 14)
+            return textView.dataWithPDF(inside: textView.bounds)
+        }
         try data.write(to: tempPDFURL)
         #endif
     }

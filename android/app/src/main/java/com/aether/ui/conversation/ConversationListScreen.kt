@@ -13,10 +13,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.aether.app.R
 import com.aether.data.model.Conversation
 import com.aether.ui.theme.AetherColors
 import com.aether.ui.theme.AetherCornerRadius
@@ -42,10 +44,13 @@ fun ConversationListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("以太", fontWeight = FontWeight.SemiBold) },
+                title = { Text(stringResource(R.string.app_name), fontWeight = FontWeight.SemiBold) },
                 actions = {
                     IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Default.Settings, contentDescription = "设置")
+                        Icon(
+                            Icons.Default.Settings,
+                            contentDescription = stringResource(R.string.settings_title)
+                        )
                     }
                 }
             )
@@ -54,7 +59,7 @@ fun ConversationListScreen(
             ExtendedFloatingActionButton(
                 onClick = { viewModel.createConversation(onCreated = onOpenConversation) },
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text("新会话") }
+                text = { Text(stringResource(R.string.conversation_list_new)) }
             )
         }
     ) { padding ->
@@ -79,7 +84,10 @@ fun ConversationListScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("暂无会话，点击右下角开始对话", color = AetherColors.starlight)
+                    Text(
+                        stringResource(R.string.conversation_list_empty_hint),
+                        color = AetherColors.starlight
+                    )
                 }
             } else {
                 LazyColumn(
@@ -111,6 +119,13 @@ private fun ConversationRow(
     val timeText = remember(conversation.updatedAt) {
         SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()).format(Date(conversation.updatedAt))
     }
+    val pinnedLabel = stringResource(R.string.conversation_list_pinned)
+    val togglePinLabel = stringResource(
+        if (conversation.isPinned) R.string.conversation_list_unpin
+        else R.string.conversation_list_pin
+    )
+    val deleteLabel = stringResource(R.string.conversation_list_delete)
+    val startChatLabel = stringResource(R.string.conversation_list_start_chat)
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
@@ -127,7 +142,7 @@ private fun ConversationRow(
                     if (conversation.isPinned) {
                         Icon(
                             Icons.Filled.PushPin,
-                            contentDescription = "已置顶",
+                            contentDescription = pinnedLabel,
                             tint = AetherColors.nebulaGlow,
                             modifier = Modifier
                                 .size(16.dp)
@@ -144,7 +159,7 @@ private fun ConversationRow(
                 }
                 Spacer(modifier = Modifier.height(AetherSpacing.xs))
                 Text(
-                    text = conversation.lastMessagePreview.ifEmpty { "点击开始对话" },
+                    text = conversation.lastMessagePreview.ifEmpty { startChatLabel },
                     style = MaterialTheme.typography.bodyMedium,
                     color = AetherColors.starlight.copy(alpha = 0.7f),
                     maxLines = 1,
@@ -160,11 +175,11 @@ private fun ConversationRow(
             IconButton(onClick = onTogglePin) {
                 Icon(
                     if (conversation.isPinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
-                    contentDescription = "置顶"
+                    contentDescription = togglePinLabel
                 )
             }
             IconButton(onClick = onDelete) {
-                Text("删除", color = MaterialTheme.colorScheme.error)
+                Text(deleteLabel, color = MaterialTheme.colorScheme.error)
             }
         }
     }
@@ -188,7 +203,7 @@ private fun ErrorBanner(message: String, onClose: () -> Unit) {
                 modifier = Modifier.weight(1f),
                 color = MaterialTheme.colorScheme.onErrorContainer
             )
-            TextButton(onClick = onClose) { Text("关闭") }
+            TextButton(onClick = onClose) { Text(stringResource(R.string.common_close)) }
         }
     }
 }

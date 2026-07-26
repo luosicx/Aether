@@ -51,6 +51,14 @@ class ChatViewModel(
             createdAt = System.currentTimeMillis()
         )
         _messages.update { it + userMessage }
+        streamSend(userMessage)
+    }
+
+    /**
+     * 内部流式发送：基于已有的用户消息发起 LLM 请求并追加助手回复。
+     */
+    private fun streamSend(userMessage: ChatMessage) {
+        val conversationId = currentConversationId ?: return
         _isLoading.value = true
         _streamingText.value = ""
         _errorMessage.value = null
@@ -58,7 +66,7 @@ class ChatViewModel(
         viewModelScope.launch {
             try {
                 val request = ChatRequest(
-                    message = trimmed,
+                    message = userMessage.content,
                     conversationId = conversationId
                 )
                 val fullResponse = StringBuilder()
@@ -82,6 +90,45 @@ class ChatViewModel(
                 _isLoading.value = false
             }
         }
+    }
+
+    /**
+     * 删除指定消息：先调用 BFF API，成功后从本地列表移除。
+     *
+     * @param messageId 消息 ID
+     */
+    fun deleteMessage(messageId: String) {
+        viewModelScope.launch {
+            try {
+                messageRepo.delete(messageId)
+                _messages.update { msgs -> msgs.filterNot { it.id == messageId } }
+            } catch (e: Exception) {
+                _errorMessage.value = "删除消息失败：${e.message}"
+            }
+        }
+    }
+
+    /**
+     * 重发用户消息：移除该消息及其后续所有消息，再以该消息内容重新发起流式请求。
+     *
+     * 仅对 role == "user" 的消息生效；非用户消息直接返回。
+     *
+     * @param message 需要重发的用户消息
+     */
+    fun resendMessage(message: ChatMessage) {
+        if (message.role != "user") return
+        val conversationId = currentConversationId ?: return
+        // 找到该消息在列表中的位置，移除它及之后的所有消息
+        val current = _messages.value
+        val index = current.indexOfFirst { it.id == message.id }
+        if (index < 0) return
+        val kept = current.subList(0, index).toList()
+        // 重新构造一条同内容的用户消息（保持原 ID 以便 UI 复用 key）
+        val newUserMessage = message.copy(
+            createdAt = System.currentTimeMillis()
+        )
+        _messages.value = kept + newUserMessage
+        streamSend(newUserMessage)
     }
 
     fun clearError() {

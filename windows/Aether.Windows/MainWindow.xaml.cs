@@ -8,6 +8,7 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        rootFrame.Navigate(typeof(ChatPage));
+        // 初始页改为会话列表页（thin client → 多页导航）
+        rootFrame.Navigate(new ConversationListPage());
     }
 }

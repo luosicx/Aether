@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.aether.app"
-    compileSdk = 35
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.aether.app"
@@ -44,6 +44,12 @@ android {
     }
 }
 
+// 排除 JetBrains annotations 的 java5 变体，避免与 annotations:23.0.0 重复类冲突
+// （annotations-java5:17.0.0 由部分依赖（如 Robolectric）传递引入，与 Kotlin stdlib 的 annotations:23.0.0 同名类冲突）
+configurations.all {
+    exclude(group = "org.jetbrains", module = "annotations-java5")
+}
+
 dependencies {
     // Compose BOM
     val composeBom = platform("androidx.compose:compose-bom:2024.09.00")
@@ -77,11 +83,29 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
+    // Markwon (Markdown 渲染：core + 表格 + 任务列表 + 删除线 + 链接 + 语法高亮)
+    implementation("io.noties.markwon:core:4.6.2")
+    implementation("io.noties.markwon:ext-tables:4.6.2")
+    implementation("io.noties.markwon:ext-tasklist:4.6.2")
+    implementation("io.noties.markwon:ext-strikethrough:4.6.2")
+    implementation("io.noties.markwon:linkify:4.6.2")
+    implementation("io.noties.markwon:syntax-highlight:4.6.2")
+    implementation("io.noties:prism4j:2.0.0")
+
     // ===== 单元测试依赖 =====
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
     testImplementation("androidx.room:room-testing:2.6.1")
     testImplementation("org.robolectric:robolectric:4.14.1")
     testImplementation("io.ktor:ktor-client-mock:2.3.12")
+    testImplementation("io.ktor:ktor-http:2.3.12")
     testImplementation("androidx.test:core:1.5.0")
+}
+
+// Robolectric 需要在 user.home 创建 .robolectric-download-lock 锁文件，
+// TRAE IDE 沙箱可能阻止在真实 home 目录写入，重定向到 build 目录
+tasks.withType<Test> {
+    val robolectricHome = layout.buildDirectory.dir("robolectric-home").get().asFile
+    doFirst { robolectricHome.mkdirs() }
+    systemProperty("user.home", robolectricHome.absolutePath)
 }

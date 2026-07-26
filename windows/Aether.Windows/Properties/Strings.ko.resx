@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <data name="AppTitle" xml:space="preserve"><value>아이테르</value></data>
+  <data name="ConversationList_Title" xml:space="preserve"><value>대화 목록</value></data>
+  <data name="ConversationList_NewConversation" xml:space="preserve"><value>새 대화</value></data>
+  <data name="ConversationList_Empty" xml:space="preserve"><value>대화가 없습니다</value></data>
+  <data name="ConversationList_Delete" xml:space="preserve"><value>삭제</value></data>
+  <data name="ConversationList_Pin" xml:space="preserve"><value>고정</value></data>
+  <data name="ConversationList_Unpin" xml:space="preserve"><value>고정 해제</value></data>
+  <data name="ConversationList_Search" xml:space="preserve"><value>대화 검색</value></data>
+  <data name="Chat_SendMessage" xml:space="preserve"><value>전송</value></data>
+  <data name="Chat_InputPlaceholder" xml:space="preserve"><value>메시지 입력...</value></data>
+  <data name="Chat_Thinking" xml:space="preserve"><value>생각 중...</value></data>
+  <data name="Chat_Copy" xml:space="preserve"><value>복사</value></data>
+  <data name="Chat_Retry" xml:space="preserve"><value>재시도</value></data>
+  <data name="Chat_DeleteMessage" xml:space="preserve"><value>메시지 삭제</value></data>
+  <data name="Settings_Title" xml:space="preserve"><value>설정</value></data>
+  <data name="Settings_BffUrl" xml:space="preserve"><value>BFF 주소</value></data>
+  <data name="Settings_BffToken" xml:space="preserve"><value>BFF 토큰</value></data>
+  <data name="Settings_DefaultModel" xml:space="preserve"><value>기본 모델</value></data>
+  <data name="Settings_ShowToken" xml:space="preserve"><value>표시</value></data>
+  <data name="Settings_HideToken" xml:space="preserve"><value>숨기기</value></data>
+  <data name="Settings_Save" xml:space="preserve"><value>저장</value></data>
+  <data name="Settings_Back" xml:space="preserve"><value>뒤로</value></data>
+  <data name="Settings_Appearance" xml:space="preserve"><value>외관</value></data>
+  <data name="Settings_AccentColor" xml:space="preserve"><value>테마 색상</value></data>
+  <data name="Settings_AccentColorPurple" xml:space="preserve"><value>아이테르 퍼플</value></data>
+  <data name="Settings_AccentColorBlue" xml:space="preserve"><value>일렉트릭 블루</value></data>
+  <data name="Settings_AccentColorGlow" xml:space="preserve"><value>네뷸러 글로우</value></data>
+  <data name="Settings_Language" xml:space="preserve"><value>언어</value></data>
+  <data name="Settings_TokenHint" xml:space="preserve"><value>토큰은 DPAPI로 암호화되어 현재 사용자만 복호화할 수 있습니다.</value></data>
+  <data name="Settings_LanguageZhHans" xml:space="preserve"><value>简体中文</value></data>
+  <data name="Settings_LanguageEn" xml:space="preserve"><value>English</value></data>
+  <data name="Settings_LanguageJa" xml:space="preserve"><value>日本語</value></data>
+  <data name="Settings_LanguageKo" xml:space="preserve"><value>한국어</value></data>
+  <data name="Settings_LanguageFr" xml:space="preserve"><value>Français</value></data>
+  <data name="Settings_LanguageDe" xml:space="preserve"><value>Deutsch</value></data>
+  <data name="Settings_LanguageEs" xml:space="preserve"><value>Español</value></data>
+  <data name="Settings_LanguageZhHant" xml:space="preserve"><value>繁體中文</value></data>
+  <data name="KnowledgeBase_Title" xml:space="preserve"><value>지식 베이스</value></data>
+  <data name="KnowledgeBase_Search" xml:space="preserve"><value>검색</value></data>
+  <data name="KnowledgeBase_SearchPlaceholder" xml:space="preserve"><value>키워드로 지식 베이스 검색</value></data>
+  <data name="KnowledgeBase_NoResults" xml:space="preserve"><value>관련 문서를 찾을 수 없습니다</value></data>
+  <data name="KnowledgeBase_Empty" xml:space="preserve"><value>키워드를 입력해 지식 베이스를 검색하세요</value></data>
+  <data name="Health_Title" xml:space="preserve"><value>건강 인사이트</value></data>
+  <data name="Health_Steps" xml:space="preserve"><value>걸음 수</value></data>
+  <data name="Health_SleepHours" xml:space="preserve"><value>수면 시간</value></data>
+  <data name="Health_RestingHeartRate" xml:space="preserve"><value>안정 심박수</value></data>
+  <data name="Health_Upload" xml:space="preserve"><value>오늘의 건강 데이터 업로드</value></data>
+  <data name="Health_Hours" xml:space="preserve"><value>시간</value></data>
+  <data name="Health_Bpm" xml:space="preserve"><value>bpm</value></data>
+  <data name="Health_StepsUnit" xml:space="preserve"><value>걸음</value></data>
+  <data name="Common_Loading" xml:space="preserve"><value>로딩 중...</value></data>
+  <data name="Common_Error" xml:space="preserve"><value>오류</value></data>
+  <data name="Common_Retry" xml:space="preserve"><value>재시도</value></data>
+  <data name="Common_Confirm" xml:space="preserve"><value>확인</value></data>
+  <data name="Common_Cancel" xml:space="preserve"><value>취소</value></data>
+</root>
