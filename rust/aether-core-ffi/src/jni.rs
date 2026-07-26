@@ -8,7 +8,7 @@ use jni::objects::{JClass, JString};
 use jni::JNIEnv;
 use std::collections::BTreeMap;
 
-use aether_core::{parse_with_tool_accumulation, AccumulatedToolCall};
+use aether_core::{parse_with_tool_accumulation, redact, AccumulatedToolCall};
 
 // 全局累积器（thread-local）。生产应改为 per-Instance 字段，
 // 此处用 thread-local 兜底，符合"首个落地单元"的最小可行原则。
@@ -80,4 +80,23 @@ pub extern "system" fn Java_com_aether_rust_VectorMath_cosineF64(
         Some(aether_core::cosine_similarity_f64(&a_elems, &b_elems))
     })();
     result.unwrap_or(0.0)
+}
+
+/// 对输入字符串脱敏（UUID/邮箱/URL/Token/凭证字段/路径）。
+///
+/// 对应 Kotlin `com.aether.rust.Redact.redact`，调用 `aether_core::redact`。
+/// 入参 `input` 为 Java String，返回脱敏后的 Java String。
+/// 解析失败时返回空串（不抛 Java 异常）。
+#[no_mangle]
+pub extern "system" fn Java_com_aether_rust_Redact_redact(
+    mut env: JNIEnv,
+    _class: JClass,
+    input: JString,
+) -> jni::sys::jstring {
+    let s: String = match env.get_string(&input) {
+        Ok(s) => s.into(),
+        Err(_) => return new_jstring(&mut env, ""),
+    };
+    let redacted = redact(&s);
+    new_jstring(&mut env, &redacted)
 }
