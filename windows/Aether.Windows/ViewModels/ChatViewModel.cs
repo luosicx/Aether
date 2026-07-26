@@ -11,6 +11,7 @@ namespace Aether.Windows.ViewModels;
 public class ChatViewModel : INotifyPropertyChanged
 {
     private readonly AetherApiClient _api;
+    private readonly BffConfigStore? _configStore;
     private string _conversationId = "";
     private string _streamingText = "";
     private bool _isLoading = false;
@@ -30,6 +31,7 @@ public class ChatViewModel : INotifyPropertyChanged
         set { _streamingText = value; OnPropertyChanged(); }
     }
 
+    /// <summary>流式响应进行中。XAML 中通过此属性控制 TypingIndicator 显示/隐藏。</summary>
     public bool IsLoading
     {
         get => _isLoading;
@@ -44,9 +46,10 @@ public class ChatViewModel : INotifyPropertyChanged
 
     public ICommand SendCommand { get; }
 
-    public ChatViewModel(AetherApiClient api)
+    public ChatViewModel(AetherApiClient api, BffConfigStore? configStore = null)
     {
         _api = api;
+        _configStore = configStore;
         SendCommand = new RelayCommand(Send);
     }
 
@@ -59,7 +62,15 @@ public class ChatViewModel : INotifyPropertyChanged
             var messages = await _api.GetMessagesAsync(conversationId);
             if (messages != null)
             {
-                foreach (var msg in messages) Messages.Add(msg);
+                foreach (var msg in messages)
+                {
+                    // 历史消息中 assistant 内容直接渲染为 Markdown（流式已结束）
+                    if (msg.Role == "assistant" && !string.IsNullOrEmpty(msg.Content))
+                    {
+                        msg.MarkdownDocument = MarkdownRenderer.RenderToFlowDocument(msg.Content);
+                    }
+                    Messages.Add(msg);
+                }
             }
         }
         catch (Exception ex)
@@ -95,7 +106,8 @@ public class ChatViewModel : INotifyPropertyChanged
             var request = new ChatRequest
             {
                 Message = text,
-                ConversationId = ConversationId
+                ConversationId = ConversationId,
+                Model = _configStore?.DefaultModel ?? "deepseek-chat"
             };
             var fullResponse = new StringBuilder();
             await foreach (var chunk in _api.StreamChatAsync(request))
@@ -103,14 +115,18 @@ public class ChatViewModel : INotifyPropertyChanged
                 fullResponse.Append(chunk);
                 StreamingText = fullResponse.ToString();
             }
-            Messages.Add(new ChatMessage
+
+            // 流式结束后将完整 assistant 内容渲染为 Markdown FlowDocument
+            var assistantMessage = new ChatMessage
             {
                 Id = Guid.NewGuid().ToString(),
                 ConversationId = ConversationId,
                 Role = "assistant",
                 Content = fullResponse.ToString(),
                 CreatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
-            });
+            };
+            assistantMessage.MarkdownDocument = MarkdownRenderer.RenderToFlowDocument(assistantMessage.Content);
+            Messages.Add(assistantMessage);
             StreamingText = "";
         }
         catch (Exception ex)

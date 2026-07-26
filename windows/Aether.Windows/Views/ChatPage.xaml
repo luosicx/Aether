@@ -1,7 +1,22 @@
 <Page x:Class="Aether.Windows.Views.ChatPage"
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-      xmlns:design="clr-namespace:Aether.Windows.Design">
+      xmlns:design="clr-namespace:Aether.Windows.Design"
+      xmlns:props="clr-namespace:Aether.Windows.Properties"
+      xmlns:svc="clr-namespace:Aether.Windows.Services">
+
+    <Page.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+        <!-- TypingIndicator 闪烁动画：3 个圆点依次 0.3→1→0.3，间隔 0.3s -->
+        <Storyboard x:Key="TypingBlink" RepeatBehavior="Forever">
+            <DoubleAnimation Storyboard.TargetName="dot1" Storyboard.TargetProperty="Opacity"
+                             From="0.3" To="1" Duration="0:0:0.6" AutoReverse="True" BeginTime="0:0:0"/>
+            <DoubleAnimation Storyboard.TargetName="dot2" Storyboard.TargetProperty="Opacity"
+                             From="0.3" To="1" Duration="0:0:0.6" AutoReverse="True" BeginTime="0:0:0.3"/>
+            <DoubleAnimation Storyboard.TargetName="dot3" Storyboard.TargetProperty="Opacity"
+                             From="0.3" To="1" Duration="0:0:0.6" AutoReverse="True" BeginTime="0:0:0.6"/>
+        </Storyboard>
+    </Page.Resources>
 
     <Grid Background="{x:Static design:AetherColors.DeepSpace}">
         <Grid.RowDefinitions>
@@ -10,36 +25,174 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- 顶部栏 -->
+        <!-- 顶部栏：返回 + 标题 + 设置 -->
         <Border Grid.Row="0" Padding="16,12" Background="{x:Static design:AetherColors.LiquidGlass}">
-            <TextBlock Text="以太" FontSize="28" FontWeight="SemiBold"
-                       Foreground="{x:Static design:AetherColors.Starlight}"/>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Button Grid.Column="0" Content="←" Click="OnBackClick" Width="32" Height="32"
+                        Foreground="{x:Static design:AetherColors.Starlight}"/>
+                <TextBlock Grid.Column="1" Text="{x:Static props:Strings.AppTitle}" FontSize="28" FontWeight="SemiBold"
+                           Foreground="{x:Static design:AetherColors.Starlight}"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                <Button Grid.Column="2" Content="⚙" Click="OnSettingsClick" Width="32" Height="32"
+                        Foreground="{x:Static design:AetherColors.Starlight}"/>
+            </Grid>
         </Border>
 
-        <!-- 消息列表 -->
-        <ListView Grid.Row="1" ItemsSource="{Binding ViewModel.Messages}"
-                  Margin="16">
-            <ListView.ItemTemplate>
-                <DataTemplate>
-                    <Border CornerRadius="16" Padding="12" Margin="0,4"
-                            Background="{x:Static design:AetherColors.AetherPurple}"
-                            HorizontalAlignment="Left" MaxWidth="480">
-                        <TextBlock Text="{Binding Content}" TextWrapping="Wrap"
-                                   Foreground="White"/>
-                    </Border>
-                </DataTemplate>
-            </ListView.ItemTemplate>
-        </ListView>
+        <!-- 消息列表 + 流式响应 + TypingIndicator -->
+        <Grid Grid.Row="1">
+            <!-- 消息列表 -->
+            <ListView ItemsSource="{Binding ViewModel.Messages}" Margin="16"
+                      Background="Transparent" BorderThickness="0"
+                      HorizontalContentAlignment="Stretch"
+                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                <ListView.ItemContainerStyle>
+                    <Style TargetType="ListViewItem">
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        <Setter Property="Padding" Value="0"/>
+                        <Setter Property="Margin" Value="0,2"/>
+                        <Setter Property="Background" Value="Transparent"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ListViewItem">
+                                    <ContentPresenter HorizontalAlignment="Stretch"
+                                                      VerticalAlignment="Center"/>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </ListView.ItemContainerStyle>
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Margin="0,4">
+                            <!-- 消息气泡：通过 DataTrigger 区分 user / assistant -->
+                            <Border Padding="12" MaxWidth="480" Margin="0,4">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <!-- 默认（assistant）：左对齐 + LiquidGlass + 圆角 16,24,24,4 -->
+                                        <Setter Property="HorizontalAlignment" Value="Left"/>
+                                        <Setter Property="Background" Value="{x:Static design:AetherColors.LiquidGlass}"/>
+                                        <Setter Property="CornerRadius" Value="16,24,24,4"/>
+                                        <Style.Triggers>
+                                            <!-- user：右对齐 + AetherPurple + 圆角 24,16,4,24 -->
+                                            <DataTrigger Binding="{Binding Role}" Value="user">
+                                                <Setter Property="HorizontalAlignment" Value="Right"/>
+                                                <Setter Property="Background" Value="{x:Static design:AetherColors.AetherPurple}"/>
+                                                <Setter Property="CornerRadius" Value="24,16,4,24"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <StackPanel>
+                                    <!-- AI 消息（MarkdownDocument 非空）：使用 RichTextBox 渲染 Markdown -->
+                                    <svc:BindableRichTextBox
+                                        BindableDocument="{Binding MarkdownDocument}"
+                                        FontSize="14"
+                                        Foreground="{x:Static design:AetherColors.Starlight}"
+                                        MaxWidth="460"
+                                        Padding="0"
+                                        Margin="0">
+                                        <svc:BindableRichTextBox.Style>
+                                            <Style TargetType="svc:BindableRichTextBox">
+                                                <!-- 默认 Visible；MarkdownDocument 为 null 时隐藏 -->
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding MarkdownDocument}" Value="{x:Null}">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </svc:BindableRichTextBox.Style>
+                                    </svc:BindableRichTextBox>
+                                    <!-- 消息内容（纯文本）：user 消息或 MarkdownDocument 为 null 时显示 -->
+                                    <TextBlock Text="{Binding Content}" TextWrapping="Wrap">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <!-- 默认（assistant）：Starlight 文字 -->
+                                                <Setter Property="Foreground" Value="{x:Static design:AetherColors.Starlight}"/>
+                                                <!-- 默认 Collapsed；MarkdownDocument 为 null 时显示（user 消息 + 流式中） -->
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding MarkdownDocument}" Value="{x:Null}">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                    <!-- user 消息永远显示纯文本 -->
+                                                    <DataTrigger Binding="{Binding Role}" Value="user">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                        <Setter Property="Foreground" Value="White"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                    <!-- 时间戳 -->
+                                    <TextBlock Text="{Binding CreatedAt, Converter={StaticResource UnixTime}}"
+                                               FontSize="10" Margin="0,4,0,0"
+                                               Foreground="{x:Static design:AetherColors.DuskGray}"/>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
 
-        <!-- 流式响应 -->
-        <TextBlock Grid.Row="1" Text="{Binding ViewModel.StreamingText}"
-                   Margin="16" TextWrapping="Wrap"
-                   Foreground="{x:Static design:AetherColors.NebulaGlow}"/>
+            <!-- 流式响应气泡 + TypingIndicator（IsLoading 时显示） -->
+            <StackPanel VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="16,0,16,8"
+                        Visibility="{Binding ViewModel.IsLoading, Converter={StaticResource BoolToVis}}">
+                <Border CornerRadius="16,24,24,4" Padding="12"
+                        Background="{x:Static design:AetherColors.LiquidGlass}"
+                        MaxWidth="480">
+                    <StackPanel>
+                        <!-- TypingIndicator：3 个圆点依次闪烁（StreamingText 为空时显示） -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ViewModel.StreamingText}" Value="">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            <TextBlock Text="{x:Static props:Strings.Chat_Thinking}" FontSize="12" Margin="0,0,8,0"
+                                       Foreground="{x:Static design:AetherColors.Starlight}"
+                                       VerticalAlignment="Center"/>
+                            <Ellipse x:Name="dot1" Width="8" Height="8" Margin="2,0"
+                                     Fill="{x:Static design:AetherColors.Starlight}" Opacity="0.3"/>
+                            <Ellipse x:Name="dot2" Width="8" Height="8" Margin="2,0"
+                                     Fill="{x:Static design:AetherColors.Starlight}" Opacity="0.3"/>
+                            <Ellipse x:Name="dot3" Width="8" Height="8" Margin="2,0"
+                                     Fill="{x:Static design:AetherColors.Starlight}" Opacity="0.3"/>
+                        </StackPanel>
+                        <!-- 流式文本（StreamingText 非空时显示） -->
+                        <TextBlock Text="{Binding ViewModel.StreamingText}" TextWrapping="Wrap"
+                                   Foreground="{x:Static design:AetherColors.Starlight}"
+                                   MaxWidth="460">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ViewModel.StreamingText}" Value="">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
 
-        <!-- 错误信息 -->
-        <TextBlock Grid.Row="1" Text="{Binding ViewModel.ErrorMessage}"
-                   Margin="16" VerticalAlignment="Bottom"
-                   Foreground="#FFEF4444"/>
+            <!-- 错误信息 -->
+            <TextBlock Text="{Binding ViewModel.ErrorMessage}"
+                       Margin="16" VerticalAlignment="Bottom"
+                       Foreground="#FFEF4444"/>
+        </Grid>
 
         <!-- 输入栏 -->
         <Grid Grid.Row="2" Margin="16" Background="{x:Static design:AetherColors.LiquidGlass}">
@@ -49,7 +202,7 @@
             </Grid.ColumnDefinitions>
             <TextBox x:Name="inputBox" Grid.Column="0"
                      KeyDown="OnInputKeyDown" Background="#80000000" Foreground="White"/>
-            <Button Grid.Column="1" Content="发送" Margin="8,0,0,0"
+            <Button Grid.Column="1" Content="{x:Static props:Strings.Chat_SendMessage}" Margin="8,0,0,0"
                     Command="{Binding ViewModel.SendCommand}"
                     CommandParameter="{Binding Text, ElementName=inputBox}"/>
         </Grid>

@@ -13,8 +13,9 @@ namespace Aether.Windows.Services;
 public class AetherApiClient
 {
     private readonly HttpClient _http;
-    private readonly string _baseUrl;
-    private readonly string _token;
+    private string _baseUrl;
+    private string _token;
+    private readonly BffConfigStore? _configStore;
 
     /// <summary>
     /// 是否使用 Rust native 实现（aether-core-ffi DLL）解析 SSE。
@@ -26,10 +27,48 @@ public class AetherApiClient
     {
         _baseUrl = baseUrl.TrimEnd('/');
         _token = token;
+        _configStore = null;
         _http = new HttpClient();
         _http.DefaultRequestHeaders.Add("X-BFF-Token", token);
         _http.DefaultRequestHeaders.Accept.Add(
             new MediaTypeWithQualityHeaderValue("application/json"));
+    }
+
+    /// <summary>
+    /// 从 BffConfigStore 动态读取 BaseUrl 与 Token 构造客户端。
+    /// 配置变更后可调用 <see cref="Refresh"/> 重新加载。
+    /// </summary>
+    public AetherApiClient(BffConfigStore configStore)
+    {
+        _configStore = configStore;
+        _baseUrl = (configStore.BaseUrl ?? "").TrimEnd('/');
+        _token = configStore.UserToken ?? "";
+        _http = new HttpClient();
+        if (!string.IsNullOrEmpty(_token))
+        {
+            _http.DefaultRequestHeaders.Add("X-BFF-Token", _token);
+        }
+        _http.DefaultRequestHeaders.Accept.Add(
+            new MediaTypeWithQualityHeaderValue("application/json"));
+    }
+
+    /// <summary>
+    /// 从 BffConfigStore 重新读取 BaseUrl 与 Token，更新 HttpClient 默认头。
+    /// 设置页保存配置后调用此方法使新配置立即生效。
+    /// </summary>
+    public void Refresh()
+    {
+        if (_configStore == null) return;
+        _configStore.Load();
+        _baseUrl = (_configStore.BaseUrl ?? "").TrimEnd('/');
+        _token = _configStore.UserToken ?? "";
+
+        // 更新 X-BFF-Token 默认请求头
+        _http.DefaultRequestHeaders.Remove("X-BFF-Token");
+        if (!string.IsNullOrEmpty(_token))
+        {
+            _http.DefaultRequestHeaders.Add("X-BFF-Token", _token);
+        }
     }
 
     // 会话
@@ -45,6 +84,12 @@ public class AetherApiClient
 
     public async Task DeleteConversationAsync(string id) =>
         await _http.DeleteAsync($"{_baseUrl}/conversations/{id}");
+
+    /// <summary>更新会话（用于置顶 / 取消置顶等）。</summary>
+    public async Task UpdateConversationAsync(Conversation conv)
+    {
+        await _http.PutAsJsonAsync($"{_baseUrl}/conversations/{conv.Id}", conv);
+    }
 
     public async Task<List<ChatMessage>?> GetMessagesAsync(string conversationId) =>
         await _http.GetFromJsonAsync<List<ChatMessage>>($"{_baseUrl}/conversations/{conversationId}/messages");

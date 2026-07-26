@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using System.Windows.Documents;
 
 namespace Aether.Windows.Models;
 
@@ -21,6 +22,14 @@ public class ChatMessage
     [JsonPropertyName("role")] public string Role { get; set; } = "";
     [JsonPropertyName("content")] public string Content { get; set; } = "";
     [JsonPropertyName("createdAt")] public long CreatedAt { get; set; }
+
+    /// <summary>
+    /// 由 Content 通过 MarkdownRenderer 转换得到的 FlowDocument。
+    /// 仅在 assistant 消息接收完成（流式结束）时填充，user 消息保持 null。
+    /// 用 [IgnoreDataMember] 避免被 JSON 序列化（FlowDocument 不可序列化）。
+    /// </summary>
+    [IgnoreDataMember]
+    public FlowDocument? MarkdownDocument { get; set; }
 }
 
 public class ChatRequest
