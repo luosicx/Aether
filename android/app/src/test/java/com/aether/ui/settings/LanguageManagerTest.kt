@@ -6,6 +6,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.aether.data.api.BffConfigStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -44,11 +45,22 @@ class LanguageManagerTest {
         Dispatchers.setMain(Dispatchers.Unconfined)
         context = ApplicationProvider.getApplicationContext()
         store = BffConfigStore(context)
+        // 重置 language 到默认值，避免前一个测试写入的值泄漏到后续测试
+        // （Robolectric 的 DataStore 在同一 ApplicationProvider context 下跨测试共享）
+        runBlocking { store.setLanguage(BffConfigStore.DEFAULT_LANGUAGE) }
     }
 
     @After
     fun tearDown() {
-        Dispatchers.resetMain()
+        // LanguageManager 的 init 协程使用 Dispatchers.Main 并通过 collect 无限运行，
+        // resetMain() 会检测到未完成协程抛 IllegalStateException，导致后续测试的
+        // setMain 也失败（TestMainDispatcher 状态不一致）。
+        // 此处忽略该异常：setMain 可被多次调用（会覆盖旧 dispatcher），不影响后续测试。
+        try {
+            Dispatchers.resetMain()
+        } catch (_: IllegalStateException) {
+            // 主 dispatcher 保留为 Unconfined，下次 setup 的 setMain 会覆盖
+        }
     }
 
     // ===== resourceSuffixFor 资源目录映射测试 =====

@@ -30,7 +30,8 @@ public class MarkdownRendererTest
     {
         var doc = MarkdownRenderer.RenderToFlowDocument(markdown);
 
-        var paragraph = Assert.Single(doc.Blocks.OfType<Paragraph>());
+        // Markdig 可能产生 HeadingBlock + 空的 ParagraphBlock，过滤掉无 inline 的空段落
+        var paragraph = Assert.Single(doc.Blocks.OfType<Paragraph>().Where(p => p.Inlines.Count > 0));
         Assert.Equal(expectedFontSize, paragraph.FontSize);
         Assert.Equal(System.Windows.FontWeights.Bold, paragraph.FontWeight);
 
@@ -61,12 +62,11 @@ public class MarkdownRendererTest
         var doc = MarkdownRenderer.RenderToFlowDocument(markdown);
 
         var container = Assert.Single(doc.Blocks.OfType<BlockUIContainer>());
-        // 容器中应包含 Border → TextBlock，文本中包含代码内容
-        var textBlock = FindDescendantTextBlock(container.Child);
-        Assert.NotNull(textBlock);
-        Assert.Contains("var x = 1;", textBlock.Text);
-        Assert.Contains("Console.WriteLine(x);", textBlock.Text);
-        Assert.Equal("Consolas", textBlock.FontFamily.Source);
+        // 容器中应包含语言标签 TextBlock + 代码 TextBlock，找到包含代码内容的那个
+        var textBlocks = FindAllDescendantTextBlocks(container.Child);
+        var codeTextBlock = Assert.Single(textBlocks.Where(tb => tb.Text.Contains("var x = 1;")));
+        Assert.Contains("Console.WriteLine(x);", codeTextBlock.Text);
+        Assert.Equal("Consolas", codeTextBlock.FontFamily.Source);
     }
 
     [WpfFact]
@@ -265,18 +265,23 @@ public class MarkdownRendererTest
         Assert.NotEmpty(doc.Blocks);
     }
 
-    /// <summary>递归查找 Visual 树中的第一个 TextBlock（用于验证代码块内容）。</summary>
-    private static TextBlock? FindDescendantTextBlock(object? root)
+    /// <summary>递归查找 Visual 树中的所有 TextBlock（用于验证代码块内容）。</summary>
+    private static List<TextBlock> FindAllDescendantTextBlocks(object? root)
     {
-        if (root is TextBlock tb) return tb;
+        var result = new List<TextBlock>();
+        FindAllDescendantTextBlocks(root, result);
+        return result;
+    }
+
+    private static void FindAllDescendantTextBlocks(object? root, List<TextBlock> result)
+    {
+        if (root is TextBlock tb) result.Add(tb);
         if (root is System.Windows.DependencyObject depObj)
         {
             foreach (var child in LogicalTreeHelper.GetChildren(depObj))
             {
-                var found = FindDescendantTextBlock(child);
-                if (found != null) return found;
+                FindAllDescendantTextBlocks(child, result);
             }
         }
-        return null;
     }
 }

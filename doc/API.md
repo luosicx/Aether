@@ -551,6 +551,273 @@ struct APIMessage: Sendable {
 
 ---
 
+## 9. MultimodalFacade 多模态 API 契约（v1.3 + v1.4）
+
+`MultimodalFacade` 是端侧多模态能力的统一入口（`public actor`，位于 `Aether/Services/Multimodal/MultimodalFacade.swift`），封装 5 个子引擎（VLM / ASR / TTS / VoiceCloner / ImageGen）并通过依赖注入支持运行时切换。v1.3 提供协议抽象与占位实现，v1.4 默认切换为 Apple 原生引擎（`NativeVisionEngine` / `NativeASREngine` / `NativeTTSEngine`）。
+
+### 9.1 引擎协议契约
+
+#### 9.1.1 VisionInferenceEngine（视觉理解）
+
+```swift
+public protocol VisionInferenceEngine: Sendable {
+    var isLoaded: Bool { get }
+    var loadedModelName: String? { get }
+    func loadModel(at modelPath: URL, modelName: String) async throws
+    func unloadModel() async
+    func describe(image: CGImage, prompt: String) async throws -> String
+}
+```
+
+| 实现 | 版本 | 说明 |
+|------|------|------|
+| `PlaceholderVisionEngine` | v1.3 | 占位，未加载抛 `engineNotLoaded`，加载后返回提示字符串 |
+| `NativeVisionEngine` | v1.4 | 基于 Vision 框架 5 个请求并发（分类 / 人脸 / 矩形 / 文字 / 条码），`isLoaded` 始终为 `true`，`loadedModelName = "Apple Vision (Native)"`，`loadModel` / `unloadModel` 为 no-op |
+| `MLXVisionEngine` | v1.5 计划 | 基于 MLX-VLM（Qwen2-VL-2B Q4 等），`MLXInferenceEngine.generate(prompt:images:)` |
+
+#### 9.1.2 ASREngine（语音识别）
+
+```swift
+public protocol ASREngine: Sendable {
+    var name: String { get }
+    var requiresNetwork: Bool { get }
+    var isLoaded: Bool { get }
+    func loadModel(at modelPath: URL) async throws
+    func transcribe(audioPath: URL, language: String) async throws -> String
+}
+```
+
+| 实现 | 版本 | 说明 |
+|------|------|------|
+| `PlaceholderASREngine` | v1.3 | 占位，`name = "PlaceholderASR"`，`requiresNetwork = false`，返回提示字符串 |
+| `NativeASREngine` | v1.4 | `name = "NativeASR (SFSpeechRecognizer)"`，`requiresNetwork = true`，基于 `SFSpeechURLRecognitionRequest` 文件识别；支持 wav / caf / m4a / mp3 / aac；CI 环境识别器不可用抛 `asrRecognitionFailed` |
+| `WhisperASREngine` | v1.5 计划 | 基于 whisper.cpp Rust 绑定，离线识别 |
+
+#### 9.1.3 TTSEngine（语音合成）
+
+```swift
+public protocol TTSEngine: Sendable {
+    var name: String { get }
+    var isLoaded: Bool { get }
+    func loadModel(at modelPath: URL) async throws
+    func synthesize(text: String, voiceId: String?) async throws -> Data
+}
+```
+
+| 实现 | 版本 | 说明 |
+|------|------|------|
+| `PlaceholderTTSEngine` | v1.3 | 占位，`name = "PlaceholderTTS"`，返回空 `Data()` |
+| `NativeTTSEngine` | v1.4 | `name = "NativeTTS (AVSpeechSynthesizer)"`，`isLoaded = true`，基于 `AVSpeechSynthesizer.write(_:toBufferCallback:)` 收集 PCM Buffer 编码为 WAV（44 字节 RIFF/WAVE 头）；CI 环境返回最小空 WAV 头；30s 超时保护 |
+| `MLXVoiceTTSEngine` | v1.5 计划 | 基于 MLX-Voice（Kokoro/Matcha-TTS） |
+
+#### 9.1.4 VoiceCloner（语音克隆）
+
+```swift
+public protocol VoiceCloner: Sendable {
+    var isLoaded: Bool { get }
+    var clonedVoices: [ClonedVoice] { get }
+    func loadModel(at modelPath: URL) async throws
+    func clone(audioPath: URL, voiceName: String) async throws -> ClonedVoice
+    func deleteVoice(voiceId: String) async
+    func voice(forId voiceId: String) -> ClonedVoice?
+}
+```
+
+| 实现 | 版本 | 说明 |
+|------|------|------|
+| `PlaceholderVoiceCloner` | v1.3 | 占位，未加载抛 `engineNotLoaded`；克隆返回 `embeddingBase64 = ""` 的占位音色 |
+| `OpenVoiceCloner` | v1.5 计划 | 基于 OpenVoice v2 蒸馏模型，提取音色嵌入存 Keychain |
+
+`ClonedVoice` 结构：
+
+```swift
+public struct ClonedVoice: Sendable, Equatable, Identifiable {
+    public let id: String          // UUID
+    public let name: String        // 用户自定义名
+    public let createdAt: Date
+    public let sampleAudioPath: URL
+    public let embeddingBase64: String  // 音色嵌入（Base64，存 Keychain）
+}
+```
+
+#### 9.1.5 ImageGenerationEngine（图像生成）
+
+```swift
+public protocol ImageGenerationEngine: Sendable {
+    var name: String { get }
+    var isLoaded: Bool { get }
+    func loadModel(at modelPath: URL) async throws
+    func unloadModel() async
+    func generate(
+        prompt: String,
+        negativePrompt: String?,
+        width: Int,
+        height: Int,
+        steps: Int,
+        seed: UInt64?
+    ) async throws -> CGImage
+}
+```
+
+| 实现 | 版本 | 说明 |
+|------|------|------|
+| `PlaceholderImageGenerationEngine` | v1.3 | 占位，`name = "PlaceholderImageGen"`，`isLoaded = false`，`generate` 抛 `platformUnsupported` |
+| `SDMobileEngine` | v1.5 计划 | 基于 Stable Diffusion Mobile / CoreML 量化 |
+
+### 9.2 MultimodalFacade 公共 API
+
+```swift
+public actor MultimodalFacade {
+    public static let shared = MultimodalFacade()
+    public init()  // v1.4: 默认 NativeVisionEngine / NativeASREngine / NativeTTSEngine + 占位 VoiceCloner / ImageGen
+    public init(visionEngine:asrEngine:ttsEngine:voiceCloner:imageGenEngine:budget:)  // 测试可注入
+
+    // 引擎切换（依赖注入）
+    public func setVisionEngine(_ engine: VisionInferenceEngine)
+    public func setASREngine(_ engine: ASREngine)
+    public func setTTSEngine(_ engine: TTSEngine)
+    public func setVoiceCloner(_ cloner: VoiceCloner)
+    public func setImageGenEngine(_ engine: ImageGenerationEngine)
+
+    // 引擎状态查询
+    public var visionEngineName: String { get }
+    public var asrEngineName: String { get }
+    public var ttsEngineName: String { get }
+    public var voiceClonerName: String { get }
+    public var imageGenEngineName: String { get }
+
+    // VLM 图像理解
+    public func describeImage(at imagePath: URL, prompt: String) async throws -> String
+    // ASR 语音识别
+    public func transcribeAudio(at audioPath: URL, language: String = "zh") async throws -> String
+    // TTS 语音合成
+    public func synthesizeSpeech(text: String, voiceId: String? = nil) async throws -> Data
+    // 语音克隆
+    public func cloneVoice(audioPath: URL, voiceName: String) async throws -> ClonedVoice
+    public func clonedVoices() async -> [ClonedVoice]
+    public func deleteVoice(voiceId: String) async
+    // 图像生成
+    public func generateImage(
+        prompt: String,
+        negativePrompt: String? = nil,
+        width: Int = 512,
+        height: Int = 512,
+        steps: Int = 20,
+        seed: UInt64? = nil
+    ) async throws -> CGImage
+
+    // 内存预算快照
+    public func budgetSnapshot() async -> BudgetSnapshot
+}
+```
+
+### 9.3 工具方法行为约定
+
+| 方法 | 输入校验 | 错误抛出 | 返回值 |
+|------|----------|----------|--------|
+| `describeImage(at:prompt:)` | `prompt.isEmpty` → `emptyInput`；图片格式不支持（非 JPEG/PNG/HEIC）→ `unsupportedImageFormat` | `MultimodalError` | VLM 生成的中文描述字符串 |
+| `transcribeAudio(at:language:)` | 文件不存在 → `emptyInput`；扩展名非 wav/caf/m4a/mp3/aac → `unsupportedAudioFormat`（由 NativeASREngine 抛出） | `MultimodalError` | 识别到的文字（可能为空字符串） |
+| `synthesizeSpeech(text:voiceId:)` | `text.isEmpty` → `emptyInput` | `MultimodalError` | WAV 格式 `Data`（至少 44 字节头部，含 RIFF/WAVE 标识） |
+| `cloneVoice(audioPath:voiceName:)` | 未加载 → `engineNotLoaded`；音频 <5s → `audioTooShort`；格式不支持 → `unsupportedAudioFormat` | `MultimodalError` | `ClonedVoice`（含 id / name / sampleAudioPath / embeddingBase64） |
+| `generateImage(prompt:...)` | `prompt.isEmpty` → `emptyInput`；占位实现 → `platformUnsupported` | `MultimodalError` | `CGImage` |
+
+### 9.4 MultimodalError 错误类型
+
+```swift
+public enum MultimodalError: LocalizedError, Sendable, Equatable {
+    case engineNotLoaded                       // 引擎未加载模型
+    case emptyInput                            // 输入为空
+    case unsupportedImageFormat               // 仅支持 JPEG/PNG/HEIC
+    case unsupportedAudioFormat               // 仅支持 WAV/CAF/m4a
+    case unsupportedSampleRate(actual: Double)
+    case audioTooShort(actualSeconds: Double, requiredSeconds: Double)
+    case memoryBudgetExceeded(requestedMB: Int, availableMB: Int)
+    case deviceCapabilityInsufficient(required: String, actual: String)
+    case vlmInferenceFailed(message: String)
+    case asrRecognitionFailed(message: String)
+    case ttsSynthesisFailed(message: String)
+    case voiceCloneFailed(message: String)
+    case imageGenerationFailed(message: String)
+    case ocrFailed(message: String)
+    case modelDownloadFailed(message: String)
+    case platformUnsupported                  // 当前平台不支持
+}
+```
+
+- `errorDescription`：用户友好的本地化描述（NSLocalizedString）
+- `diagnosticDescription`：含底层信息的诊断字符串，用于日志输出
+
+### 9.5 MemoryBudget 与 DeviceCapability
+
+#### MemoryBudget
+
+```swift
+public actor MemoryBudget {
+    public static let shared = MemoryBudget()
+    public init()                                  // 按 DeviceCapability.current 自动配置总预算
+    public init(totalBudgetMB: Int)                // 测试可注入
+
+    public var total: Int { get }                   // 总预算（MB）
+    public var used: Int { get }                    // 已用（MB）
+    public var available: Int { get }               // 剩余（MB）
+    public var peak: Int { get }                    // 历史峰值（MB）
+
+    public func reserve(mb: Int) async throws -> Int   // 申请内存，返回剩余
+    public func release(mb: Int) async -> Int           // 释放内存
+    public func reset() async                          // 释放所有（仅测试）
+    public func snapshot() async -> BudgetSnapshot      // 状态快照
+}
+```
+
+#### BudgetSnapshot
+
+```swift
+public struct BudgetSnapshot: Sendable, Equatable {
+    public let totalMB: Int
+    public let usedMB: Int
+    public let availableMB: Int
+    public let peakMB: Int
+    public let utilization: Double            // 0.0 - 1.0
+    public var utilizationPercentage: Double  // 0-100，保留 1 位小数
+}
+```
+
+#### DeviceCapability
+
+```swift
+public enum DeviceCapability: String, Sendable, Equatable, CaseIterable {
+    case low      // iPhone SE / 14 及以下，仅支持 0.5B
+    case medium   // iPhone 15 / 15 Plus，1B
+    case high     // iPhone 15 Pro / 16，2B VLM
+    case ultra    // iPad Pro M4 / Mac，7B+ 模型
+
+    public var displayName: String
+    public var maxVLMScale: Int                // 0 / 1 / 2 / 11
+    public var supportsVLM: Bool               // != .low
+    public var supportsVoiceClone: Bool         // high / ultra
+    public var supportsImageGeneration: Bool   // high / ultra
+    public var recommendedMemoryBudgetMB: Int   // 1500 / 2500 / 3000 / 6000
+
+    public static var current: DeviceCapability  // 自动检测
+    public static func detect() -> DeviceCapability
+}
+```
+
+### 9.6 LLM 工具调用入口
+
+`MultimodalFacade` 的 4 个工具方法通过 `ToolRegistry` 注册为 LLM 可调用工具（v1.3 新增）：
+
+| 工具名 | 函数名 | 参数（JSON Schema）| 底层调用 |
+|--------|--------|--------------------|----------|
+| `DescribeImageTool` | `describe_image` | `image_path: string`（必填）+ `prompt: string`（必填） | `facade.describeImage(at:prompt:)` |
+| `TranscribeAudioTool` | `transcribe_audio` | `audio_path: string`（必填）+ `language: string`（默认 "zh"） | `facade.transcribeAudio(at:language:)` |
+| `CloneVoiceTool` | `clone_voice` | `audio_path: string`（必填）+ `voice_name: string`（必填） | `facade.cloneVoice(audioPath:voiceName:)` |
+| `GenerateImageTool` | `generate_image` | `prompt: string`（必填）+ `negative_prompt` / `width` / `height` / `steps` / `seed`（可选） | `facade.generateImage(prompt:...)` |
+
+工具返回值为字符串形式（成功或错误描述），作为 `tool` role 消息回传 LLM 继续推理。
+
+---
+
 ## 相关文档
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — 架构总览与模块职责

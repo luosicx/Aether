@@ -57,10 +57,11 @@
 | 版本 | 预计时间窗 | 主题 |
 |------|------------|------|
 | v1.0 | 2026 Q3（已完成） | 多平台首发 + 核心能力落地 |
-| v1.1 | 2026 Q4 | 智能体增强完善 |
-| v1.2 | 2027 Q1 | 设计与体验升级 Phase 1 |
-| v1.3 | 2027 Q2 | 端侧多模态 Phase 1（VLM / Whisper / 跨平台 OCR） |
-| v1.5 | 2027 Q3 | 端侧多模态 Phase 2（SD Mobile / 多模态融合） |
+| v1.1 | 2026-07-24（已完成） | 智能体增强完善（MCP Server 反向暴露 / Agent 多步协作 / 插件市场 MVP / 动态星空背景） |
+| v1.2 | 2026-07-25（已完成） | 设计与体验升级 Phase 1（AnimationTokens / AetherIcons / 响应式布局） |
+| v1.3 | 2026-07-25（已完成） | 端侧多模态 Phase 1（协议抽象 + 4 个多模态工具 + 跨平台 OCR + 占位引擎） |
+| v1.4 | 2026-07-25（已完成） | 端侧多模态 Phase 1.5（Apple 原生引擎：NativeVision / NativeASR / NativeTTS 替换占位） |
+| v1.5 | 2027 Q3 | 端侧多模态 Phase 2（MLX-VLM / Whisper.cpp / MLX-Voice / SD Mobile / 多模态融合） |
 | v2.0 | 2027 Q4 | 跨端协作（iCloud / Handoff / visionOS / Web 伴侣） |
 | v2.5 | 2028 Q1 | 生态扩展（插件市场 / 热更新 / MCP 共建 / Android 深化） |
 | v3.0 | 2028 Q2 | 智能平台（Apple Intelligence / 本地 RAG 增强 / AI Workflow / 多 Agent 协作） |
@@ -119,13 +120,16 @@ gantt
     MCP/记忆/Agent/SDK      :done, v10c, 2026-07-17, 1d
 
     section v1.1（已完成）
-    智能体增强完善           :done, v11, 2026-10-01, 90d
+    智能体增强完善           :done, v11, 2026-07-24, 1d
 
-    section v1.2 (2027 Q1)
-    设计升级（动画/图标/响应式） :v12, 2027-01-01, 90d
+    section v1.2（已完成）
+    设计升级（动画/图标/响应式） :done, v12, 2026-07-25, 1d
 
-    section v1.3 (2027 Q2)
-    端侧多模态 Phase 1       :v13, 2027-04-01, 90d
+    section v1.3（已完成）
+    端侧多模态 Phase 1       :done, v13, 2026-07-25, 1d
+
+    section v1.4（已完成）
+    端侧多模态 Phase 1.5     :done, v14, 2026-07-25, 1d
 
     section v1.5 (2027 Q3)
     端侧多模态 Phase 2       :v15, 2027-07-01, 90d
@@ -149,9 +153,10 @@ gantt
 |------|----------|--------------|
 | v1.0 ✅ | 跨平台重构 / Rust 核心 / MCP / 记忆 / Agent / SDK | — |
 | v1.1 ✅ | MCP Server 反向暴露 / Agent 多步协作 / 插件市场 MVP / 动态星空背景 | v1.0 已落地 |
-| v1.2 | AnimationTokens 全面应用 / AetherIcons / 响应式布局 | 无外部依赖 |
-| v1.3 | 端侧 VLM / Whisper ASR + 自然 TTS + 语音克隆 / 跨平台 OCR | OnDeviceModelDownloader / 全局内存预算器 |
-| v1.5 | 端侧图像生成 / 多模态融合 Facade | v1.3 全部交付 |
+| v1.2 ✅ | AnimationTokens 全面应用 / AetherIcons / 响应式布局 / Starfield 呼吸效果 | 无外部依赖 |
+| v1.3 ✅ | 多模态协议抽象（VisionInferenceEngine / ASREngine / TTSEngine / VoiceCloner / ImageGenerationEngine）/ 4 个多模态工具 / 跨平台 OCR / 占位实现 / MultimodalFacade + MemoryBudget + DeviceCapability | OnDeviceModelDownloader / 全局内存预算器 |
+| v1.4 ✅ | NativeVisionEngine（基于 Vision）/ NativeASREngine（基于 SFSpeech）/ NativeTTSEngine（基于 AVSpeechSynthesizer.write）替换占位实现；MultimodalFacade 默认切换为 Native 引擎 | v1.3 协议抽象与 Facade |
+| v1.5 | MLX-VLM / Whisper.cpp ASR + MLX-Voice TTS + OpenVoice 语音克隆 / 端侧图像生成（SD Mobile）/ 多模态融合 Facade | v1.4 Native 引擎作为兜底 |
 | v2.0 | iCloud 同步 / Handoff / visionOS 适配 / Web 伴侣 / macOS 多窗口 | v1.5 端侧 VLM / v1.2 设计升级 |
 | v2.5 | 社区插件市场 / 插件热更新 / MCP 共建 / Android 伴侣深化 | v2.0 跨端协作 |
 | v3.0 | Apple Intelligence 集成 / 本地 RAG 增强 / 多 Agent 协作 / AI Workflow | v1.3 VLM / v2.5 插件市场 |
@@ -2513,41 +2518,61 @@ end
 ### 6.1 端侧多模态展望（v1.3 ~ v1.5）
 
 > **实施细节参见** 4.1 端侧多模态。本节给出 v1.3 ~ v1.5 的版本切片与优先级，专题文档中的架构图 / 内存预算表 / 技术选型表 / 5 阶段实施路径不再重复。
+>
+> **实施进度（v1.4 已发布）**：
+> - v1.3 已交付协议抽象（`VisionInferenceEngine` / `ASREngine` / `TTSEngine` / `VoiceCloner` / `ImageGenerationEngine`）、`MultimodalFacade` 门面、`MemoryBudget` 全局内存预算器、`DeviceCapability` 设备能力分级、4 个多模态工具（`describe_image` / `transcribe_audio` / `clone_voice` / `generate_image`）、跨平台 OCRTool 改造、占位实现。UT 3290。
+> - v1.4 已交付 Apple 原生引擎实现：`NativeVisionEngine`（Vision 框架 5 并发请求：分类 / 人脸 / 矩形 / 文字 / 条码）/ `NativeASREngine`（`SFSpeechURLRecognitionRequest` 文件识别）/ `NativeTTSEngine`（`AVSpeechSynthesizer.write` 收集 PCM Buffer 编码 WAV）。`MultimodalFacade` 默认从 Placeholder 切换为 Native 引擎，三端原生可用。新增 24 个测试用例，UT 3314。
+> - v1.5 规划中：集成 MLX-VLM / Whisper.cpp / MLX-Voice / OpenVoice v2 / SD Mobile，Native 引擎将作为 MLX 路径不可用时的兜底。
 
 #### 6.1.1 端侧视觉理解（VLM）
 
-- **版本归属**：v1.3
+- **版本归属**：v1.3（协议 + 占位）/ v1.4（Native 实现）/ v1.5（MLX-VLM 集成）
 - **优先级**：P2
-- **依赖**：`OnDeviceModelDownloader`（已有，需扩展支持多模态模型分发）/ 全局内存预算器（待建）/ 模型仓库（待建，托管量化产物）/ CoreML 量化工具链。
+- **依赖**：`OnDeviceModelDownloader`（已有，需扩展支持多模态模型分发）/ 全局内存预算器（v1.3 已建）/ 模型仓库（待建，托管量化产物）/ CoreML 量化工具链。
 - **关键交付**：iPhone 15 Pro 可加载 Qwen2-VL-2B Q4 模型并完成图像理解，首 token ≤2s；COCO 验证集图像描述准确率 >80%；`describe_image` 工具被 LLM 正确调用；内存峰值 ≤3GB。
+- **当前状态**：v1.4 `NativeVisionEngine` 提供 5 个 Vision 请求并发执行（VNClassifyImageRequest / VNDetectFaceRectanglesRequest / VNDetectRectanglesRequest / VNRecognizeTextRequest / VNDetectBarcodesRequest），按 prompt 关键字聚焦返回；MLX-VLM 待 v1.5 集成。
 
 #### 6.1.2 端侧语音增强
 
-- **版本归属**：v1.3
+- **版本归属**：v1.3（协议 + 占位）/ v1.4（Native 实现）/ v1.5（Whisper + MLX-Voice 集成）
 - **优先级**：P2
 - **依赖**：whisper.cpp Swift 绑定 / MLX-Voice 开源仓库 / OpenVoice v2 蒸馏模型 / `KeychainManager`（已有）/ `TTSVoiceCatalog`（已有，需扩展支持定制音色）。
 - **关键交付**：离线状态下 Whisper tiny 中文 WER ≤15%；MLX-Voice TTS MOS ≥3.5；`VoiceCloner` 接受 5 秒样本生成定制音色；`VoiceService` 默认行为不变（SFSpeech + AVSpeech），现有调用方零改动。
+- **当前状态**：v1.4 `NativeASREngine` 基于 `SFSpeechURLRecognitionRequest` 实现文件级识别（支持 wav/caf/m4a/mp3/aac，CI 环境跳过）；`NativeTTSEngine` 基于 `AVSpeechSynthesizer.write` 收集 PCM Buffer 编码为 WAV（含 44 字节 RIFF/WAVE 头）；Whisper.cpp / MLX-Voice 待 v1.5 集成。
 
 #### 6.1.3 端侧图像生成
 
-- **版本归属**：v1.5
+- **版本归属**：v1.3（占位）/ v1.5（SD Mobile 集成）
 - **优先级**：P3
 - **依赖**：apple/swift-coreml Stable Diffusion 仓库 / Draw Things app / CoreML 模型转换工具 / 全局内存预算器。
 - **关键交付**：Mac 上 512×512 20 step 图像生成 ≤15s，内存峰值 ≤4GB；iPad Pro 可完成 256×256 4 step 生成 ≤30s；iPhone 15 Pro 限定 256×256 4 step，连续 5 次生成无 OOM；`generate_image` 工具被 LLM 正确调用，返回 PNG/JPEG 数据可在消息气泡内联显示。
+- **当前状态**：v1.3 `PlaceholderImageGenerationEngine` 占位实现返回 `platformUnsupported` 错误；v1.5 将由 `SDMobileEngine` 接管。
 
 #### 6.1.4 跨平台 OCR
 
-- **版本归属**：v1.3
+- **版本归属**：v1.3（已交付）
 - **优先级**：P1
 - **依赖**：Vision 框架（已有）/ CoreML 模型转换 / ONNX Runtime Swift 包 / `VisionInferenceEngine`（v1.3 同期交付）。
 - **关键交付**：`OCRTool` 在 iOS / iPadOS / macOS 三端均可执行 OCR，跨平台测试集准确率差异 <3%；1080p 图像 OCR ≤300ms（iPhone 15 Pro）；`ObjectDetectionEngine` 输出边界框 IoU >0.7（COCO val 子集）；Vision 置信度 <0.6 时自动降级到 VLM 路径。
+- **当前状态**：v1.3 已改造 `OCRTool` 跨平台，基于 `VNRecognizeTextRequest`，zh-Hans + en，`.accurate` 精度；iOS / iPadOS / macOS 三端均可用。
 
 #### 6.1.5 多模态融合
 
-- **版本归属**：v1.5
+- **版本归属**：v1.3（Facade + MemoryBudget + DeviceCapability 已交付）/ v1.5（4 个接口全部真实实现）
 - **优先级**：P2
 - **依赖**：6.1.1 VLM / 6.1.2 语音增强 / 6.1.3 图像生成 / 6.1.4 OCR 全部交付后方可整合。
 - **关键交付**：`MultimodalFacade` 4 个接口全部实现并注册到 `ToolRegistry`，LLM 可调用 4 个新工具；用户可一次输入"图片 + 文字"混合内容，VLM 正确理解并回答；全局内存预算器在峰值超限时自动降级，无 OOM 崩溃。
+- **当前状态**：v1.3 已交付 `MultimodalFacade` 门面（5 个引擎注入接口 + 4 个工具方法 + 内存预算快照），4 个多模态工具已注册到 `ToolRegistry`；v1.4 默认引擎已切换为 Native 实现；v1.5 待 SD Mobile 与 OpenVoice 落地后 4 个接口全部真实实现。
+
+#### 6.1.6 端侧多模态引擎状态汇总（v1.3 + v1.4）
+
+| 引擎协议 | v1.3 占位实现 | v1.4 Native 实现 | v1.5 计划实现 |
+|----------|--------------|------------------|--------------|
+| `VisionInferenceEngine` | `PlaceholderVisionEngine` | `NativeVisionEngine`（Vision 框架）| `MLXVisionEngine`（MLX-VLM）|
+| `ASREngine` | `PlaceholderASREngine` | `NativeASREngine`（SFSpeech 文件识别）| `WhisperASREngine`（whisper.cpp）|
+| `TTSEngine` | `PlaceholderTTSEngine` | `NativeTTSEngine`（AVSpeechSynthesizer.write）| `MLXVoiceTTSEngine`（MLX-Voice）|
+| `VoiceCloner` | `PlaceholderVoiceCloner` | —（仍为占位）| `OpenVoiceCloner`（OpenVoice v2）|
+| `ImageGenerationEngine` | `PlaceholderImageGenerationEngine` | —（仍为占位）| `SDMobileEngine`（SD Mobile）|
 
 ### 6.2 跨设备协同与生态展望（v2.0 ~ v2.5）
 

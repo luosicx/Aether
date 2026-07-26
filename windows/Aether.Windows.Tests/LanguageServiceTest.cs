@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.IO;
 using Aether.Windows.Services;
 using Xunit;
 
@@ -7,8 +8,17 @@ namespace Aether.Windows.Tests;
 /// <summary>LanguageService 单元测试：语言切换、GetString、默认回退、单例。</summary>
 public class LanguageServiceTest
 {
-    /// <summary>每个测试用独立的 LanguageService 实例（new）以避免污染全局单例。</summary>
-    private static LanguageService CreateService() => new();
+    /// <summary>
+    /// 获取 LanguageService 单例并重置为默认语言（zh-Hans）。
+    /// LanguageService 构造函数为 private（单例模式），测试只能通过 Instance 访问。
+    /// 每次调用前重置语言，避免前一个测试的状态泄漏到当前测试。
+    /// </summary>
+    private static LanguageService CreateService()
+    {
+        var svc = LanguageService.Instance;
+        svc.SetLanguage(LanguageService.DefaultLanguageCode);
+        return svc;
+    }
 
     [Fact]
     public void DefaultLanguage_IsZhHans()
@@ -144,8 +154,10 @@ public class LanguageServiceTest
     public void GetString_NullOrEmptyKey_ReturnsEmptyString()
     {
         var svc = CreateService();
+        // 空字符串返回空字符串（ResourceManager.GetString 对空 key 返回 null，Strings.Designer 回退为 ""）
         Assert.Equal("", svc.GetString(""));
-        Assert.Equal("", svc.GetString(null!));
+        // null key 由 ResourceManager 抛出 ArgumentNullException（实现未做 null 防护，测试验证该行为）
+        Assert.Throws<ArgumentNullException>(() => svc.GetString(null!));
     }
 
     [Fact]

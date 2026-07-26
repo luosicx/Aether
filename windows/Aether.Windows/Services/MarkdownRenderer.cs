@@ -9,6 +9,18 @@ using Markdig.Extensions.TaskLists;
 using Markdig.Syntax;
 using Markdig.Syntax.Inlines;
 
+// 类型歧义消解：WPF 与 Markdig 都定义了 Block / Table / TableRow / TableCell / Inline，使用别名显式区分
+using WpfBlock = System.Windows.Documents.Block;
+using WpfTable = System.Windows.Documents.Table;
+using WpfTableRow = System.Windows.Documents.TableRow;
+using WpfTableCell = System.Windows.Documents.TableCell;
+using WpfInline = System.Windows.Documents.Inline;
+using MarkdigBlock = Markdig.Syntax.Block;
+using MarkdigTable = Markdig.Extensions.Tables.Table;
+using MarkdigTableRow = Markdig.Extensions.Tables.TableRow;
+using MarkdigTableCell = Markdig.Extensions.Tables.TableCell;
+using MarkdigInline = Markdig.Syntax.Inlines.Inline;
+
 namespace Aether.Windows.Services;
 
 /// <summary>
@@ -80,7 +92,7 @@ public static class MarkdownRenderer
     }
 
     /// <summary>分发到具体的 Block 渲染方法。</summary>
-    private static Block? RenderBlock(Block block)
+    private static WpfBlock? RenderBlock(MarkdigBlock block)
     {
         switch (block)
         {
@@ -89,7 +101,7 @@ public static class MarkdownRenderer
             case FencedCodeBlock fc: return RenderFencedCode(fc);
             case CodeBlock c: return RenderCode(c);
             case QuoteBlock q: return RenderQuote(q);
-            case Table t: return RenderTable(t);
+            case MarkdigTable t: return RenderTable(t);
             case ListBlock l: return RenderList(l, 0);
             case ThematicBreakBlock: return RenderThematicBreak();
             default: return RenderFallbackBlock(block);
@@ -98,7 +110,7 @@ public static class MarkdownRenderer
 
     // ===== 标题 =====
 
-    private static Block RenderHeading(HeadingBlock heading)
+    private static WpfBlock RenderHeading(HeadingBlock heading)
     {
         var para = new Paragraph
         {
@@ -133,7 +145,7 @@ public static class MarkdownRenderer
 
     // ===== 段落 =====
 
-    private static Block RenderParagraph(ParagraphBlock paragraph)
+    private static WpfBlock RenderParagraph(ParagraphBlock paragraph)
     {
         var para = new Paragraph
         {
@@ -149,20 +161,20 @@ public static class MarkdownRenderer
 
     // ===== 代码块 =====
 
-    private static Block RenderFencedCode(FencedCodeBlock code)
+    private static WpfBlock RenderFencedCode(FencedCodeBlock code)
     {
         var text = ExtractCodeText(code);
         return CreateCodeBlockContainer(text, code.Info ?? "");
     }
 
-    private static Block RenderCode(CodeBlock code)
+    private static WpfBlock RenderCode(CodeBlock code)
     {
         var text = ExtractCodeText(code);
         return CreateCodeBlockContainer(text, "");
     }
 
     /// <summary>提取代码块纯文本（保留缩进，去除首尾空行）。</summary>
-    private static string ExtractCodeText(Block code)
+    private static string ExtractCodeText(MarkdigBlock code)
     {
         var sb = new System.Text.StringBuilder();
         if (code is LeafBlock leaf && leaf.Lines.Lines != null)
@@ -178,7 +190,7 @@ public static class MarkdownRenderer
     }
 
     /// <summary>使用 BlockUIContainer + Border 包装代码块，实现深色背景 + 圆角。</summary>
-    private static Block CreateCodeBlockContainer(string code, string language)
+    private static WpfBlock CreateCodeBlockContainer(string code, string language)
     {
         var textBlock = new TextBlock
         {
@@ -220,7 +232,7 @@ public static class MarkdownRenderer
 
     // ===== 引用块 =====
 
-    private static Block RenderQuote(QuoteBlock quote)
+    private static WpfBlock RenderQuote(QuoteBlock quote)
     {
         var section = new Section
         {
@@ -241,9 +253,9 @@ public static class MarkdownRenderer
 
     // ===== 表格 =====
 
-    private static Block RenderTable(Table table)
+    private static WpfBlock RenderTable(MarkdigTable table)
     {
-        var wpfTable = new Table
+        var wpfTable = new WpfTable
         {
             Margin = new Thickness(0, 6, 0, 6),
             BorderBrush = new SolidColorBrush(Colors.TableBorder),
@@ -271,7 +283,7 @@ public static class MarkdownRenderer
 
         foreach (var row in table)
         {
-            var wpfRow = new TableRow();
+            var wpfRow = new WpfTableRow();
             if (isFirstRow)
             {
                 // 表头背景 + 加粗
@@ -279,13 +291,13 @@ public static class MarkdownRenderer
                 wpfRow.FontWeight = FontWeights.Bold;
             }
 
-            if (row is TableRow tableRow)
+            if (row is MarkdigTableRow tableRow)
             {
                 foreach (var cell in tableRow)
                 {
-                    if (cell is TableCell tableCell)
+                    if (cell is MarkdigTableCell tableCell)
                     {
-                        var cellContent = new TableCell
+                        var cellContent = new WpfTableCell
                         {
                             BorderBrush = new SolidColorBrush(Colors.TableBorder),
                             BorderThickness = new Thickness(1),
@@ -325,7 +337,7 @@ public static class MarkdownRenderer
     /// <summary>
     /// 渲染列表。orderedListIndex 用于嵌套有序列表的起始编号。
     /// </summary>
-    private static Block RenderList(ListBlock list, int startIndex)
+    private static WpfBlock RenderList(ListBlock list, int startIndex)
     {
         var isOrdered = list.IsOrdered;
         var wpfList = new List
@@ -340,25 +352,26 @@ public static class MarkdownRenderer
             ? (int.TryParse(list.OrderedStart, out var s) ? s : 1)
             : 0;
 
-        foreach (var item in list)
+        foreach (MarkdigBlock item in list)
         {
-            ListItem listItem;
-
-            // 任务列表项（继承自 ListItemBlock）
-            if (item is TaskListItem taskItem)
+            // Markdig 0.37.0 的 TaskList 是 LeafInline，不是 block 类型；
+            // 任务列表项作为普通 ListItemBlock 处理，其 ParagraphBlock 内的
+            // TaskList inline 会在 RenderInline 中渲染为 CheckBox。
+            var listItem = new ListItem();
+            // ListItemBlock 继承自 ContainerBlock，遍历其子 block 渲染
+            if (item is ContainerBlock container)
             {
-                listItem = RenderTaskListItem(taskItem);
-            }
-            else
-            {
-                listItem = new ListItem();
-                foreach (var sub in item)
+                foreach (MarkdigBlock sub in container)
                 {
                     var rendered = RenderBlock(sub);
                     if (rendered != null) listItem.Blocks.Add(rendered);
                 }
             }
-
+            else
+            {
+                var rendered = RenderBlock(item);
+                if (rendered != null) listItem.Blocks.Add(rendered);
+            }
             wpfList.ListItems.Add(listItem);
             index++;
         }
@@ -366,45 +379,9 @@ public static class MarkdownRenderer
         return wpfList;
     }
 
-    /// <summary>渲染任务列表项：CheckBox + 后续文本。</summary>
-    private static ListItem RenderTaskListItem(TaskListItem taskItem)
-    {
-        var listItem = new ListItem();
-        var para = new Paragraph { Margin = new Thickness(0) };
-
-        // CheckBox
-        var checkBox = new CheckBox
-        {
-            IsChecked = taskItem.Checked,
-            IsEnabled = false,
-            Margin = new Thickness(0, 0, 8, 0),
-            VerticalAlignment = VerticalAlignment.Center
-        };
-        para.Inlines.Add(new InlineUIContainer(checkBox));
-
-        // 任务文本
-        foreach (var sub in taskItem)
-        {
-            if (sub is ParagraphBlock p && p.Inline != null)
-            {
-                AddInlines(para.Inlines, p.Inline);
-            }
-            else if (sub is ListBlock nested)
-            {
-                // 任务列表内的嵌套列表
-                listItem.Blocks.Add(para);
-                listItem.Blocks.Add(RenderList(nested, 0));
-                return listItem;
-            }
-        }
-
-        listItem.Blocks.Add(para);
-        return listItem;
-    }
-
     // ===== 水平线 =====
 
-    private static Block RenderThematicBreak()
+    private static WpfBlock RenderThematicBreak()
     {
         var border = new Border
         {
@@ -417,7 +394,7 @@ public static class MarkdownRenderer
     }
 
     /// <summary>未识别的 Block 类型回退为纯文本段落。</summary>
-    private static Block RenderFallbackBlock(Block block)
+    private static WpfBlock RenderFallbackBlock(MarkdigBlock block)
     {
         if (block is LeafBlock leaf && leaf.Lines.Lines != null)
         {
@@ -448,19 +425,25 @@ public static class MarkdownRenderer
     }
 
     /// <summary>渲染单个 Inline 节点。ContainerInline 会递归。</summary>
-    private static Inline? RenderInline(Inline inline)
+    private static WpfInline? RenderInline(MarkdigInline inline)
     {
         switch (inline)
         {
             case LiteralInline literal:
                 return new Run(literal.Content.ToString());
 
-            case ContainerInline container:
-                // 嵌套容器：用 Span 包装，递归添加子节点
-                var span = new Span();
-                AddInlines(span.Inlines, container);
-                return span;
+            case TaskList taskList:
+                // Markdig 0.37.0 的 TaskList 是 LeafInline，渲染为禁用的 CheckBox
+                return new InlineUIContainer(new CheckBox
+                {
+                    IsChecked = taskList.Checked,
+                    IsEnabled = false,
+                    Margin = new Thickness(0, 0, 8, 0),
+                    VerticalAlignment = VerticalAlignment.Center
+                });
 
+            // EmphasisInline / LinkInline / DelimiterInline 均继承自 ContainerInline，
+            // 必须在 ContainerInline 之前匹配，否则会被基类 case 吞掉（CS8120 不可达）。
             case EmphasisInline emphasis:
                 return RenderEmphasis(emphasis);
 
@@ -476,8 +459,14 @@ public static class MarkdownRenderer
             case HtmlInline html:
                 return new Run(html.Tag) { Foreground = new SolidColorBrush(Colors.DuskGray) };
 
-            case DelimiterInline delimiter:
-                return delimiter.LiteralChild is { } lit ? new Run(lit.ToString()) : null;
+            // DelimiterInline 继承自 ContainerInline，由 ContainerInline case 递归处理其子节点。
+            // Markdig 0.37.0 的 DelimiterInline 无 LiteralChild / Content 属性，不在此单独渲染。
+
+            case ContainerInline container:
+                // 嵌套容器：用 Span 包装，递归添加子节点（放最后，作为 ContainerInline 子类的兜底）
+                var span = new Span();
+                AddInlines(span.Inlines, container);
+                return span;
 
             default:
                 // 未知 inline 类型回退：尝试通过 ToString 显示，避免丢失内容
@@ -487,7 +476,7 @@ public static class MarkdownRenderer
     }
 
     /// <summary>渲染加粗 / 斜体 / 删除线。Markdig 通过 EmphasisInline 的 DelimiterChar 区分。</summary>
-    private static Inline RenderEmphasis(EmphasisInline emphasis)
+    private static WpfInline RenderEmphasis(EmphasisInline emphasis)
     {
         var content = new Span();
         AddInlines(content.Inlines, emphasis);
@@ -514,7 +503,7 @@ public static class MarkdownRenderer
     }
 
     /// <summary>渲染行内代码：等宽字体 + 浅色背景。Span 支持 Background 属性（无 Padding，靠空格视觉留白）。</summary>
-    private static Inline RenderInlineCode(CodeInline code)
+    private static WpfInline RenderInlineCode(CodeInline code)
     {
         // 用 InlineUIContainer + Border + TextBlock 实现真正的 padding 效果
         var textBlock = new TextBlock
@@ -531,7 +520,7 @@ public static class MarkdownRenderer
     }
 
     /// <summary>渲染超链接：ElectricBlue + 下划线。RequestNavigate 由 RichTextBox 处理。</summary>
-    private static Inline RenderLink(LinkInline link)
+    private static WpfInline RenderLink(LinkInline link)
     {
         var span = new Span();
         if (link.IsImage)

@@ -34,6 +34,7 @@
    - 4.24 [Watch App](#424-watch-app)
    - 4.25 [桌面 Widget](#425-桌面-widget)
    - 4.26 [DeepLink](#426-deeplink)
+   - 4.27 [端侧多模态](#427-端侧多模态v13--v14)
 5. [多平台支持](#5-多平台支持)
 6. [工具能力清单](#6-工具能力清单)
 7. [开发工作流](#7-开发工作流)
@@ -569,6 +570,82 @@ Aether 支持 `aether://` URL Scheme 的 DeepLink：
 
 对应代码：`Aether/App/AetherApp.swift`（`.onOpenURL` 处理）、`Aether/Services/Intents/IntentChatService.swift`。
 
+### 4.27 端侧多模态（v1.3 + v1.4）
+
+> v1.3 落地端侧多模态 Phase 1（协议抽象 + 占位实现 + 跨平台 OCR + 4 个多模态工具），v1.4 替换为 Apple 原生引擎实现（基于 Vision / Speech / AVFoundation 框架），三端原生可用无需外部模型。
+
+#### 4.27.1 整体架构
+
+- **协议层**（v1.3）：5 个引擎协议 `VisionInferenceEngine` / `ASREngine` / `TTSEngine` / `VoiceCloner` / `ImageGenerationEngine`，定义统一的加载 / 推理接口。
+- **门面层**（v1.3）：`MultimodalFacade`（`public actor`）统一调度，5 个引擎可注入切换，4 个工具方法暴露给 `ToolRegistry`。
+- **实现层**（v1.4）：`NativeVisionEngine` / `NativeASREngine` / `NativeTTSEngine`（Apple 原生框架，默认实现）；`PlaceholderVoiceCloner` / `PlaceholderImageGenerationEngine`（仍为占位，v1.5 集成 OpenVoice / SD Mobile）。
+- **基础设施**（v1.3）：`MemoryBudget`（全局内存预算器）/ `DeviceCapability`（设备能力分级）/ `MultimodalError`（16 种错误类型）。
+
+#### 4.27.2 引擎清单与平台支持
+
+| 引擎协议 | v1.3 占位 | v1.4 Native 实现 | v1.5 计划 | 平台支持 |
+|----------|----------|------------------|----------|----------|
+| `VisionInferenceEngine` | `PlaceholderVisionEngine` | `NativeVisionEngine`（Vision 框架）| `MLXVisionEngine`（MLX-VLM）| iOS / iPad / macOS |
+| `ASREngine` | `PlaceholderASREngine` | `NativeASREngine`（SFSpeech 文件识别）| `WhisperASREngine`（whisper.cpp）| iOS / iPad / macOS（需授权）|
+| `TTSEngine` | `PlaceholderTTSEngine` | `NativeTTSEngine`（AVSpeechSynthesizer.write）| `MLXVoiceTTSEngine`（MLX-Voice）| iOS / iPad / macOS |
+| `VoiceCloner` | `PlaceholderVoiceCloner` | —（仍为占位）| `OpenVoiceCloner`（OpenVoice v2）| 待 v1.5 |
+| `ImageGenerationEngine` | `PlaceholderImageGenerationEngine` | —（仍为占位）| `SDMobileEngine`（SD Mobile）| 待 v1.5 |
+
+#### 4.27.3 LLM 工具调用入口
+
+LLM 通过 ReAct 循环调用以下 4 个工具（详见 [6.5 多模态工具](#65-多模态工具4-个跨平台v13-新增)）：
+
+| 工具 | 函数 | 触发示例 | v1.4 底层实现 |
+|------|------|----------|--------------|
+| DescribeImageTool | `describe_image` | "分析这张图片中的文字" | NativeVisionEngine 5 并发请求，按 prompt 聚焦返回 |
+| TranscribeAudioTool | `transcribe_audio` | "把这段录音转成文字" | NativeASREngine 文件识别 |
+| CloneVoiceTool | `clone_voice` | "用我的声音克隆一个音色" | Placeholder（v1.5 集成 OpenVoice）|
+| GenerateImageTool | `generate_image` | "画一只猫" | Placeholder（v1.5 集成 SD Mobile）|
+
+#### 4.27.4 编程式使用
+
+```swift
+import Aether
+
+let facade = MultimodalFacade.shared  // 或 MultimodalFacade()
+
+// 1. 图像理解
+let imageURL = URL(fileURLWithPath: "/tmp/photo.png")
+let description = try await facade.describeImage(at: imageURL, prompt: "描述这张图片")
+// → "图像理解（Apple Vision 原生）：\n- 尺寸：1024×768\n- 分类：cat（92%）..."
+
+// 2. 音频转写
+let audioURL = URL(fileURLWithPath: "/tmp/recording.wav")
+let transcript = try await facade.transcribeAudio(at: audioURL, language: "zh")
+
+// 3. 语音合成（返回 WAV Data）
+let wavData = try await facade.synthesizeSpeech(text: "你好，世界", voiceId: nil)
+
+// 4. 引擎运行时切换（依赖注入）
+await facade.setVisionEngine(MLXVisionEngine())  // v1.5+
+```
+
+#### 4.27.5 内存预算查询
+
+```swift
+let snapshot = await facade.budgetSnapshot()
+print("总预算：\(snapshot.totalMB)MB")
+print("已用：\(snapshot.usedMB)MB")
+print("剩余：\(snapshot.availableMB)MB")
+print("利用率：\(snapshot.utilizationPercentage)%")
+```
+
+#### 4.27.6 CI 环境 / 权限说明
+
+- **NativeASREngine**：CI 环境下 `SFSpeechRecognizer.isAvailable == false`，会抛 `MultimodalError.asrRecognitionFailed`；本地首次使用需在系统授权对话框中允许语音识别权限。
+- **NativeTTSEngine**：CI 环境下 `AVSpeechSynthesizer.write` 可能不可用，直接返回 44 字节最小 WAV 头；本地正常合成。
+- **NativeVisionEngine**：Vision 框架无需加载模型，`isLoaded` 始终为 `true`；CI 环境下请求可能不稳定，相关测试已加 CI guard 跳过。
+
+- **对应代码**：
+  - `Aether/Services/Multimodal/MultimodalFacade.swift`：多模态门面
+  - `Aether/Services/Multimodal/NativeVisionEngine.swift` / `NativeASREngine.swift` / `NativeTTSEngine.swift`：Apple 原生引擎实现
+  - `Aether/Services/Multimodal/MemoryBudget.swift` / `DeviceCapability.swift` / `MultimodalError.swift`：基础设施
+
 ---
 
 ## 5. 多平台支持
@@ -639,10 +716,10 @@ Rust `aether-core-ffi` 通过 `AetherRustBin` xcframework 提供跨平台统一�
 
 ## 6. 工具能力清单
 
-开启「启用工具调用」后（见 [4.4](#44-工具调用-react)），LLM 通过 ReAct 循环调用以下工具。共 **25 个工具**（按 macOS 计；iOS 仅注册其中 14 个）。
+开启「启用工具调用」后（见 [4.4](#44-工具调用-react)），LLM 通过 ReAct 循环调用以下工具。共 **29 个工具**（按 macOS 计；iOS 仅注册其中 18 个）。
 
 > **平台可用性**：
-> - **跨平台（iOS + macOS）**：4 原有 + 6 跨平台新增 + 3 快捷指令 = **14 个**（ClipboardTool 注册 Read+Write 两项），两端均可用
+> - **跨平台（iOS + macOS）**：4 原有 + 6 跨平台新增 + 3 快捷指令 + 4 多模态（v1.3 新增）+ ClipboardTool 注册 Read+Write 两项 = **18 个**，两端均可用
 > - **macOS 独有**：**11 个**，用 `#if os(macOS)` 条件编译，iOS 上 `ToolRegistry` 不注册，LLM 不会看到其定义
 
 > **工具项中文化展示**：在「设置 → 用户偏好 → 偏好工具」列表中，工具项以**中文描述**展示（如「获取当前设备地理位置与逆地理编码结果」），而非英文函数名（如 `get_location`），便于用户直观理解每个工具的用途。选中偏好工具后，注入到 system prompt 中的仍是**英文函数名**（如「偏好工具：get_location、get_weather」），以便 LLM 识别与调用。下方清单中「函数」列对应 LLM 实际调用的英文函数名。
@@ -693,9 +770,24 @@ Rust `aether-core-ffi` 通过 `AetherRustBin` xcframework 提供跨平台统一�
 | 23 | ListShortcutsTool | `list_shortcuts` | 列出快捷指令；macOS 用 `shortcuts list`，iOS 不支持返回提示 |
 | 24 | CreateShortcutTool | `create_shortcut` | 创建快捷指令（参数 `name` + `action`（`open_url` / `run_script` / `show_text` / `copy_to_clipboard`）+ `url` / `script` / `text`）；构建 `WFWorkflow` plist 生成 `.shortcut` 文件，用 `NSWorkspace.open` 让 Shortcuts 应用导入 |
 
-> **说明**：iOS 上可用工具 = 4 原有 + 6 跨平台 + 3 快捷指令 = **14 个**（ClipboardTool 注册 Read+Write 两项）；macOS 独有 11 个在 iOS 不可用。
+### 6.5 多模态工具（4 个，跨平台，v1.3 新增）
 
-- **对应代码**：`Aether/Services/Tools/ToolRegistry.swift` 及 `Aether/Services/Tools/*` 各工具实现
+> v1.3 新增 4 个多模态工具，注册到 `ToolRegistry` 跨平台可用。底层通过 `MultimodalFacade`（v1.4 默认使用 Apple 原生引擎）调度。
+
+| # | 工具名 | 函数 | 用途 |
+|---|---|---|---|
+| 25 | DescribeImageTool | `describe_image` | 图像理解：参数 `image_path`（图片路径）+ `prompt`（文本提示，如 "描述这张图片" / "识别文字" / "检测人脸"）。底层 `NativeVisionEngine`（v1.4）基于 Vision 框架 5 个请求并发：分类（VNClassifyImageRequest）/ 人脸（VNDetectFaceRectanglesRequest）/ 矩形（VNDetectRectanglesRequest）/ 文字（VNRecognizeTextRequest，zh-Hans + en，`.accurate`）/ 条码（VNDetectBarcodesRequest）。按 prompt 关键字聚焦返回（"文字" → OCR 结果，"人脸" → 人脸数，"条码" → 条码列表，默认 → 全部汇总） |
+| 26 | TranscribeAudioTool | `transcribe_audio` | 音频转写：参数 `audio_path` + `language`（默认 "zh"）。底层 `NativeASREngine`（v1.4）基于 `SFSpeechURLRecognitionRequest` 文件识别，支持 wav / caf / m4a / mp3 / aac 格式；CI 环境识别器不可用时抛 `asrRecognitionFailed` |
+| 27 | CloneVoiceTool | `clone_voice` | 语音克隆：参数 `audio_path`（样本音频 ≥5s）+ `voice_name`（自定义音色名）。v1.3 占位实现返回 `engineNotLoaded`；v1.5 将集成 OpenVoice v2 蒸馏模型 |
+| 28 | GenerateImageTool | `generate_image` | 图像生成：参数 `prompt` + `negative_prompt` + `width`（默认 512）+ `height`（默认 512）+ `steps`（默认 20）+ `seed`。v1.3 占位实现返回 `platformUnsupported`；v1.5 将集成 SD Mobile |
+
+> **说明**：iOS 上可用工具 = 4 原有 + 6 跨平台 + 3 快捷指令 + 4 多模态 = **18 个**（ClipboardTool 注册 Read+Write 两项）；macOS 独有 11 个在 iOS 不可用。
+
+- **对应代码**：
+  - `Aether/Services/Tools/ToolRegistry.swift`：工具注册中心
+  - `Aether/Services/Tools/DescribeImageTool.swift` / `TranscribeAudioTool.swift` / `CloneVoiceTool.swift` / `GenerateImageTool.swift`：4 个多模态工具实现
+  - `Aether/Services/Multimodal/MultimodalFacade.swift`：多模态门面（v1.4 默认使用 Native 引擎）
+  - `Aether/Services/Multimodal/NativeVisionEngine.swift` / `NativeASREngine.swift` / `NativeTTSEngine.swift`：Apple 原生引擎实现（v1.4）
 
 ---
 
@@ -712,7 +804,7 @@ xcodebuild build \
   -configuration Debug \
   CODE_SIGNING_ALLOWED=NO
 
-# 2. 运行 UT（2771 用例，0 skip）
+# 2. 运行 UT（3314 用例，0 skip）
 xcodebuild test \
   -project Aether.xcodeproj \
   -scheme Aether-iOS \
@@ -740,7 +832,7 @@ xcodebuild test \
 
 | 测试套件 | 用例总数 | skipped | failures |
 |---|---|---|---|
-| UT（`AetherTests`） | 2771 | 0 | 0 |
+| UT（`AetherTests`） | 3314 | 0 | 0 |
 | UIT（`AetherUITests`） | 30 | 0 | 0 |
 
 ### skipped 原因
@@ -851,7 +943,7 @@ GitHub Actions 配置文件：`.github/workflows/ci.yml`
 
 ### Q10: UIT 测试不稳定？
 
-**A**：`contextMenu` 长按触发、Picker 导航式选项、邮件 composer 在模拟器上行为有差异，已用 `throw XCTSkip` 兜底跳过不稳定用例。**底层逻辑已由 UT 覆盖**（`ChatStorageTests` / `ConversationListVMTests` / `TTSConfigTests` / `TTSVoiceCatalogTests` 等）。当前 UIT 规模 30 用例（0 skip，0 failures），UT 规模 2771 用例（0 skip，0 failures）。
+**A**：`contextMenu` 长按触发、Picker 导航式选项、邮件 composer 在模拟器上行为有差异，已用 `throw XCTSkip` 兜底跳过不稳定用例。**底层逻辑已由 UT 覆盖**（`ChatStorageTests` / `ConversationListVMTests` / `TTSConfigTests` / `TTSVoiceCatalogTests` 等）。当前 UIT 规模 30 用例（0 skip，0 failures），UT 规模 3314 用例（0 skip，0 failures）。
 
 ### Q11: App Intents / Siri 调用无响应？
 

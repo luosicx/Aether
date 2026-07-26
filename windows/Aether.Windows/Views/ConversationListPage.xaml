@@ -83,7 +83,7 @@
                                 <TextBlock Text="{Binding LastMessagePreview}" FontSize="12" Margin="0,4,0,0"
                                            Foreground="{x:Static design:AetherColors.DuskGray}"
                                            TextTrimming="CharacterEllipsis"
-                                           MaxLines="1"/>
+                                           TextWrapping="NoWrap"/>
                                 <TextBlock Text="{Binding UpdatedAt, Converter={StaticResource UnixTime}, ConverterParameter='MM-dd HH:mm'}"
                                            FontSize="10" Margin="0,2,0,0"
                                            Foreground="{x:Static design:AetherColors.DuskGray}"/>

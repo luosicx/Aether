@@ -23,7 +23,8 @@ public class SettingsViewModelTest
             store.BaseUrl = "https://api.example.com";
             store.UserToken = "token-123";
             store.DefaultModel = "qwen-plus";
-            store.Load();
+            // 不调用 store.Load()：Load() 会因文件不存在而 ResetToDefaults，覆盖已设置的值。
+            // 此测试验证 ViewModel 从 store 内存状态读取，而非从文件加载。
 
             var vm = new SettingsViewModel(store, () => { }, () => { });
 

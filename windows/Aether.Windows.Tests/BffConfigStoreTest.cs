@@ -66,8 +66,8 @@ public class BffConfigStoreTest
             // 读取原始 JSON 文件，确认明文 Token 不存在
             var fileContent = File.ReadAllText(path);
             Assert.DoesNotContain("my-secret-token", fileContent);
-            // 确认文件包含 encryptedToken 字段
-            Assert.Contains("encryptedToken", fileContent);
+            // 确认文件包含 EncryptedToken 字段（PascalCase，与 BffConfigData 属性名一致）
+            Assert.Contains("EncryptedToken", fileContent);
         }
         finally
         {

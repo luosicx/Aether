@@ -10,9 +10,9 @@
 ### 工程基线
 
 - iOS / iPad / macOS 三端原生 SwiftUI 渲染，`#if os(iOS)` 条件编译优雅降级
-- **25 个工具**（14 跨平台 + 11 macOS 独有），ReAct 循环最大 5 轮
+- **29 个工具**（18 跨平台含 4 多模态 + 11 macOS 独有），ReAct 循环最大 5 轮
 - **8 种语言** i18n（zh-Hans / zh-Hant / en / ja / ko / fr / de / es），888 keys
-- **2771 UT** + 30 UIT，0 failures / 0 skips
+- **3314 UT** + 30 UIT，0 failures / 0 skips
 - 多 Provider（DeepSeek / Qwen / MLX 端侧）+ SmartRouter + Fallback 自动降级
 - SwiftLint + SwiftFormat 代码质量工具链，CI 集成脚本
 - **Watch App 源代码**就绪（`AetherWatch/`，⚠️ 需手动创建 Xcode target）
@@ -110,9 +110,9 @@
 
 - [x] Aether 色彩 / 字体 / 圆角 Token 体系（已完成）
 - [x] 深色模式默认 + 液态玻璃 UI（已完成）
-- [ ] 动画与过渡效果统一（AnimationTokens 全面应用）
-- [ ] 自定义图标集（SF Symbols 之外的 Aether 专属图标）
-- [ ] 响应式布局适配（iPhone SE / iPad Pro / macOS 超宽屏）
+- [x] 动画与过渡效果统一（AnimationTokens 全面应用，v1.2 已交付）
+- [x] 自定义图标集（AetherIcons 4 类 11 图标，v1.2 已交付）
+- [x] 响应式布局适配（LayoutSize / Strategy / SplitViewStyle，v1.2 已交付）
 
 ### H.2 交互升级
 
@@ -141,10 +141,12 @@
 
 ### I.1 端侧多模态
 
-- [ ] 端侧视觉理解（CLIP / LLaVA 离线模型）
-- [ ] 端侧语音识别（Whisper / Speech 库离线 STT）
-- [ ] 端侧图像生成（Stable Diffusion Mobile / Draw Things API）
-- [ ] 端侧 TTS 自然语音合成（超过 AVSpeechSynthesizer 默认音色）
+- [~] 端侧视觉理解（v1.3 协议 + 占位已交付；v1.4 替换为 NativeVisionEngine 基于 Apple Vision 框架；MLX-VLM 待 v1.5 集成）
+- [~] 端侧语音识别（v1.3 协议 + 占位已交付；v1.4 替换为 NativeASREngine 基于 SFSpeech 文件识别；Whisper.cpp 待 v1.5 集成）
+- [~] 端侧 TTS 语音合成（v1.3 协议 + 占位已交付；v1.4 替换为 NativeTTSEngine 基于 AVSpeechSynthesizer.write；MLX-Voice 待 v1.5 集成）
+- [ ] 端侧图像生成（Stable Diffusion Mobile / Draw Things API，v1.3 占位已交付，v1.5 集成 SD Mobile）
+- [ ] 端侧语音克隆（OpenVoice v2 蒸馏，v1.3 占位已交付，v1.5 集成真实克隆）
+- [x] 跨平台 OCR（v1.3 改造 OCRTool 跨平台，iOS + macOS 均可用，基于 Vision `VNRecognizeTextRequest`）
 
 ### I.2 本地化扩展
 
@@ -194,7 +196,10 @@
 |------|------|------|
 | v1.0 | 深空背景 + 液态玻璃卡片 + 紫蓝渐变 | ✅ 已完成 |
 | v1.1 | 动态星空背景（粒子动画）+ 毛玻璃深度分层 | ✅ 已完成 |
-| v1.2 | 流体动画（消息气泡液态进出）+ 光晕呼吸效果 | 📋 设计中 |
+| v1.2 | 流体动画（消息气泡液态进出）+ 光晕呼吸效果 + AetherIcons + 响应式布局 | ✅ 已完成 |
+| v1.3 | 端侧多模态 Phase 1（协议抽象 + 占位实现 + 跨平台 OCR + 4 个多模态工具） | ✅ 已完成 |
+| v1.4 | 端侧多模态 Phase 1.5（Apple 原生引擎：NativeVision / NativeASR / NativeTTS） | ✅ 已完成 |
+| v1.5 | 端侧多模态 Phase 2（MLX-VLM + Whisper + MLX-Voice + SD Mobile） | 📋 规划中 |
 | v2.0 | 全沉浸式 3D 交互（visionOS 空间计算） | 🔮 远期 |
 
 ### 设计哲学
@@ -210,14 +215,15 @@
 
 | 里程碑 | 目标 | 关键交付 | 预计版本 |
 |--------|------|----------|----------|
-| v1.0 | App Store 首发 | 工程化完善、审核通过、首版上架 | 2026 Q3 |
-| v1.1 ✅ | 智能体增强完善（MCP 生态共建 + Agent 多步协作 + 插件市场 MVP） | MCP Server 反向暴露、Agent 多步协作、插件市场 MVP、动态星空背景 | 2026 Q4（已完成） |
-| v1.2 | 设计升级 | 动画统一、多窗口、个性化主题 | 2027 Q1 |
-| v1.3 | 端侧多模态 Phase 1 | VLM 图像理解、跨平台 OCR、Whisper ASR | 2027 Q2 |
-| v1.5 | 端侧多模态 Phase 2 | 自然 TTS、语音克隆、SD Mobile 图像生成 | 2027 Q3 |
-| v2.0 | 跨端协作 | iCloud 同步、Web 伴侣、团队协作 | 2027 Q3 |
+| v1.0 ✅ | App Store 首发 | 工程化完善、审核通过、首版上架 | 2026 Q3（已完成） |
+| v1.1 ✅ | 智能体增强完善（MCP 生态共建 + Agent 多步协作 + 插件市场 MVP） | MCP Server 反向暴露、Agent 多步协作、插件市场 MVP、动态星空背景 | 2026-07-24 已发布 |
+| v1.2 ✅ | 设计升级 | AnimationTokens、AetherIcons、响应式布局、动态星空呼吸效果 | 2026-07-25 已发布 |
+| v1.3 ✅ | 端侧多模态 Phase 1 | 协议抽象、4 个多模态工具、跨平台 OCR、占位引擎 | 2026-07-25 已发布 |
+| v1.4 ✅ | 端侧多模态 Phase 1.5 | NativeVisionEngine / NativeASREngine / NativeTTSEngine 替换占位实现 | 2026-07-25 已发布 |
+| v1.5 | 端侧多模态 Phase 2 | MLX-VLM、Whisper.cpp、MLX-Voice、SD Mobile 图像生成 | 2027 Q3 |
+| v2.0 | 跨端协作 | iCloud 同步、Web 伴侣、团队协作 | 2027 Q4 |
 | v2.5 | 生态扩展 | 社区插件市场、多 Agent 协作、Android 深化 | 2028 Q1 |
-| v3.0 | 生态平台 | SDK、插件市场、visionOS | 2028 |
+| v3.0 | 生态平台 | SDK、插件市场、visionOS | 2028 Q2 |
 | v3.0+ | 远期探索 | 隐私计算、实时协作、多模态记忆 | 2028 下半年 |
 
 ---
@@ -230,7 +236,8 @@
 |--------|------|------|
 | BFF 令牌桶仅客户端 | 可被绕过 | v2.0 服务端限流强化 |
 | Candle iOS 受限 | iOS 端侧推理能力受限 | v1.3 评估 MLX 替代方案 |
-| Vision OCR 仅 macOS | iOS 无法离线 OCR | v1.3 跨平台 OCR 适配 |
+| ~~Vision OCR 仅 macOS~~ | ~~iOS 无法离线 OCR~~ | ✅ v1.3 已改造跨平台 OCR |
+| 多模态引擎为 Apple 原生（无 MLX） | 自然度不及 MLX-VLM/Whisper.cpp/MLX-Voice | v1.5 集成 MLX 后端，原生引擎作为兜底 |
 | Plugin 热更新未实现 | 插件版本管理占位 | v2.5 实现热更新与依赖解析 |
 | visionOS target 缺失 | 空间计算体验缺失 | v2.0 新增 visionOS target |
 

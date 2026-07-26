@@ -1823,11 +1823,29 @@ README.md
 
 ## 9. 架构演进方向
 
-> 本章节面向 v1.1~v3.0+ 远期演进（详见 `doc/MASTER_PLAN.md`），描述各方向的架构扩展点与关键技术决策，**仅规划未实施**。
+> 本章节面向 v1.5~v3.0+ 远期演进（详见 `doc/MASTER_PLAN.md`），描述各方向的架构扩展点与关键技术决策。
+> **v1.3 / v1.4 已落地**：9.1 端侧多模态架构（协议抽象 + Apple 原生引擎）已实施，下方原规划保留作为 v1.5 MLX 集成参考。
 
-### 9.1 端侧多模态架构
+### 9.1 端侧多模态架构（v1.3 + v1.4 已实施）
 
-#### 9.1.1 VLM 集成点
+#### 9.1.0 当前实施状态
+
+- **v1.3 已交付**：
+  - 5 个引擎协议：`VisionInferenceEngine` / `ASREngine` / `TTSEngine` / `VoiceCloner` / `ImageGenerationEngine`（位于 `Aether/Services/Multimodal/`）
+  - `MultimodalFacade`（`public actor`）门面，5 个引擎注入接口 + 4 个工具方法 + 内存预算快照
+  - `MemoryBudget`（`public actor`）全局内存预算器，按 `DeviceCapability` 自动配置总预算（iPhone ≤ 3GB / iPad ≤ 6GB / Mac ≤ 8GB）
+  - `DeviceCapability` 设备能力分级枚举（low / medium / high / ultra）
+  - `MultimodalError` 16 种错误类型（含本地化描述 + 诊断描述）
+  - 4 个多模态工具注册到 `ToolRegistry`：`describe_image` / `transcribe_audio` / `clone_voice` / `generate_image`
+  - `OCRTool` 跨平台改造（基于 `VNRecognizeTextRequest`，zh-Hans + en，`.accurate`）
+- **v1.4 已交付**：Apple 原生引擎实现替代占位
+  - `NativeVisionEngine`：基于 Vision 框架组合 5 个请求并发执行（VNClassifyImageRequest / VNDetectFaceRectanglesRequest / VNDetectRectanglesRequest / VNRecognizeTextRequest / VNDetectBarcodesRequest），按 prompt 关键字聚焦返回
+  - `NativeASREngine`：基于 `SFSpeechURLRecognitionRequest` 文件级识别（支持 wav/caf/m4a/mp3/aac；CI 环境识别器不可用时抛 `asrRecognitionFailed`）
+  - `NativeTTSEngine`：基于 `AVSpeechSynthesizer.write` 收集 PCM Buffer 编码为 WAV（44 字节 RIFF/WAVE 头；CI 环境返回最小空 WAV 头；30s 超时保护）
+  - `MultimodalFacade.init()` 默认从 `PlaceholderXxx` 切换为 `NativeXxx`（`voiceCloner` / `imageGenEngine` 仍为占位，待 v1.5）
+- **v1.5 规划**：MLX-VLM / Whisper.cpp / MLX-Voice / OpenVoice v2 / SD Mobile 集成，Native 引擎作为 MLX 路径不可用时的兜底
+
+#### 9.1.1 VLM 集成点（v1.5 规划）
 
 扩展现有 `MLXInferenceEngine`（位于 `Services/OnDevice/MLXInferenceEngine.swift`），新增 `generate(prompt:images:)` 接口支持图像输入：
 
@@ -1839,50 +1857,83 @@ extension MLXInferenceEngine {
 
 - 复用现有 `loadModel(path:expectedSHA256:)` 加载流程，扩展支持多模态权重（如 Llama-3.2-11B-Vision Q4 量化）。
 - 通过 `OfflineLLMProvider` 适配为 `LLMProvider` 协议，与现有 ChatViewModel 流式通路无缝衔接。
+- v1.4 临时方案：`NativeVisionEngine` 通过 Vision 框架的 5 个请求提供基础图像理解（分类 / 人脸 / 矩形 / 文字 / 条码），置信度 <0.6 时可作为 MLX-VLM 路径的兜底。
 
-#### 9.1.2 ASR / TTS 引擎抽象
+#### 9.1.2 ASR / TTS 引擎抽象（v1.3 已实施 / v1.5 增强）
 
-引入 `ASREngine` 与 `TTSEngine` 协议，解耦具体实现：
+引入 `ASREngine` 与 `TTSEngine` 协议，解耦具体实现（位于 `Aether/Services/Multimodal/ASREngine.swift` / `TTSEngine.swift`）：
 
 ```swift
-protocol ASREngine: Sendable {
-    func transcribe(audio: URL) async throws -> String
-    func streamTranscribe() -> AsyncStream<String>
+public protocol ASREngine: Sendable {
+    var name: String { get }
+    var requiresNetwork: Bool { get }
+    var isLoaded: Bool { get }
+    func loadModel(at modelPath: URL) async throws
+    func transcribe(audioPath: URL, language: String) async throws -> String
 }
 
-protocol TTSEngine: Sendable {
-    func synthesize(text: String, config: TTSConfig) async throws -> Data
+public protocol TTSEngine: Sendable {
+    var name: String { get }
+    var isLoaded: Bool { get }
+    func loadModel(at modelPath: URL) async throws
+    func synthesize(text: String, voiceId: String?) async throws -> Data
 }
 ```
 
-- 现有 `VoiceService` 中 `SFSpeechRecognizer` 包装为 `AppleASREngine` 实现，`AVSpeechSynthesizer` 包装为 `AppleTTSEngine` 实现。
-- 新增 `WhisperASREngine`（基于 whisper.cpp Rust 绑定）与 `NaturalTTSEngine`（基于端侧 TTS 模型）作为可选实现，通过配置切换。
+- **v1.3 占位实现**：`PlaceholderASREngine` / `PlaceholderTTSEngine`（返回提示信息或空 Data）
+- **v1.4 Native 实现**：`NativeASREngine`（基于 `SFSpeechURLRecognitionRequest` 文件识别）/ `NativeTTSEngine`（基于 `AVSpeechSynthesizer.write` PCM 收集 + WAV 编码）
+- **v1.5 计划实现**：`WhisperASREngine`（whisper.cpp Rust 绑定）/ `MLXVoiceTTSEngine`（端侧 TTS 模型）
 
-#### 9.1.3 MultimodalFacade 统一入口
+#### 9.1.3 MultimodalFacade 统一入口（v1.3 已实施）
 
-引入 `MultimodalFacade`（`@MainActor`）作为多模态能力的统一入口，承担：
+引入 `MultimodalFacade`（`public actor`，位于 `Aether/Services/Multimodal/MultimodalFacade.swift`）作为多模态能力的统一入口，承担：
 
 - 模型加载调度（按优先级与内存预算加载 VLM / Whisper / SD 之一）
-- 引擎路由（按用户配置选择 ASR / TTS / VLM 实现）
+- 引擎路由（按用户配置选择 ASR / TTS / VLM 实现，支持运行时依赖注入切换）
 - 互斥锁（避免同时加载多个重型模型导致 OOM）
 
 ```swift
-@MainActor final class MultimodalFacade {
-    func generateImage(prompt: String) async throws -> CGImage
-    func transcribe(audio: URL) async throws -> String
-    func synthesize(text: String, config: TTSConfig) async throws -> Data
-    func generateText(prompt: String, images: [CGImage]) -> AsyncStream<String>
+public actor MultimodalFacade {
+    public static let shared = MultimodalFacade()
+    public init()  // v1.4: 默认使用 NativeVisionEngine / NativeASREngine / NativeTTSEngine + 占位 VoiceCloner / ImageGen
+
+    // 引擎切换（依赖注入）
+    public func setVisionEngine(_ engine: VisionInferenceEngine)
+    public func setASREngine(_ engine: ASREngine)
+    public func setTTSEngine(_ engine: TTSEngine)
+    public func setVoiceCloner(_ cloner: VoiceCloner)
+    public func setImageGenEngine(_ engine: ImageGenerationEngine)
+
+    // 引擎状态查询
+    public var visionEngineName: String { get }
+    public var asrEngineName: String { get }
+    public var ttsEngineName: String { get }
+    public var voiceClonerName: String { get }
+    public var imageGenEngineName: String { get }
+
+    // 工具方法
+    public func describeImage(at imagePath: URL, prompt: String) async throws -> String
+    public func transcribeAudio(at audioPath: URL, language: String = "zh") async throws -> String
+    public func synthesizeSpeech(text: String, voiceId: String? = nil) async throws -> Data
+    public func cloneVoice(audioPath: URL, voiceName: String) async throws -> ClonedVoice
+    public func clonedVoices() async -> [ClonedVoice]
+    public func deleteVoice(voiceId: String) async
+    public func generateImage(prompt: String, negativePrompt: String? = nil, width: Int = 512, height: Int = 512, steps: Int = 20, seed: UInt64? = nil) async throws -> CGImage
+
+    // 内存预算
+    public func budgetSnapshot() async -> BudgetSnapshot
 }
 ```
 
-#### 9.1.4 内存预算器全局协调
+#### 9.1.4 内存预算器全局协调（v1.3 已实施）
 
-引入 `MemoryBudgeter`（`@MainActor`）作为全局内存预算器，协调 VLM / Whisper / SD 三个重型模型的加载：
+引入 `MemoryBudget`（`public actor`，位于 `Aether/Services/Multimodal/MemoryBudget.swift`）作为全局内存预算器，协调 VLM / Whisper / SD 三个重型模型的加载：
 
-- 按设备分级配置预算（iPhone ≤ 3GB / iPad ≤ 6GB / Mac ≤ 8GB）
-- 跟踪已加载模型的内存占用
-- 超预算时按优先级卸载最低优先级模型
-- 与 `MultimodalFacade` 协作强制串行加载
+- 按设备能力自动配置总预算（iPhone ≤ 1.5-3GB / iPad ≤ 3GB / Mac ≤ 6GB，详见 `DeviceCapability.recommendedMemoryBudgetMB`）
+- 跟踪已加载模型的内存占用（`reserve(mb:)` / `release(mb:)` / `reset()`）
+- 申请超过剩余额度时抛 `MultimodalError.memoryBudgetExceeded(requestedMB:availableMB:)`
+- 通过 `snapshot()` 返回 `BudgetSnapshot`（total / used / available / peak / utilization）用于 UI 展示
+- `MultimodalFacade.budgetSnapshot()` 暴露给上层
 
 ### 9.2 跨设备协同架构
 

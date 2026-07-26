@@ -110,9 +110,54 @@ pwsh scripts/build-windows.ps1 -Command publish -Configuration Release -Runtime 
 
 ---
 
-## 6. 已知限制
+## 6. 已实现功能（v1.5）
 
+- **会话列表 UI + 设置页 + DPAPI Token 加密**：新增 `ConversationListPage` + `SettingsPage` + 3 个 ViewModel；BFF 配置从硬编码改为 `BffConfigStore` 持久化（DPAPI 加密 Token）。
+- **消息气泡左右区分 + TypingIndicator**：用户消息右对齐 AetherPurple，AI 消息左对齐 LiquidGlass；流式响应时显示三圆点闪烁动画。
+- **Markdown 渲染（Markdig 0.37.0）**：AI 消息用 `RichTextBox` + `FlowDocument` 渲染（支持标题 / 代码块 / 表格 / 任务列表 / 链接 / 加粗斜体）。
+- **i18n 国际化（8 种语言 .resx）**：8 种语言 `.resx` 文件（zh-Hans / en / ja / ko / fr / de / es / zh-Hant），`LanguageService` 管理语言切换。
 - **已集成 Rust DLL（SSE 解析 + 向量数学 + 脱敏）**：通过 `windows/Aether.Windows/Native/` 目录引用 `aether_core_ffi.dll`，CI 在 `windows-build` job 中自动构建并下载到该目录；`AetherNativeBridge` 提供 P/Invoke 桥接（DLL 不存在时安全降级），`AetherApiClient.UseRustSse` 可切换 SSE 解析路径。
 - **已新增 Aether.Windows.Tests xUnit 项目**：`windows/Aether.Windows.Tests/` 提供模型与 API 客户端测试，CI 在 `windows-build` job 中执行 `dotnet test`，`scripts/build-windows.ps1 -Command test` 同样会扫描并运行测试项目。
-- **无 MSIX 打包**：当前仅以 zip 方式发布，未提供 MSIX 应用包安装方案。
 - **支持 win-x64 与 win-arm64**：通过 `RuntimeIdentifiers` 配置两种架构，使用 `build-windows.ps1 -Runtime win-arm64` 指定目标架构（默认 win-x64）。
+
+### 6.1 功能清单
+
+| 功能 | 状态 | 说明 |
+|------|------|------|
+| 会话列表 UI | ✅ | ConversationListPage（加载 / 创建 / 删除 / 置顶） |
+| 设置页 | ✅ | SettingsPage（BFF URL / Token / 模型 / 语言） |
+| Markdown 渲染 | ✅ | Markdig 0.37.0 + RichTextBox + FlowDocument |
+| i18n 国际化 | ✅ | 8 种语言 .resx，LanguageService 切换 |
+| DPAPI Token 加密 | ✅ | BffConfigStore 持久化，System.Security.Cryptography.ProtectedData |
+| 消息气泡左右区分 | ✅ | 用户右对齐 AetherPurple / AI 左对齐 LiquidGlass |
+| TypingIndicator | ✅ | 流式响应三圆点闪烁 |
+| Rust DLL 集成 | ✅ | SSE 解析 + 向量数学 + 脱敏 |
+| 单元测试 | ✅ | Aether.Windows.Tests xUnit |
+| 多架构发布 | ✅ | win-x64 + win-arm64 |
+
+---
+
+## 7. 依赖列表
+
+`windows/Aether.Windows/Aether.Windows.csproj` 关键 NuGet 依赖：
+
+| 包名 | 版本 | 用途 |
+|------|------|------|
+| Markdig | 0.37.0 | Markdown 解析为 FlowDocument，AI 消息渲染（标题 / 代码块 / 表格 / 任务列表 / 链接 / 加粗斜体） |
+| System.Security.Cryptography.ProtectedData | 9.0.0 | DPAPI 加密 BFF Token，本地持久化（BffConfigStore） |
+
+> WPF .NET 8 自带的 `PresentationFramework` / `System.Net.Http` / `System.Text.Json` 等基础库随 `net8.0-windows` TFM 自动引入，无需显式声明。
+
+---
+
+## 8. 已知限制
+
+- **无 MSIX 打包**：当前仅以 zip 方式发布，未提供 MSIX 应用包安装方案。
+- **无端侧 MLX 推理**：未集成 mlx-swift，仅依赖 BFF 代理 LLM 服务。
+- **无多模态**：未实现 NativeVision / ASR / TTS，无可视化 / 语音能力。
+- **无 HealthKit**：Windows 平台无 HealthKit 等价 API，未实现健康洞察 UI。
+- **无 RAG 知识库 UI**：API 已提供 `searchDocuments` 端点，客户端未实现 UI。
+- **无工具调用 UI**：工具调用由 BFF 端执行，客户端无独立 UI。
+- **无离线模式**：依赖 BFF 在线服务，无本地推理 / 缓存。
+- **无本地数据库**：未集成 SQLite / EF Core，无会话本地持久化（除 `BffConfigStore` 外）。
+- **无 watchOS / Widget**：Windows 平台无对应扩展机制。

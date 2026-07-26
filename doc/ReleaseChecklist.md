@@ -55,6 +55,7 @@
   - **Markdown 渲染**：发送一条可触发包含代码块（```swift）、表格、任务列表（- [ ]）、多级标题（#/##/###）的助手回复，验证代码块语法高亮、表格对齐、任务列表勾选状态、标题层级缩进渲染正确
   - **端侧 MLX 模型下载**：进入 设置 → 端侧推理，选择模型（如 Qwen2.5-0.5B-Instruct）开始下载，验证下载进度条更新、中断后重启可断点续传、下载完成自动执行 SHA256 校验；关闭网络后发起对话，验证自动切换为端侧推理并在 UI 标识
   - **HealthKit 授权**：首次进入 设置 → 健康洞察，验证系统弹出 HealthKit 授权弹窗并请求心率 / 睡眠 / 步数读取权限；授权后下拉刷新健康洞察，验证数据读取成功；在对话中验证健康上下文已注入 system prompt（助手可引用近 7 天健康数据）
+  - **端侧多模态 v1.4**（v1.4 新增）：在对话中让助手调用 `describe_image` 工具分析含文字 / 二维码的图片，验证 NativeVisionEngine 返回 OCR 文字与条码 payload；调用 `transcribe_audio` 工具转写中文录音，验证 NativeASREngine 返回识别文字；首次使用 `transcribe_audio` 时系统会弹出语音识别授权对话框；底层 3 个 Native 引擎基于 Apple Vision / Speech / AVSpeechSynthesizer 框架，无需下载外部模型
 
 ### 4.1 构建验证
 - [ ] iOS 构建：`xcodebuild build -destination 'platform=iOS Simulator,name=iPhone 17'` 成功
@@ -62,12 +63,12 @@
 - [ ] 双端构建均无警告（或警告已审查）
 
 ### 4.2 工具数量审计
-- [ ] iOS 工具数：14 个（14 个跨平台工具，无条件注册）
-- [ ] macOS 工具数：25 个（14 跨平台 + 11 macOS 独有 AppleScriptTool/ScreenshotTool/OCRTool/TerminalCommandTool/WindowManagementTool/AppManagementTool/FileOperationTool/FinderTool/SafariControlTool/SystemControlTool/InputAutomationTool）
-- [ ] ToolRegistry.swift 注册数验证：14 个跨平台工具无条件注册，11 个 macOS 独有工具用 `#if os(macOS)` 条件注册
+- [ ] iOS 工具数：18 个（4 原有 + 6 跨平台新增 + 3 快捷指令 + 4 多模态（v1.3）+ ClipboardTool 注册 Read+Write 两项）
+- [ ] macOS 工具数：29 个（18 跨平台 + 11 macOS 独有 AppleScriptTool/ScreenshotTool/OCRTool/TerminalCommandTool/WindowManagementTool/AppManagementTool/FileOperationTool/FinderTool/SafariControlTool/SystemControlTool/InputAutomationTool）
+- [ ] ToolRegistry.swift 注册数验证：18 个跨平台工具无条件注册，11 个 macOS 独有工具用 `#if os(macOS)` 条件注册
 
 ### 4.3 测试规模
-- [ ] UT 用例数：2771
+- [ ] UT 用例数：3314
 - [ ] UIT 用例数：30
 - [ ] iOS UT 运行：`xcodebuild test -destination 'platform=iOS Simulator,name=iPhone 17'` 全部通过（0 skipped，0 failures）
 - [ ] UIT 运行全部通过（0 failures）
@@ -89,8 +90,17 @@
 - [ ] preferredTools 存储仍用英文 name
 
 ### 4.7 代码注释验证
-- [ ] 18 个工具文件有文件级 `///` 注释
+- [ ] 22 个工具文件有文件级 `///` 注释（18 跨平台 + 4 多模态）
 - [ ] ToolRegistry.swift 有注册逻辑注释
+
+### 4.7.1 端侧多模态功能验证（v1.3 + v1.4）
+- [ ] **图像理解**（`describe_image`）：准备一张含文字 / 人脸 / 二维码的图片，对话中让助手调用 `describe_image` 工具，验证 NativeVisionEngine 返回结果含分类 / 人脸数 / 文字 OCR / 条码 payload
+- [ ] **音频转写**（`transcribe_audio`）：录制一段 ≥3 秒的中文音频，让助手调用 `transcribe_audio` 工具，验证 NativeASREngine 返回识别文字
+- [ ] **语音合成**（编程式）：调用 `MultimodalFacade.shared.synthesizeSpeech(text:voiceId:)`，验证返回的 WAV Data 以 `RIFF`/`WAVE` 标识开头，长度 ≥44 字节
+- [ ] **引擎默认使用 Native**：调用 `MultimodalFacade().visionEngineName` / `asrEngineName` / `ttsEngineName`，均返回含 `Native` 关键字
+- [ ] **引擎可切换回 Placeholder**：调用 `setVisionEngine(PlaceholderVisionEngine())` 等接口，验证可切换为占位实现
+- [ ] **内存预算快照**：调用 `facade.budgetSnapshot()`，验证返回 `totalMB / usedMB / availableMB / peakMB` 均为非负值
+- [ ] **NativeEnginesTests 通过**：`xcodebuild test -only-testing:AetherTests/NativeEnginesTests` 24 用例全部通过
 
 ## 4.8 国际化与无障碍审计
 
@@ -138,21 +148,21 @@
 
 ## 4.11 工具数量审计
 
-- [ ] iOS 工具数 = 14（14 个跨平台工具）
-- [ ] macOS 工具数 = 25（14 跨平台 + 11 macOS 独有）
+- [ ] iOS 工具数 = 18（4 原有 + 6 跨平台新增 + 3 快捷指令 + 4 多模态（v1.3）+ ClipboardTool 注册 Read+Write 两项）
+- [ ] macOS 工具数 = 29（18 跨平台 + 11 macOS 独有）
 - [ ] 验证命令：
   ```bash
   # 在 Xcode 中运行 Debug Playground 或在 ChatViewModel 加日志：
   # print("Tools count: \(ToolRegistry.shared.allToolDefs.count)")
   ```
-- [ ] 预期：iOS 14，macOS 25
-- [ ] ToolRegistry 注册逻辑：14 个跨平台工具无条件注册 + 11 个 macOS 工具用 `#if os(macOS)` 条件注册
+- [ ] 预期：iOS 18，macOS 29
+- [ ] ToolRegistry 注册逻辑：18 个跨平台工具无条件注册 + 11 个 macOS 工具用 `#if os(macOS)` 条件注册
 
 ## 4.12 测试规模审计
 
 ### 单元测试（UT）
-- [ ] UT 用例数 = 2771（2771 pass / 0 skip / 0 failures）
-- [ ] UT 文件数 = 157
+- [ ] UT 用例数 = 3314（3314 pass / 0 skip / 0 failures）
+- [ ] UT 文件数 = 190
 - [ ] 验证命令：
   ```bash
   xcodebuild test \
@@ -162,7 +172,7 @@
     -only-testing:AetherTests \
     CODE_SIGNING_ALLOWED=NO 2>&1 | tail -5
   ```
-- [ ] 预期输出包含：`Executed 2771 tests, with 0 failures, 0 skipped`
+- [ ] 预期输出包含：`Executed 3314 tests, with 0 failures, 0 skipped`
 
 ### UI 测试（UIT）
 - [ ] UIT 用例数 = 30（30 pass / 0 skip / 0 failures）
@@ -180,16 +190,23 @@
 
 ## 4.13 文档完整性审计
 
-- [ ] `doc/ARCHITECTURE.md` 存在且章节完整（1-8）
-- [ ] `doc/USAGE.md` 存在且章节完整（1-10）
+- [ ] `doc/ARCHITECTURE.md` 存在且章节完整（1-9，含 9.1 端侧多模态 v1.3+v1.4 已实施章节）
+- [ ] `doc/USAGE.md` 存在且章节完整（1-10，含 4.27 端侧多模态 / 6.5 多模态工具）
 - [ ] `doc/MANUAL_TEST_CHECKLIST.md` 存在且手测项完整
-- [ ] `doc/ReleaseChecklist.md` 存在且 4.1-4.14 审计项完整
+- [ ] `doc/ReleaseChecklist.md` 存在且 4.1-4.21 审计项完整（含 4.7.1 端侧多模态功能验证）
 - [ ] `doc/BFF_DEPLOYMENT.md` 存在且部署步骤完整
-- [ ] `doc/CONTRIBUTING.md` 存在（贡献指南）
-- [ ] `doc/CHANGELOG.md` 存在（变更日志）
-- [ ] `doc/API.md` 存在（API 契约文档）
+- [ ] `doc/CONTRIBUTING.md` 存在（贡献指南，UT 数 3314）
+- [ ] `doc/CHANGELOG.md` 存在（变更日志，含 v1.4.0 条目）
+- [ ] `doc/API.md` 存在（API 契约文档，含第 9 章 MultimodalFacade API 契约）
+- [ ] `doc/ROADMAP.md` 存在（路线图，v1.0-v1.4 标注 ✅）
+- [ ] `doc/MASTER_PLAN.md` 存在（主规划，含 v1.4 实施进度）
+- [ ] `doc/OPTIMIZATION.md` 存在（优化方向，标注 v1.3/v1.4 已实施）
+- [ ] `doc/ANDROID_BUILD.md` 存在（Android 构建指南，含 RAG UI / Health UI / Markdown（Markwon 4.6.2） / i18n（8 种语言 strings.xml） / Room 生产使用（先 Room 后网络） / Rust Redact JNI 暴露）
+- [ ] `doc/WINDOWS_BUILD.md` 存在（Windows 构建指南，含会话列表 UI / 设置页 / Markdown（Markdig 0.37.0） / i18n（8 种语言 .resx） / DPAPI Token 加密 / 消息气泡左右区分 + TypingIndicator）
+- [ ] `doc/DMG_PACKAGING.md` 存在（macOS DMG 打包指南）
 - [ ] `README.md` 详细文档章节含 8 个文档链接
 - [ ] 文档间交叉引用链接全部有效（点击不报 404）
+- [ ] 运行 `bash scripts/check-doc-consistency.sh` 输出 PASS（i18n=888 / tools=29 / tests=3314）
 
 ## 4.14 国际化与无障碍审计
 
@@ -339,6 +356,24 @@
   cd Packages/AetherCore && swift test
   ```
 
+## 4.22 Windows 端验证（v1.5）
+
+- [ ] Windows 端会话列表 UI 验证（ConversationListPage 加载 / 创建 / 删除 / 置顶）
+- [ ] Windows 端设置页验证（BFF URL / Token DPAPI 加密 / 模型选择 / 语言切换）
+- [ ] Windows 端 Markdown 渲染验证（标题 / 代码块 / 表格 / 任务列表）
+- [ ] Windows 端 i18n 验证（8 种语言切换）
+- [ ] Windows 端消息气泡验证（左右区分 + TypingIndicator + 时间戳）
+
+## 4.23 Android 端验证（v1.5）
+
+- [ ] Android 端 RAG 知识库 UI 验证（搜索 / 结果展示 / 空状态）
+- [ ] Android 端 Health UI 验证（日期选择 / 数据展示 / 上传）
+- [ ] Android 端 Rust Redact JNI 验证（redactSafe 回退）
+- [ ] Android 端消息长按菜单验证（复制 / 重发 / 删除）
+- [ ] Android 端 Markdown 渲染验证（标题 / 代码块 / 表格 / 任务列表）
+- [ ] Android 端 i18n 验证（8 种语言切换 + recreate）
+- [ ] Android 端 Room 生产使用验证（离线缓存 / 网络同步 / 失败回退）
+
 ## 5. 提交审核前最终检查
 
 ### 5.1 功能验证
@@ -462,4 +497,5 @@ shasum -a 256 -c Aether-macOS-1.2.0.dmg.sha256
   - **Markdown 渲染**：发送包含代码块 / 表格 / 任务列表 / 多级标题的助手回复，验证渲染正确
   - **端侧 MLX 模型下载**：设置 → 端侧推理中下载模型，验证下载进度、断点续传、SHA256 校验；断网后自动切换端侧推理
   - **HealthKit 授权**：首次进入健康设置请求授权，验证心率 / 睡眠 / 步数读取，验证健康上下文注入 system prompt
+  - **端侧多模态 v1.4**（v1.4 新增）：在对话中让助手调用 `describe_image` 工具分析含文字 / 二维码的图片，调用 `transcribe_audio` 工具转写中文录音；首次使用需在系统弹窗中授权语音识别权限；底层 NativeVisionEngine（Vision 框架）/ NativeASREngine（SFSpeech）/ NativeTTSEngine（AVSpeechSynthesizer）为 Apple 原生实现，无需下载外部模型
 - [ ] 提交审核，等待 Apple 审核反馈（通常 24-48 小时）

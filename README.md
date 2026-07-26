@@ -6,9 +6,9 @@
 
 ## 项目愿景
 
-**v1.0 已完成核心能力交付**：覆盖 MCP 协议接入、长期记忆体系（SwiftData + 语义缓存）、Agent 多步协作编排（AgentOrchestrator / GoalDecomposer）、跨平台 AetherSDK（iOS / macOS / Android / Windows）等基础设施，已发布 v1.0.0 多平台首发版本（详见 [变更日志](doc/CHANGELOG.md)）。
+**v1.4 已完成端侧多模态基线交付**：在 v1.0 核心能力（MCP / 长期记忆 / Agent / AetherSDK）基础上，v1.1 完成智能体增强（MCP Server 反向暴露 / Agent 多步协作 / 插件市场 MVP / 动态星空背景），v1.2 完成设计升级（AnimationTokens / AetherIcons / 响应式布局），v1.3 落地端侧多模态 Phase 1（协议抽象 + 占位实现 + 4 个多模态工具 + 跨平台 OCR），v1.4 替换为 Apple 原生引擎（NativeVisionEngine 基于 Vision / NativeASREngine 基于 SFSpeech / NativeTTSEngine 基于 AVSpeechSynthesizer），三端开箱即用无需外部模型。详见 [变更日志](doc/CHANGELOG.md)。
 
-**远期演进方向（v1.1~v3.0+）**：规划端侧多模态（VLM / Whisper / TTS / SD）、跨设备协作（iCloud / Handoff / visionOS / Web 伴侣）、插件生态（社区市场 / 多 Agent 协作）、智能平台（Apple Intelligence / 本地 RAG / AI Workflow）五大方向，详见 [`doc/MASTER_PLAN.md`](doc/MASTER_PLAN.md)（含 Mermaid 架构图与里程碑规划）。
+**远期演进方向（v1.5~v3.0+）**：规划端侧多模态 Phase 2（MLX-VLM / Whisper.cpp / MLX-Voice / SD Mobile）、跨设备协作（iCloud / Handoff / visionOS / Web 伴侣）、插件生态（社区市场 / 多 Agent 协作）、智能平台（Apple Intelligence / 本地 RAG / AI Workflow）五大方向，详见 [`doc/MASTER_PLAN.md`](doc/MASTER_PLAN.md)（含 Mermaid 架构图与里程碑规划）。
 
 ## 截图
 
@@ -23,11 +23,12 @@
 ## 功能特性
 
 - **流式对话**：基于 SSE 打字机效果，支持 DeepSeek / Qwen / BFF 代理 / 端侧 MLX 四种 Provider，逐 chunk 实时输出。
-- **ReAct 工具调用**：14 个跨平台工具 + 11 个 macOS 独有工具，基于 function calling 循环执行，最大 5 轮，单工具超时 15s 不中断。
+- **ReAct 工具调用**：18 个跨平台工具（含 v1.3 新增 4 个多模态工具：`describe_image` / `transcribe_audio` / `clone_voice` / `generate_image`）+ 11 个 macOS 独有工具，基于 function calling 循环执行，最大 5 轮，单工具超时 15s 不中断。
 - **RAG 知识库**：本地文档导入（PDF / 文本）→ 分块 → 嵌入 → 余弦相似度 topK 检索 → `[1][2]` 编号注入 prompt。
 - **语义缓存**：基于 embedding 余弦相似度（阈值 0.92）匹配历史 query，命中跳过 LLM 请求，减少重复调用。
 - **端侧推理**：MLX 离线模式，设备本地运行 Llama-3.2-1B-Instruct Q4_K_M 量化模型，断网自动切换。
 - **语音合成与识别**：SFSpeechRecognizer 实时语音输入，AVSpeechSynthesizer 朗读 AI 回复，TTS 音色可调节。
+- **端侧多模态**（v1.4）：基于 Apple 原生 Vision / Speech / AVSpeechSynthesizer 实现图像理解（分类 / 人脸 / 矩形 / 文字 / 条码 5 并发请求）、文件级语音识别、PCM/WAV 语音合成，三端开箱即用无需外部模型；通过 `MultimodalFacade` 统一调度，支持 MLX-VLM / Whisper.cpp / MLX-Voice 后续替换。
 - **健康洞察**（iOS）：HealthKit 读取步数 / 心率 / 睡眠，生成中文洞察文本并持久化。
 - **灵动岛 Live Activity**（iOS）：ActivityKit 状态机「思考中 → 回复中 → 完成」。
 - **SmartRouter 智能模型路由**：基于规则与历史成功率在多 Provider 间动态路由，失败自动 Fallback。
@@ -97,7 +98,7 @@ Aether/                     # 主 App（iOS / iPad / macOS）
 AetherWatch/                # watchOS App（TabView：快速对话 / 健康洞察 / 设置）
 AetherWidgets/              # Widget Extension（QuickChat / HealthInsight / RecentConversations）
 CloudflareWorkers/          # BFF 代理层（worker.js + wrangler.toml）
-AetherTests/                # 单元测试（190 文件 / 3314 用例）
+AetherTests/                # 单元测试（190 文件 / 3314 用例，覆盖 Multimodal / Tools / Services 全模块）
 AetherUITests/              # UI 测试（7 文件 / 30 用例）
 ```
 
@@ -126,9 +127,10 @@ AetherUITests/              # UI 测试（7 文件 / 30 用例）
 | 版本 | 预计时间 | 关键交付 |
 |------|----------|----------|
 | v1.1 | 2026-07-24 已发布 | 智能体增强完善（MCP 生态共建 + Agent 多步协作 + 插件市场 MVP + 动态星空背景） |
-| v1.2 | 2027 Q1 | 设计升级（AnimationTokens + AetherIcons + 响应式布局 + 动态星空） |
-| v1.3 | 2027 Q2 | 端侧多模态 Phase 1（VLM 图像理解 + 跨平台 OCR + Whisper ASR） |
-| v1.5 | 2027 Q3 | 端侧多模态 Phase 2（自然 TTS + 语音克隆 + SD Mobile 图像生成） |
+| v1.2 | 2026-07-25 已发布 | 设计升级（AnimationTokens + AetherIcons + 响应式布局 + 动态星空呼吸效果） |
+| v1.3 | 2026-07-25 已发布 | 端侧多模态 Phase 1（协议抽象 + 4 个多模态工具 + 跨平台 OCR + 占位引擎） |
+| v1.4 | 2026-07-25 已发布 | 端侧多模态 Phase 1.5（Apple 原生引擎：NativeVision / NativeASR / NativeTTS 替换占位实现） |
+| v1.5 | 2027 Q3 | 端侧多模态 Phase 2（MLX-VLM + Whisper.cpp + MLX-Voice + SD Mobile 图像生成） |
 | v2.0 | 2027 Q4 | 跨端协作（iCloud 同步 + Handoff + visionOS + Web 伴侣） |
 | v2.5 | 2028 Q1 | 生态扩展（社区插件市场 + 多 Agent 协作 + Android 深化） |
 | v3.0 | 2028 Q2 | 智能平台（Apple Intelligence + 本地 RAG 增强 + AI Workflow） |

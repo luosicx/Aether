@@ -44,6 +44,12 @@ android {
     }
 }
 
+// 排除 JetBrains annotations 的 java5 变体，避免与 annotations:23.0.0 重复类冲突
+// （annotations-java5:17.0.0 由部分依赖（如 Robolectric）传递引入，与 Kotlin stdlib 的 annotations:23.0.0 同名类冲突）
+configurations.all {
+    exclude(group = "org.jetbrains", module = "annotations-java5")
+}
+
 dependencies {
     // Compose BOM
     val composeBom = platform("androidx.compose:compose-bom:2024.09.00")

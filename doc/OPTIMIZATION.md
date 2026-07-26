@@ -109,14 +109,15 @@
 
 ## 4. 远期优化方向
 
-> 以下章节面向 v1.1~v3.0+ 远期演进（详见 `doc/MASTER_PLAN.md`），描述各方向的优化目标与技术路径，**仅规划未实施**。
+> 以下章节面向 v1.5~v3.0+ 远期演进（详见 `doc/MASTER_PLAN.md`），描述各方向的优化目标与技术路径。
+> **v1.3 / v1.4 已落地**：4.1 端侧多模态性能优化的「内存预算器」与「互斥使用」已实施，详见下方说明。
 
 ### 4.1 端侧多模态性能优化方向
 
-- **内存预算器**：全局内存预算器协调 VLM / Whisper / SD 三类大模型同时加载时的内存使用，按设备分级配置（iPhone ≤ 3GB / iPad ≤ 6GB / Mac ≤ 8GB），超预算时按优先级卸载最低优先级模型。
-- **推理加速**：基于 Metal Performance Shaders 与 CoreML 量化推理路径加速 VLM / ASR / TTS 推理，对比 MLX 默认实现实测目标提升 ≥ 30%。
-- **模型量化**：将端侧 VLM / Whisper / SD 模型统一量化到 Q4（INT4）或 Q8（INT8），在精度可接受范围内将内存占用压缩到原模型的 25% / 50%。
-- **互斥使用**：VLM / Whisper / Stable Diffusion 三个重型模型不可同时加载到内存，通过 `MultimodalFacade` 强制串行调度，避免 OOM 导致系统终止。
+- **内存预算器**（v1.3 已实施）：`MemoryBudget`（`public actor`，`Aether/Services/Multimodal/MemoryBudget.swift`）协调 VLM / Whisper / SD 三类大模型同时加载时的内存使用，按 `DeviceCapability` 分级配置总预算（iPhone 1.5-3GB / iPad 3GB / Mac 6GB），通过 `reserve(mb:)` / `release(mb:)` 跟踪已用 / 剩余 / 峰值，超预算时抛 `MultimodalError.memoryBudgetExceeded`。
+- **推理加速**（v1.5 规划）：基于 Metal Performance Shaders 与 CoreML 量化推理路径加速 MLX-VLM / Whisper.cpp / MLX-Voice 推理，对比 MLX 默认实现实测目标提升 ≥ 30%。v1.4 已使用 Apple 原生 Vision / Speech / AVSpeech 框架，零外部模型加载，原生路径已具备低延迟优势。
+- **模型量化**（v1.5 规划）：将端侧 MLX-VLM / Whisper.cpp / MLX-Voice / SD Mobile 模型统一量化到 Q4（INT4）或 Q8（INT8），在精度可接受范围内将内存占用压缩到原模型的 25% / 50%。
+- **互斥使用**（v1.3 已实施）：VLM / Whisper / Stable Diffusion 三个重型模型不可同时加载到内存，通过 `MultimodalFacade` 强制串行调度，避免 OOM 导致系统终止。v1.4 Native 引擎无需加载模型，`isLoaded` 始终为 `true`，进一步降低互斥成本。
 
 ### 4.2 跨设备同步效率优化方向
 

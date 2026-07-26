@@ -129,10 +129,14 @@ buildConfigField("String", "BFF_BASE_URL", "\"https://aether-bff.example.com\"")
 
 ---
 
-## 8. 已知限制与集成状态
+## 8. 已实现功能（v1.5）
 
-- **Rust JNI 已集成**：Android 端已集成 Rust core 的 JNI 桥接（SSE 解析 + 向量数学）。
-  - Kotlin 桥接代码位于 `com.aether.rust` 包：`SseBridge`（SSE 解析）、`VectorMath`（余弦相似度）。
+- **RAG 知识库 UI + Health UI**：新增 `KnowledgeBaseScreen` + `HealthScreen` + 2 个 ViewModel，API 已有的 `searchDocuments` / `uploadHealthSummary` / `getHealthSummary` 端点终于有 UI。
+- **Rust Redact JNI 暴露 + 消息长按菜单**：新增 `Redact.kt`（JNI 桥接 `aether_redact`）+ `jni.rs` 添加 Redact 函数；`ChatScreen` 消息长按弹出复制 / 重发 / 删除菜单。
+- **Markdown 渲染（Markwon 4.6.2）**：AI 消息用 `MarkdownText` Composable 渲染（支持标题 / 代码块 / 表格 / 任务列表 / 链接 / 加粗斜体）。
+- **Room 生产使用 + i18n**：`ConversationRepository` 改为先 Room 后网络模式；8 种语言 `strings.xml`（values / values-en / values-ja / values-ko / values-fr / values-de / values-es / values-zh-rTW）。
+- **Rust JNI 已集成**：Android 端已集成 Rust core 的 JNI 桥接（SSE 解析 + 向量数学 + 脱敏）。
+  - Kotlin 桥接代码位于 `com.aether.rust` 包：`SseBridge`（SSE 解析）、`VectorMath`（余弦相似度）、`Redact`（脱敏）。
   - `.so` 产物由 CI `rust` job 通过 `cargo-ndk` 构建（`aarch64-linux-android` + `x86_64-linux-android`），上传为 artifact `aether-core-android-so`。
   - `android-build` CI job 下载 `.so` 并放入 `android/app/src/main/jniLibs/{arm64-v8a,x86_64}/`，通过 Gradle jniLibs 打包进 APK。
   - `ChatStreamClient` SSE 解析优先走 Rust JNI（`BuildConfig.USE_RUST_SSE = true`），JNI 不可用时自动回退到纯 Kotlin 实现。
@@ -142,4 +146,47 @@ buildConfigField("String", "BFF_BASE_URL", "\"https://aether-bff.example.com\"")
   - `ConversationRepositoryTest`：Room DAO CRUD + 排序 + 级联删除（Room in-memory database）。
   - `SseBridgeTest`：JNI 不可用时的 Kotlin 回退路径。
   - `VectorMathTest`：JNI 不可用时的 `cosineF64Safe` 回退（返回 0.0）。
-- **JNI 在纯 JVM 测试中不可用**：单元测试运行在 JVM（无 `.so`），`SseBridge` / `VectorMath` 的 native 方法不可调用，测试覆盖回退路径而非 native 路径。Native 路径需在真机/模拟器插桩测试中验证。
+
+### 8.1 功能清单
+
+| 功能 | 状态 | 说明 |
+|------|------|------|
+| RAG 知识库 UI | ✅ | KnowledgeBaseScreen（搜索 / 结果展示 / 空状态） |
+| Health UI | ✅ | HealthScreen（日期选择 / 数据展示 / 上传） |
+| Markdown 渲染 | ✅ | Markwon 4.6.2，MarkdownText Composable |
+| i18n 国际化 | ✅ | 8 种语言 strings.xml + recreate Activity |
+| Room 生产使用 | ✅ | ConversationRepository 先 Room 后网络 |
+| Rust Redact JNI | ✅ | Redact.kt + jni.rs，redactSafe 回退 |
+| 消息长按菜单 | ✅ | 复制 / 重发 / 删除 DropdownMenu |
+| Rust JNI 集成 | ✅ | SSE 解析 + 向量数学 + 脱敏 |
+| 单元测试 | ✅ | testDebugUnitTest，5 文件 30+ 用例 |
+
+---
+
+## 9. 依赖列表
+
+`android/app/build.gradle.kts` 关键依赖（除 Kotlin / Compose / Ktor / Room / DataStore / kotlinx.serialization 外，v1.5 新增）：
+
+| 包名 | 版本 | 用途 |
+|------|------|------|
+| io.noties.markwon:core | 4.6.2 | Markwon 核心，Markdown 解析与渲染 |
+| io.noties.markwon:ext-tables | 4.6.2 | 表格语法支持（GFM） |
+| io.noties.markwon:ext-tasklist | 4.6.2 | 任务列表语法支持（`- [ ]` / `- [x]`） |
+| io.noties.markwon:ext-strikethrough | 4.6.2 | 删除线语法支持 |
+| io.noties.markwon:linkify | 4.6.2 | 自动识别链接（Linkify） |
+| io.noties.markwon:syntax-highlight | 4.6.2 | 代码块语法高亮（基于 Prism4j） |
+
+> Kotlin / Compose BOM / Room / Ktor / DataStore / kotlinx.serialization 等基础依赖随 `android/app/build.gradle.kts` 配置自动引入，详见该文件。
+
+---
+
+## 10. 已知限制与未开放功能
+
+- **无端侧 MLX 推理**：Rust FFI `#[cfg]` 排除 Android，仅依赖 BFF 代理 LLM 服务。
+- **无多模态**：未实现 NativeVision / ASR / TTS，无可视化 / 语音能力（`RECORD_AUDIO` 权限已声明但未使用）。
+- **无 Health Connect 集成**：HealthScreen 仅展示 BFF 返回数据，未对接 Android Health Connect。
+- **无 watchOS / Widget**：Android 平台无对应扩展机制。
+- **JNI 在纯 JVM 测试中不可用**：单元测试运行在 JVM（无 `.so`），`SseBridge` / `VectorMath` / `Redact` 的 native 方法不可调用，测试覆盖回退路径而非 native 路径。Native 路径需在真机 / 模拟器插桩测试中验证。
+- **无工具调用 UI**：工具调用由 BFF 端执行，客户端无独立 UI。
+- **无离线模式**：依赖 BFF 在线服务（Room 仅缓存会话列表，消息流仍需在线）。
+- **无 UI 自动化测试**：未集成 Espresso / Compose UI Test。

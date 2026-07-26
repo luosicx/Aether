@@ -14,6 +14,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
 using System.Resources;
+using System.Runtime.CompilerServices;
 
 namespace Aether.Windows.Properties;
 
