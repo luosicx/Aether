@@ -3823,14 +3823,14 @@
 | Windows 端构建（38.1） | Windows 10+ 真机或虚拟机 | .NET 8 SDK + PowerShell 7+，支持 win-x64 / win-arm64 |
 | Windows 端基础对话（38.2） | Windows 10+ 真机或虚拟机 | 需部署 BFF 并配置 X-BFF-Token；v1.5 起 baseUrl 已迁移至 BffConfigStore（DPAPI 加密）|
 | Windows 端 Rust P/Invoke（38.4） | Windows 10+ 真机或虚拟机 | 需 Native/aether_core_ffi.dll（CI 构建），DLL 不存在时验证安全降级 |
-| Windows 端单测（38.6） | Windows 10+ 真机或虚拟机 | `dotnet test` xUnit 2 文件，无需 BFF |
+| Windows 端单测（38.6） | Windows 10+ 真机或虚拟机 | `dotnet test` xUnit 7 文件 72 用例，无需 BFF |
 | Android 端构建（39.1） | Android 真机（API 29+）或模拟器 | JDK 17 + Android SDK 35 + Gradle 8.7（wrapper 已提交） |
 | Android 端会话列表 UI（39.3） | Android 真机或模拟器 | 需部署 BFF 并配置 X-BFF-Token |
 | Android 端聊天 UI（39.4） | Android 真机或模拟器 | 需部署 BFF；验证流式光标 `▌` 与 TypingIndicator |
 | Android 端设置 UI（39.5） | Android 真机或模拟器 | 验证 BFF URL / Token 加密存储 / 模型选择 / 主题色 |
 | Android 端 Rust JNI（39.7） | Android 真机或模拟器 | 需 jniLibs/{arm64-v8a,x86_64}/libaether_core_ffi.so（CI 构建） |
 | Android 端 Room 数据库（39.8） | Android 真机或模拟器 | v1.5 起已生产使用，Repository 先 Room 后网络（详见 39.20） |
-| Android 端单测（39.11） | 任意系统（JVM） | `./gradlew testDebugUnitTest`，5 文件 30 用例，JNI 在纯 JVM 不可用测试覆盖回退路径 |
+| Android 端单测（39.11） | 任意系统（JVM） | `./gradlew testDebugUnitTest`，12 文件 95 用例，JNI 在纯 JVM 不可用测试覆盖回退路径 |
 | Windows 端 v1.5 新功能（38.8-38.12） | Windows 10+ 真机或虚拟机 | 会话列表 / 设置页 / Markdown / i18n / 消息气泡；i18n 切换无需重启，DPAPI 加密需 Windows 用户态 |
 | Android 端 v1.5 新功能（39.14-39.20） | Android 真机或模拟器 | RAG / Health / Rust Redact / 消息长按 / Markdown / i18n / Room 生产；JNI 需真机或模拟器 |
 

@@ -30,6 +30,28 @@
 | `widget_health_insight.png` | iOS | HealthInsight Widget（桌面健康洞察） | 待补充（需 Widget target） |
 | `widget_recent_conversations.png` | iOS | RecentConversations Widget（桌面最近会话） | 待补充（需 Widget target） |
 
+### Windows 端截图（v1.5.0，待补充）
+
+v1.5.0 已交付 Windows 端（WPF .NET 8），但截图尚未补充。预期截图清单：
+
+| 文件名 | 平台 | 内容 | 状态 |
+|--------|------|------|------|
+| `windows_chat_main.png` | Windows | 主对话页（流式回复 + Markdown 渲染） | 待补充 |
+| `windows_settings.png` | Windows | 设置页（BFF Token / 模型 / 语言） | 待补充 |
+| `windows_conversation_list.png` | Windows | 会话列表页 | 待补充 |
+
+### Android 端截图（v1.5.0，待补充）
+
+v1.5.0 已交付 Android 端（Kotlin + Jetpack Compose），但截图尚未补充。预期截图清单：
+
+| 文件名 | 平台 | 内容 | 状态 |
+|--------|------|------|------|
+| `android_chat_main.png` | Android | 主对话页（流式回复 + Markdown 渲染） | 待补充 |
+| `android_settings.png` | Android | 设置页（BFF Token / 模型 / 语言） | 待补充 |
+| `android_rag_search.png` | Android | 知识库检索 | 待补充 |
+| `android_health_insight.png` | Android | 健康洞察 | 待补充 |
+| `android_conversation_list.png` | Android | 会话列表页 | 待补充 |
+
 ## 截图方法
 
 ### iOS 模拟器截图

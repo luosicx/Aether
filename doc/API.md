@@ -573,7 +573,7 @@ public protocol VisionInferenceEngine: Sendable {
 |------|------|------|
 | `PlaceholderVisionEngine` | v1.3 | 占位，未加载抛 `engineNotLoaded`，加载后返回提示字符串 |
 | `NativeVisionEngine` | v1.4 | 基于 Vision 框架 5 个请求并发（分类 / 人脸 / 矩形 / 文字 / 条码），`isLoaded` 始终为 `true`，`loadedModelName = "Apple Vision (Native)"`，`loadModel` / `unloadModel` 为 no-op |
-| `MLXVisionEngine` | v1.5 计划 | 基于 MLX-VLM（Qwen2-VL-2B Q4 等），`MLXInferenceEngine.generate(prompt:images:)` |
+| `MLXVisionEngine` | v1.6 计划 | 基于 MLX-VLM（Qwen2-VL-2B Q4 等），`MLXInferenceEngine.generate(prompt:images:)` |
 
 #### 9.1.2 ASREngine（语音识别）
 
@@ -591,7 +591,7 @@ public protocol ASREngine: Sendable {
 |------|------|------|
 | `PlaceholderASREngine` | v1.3 | 占位，`name = "PlaceholderASR"`，`requiresNetwork = false`，返回提示字符串 |
 | `NativeASREngine` | v1.4 | `name = "NativeASR (SFSpeechRecognizer)"`，`requiresNetwork = true`，基于 `SFSpeechURLRecognitionRequest` 文件识别；支持 wav / caf / m4a / mp3 / aac；CI 环境识别器不可用抛 `asrRecognitionFailed` |
-| `WhisperASREngine` | v1.5 计划 | 基于 whisper.cpp Rust 绑定，离线识别 |
+| `WhisperASREngine` | v1.6 计划 | 基于 whisper.cpp Rust 绑定，离线识别 |
 
 #### 9.1.3 TTSEngine（语音合成）
 
@@ -608,7 +608,7 @@ public protocol TTSEngine: Sendable {
 |------|------|------|
 | `PlaceholderTTSEngine` | v1.3 | 占位，`name = "PlaceholderTTS"`，返回空 `Data()` |
 | `NativeTTSEngine` | v1.4 | `name = "NativeTTS (AVSpeechSynthesizer)"`，`isLoaded = true`，基于 `AVSpeechSynthesizer.write(_:toBufferCallback:)` 收集 PCM Buffer 编码为 WAV（44 字节 RIFF/WAVE 头）；CI 环境返回最小空 WAV 头；30s 超时保护 |
-| `MLXVoiceTTSEngine` | v1.5 计划 | 基于 MLX-Voice（Kokoro/Matcha-TTS） |
+| `MLXVoiceTTSEngine` | v1.6 计划 | 基于 MLX-Voice（Kokoro/Matcha-TTS） |
 
 #### 9.1.4 VoiceCloner（语音克隆）
 
@@ -626,7 +626,7 @@ public protocol VoiceCloner: Sendable {
 | 实现 | 版本 | 说明 |
 |------|------|------|
 | `PlaceholderVoiceCloner` | v1.3 | 占位，未加载抛 `engineNotLoaded`；克隆返回 `embeddingBase64 = ""` 的占位音色 |
-| `OpenVoiceCloner` | v1.5 计划 | 基于 OpenVoice v2 蒸馏模型，提取音色嵌入存 Keychain |
+| `OpenVoiceCloner` | v1.6 计划 | 基于 OpenVoice v2 蒸馏模型，提取音色嵌入存 Keychain |
 
 `ClonedVoice` 结构：
 
@@ -662,7 +662,7 @@ public protocol ImageGenerationEngine: Sendable {
 | 实现 | 版本 | 说明 |
 |------|------|------|
 | `PlaceholderImageGenerationEngine` | v1.3 | 占位，`name = "PlaceholderImageGen"`，`isLoaded = false`，`generate` 抛 `platformUnsupported` |
-| `SDMobileEngine` | v1.5 计划 | 基于 Stable Diffusion Mobile / CoreML 量化 |
+| `SDMobileEngine` | v1.6 计划 | 基于 Stable Diffusion Mobile / CoreML 量化 |
 
 ### 9.2 MultimodalFacade 公共 API
 

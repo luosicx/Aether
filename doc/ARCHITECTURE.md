@@ -1742,7 +1742,7 @@ sequenceDiagram
 | **Windows 端技术栈** | | | |
 | WPF .NET 8 | `windows/Aether.Windows/Aether.Windows.csproj`（`net8.0-windows`） | MVVM + XAML 桌面 UI 框架，`INotifyPropertyChanged` 数据绑定 | .NET 8 LTS / Windows 10 1809+ |
 | HttpClient | `windows/Aether.Windows/Services/AetherApiClient.cs` | BFF HTTP 客户端 + SSE 流式（`IAsyncEnumerable<string>`） | .NET 8 内置 |
-| Markdig | `windows/Aether.Windows/Services/MarkdownRenderer.cs` | Markdown 解析 → WPF `FlowDocument` | Markdig 0.36+ |
+| Markdig | `windows/Aether.Windows/Services/MarkdownRenderer.cs` | Markdown 解析 → WPF `FlowDocument` | Markdig 0.37.0 |
 | DPAPI（ProtectedData） | `windows/Aether.Windows/Services/BffConfigStore.cs` | UserToken 加密（`CurrentUser` 范围，Base64 存储） | `System.Security.Cryptography.ProtectedData` NuGet |
 | P/Invoke | `windows/Aether.Windows/Native/AetherNativeBridge.cs` | 调用 `aether_core_ffi.dll` C ABI（`aether_sse_parse_chunk` / `aether_cosine_f32` / `aether_redact` / `aether_free_string`） | .NET 8 内置 |
 | .resx 多语言资源 | `windows/Aether.Windows/Properties/Strings.Designer.cs` + 8 `.resx` | 8 种语言（zh-Hans / zh-Hant / en / ja / ko / fr / de / es），`LanguageService` 动态切换 | .NET 8 内置 |
@@ -2231,7 +2231,7 @@ README.md
 ## 9. 架构演进方向
 
 > 本章节面向 v1.5~v3.0+ 远期演进（详见 `doc/MASTER_PLAN.md`），描述各方向的架构扩展点与关键技术决策。
-> **v1.3 / v1.4 已落地**：9.1 端侧多模态架构（协议抽象 + Apple 原生引擎）已实施，下方原规划保留作为 v1.5 MLX 集成参考。
+> **v1.3 / v1.4 已落地**：9.1 端侧多模态架构（协议抽象 + Apple 原生引擎）已实施，下方原规划保留作为 v1.6 MLX 集成参考。
 
 ### 9.1 端侧多模态架构（v1.3 + v1.4 已实施）
 
@@ -2249,10 +2249,10 @@ README.md
   - `NativeVisionEngine`：基于 Vision 框架组合 5 个请求并发执行（VNClassifyImageRequest / VNDetectFaceRectanglesRequest / VNDetectRectanglesRequest / VNRecognizeTextRequest / VNDetectBarcodesRequest），按 prompt 关键字聚焦返回
   - `NativeASREngine`：基于 `SFSpeechURLRecognitionRequest` 文件级识别（支持 wav/caf/m4a/mp3/aac；CI 环境识别器不可用时抛 `asrRecognitionFailed`）
   - `NativeTTSEngine`：基于 `AVSpeechSynthesizer.write` 收集 PCM Buffer 编码为 WAV（44 字节 RIFF/WAVE 头；CI 环境返回最小空 WAV 头；30s 超时保护）
-  - `MultimodalFacade.init()` 默认从 `PlaceholderXxx` 切换为 `NativeXxx`（`voiceCloner` / `imageGenEngine` 仍为占位，待 v1.5）
-- **v1.5 规划**：MLX-VLM / Whisper.cpp / MLX-Voice / OpenVoice v2 / SD Mobile 集成，Native 引擎作为 MLX 路径不可用时的兜底
+  - `MultimodalFacade.init()` 默认从 `PlaceholderXxx` 切换为 `NativeXxx`（`voiceCloner` / `imageGenEngine` 仍为占位，待 v1.6）
+- **v1.6 规划**：MLX-VLM / Whisper.cpp / MLX-Voice / OpenVoice v2 / SD Mobile 集成，Native 引擎作为 MLX 路径不可用时的兜底
 
-#### 9.1.1 VLM 集成点（v1.5 规划）
+#### 9.1.1 VLM 集成点（v1.6 规划）
 
 扩展现有 `MLXInferenceEngine`（位于 `Services/OnDevice/MLXInferenceEngine.swift`），新增 `generate(prompt:images:)` 接口支持图像输入：
 
@@ -2266,7 +2266,7 @@ extension MLXInferenceEngine {
 - 通过 `OfflineLLMProvider` 适配为 `LLMProvider` 协议，与现有 ChatViewModel 流式通路无缝衔接。
 - v1.4 临时方案：`NativeVisionEngine` 通过 Vision 框架的 5 个请求提供基础图像理解（分类 / 人脸 / 矩形 / 文字 / 条码），置信度 <0.6 时可作为 MLX-VLM 路径的兜底。
 
-#### 9.1.2 ASR / TTS 引擎抽象（v1.3 已实施 / v1.5 增强）
+#### 9.1.2 ASR / TTS 引擎抽象（v1.3 已实施 / v1.6 增强）
 
 引入 `ASREngine` 与 `TTSEngine` 协议，解耦具体实现（位于 `Aether/Services/Multimodal/ASREngine.swift` / `TTSEngine.swift`）：
 
@@ -2289,7 +2289,7 @@ public protocol TTSEngine: Sendable {
 
 - **v1.3 占位实现**：`PlaceholderASREngine` / `PlaceholderTTSEngine`（返回提示信息或空 Data）
 - **v1.4 Native 实现**：`NativeASREngine`（基于 `SFSpeechURLRecognitionRequest` 文件识别）/ `NativeTTSEngine`（基于 `AVSpeechSynthesizer.write` PCM 收集 + WAV 编码）
-- **v1.5 计划实现**：`WhisperASREngine`（whisper.cpp Rust 绑定）/ `MLXVoiceTTSEngine`（端侧 TTS 模型）
+- **v1.6 计划实现**：`WhisperASREngine`（whisper.cpp Rust 绑定）/ `MLXVoiceTTSEngine`（端侧 TTS 模型）
 
 #### 9.1.3 MultimodalFacade 统一入口（v1.3 已实施）
 

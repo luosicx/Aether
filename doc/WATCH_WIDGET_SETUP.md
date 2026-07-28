@@ -2,6 +2,8 @@
 
 本指南说明 Aether 的 watchOS App（`AetherWatch`）与 Widget Extension（`AetherWidgets`）的构建、调试与已知限制。
 
+> **平台说明**：Watch App 与 Widget Extension 为 Apple 平台独有（watchOS / iOS / iPadOS / macOS），基于 SwiftUI + WidgetKit + AppIntents 实现。Windows 与 Android 平台不提供等价能力，未来不计划移植。本文档仅适用于 Apple 平台开发。
+
 > **重要**：Watch App 与 Widget Extension 的 target 已存在于 `Aether.xcodeproj/project.pbxproj` 中，对应的 scheme（`AetherWatch` / `AetherWidgets`）也已生成，**无需在 Xcode 中手动创建 target**。本指南仅关注构建与调试。
 
 ---
