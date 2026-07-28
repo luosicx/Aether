@@ -1,6 +1,6 @@
 # Aether BFF 跨平台业务网关
 
-基于 Cloudflare Workers 的跨平台业务网关，统一为 iOS / Android / Web 端提供：
+基于 Cloudflare Workers 的跨平台业务网关，统一为 iOS / macOS / Windows / Android / Web 端提供：
 
 - 流式聊天（SSE，集成会话上下文 / 长期记忆 / RAG 知识库）
 - 会话与消息管理（CRUD + 反馈）
@@ -58,6 +58,18 @@ CloudflareWorkers/
         ├── rag.js             # 文档检索 / 上传
         └── health.js          # 健康摘要上报 / 查询
 ```
+
+## 客户端实现
+
+BFF 对外暴露统一的 HTTP / SSE 契约，三端客户端各自实现 BFF 代理调用：
+
+| 平台 | 客户端实现 | 路径 |
+|------|-----------|------|
+| iOS / macOS | `BFFProxyClient.swift` | `Aether/`（SwiftUI 共用代码库） |
+| Windows | `AetherApiClient.cs` | [`../windows/Aether.Windows/Services/AetherApiClient.cs`](../windows/Aether.Windows/Services/AetherApiClient.cs) |
+| Android | `AetherApi.kt` | [`../android/app/src/main/java/com/aether/app/data/api/AetherApi.kt`](../android/app/src/main/java/com/aether/app/data/api/AetherApi.kt) |
+
+三端均仅持 `X-BFF-Token`，不持有上游 LLM API Key；通过 BFF 统一鉴权、限流并转发至 DeepSeek / 通义千问等上游模型。
 
 ## 部署步骤
 

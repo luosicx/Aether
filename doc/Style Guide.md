@@ -1,5 +1,13 @@
 基于“Aether（以太）”这个充满哲学与科技感的名字，我为你构思了一套完整的视觉方案。核心是围绕 **“液态玻璃（Liquid Glass）”** 和 **“深邃太空”** 的意象展开，让App看起来像是系统原生功能的一种自然延伸，既高级又神秘。
 
+> **跨平台覆盖说明**：本指南覆盖 Aether 全平台设计规范。各端技术栈与 Liquid Glass 实现方式如下：
+>
+> - **iOS / macOS**：SwiftUI + Liquid Glass（苹果 WWDC25 原生设计语言，本文档主体基准）
+> - **Windows**：WPF .NET 8 + Liquid Glass 风格适配（详见末章「跨平台设计规范」）
+> - **Android**：Jetpack Compose Material3 + Liquid Glass 风格适配（详见末章「跨平台设计规范」）
+>
+> 所有平台共享同一套品牌色彩 token（AetherPurple / ElectricBlue / LiquidGlass / DeepSpace 等），仅渲染框架与字体系统按平台特性差异化实现。
+
 ---
 
 ### ✨ 品牌视觉理念：无形、无处不在、智能
@@ -57,6 +65,22 @@
 > | `Color.duskGray` | 暮色灰（系统色 fallback） |
 
 > **aetherGradient 使用说明**：品牌主渐变 `Color.aetherGradient` 已封装为 `LinearGradient(colors: [aetherPurple, electricBlue], startPoint: .topLeading, endPoint: .bottomTrailing)`，在关键 UI 元素（如开屏 Logo、主按钮、标题强调）上直接使用 `.background(Color.aetherGradient)` 即可获得紫→电光蓝的能量感渐变。
+
+> **跨平台 Token 映射**：以上 Design Token 在各端的落地位置如下，色彩语义保持一致，仅按平台特性转换为对应的颜色类型（SwiftUI `Color` / WPF `SolidColorBrush` / Compose `Color`）。
+>
+> | Token | iOS / macOS（SwiftUI） | Windows（WPF） | Android（Compose） |
+> |-------|------------------------|----------------|--------------------|
+> | `aetherPurple` | `Color.aetherPurple` | `DesignTokens.AetherPurple` | `DesignTokens.AetherPurple` |
+> | `electricBlue` | `Color.electricBlue` | `DesignTokens.ElectricBlue` | `DesignTokens.ElectricBlue` |
+> | `liquidGlass` | `Color.liquidGlass` | `DesignTokens.LiquidGlass` | `DesignTokens.LiquidGlass` |
+> | `deepSpace` | `Color.deepSpace` | `DesignTokens.DeepSpace` | `DesignTokens.DeepSpace` |
+> | `starlight` | `Color.starlight` | `DesignTokens.Starlight` | `DesignTokens.Starlight` |
+> | `nebulaGlow` | `Color.nebulaGlow` | `DesignTokens.NebulaGlow` | `DesignTokens.NebulaGlow` |
+> | `aetherGradient` | `Color.aetherGradient`（LinearGradient） | `DesignTokens.AetherGradient`（LinearBrush） | `DesignTokens.AetherGradient`（Brush） |
+>
+> - iOS / macOS：`Packages/AetherCore/Sources/AetherDesign/ColorTokens.swift`
+> - Windows：`windows/Aether.Windows/Design/DesignTokens.cs`
+> - Android：`android/app/src/main/java/com/aether/ui/theme/DesignTokens.kt`
 
 #### 字体系统
 *   **西文**：使用无衬线字体，强调清晰与自信。
@@ -150,3 +174,60 @@ Widget 遵循 WidgetKit 设计规范，保持 Aether 视觉一致性。
 - **圆角**：使用系统 Widget 圆角（不使用 Aether CornerRadius Token）
 - **字体**：使用系统语义字体（`.font(.headline)` / `.font(.caption2)`）
 - **强调色**：QuickChatWidget 发送按钮使用 `aetherGradient`
+
+---
+
+### 🪟 跨平台设计规范
+
+Aether v1.5.0 已交付 Windows + Android 双端，与 Apple 平台共享同一套品牌视觉语言（液态玻璃 + 深邃太空 + 紫蓝渐变），但按平台特性差异化实现渲染框架与控件系统。
+
+#### Windows 端（WPF .NET 8）
+
+Windows 端采用 WPF + .NET 8 实现，通过自定义控件样式与 `AcrylicBrush` 模拟 Liquid Glass 质感。
+
+- **设计 Token**：`windows/Aether.Windows/Design/DesignTokens.cs`
+    - 定义 `AetherPurple` / `ElectricBlue` / `LiquidGlass` / `DeepSpace` / `Starlight` / `NebulaGlow` 等 `SolidColorBrush`，与 iOS 端 `ColorTokens.swift` 一一对应
+    - 定义 `AetherGradient`（`LinearGradientBrush`，紫→电光蓝，左上→右下）
+    - 圆角 token：`CornerRadius`（Small=12 / Medium=16 / Large=24 / Pill=999），与 iOS 端 `CornerRadius` 完全对齐
+- **字体系统**
+    - 系统字体：**Segoe UI**（西文），中文 fallback 至 `Microsoft YaHei UI`
+    - 标题字号阶梯：24 / 20 / 18 / 16 / 14 / 12pt
+    - 正文：14pt Regular；标题：20pt Semibold
+- **Markdown 渲染**：使用 **Markdig** 解析 → 转 `FlowDocument` 渲染
+    - 标题：H1=24pt / H2=20pt / H3=18pt / H4=16pt，AetherPurple 强调色
+    - 代码块：深色背景（DeepSpace）+ 8px 圆角 + `Consolas` 等宽字体 + Starlight 文字色
+    - 表格：LiquidGlass 半透明背景 + AetherPurple 表头
+    - 引用块：AetherPurple 左边框（3px）+ LiquidGlass 背景
+    - 链接：ElectricBlue 文字 + 下划线
+- **控件系统**：Material Design 风格的自定义控件
+    - `Button` / `TextBox` / `ListView` / `Border` 均通过 `Style` 覆盖，统一 `CornerRadius` 圆角
+    - 卡片：`Border` + `CornerRadius=16` + `Background=LiquidGlass` + 轻微阴影
+    - 输入框：圆角 + 聚焦时 AetherPurple 边框光效
+    - 按钮：主按钮 `AetherGradient` 背景 + 白字；次按钮 `LiquidGlass` 背景 + AetherPurple 字
+
+#### Android 端（Kotlin + Jetpack Compose）
+
+Android 端采用 Kotlin + Jetpack Compose + Material3 实现，通过主题覆盖将 Material3 控件染色为 Aether 品牌色。
+
+- **设计 Token**：`android/app/src/main/java/com/aether/ui/theme/DesignTokens.kt`
+    - 定义 `AetherPurple` / `ElectricBlue` / `LiquidGlass` / `DeepSpace` / `Starlight` / `NebulaGlow` 等 `Color` 常量
+    - 定义 `AetherGradient`（`Brush.linearGradient`，紫→电光蓝）
+    - 圆角 token：`CornerRadius`（Small=12.dp / Medium=16.dp / Large=24.dp / Pill=999.dp）
+- **字体系统**
+    - 系统字体：**Roboto**（西文），中文 fallback 至系统默认（Noto Sans CJK / PingFang）
+    - 标题使用 **Material3 TypeScale**：`displayLarge` / `headlineLarge` / `titleLarge` / `bodyLarge` 等
+    - 不自定义字体文件，保证与 Android 系统视觉一致性
+- **Markdown 渲染**：使用 **Markwon 4.6.2** + 自定义 `AetherThemePlugin`
+    - `AetherThemePlugin` 自定义主题：
+        - 链接文字 = `ElectricBlue`
+        - 行内代码文字 = `Starlight`，背景 = `LiquidGlass`
+        - 代码块背景 = `DeepSpace`，文字 = `Starlight`
+        - 引用块左边框 = `AetherPurple`，背景 = `LiquidGlass`
+        - 表格背景 = `LiquidGlass`，表头文字 = `AetherPurple`
+    - 通过 `Markwon.create(...)` 注册插件，渲染至 `TextView` 或 Compose `AndroidView` 包装
+- **控件系统**：Material3 原生控件 + Aether 主题色覆盖
+    - `Card` / `Button` / `OutlinedTextField` / `LazyColumn` / `TopAppBar`
+    - 通过 `MaterialTheme(colorScheme = ...)` 覆盖 `primary` = AetherPurple、`secondary` = ElectricBlue、`surface` = LiquidGlass、`background` = DeepSpace
+    - 卡片：`Card` + `shape = RoundedCornerShape(16.dp)` + `containerColor = LiquidGlass`
+    - 主按钮：`Button` + `brush = AetherGradient`（通过 `Modifier.background`）
+    - 输入框：`OutlinedTextField` + 聚焦时 `cursorColor` 与 `focusedBorderColor` = AetherPurple

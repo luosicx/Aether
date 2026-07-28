@@ -256,8 +256,8 @@
 | v1.4 ✅ | 端侧多模态 Phase 1.5 | NativeVisionEngine / NativeASREngine / NativeTTSEngine 替换占位实现 | 2026-07-25 已发布 |
 | v1.5 ✅ | 跨平台扩展 | Windows WPF .NET 8 + Android Kotlin/Compose + Rust JNI 暴露 | 2026-07-26 已发布 |
 | v1.6 | 端侧多模态 Phase 2 | MLX-VLM、Whisper.cpp、MLX-Voice、SD Mobile 图像生成 | 2027 Q3 |
-| v2.0 | 跨端协作 | iCloud 同步、Web 伴侣、团队协作 | 2027 Q4 |
-| v2.5 | 生态扩展 | 社区插件市场、多 Agent 协作、Android 深化 | 2028 Q1 |
+| v2.0 | 跨端协作 | iCloud 同步、Web 伴侣、团队协作、Windows ARM64 工具链 | 2027 Q4 |
+| v2.5 | 生态扩展 | 社区插件市场、多 Agent 协作、Android 深化（端侧 MLX/NNAPI 推理） | 2028 Q1 |
 | v3.0 | 生态平台 | SDK、插件市场、visionOS | 2028 Q2 |
 | v3.0+ | 远期探索 | 隐私计算、实时协作、多模态记忆 | 2028 下半年 |
 

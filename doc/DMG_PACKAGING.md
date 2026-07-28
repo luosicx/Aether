@@ -2,6 +2,17 @@
 
 本指南介绍如何使用 `scripts/build-dmg.sh` 脚本为 Aether（以太）构建 macOS `.dmg` 安装包，涵盖无签名本地测试与签名 + 公证公开分发两种模式。
 
+> **平台说明**：本文档仅覆盖 **macOS 独有**的 `.dmg` 打包方式。Aether 在各平台的分发格式如下：
+>
+> | 平台 | 分发格式 | 参考文档 |
+> |------|----------|----------|
+> | macOS | `.dmg`（本文档） | `doc/DMG_PACKAGING.md` |
+> | Windows | `.exe` + `aether_core_ffi.dll` | `doc/WINDOWS_BUILD.md` |
+> | Android | `.apk` | `doc/ANDROID_BUILD.md` |
+> | iOS | TestFlight / App Store（通过 Xcode Organizer 上传） | Xcode Organizer 内置流程 |
+>
+> 跨平台 CI 集成详见 `.github/workflows/release.yml`。
+
 ## 项目信息
 
 | 项 | 值 |

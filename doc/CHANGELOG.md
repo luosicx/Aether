@@ -42,7 +42,7 @@
 #### Tests
 - **测试规模**：UT 从 3314 增至 3481（+167 用例：iOS/macOS 3314 基线 + Windows 72 + Android 95）。
 - **Windows 测试**：新增 `Aether.Windows.Tests` 项目（xUnit），覆盖 `ConversationListViewModelTest` / `SettingsViewModelTest` / `MarkdownRendererTest` / `LanguageServiceTest` / `BffConfigStoreTest` / `AetherApiClientTest` / `ModelsTest` 共 72 用例。
-- **Android 测试**：新增 9 个测试文件（JUnit + MockK），覆盖 `LanguageManagerTest` / `MarkdownTextTest` / `ChatViewModelDeleteTest` / `KnowledgeBaseViewModelTest` / `HealthViewModelTest` / `ConversationRepositoryRoomTest` / `RedactTest` / `VectorMathTest` / `SseBridgeTest` / `ModelsTest` / `ConversationRepositoryTest` / `BffConfigTest` 共 95 用例。
+- **Android 测试**：新增 12 个测试文件（JUnit + Robolectric），覆盖 `LanguageManagerTest` / `MarkdownTextTest` / `ChatViewModelDeleteTest` / `KnowledgeBaseViewModelTest` / `HealthViewModelTest` / `ConversationRepositoryRoomTest` / `RedactTest` / `VectorMathTest` / `SseBridgeTest` / `ModelsTest` / `ConversationRepositoryTest` / `BffConfigTest` 共 95 用例。
 
 #### Release
 - **PR #40**：squash merge 到 main，CI run #30188559217 全部 14 个 job 通过：

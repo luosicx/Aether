@@ -257,7 +257,7 @@ graph LR
 
 #### 3.1.1 背景与目标
 
-将 iOS 与 macOS 拆分为独立 target，提取平台无关的公共组件库（AetherCore Swift Package），并扩展到 Android（Kotlin/Compose）与 Windows（C#/WinUI 3），通过增强的 BFF 统一业务逻辑与数据层。
+将 iOS 与 macOS 拆分为独立 target，提取平台无关的公共组件库（AetherCore Swift Package），并扩展到 Android（Kotlin/Compose）与 Windows（WPF .NET 8，v1.5 已交付），通过增强的 BFF 统一业务逻辑与数据层。
 
 **架构策略**：采用"BFF 共享 + 各平台原生 UI"。Apple 平台通过 Swift Package 共享核心逻辑（AetherCore），iOS 与 macOS 拆为独立 target；Android 与 Windows 各自原生实现 UI，通过 BFF（Cloudflare Workers）共享 LLM 代理、RAG 检索、记忆管理等业务逻辑。数据层抽象为仓储协议，各平台独立实现持久化。设计系统提取为平台无关 Token（JSON），各平台编写原生映射器。
 
@@ -267,7 +267,7 @@ graph LR
 - iOS App：SwiftUI + SwiftData
 - macOS App：SwiftUI + AppKit 增强
 - Android App：Kotlin + Jetpack Compose + Room
-- Windows App：C# + WinUI 3 + EF Core
+- Windows App：WPF .NET 8（v1.5 已交付，从最初规划的 WinUI 3 调整为 WPF）
 - 跨平台 BFF：Cloudflare Workers（TypeScript）+ D1（SQLite）+ R2（对象存储）+ KV（配置缓存）
 - 设计 Token：JSON Schema + 各平台原生映射器
 
@@ -308,7 +308,7 @@ package "Android (Kotlin)" {
 }
 
 package "Windows (C#)" {
-    component "Aether-Windows\n(WinUI 3)" as WIN
+    component "Aether-Windows\n(WPF .NET 8)" as WIN
 }
 
 package "共享规范" {
@@ -343,7 +343,7 @@ APIContract --> WIN
 | 条件编译 | 102 处 `#if os(iOS)` + 53 处 `#if os(macOS)` | 大幅减少（平台代码归入专属 target） |
 | 公共组件库 | 无（`Shared/` 仅 AppGroupContainer.swift） | AetherCore 等 Swift Package |
 | Android 支持 | 无 | 原生 Kotlin/Compose 客户端 |
-| Windows 支持 | 无 | 原生 C#/WinUI 3 客户端 |
+| Windows 支持 | 无 | 原生 WPF .NET 8 客户端（v1.5 已交付） |
 | 数据层 | SwiftData 直耦 ViewModel | 仓储协议 + 各平台实现 |
 | 设计系统 | 强绑定 SwiftUI | Token JSON + 各平台映射器 |
 | BFF | 仅 LLM 代理 + 配置 | 增强为跨平台业务网关 |
@@ -356,7 +356,7 @@ APIContract --> WIN
 | Phase 2 | iOS/macOS target 分离 | 拆分双 target | iOS / macOS 独立构建 | Phase 1 |
 | Phase 3 | 跨平台抽象层 | 仓储协议 + Token JSON + BFF 增强 | BFF 跨平台 API 可用 | Phase 1 |
 | Phase 4 | Android 客户端 | Kotlin/Compose 原生 App | Android APK 可运行 | Phase 3 |
-| Phase 5 | Windows 客户端 | C#/WinUI 3 原生 App | Windows MSIX 可安装 | Phase 3 |
+| Phase 5 | Windows 客户端 | WPF .NET 8 原生 App（v1.5 已交付） | Windows MSIX 可安装 | Phase 3 |
 
 > Phase 3 可与 Phase 2 并行；Phase 4 与 Phase 5 可并行。
 
@@ -369,7 +369,7 @@ APIContract --> WIN
 | 数据层 | 抽象仓储协议 + 各平台实现 | 解耦持久化框架，DTO 跨平台共享，SwiftData/Room/EF Core 各自最优 |
 | 设计系统 | Token JSON + 各平台映射 | Token 为唯一真相源，各平台原生渲染保留质感 |
 | Android 技术栈 | Kotlin + Jetpack Compose | 现代 Android 官方推荐，响应式 UI 与 SwiftUI 范式接近 |
-| Windows 技术栈 | C# + WinUI 3 | 现代 Windows 桌面官方推荐，Fluent Design 原生支持 |
+| Windows 技术栈 | WPF .NET 8（v1.5 已交付） | 现代 Windows 桌面官方推荐，Fluent Design 原生支持 |
 | BFF 增强 | Cloudflare Workers + D1 + R2 | 已有基础设施，边缘计算低延迟，D1 提供关系型存储 |
 
 #### 3.1.6 Swift Package 分层
@@ -520,7 +520,7 @@ AIBuiler/
 ├── AetherWidgets/                     # Widget Extension
 ├── AetherTests/                       # 平台专属测试
 ├── android/                           # Android 客户端（Kotlin/Compose）
-├── windows/                           # Windows 客户端（C#/WinUI 3）
+├── windows/                           # Windows 客户端（WPF .NET 8，v1.5 已交付）
 ├── CloudflareWorkers/                 # 跨平台 BFF
 │   ├── src/routes/
 │   ├── schema.sql
@@ -2666,7 +2666,7 @@ end
 
 #### 6.2.5 Android 伴侣应用深化
 
-- **背景**：当前 Aether 无 Android 客户端。考虑到 Android 用户基数与跨平台战略，需要原生 Android 体验而非仅 Web 兜底。
+- **背景**：v1.5 已交付 Android 首版（Kotlin + Compose），本节描述 v2.5 伴侣深化方向。考虑到 Android 用户基数与跨平台战略，需要原生 Android 体验而非仅 Web 兜底。
 - **目标**：Kotlin + Jetpack Compose 客户端，复用 BFF 网关，本地 Room 持久化 + WorkManager 后台同步，提供与 iOS 版对等的对话与工具调用体验。
 - **技术方案**：
   1. 全新 Android 工程，Kotlin + Jetpack Compose + Material 3。
@@ -3247,7 +3247,7 @@ end
 | BFF 网关 | `CloudflareWorkers/` | worker.js / src/routes/ / src/lib/auth.js / src/lib/llm.js / schema.sql |
 | Design Tokens | `DesignTokens/` | tokens.json / schema.json |
 | Android 客户端 | `android/`（规划） | Kotlin + Jetpack Compose |
-| Windows 客户端 | `windows/`（规划） | C# + WinUI 3 |
+| Windows 客户端 | windows/（v1.5 已交付） | WPF .NET 8 |
 | CI 配置 | `.github/workflows/ci.yml` | iOS + macOS + Android + Windows + Rust CI |
 
 ### 附录 C：与 ROADMAP 的对应关系
