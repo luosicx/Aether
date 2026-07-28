@@ -1,22 +1,31 @@
 # BFF 代理层部署文档（Day 15）
 
-Aether 的 BFF（Backend For Frontend）代理层运行在 Cloudflare Workers 上，负责在服务端持有上游 LLM API Key，设备端仅持有 BFF Token。本文档描述从账号注册到设备端配置的完整部署流程。
+Aether 的 BFF（Backend For Frontend）代理层运行在 Cloudflare Workers 上，负责在服务端持有上游 LLM API Key。iOS/macOS/Windows/Android 多端均通过 BFF 代理调用 LLM，上游 API Key 不落设备，设备端仅持有 BFF Token。本文档描述从账号注册到设备端配置的完整部署流程。
 
 ## 架构概览
 
 ```mermaid
 flowchart LR
-    A[iOS App<br/>BFFProxyClient] -->|X-BFF-Token<br/>X-Provider| B[Cloudflare Worker<br/>worker.js]
+    A1[iOS / macOS App<br/>BFFProxyClient] -->|X-BFF-Token<br/>X-Provider| B[Cloudflare Worker<br/>worker.js]
+    A2[Windows App<br/>AetherApiClient] -->|X-BFF-Token<br/>X-Provider| B
+    A3[Android App<br/>AetherApi] -->|X-BFF-Token<br/>X-Provider| B
     B -->|Authorization: Bearer<br/>upstream-key| C[DeepSeek<br/>api.deepseek.com]
     B -->|Authorization: Bearer<br/>upstream-key| D[Qwen<br/>dashscope.aliyuncs.com]
     C -.->|SSE 流式响应| B
     D -.->|SSE 流式响应| B
-    B -.->|SSE 转发| A
+    B -.->|SSE 转发| A1
+    B -.->|SSE 转发| A2
+    B -.->|SSE 转发| A3
 ```
 
-- 设备端：`BFFProxyClient`（`Aether/Services/LLM/BFFProxyClient.swift`）将请求发往 BFF endpoint，附带 `X-BFF-Token` 与 `X-Provider`，**不携带上游 API Key**。
+- 设备端（三端共享同一 BFF HTTP 契约，均不携带上游 API Key）：
+  - iOS / macOS：`BFFProxyClient`（`Aether/Services/LLM/BFFProxyClient.swift`）
+  - Windows：`AetherApiClient`（`windows/Aether.Windows/Services/AetherApiClient.cs`）
+  - Android：`AetherApi`（`android/app/src/main/java/com/aether/data/api/AetherApi.kt`）
+- 三端均通过 `X-BFF-Token` 与 `X-Provider` 请求头调用 BFF，BFF endpoint 统一为 Cloudflare Worker 地址。
 - BFF：`CloudflareWorkers/worker.js` 校验 token、按 provider 路由、注入上游 key、流式转发 SSE 响应。
 - 上游：DeepSeek（`https://api.deepseek.com`）与 Qwen（`https://dashscope.aliyuncs.com/compatible-mode/v1`）。
+- 共享 BFF HTTP 契约：`POST /v1/chat/completions`（流式聊天，SSE）、`GET /v1/conversations`（会话列表）、`GET /v1/messages?conversationId=X`（消息历史）、`GET /v1/rag/search?q=X`（RAG 知识库搜索）、`GET /v1/health/summary?date=X`（健康洞察）。
 
 ## 1. Cloudflare 账号注册
 
@@ -213,6 +222,10 @@ wrangler deploy
 
 ## 7. 设备端配置（endpoint URL + user token 分发）
 
+v1.5.0 起 BFF 客户端在 iOS/macOS、Windows、Android 三端各自原生实现，配置入口与存储方式不同，但均需填入同一组 BFF endpoint 与 BFF Token。
+
+### 7.1 iOS / macOS 端
+
 在 App「设置 → BFF 代理」中：
 
 1. **启用 BFF 代理**：打开开关。
@@ -222,6 +235,42 @@ wrangler deploy
 5. 离开设置页时配置自动写入 UserDefaults（`bff_config_cache`）。
 
 启用后，App 的 LLM 请求经 `BFFProxyClient` 转发到 BFF，**上游 API Key 不再落设备**，仅 BFF Token 存于 UserDefaults（敏感度低于上游 key，且可随时在服务端 KV 撤销）。
+
+### 7.2 Windows 端
+
+在 App「设置页」（`SettingsPage.xaml`）中：
+
+1. **启用 BFF 代理**：勾选启用选项。
+2. **BFF endpoint**：填入部署地址，例如 `https://aether-bff.your-subdomain.workers.dev` 或自定义域名 `https://bff.yourdomain.com`。
+3. **BFF Token**：填入第 4 步生成的 token（如 `test-token-abc123`）。
+4. **限流参数**：按需调整 chat / embed 每分钟令牌数（默认 20 / 10）。
+5. 离开设置页时配置经 `BffConfigStore`（`windows/Aether.Windows/Services/BffConfigStore.cs`）写入 `%LOCALAPPDATA%/Aether/bff_config.json`。
+
+Windows 端的 Token 加密方案：
+
+- UserToken 通过 **DPAPI** 加密（`ProtectedData.Protect(..., DataProtectionScope.CurrentUser)`），Base64 编码后落盘到 `bff_config.json`。
+- 明文仅存内存，磁盘上为 DPAPI 密文，且绑定当前 Windows 用户账户（换用户/换机器无法解密）。
+- 其他非敏感字段（endpoint、限流参数等）以明文 JSON 存储。
+
+启用后，App 的 LLM 请求经 `AetherApiClient` 转发到 BFF，**上游 API Key 不再落设备**。
+
+### 7.3 Android 端
+
+在 App「设置页」（`SettingsScreen.kt`）中：
+
+1. **启用 BFF 代理**：打开开关。
+2. **BFF endpoint**：填入部署地址，例如 `https://aether-bff.your-subdomain.workers.dev` 或自定义域名 `https://bff.yourdomain.com`。
+3. **BFF Token**：填入第 4 步生成的 token（如 `test-token-abc123`）。
+4. **限流参数**：按需调整 chat / embed 每分钟令牌数（默认 20 / 10）。
+5. 离开设置页时配置经 `BffConfigStore`（`android/app/src/main/java/com/aether/data/api/BffConfigStore.kt`）写入 DataStore Preferences。
+
+Android 端的 Token 加密方案：
+
+- UserToken 通过 **EncryptedSharedPreferences**（AndroidX Security）加密存储，底层依赖 Android Keystore 主密钥。
+- 非敏感字段（endpoint、限流参数等）存于 DataStore Preferences（明文）。
+- 敏感字段（UserToken）单独走 EncryptedSharedPreferences，与普通配置隔离。
+
+启用后，App 的 LLM 请求经 `AetherApi` 转发到 BFF，**上游 API Key 不再落设备**。
 
 ## 8. 限流策略说明
 
@@ -238,12 +287,14 @@ wrangler deploy
 
 ## 9. 错误码映射
 
-| HTTP | 含义 | iOS 端 `LLMError` | UI 提示 |
-|------|------|-------------------|---------|
-| 401 | BFF Token 缺失/无效 | `.llmErrorOccurred("BFF Token 无效")` | BFF Token 无效 |
-| 429 | 触发限流（服务端或客户端） | `.rateLimited(retryAfter:)` | 请求过于频繁，请 X 秒后重试 |
-| 5xx | BFF 服务异常 / 上游不可达 | `.llmErrorOccurred("BFF 服务异常")` | BFF 服务异常 |
-| 其他 | 上游业务错误 | `.apiError(code:message:)` | 服务异常（code），请稍后再试 |
+| HTTP | 含义 | iOS 端 `LLMError` | Windows 端处理 | Android 端处理 | UI 提示 |
+|------|------|-------------------|-----------------|------------------|---------|
+| 401 | BFF Token 缺失/无效 | `.llmErrorOccurred("BFF Token 无效")` | `HttpRequestException`（status 401） | `HttpException`（Ktor，status 401） | BFF Token 无效 |
+| 429 | 触发限流（服务端或客户端） | `.rateLimited(retryAfter:)` | `HttpRequestException`（status 429） | `HttpException`（status 429） | 请求过于频繁，请 X 秒后重试 |
+| 5xx | BFF 服务异常 / 上游不可达 | `.llmErrorOccurred("BFF 服务异常")` | `HttpRequestException`（status 5xx） | `HttpException`（status 5xx） | BFF 服务异常 |
+| 其他 | 上游业务错误 | `.apiError(code:message:)` | `HttpRequestException`（其他 status） | `HttpException`（其他 status） | 服务异常（code），请稍后再试 |
+
+> 说明：Windows 端通过 `HttpClient` 抛出 `HttpRequestException`，按 `HttpResponseMessage.StatusCode` 区分 401/429/5xx；Android 端通过 Ktor 抛出 `HttpException`，按 `response.code()` 区分。两端的 401 分支均向用户提示「BFF Token 无效」，引导其回到设置页重新填写 token。
 
 ## 10. 运维与撤销
 
@@ -253,6 +304,24 @@ wrangler deploy
   ```
 - **轮换上游 key**：重新 `wrangler secret put DEEPSEEK_API_KEY` 后无需改代码。
 - **查看日志**：`wrangler tail` 实时查看 Worker 请求与错误日志。
+
+## 11. 跨平台客户端实现差异
+
+v1.5.0 起 BFF 客户端在 iOS/macOS、Windows、Android 三端各自原生实现，共享同一 BFF HTTP 契约（见架构概览），但在客户端类、配置存储、加密方案、设置入口、流式响应处理等方面存在平台差异。下表为三端实现对照：
+
+| 维度 | iOS / macOS | Windows | Android |
+|------|-------------|---------|---------|
+| 客户端类 | `BFFProxyClient` | `AetherApiClient` | `AetherApi` |
+| 源码位置 | `Aether/Services/LLM/BFFProxyClient.swift` | `windows/Aether.Windows/Services/AetherApiClient.cs` | `android/app/src/main/java/com/aether/data/api/AetherApi.kt` |
+| 配置存储 | UserDefaults（`bff_config_cache`） | `BffConfigStore`（JSON 文件） | `BffConfigStore`（DataStore Preferences） |
+| 存储路径 | UserDefaults plist | `%LOCALAPPDATA%/Aether/bff_config.json` | DataStore Preferences 文件 |
+| Token 加密 | Keychain | DPAPI（`ProtectedData.Protect`，`CurrentUser` 范围，Base64 落盘） | EncryptedSharedPreferences（AndroidX Security，依赖 Android Keystore） |
+| 设置入口 | App「设置 → BFF 代理」 | App「设置页」（`SettingsPage.xaml`） | App「设置页」（`SettingsScreen.kt`） |
+| 流式响应处理 | `AsyncThrowingStream` | `StreamReader`（读取 `HttpResponseMessage.Content` 流） | `Flow<Chunk>`（Ktor SSE） |
+| HTTP 客户端 | `URLSession` | `HttpClient`（.NET） | Ktor `HttpClient` |
+| 错误类型 | `LLMError` | `HttpRequestException` | `HttpException`（Ktor） |
+
+> 注：三端均不携带上游 API Key，仅 BFF Token 落设备；Token 的加密方案各端独立选型，分别采用平台原生方案（Keychain / DPAPI / EncryptedSharedPreferences），确保明文不落盘。详细错误码映射见第 9 节。
 
 ## 常见部署错误与排查
 
