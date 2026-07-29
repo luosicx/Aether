@@ -33,6 +33,10 @@
 
 #### Tests
 - **测试规模**：UT 从 3481 增至 3526（+45 用例：iOS/macOS 3314 → 3359，5 个新测试文件）。
+- **Rust 单测**：`redact.rs` 新增 3 个 JSON 格式用例（password / token / api_key），Rust 单测从 13 增至 16。
+
+#### Fixed
+- **Rust redact 正则不支持 JSON 格式密码字段**：原正则 `(?i)(password|...)\s*[:=]\s*[^\s&]+` 要求 key 后紧跟 `:` / `=`，不匹配 JSON 格式 `"password": "value"`（键值被引号包围），导致 iOS `RedactorRustTests.testRedactPassword` 失败。修改为 `(?i)["']?(password|...)["']?\s*[:=]\s*["']?[^\s&"']*["']?`，支持 JSON / ini / 单双引号多种格式（Rust regex 不支持反向引用，故键值前后引号独立匹配）。
 
 ---
 
