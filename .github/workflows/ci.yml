@@ -24,7 +24,9 @@ jobs:
   unit-tests:
     needs: [rust-apple, rust]
     runs-on: macos-15
-    timeout-minutes: 45
+    # v1.6: 45min 不足以跑完全部测试（v1.6 新增 45 个多模态测试后总时长接近 49min），
+    # 增至 60min 给足 buffer，避免超时 cancelled 导致 coverage-summary 失败。
+    timeout-minutes: 60
     outputs:
       coverage_pct: ${{ steps.coverage.outputs.coverage_pct }}
       coverage_pass: ${{ steps.coverage.outputs.coverage_pass }}
