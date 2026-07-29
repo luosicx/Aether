@@ -50,10 +50,12 @@ fn rules() -> &'static [Rule] {
                 replacement: "[REDACTED_TOKEN]",
             },
             // 6. 密码 / 密钥 / Token 字段：password=...、token: ...、api_key=... 等
+            //    支持 JSON 格式："password": "value"（v1.6 修复：原正则不匹配键值被引号包围的场景）
             // (?i) 大小写不敏感（Rust regex 用 inline flag (?i:...)）
+            // Rust regex 不支持反向引用，故键值前后引号独立匹配（["']?）
             Rule {
                 regex: Regex::new(
-                    r"(?i)(password|token|secret|api[_-]?key|access[_-]?token)\s*[:=]\s*[^\s&]+",
+                    r#"(?i)["']?(password|token|secret|api[_-]?key|access[_-]?token)["']?\s*[:=]\s*["']?[^\s&"']*["']?"#,
                 )
                 .unwrap(),
                 replacement: "[REDACTED_CREDENTIAL]",
@@ -127,6 +129,25 @@ mod tests {
     fn redacts_credential_field_case_insensitive() {
         let input = "API_KEY=mykey456";
         assert_eq!(redact(input), "[REDACTED_CREDENTIAL]");
+    }
+
+    #[test]
+    fn redacts_credential_field_json_format() {
+        // v1.6 修复：JSON 格式 "password": "value" 应被脱敏
+        let input = r#"{"password": "mySecret123"}"#;
+        assert_eq!(redact(input), r#"{[REDACTED_CREDENTIAL]}"#);
+    }
+
+    #[test]
+    fn redacts_credential_field_json_no_spaces() {
+        let input = r#"{"token":"abc.def.ghi"}"#;
+        assert_eq!(redact(input), r#"{[REDACTED_CREDENTIAL]}"#);
+    }
+
+    #[test]
+    fn redacts_credential_field_json_api_key() {
+        let input = r#"{"api_key": "sk-xxx"}"#;
+        assert_eq!(redact(input), r#"{[REDACTED_CREDENTIAL]}"#);
     }
 
     #[test]

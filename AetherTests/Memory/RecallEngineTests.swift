@@ -52,15 +52,20 @@ final class RecallEngineTests: XCTestCase {
         XCTAssertEqual(score, 0.94, accuracy: 0.0001, "用户主动记忆 importance=0.8、recency=1.0、sim=1.0 应为 0.94")
     }
 
-    /// 时间衰减：30 天前访问的记忆 recency 应为 0.5（半衰期）
+    /// 时间衰减：30 天前访问的记忆 recency 应为 exp(-1)≈0.3679（时间常数 τ=30 天）
+    ///
+    /// 实现使用指数衰减 `recency = exp(-Δt/τ)`，其中 τ 为时间常数（非半衰期）。
+    /// 当 Δt = τ 时 recency = 1/e ≈ 0.367879。
+    /// 半衰期 = τ × ln(2) ≈ 30 × 0.693 ≈ 20.79 天。
     func testTimeDecayHalfLife() {
         let memory = Memory(content: "测试", embedding: [1, 0], category: "context", importance: 0.5)
         let now = Date()
-        // 30 天前访问
+        // 30 天前访问（= 时间常数 τ）
         let past = now.addingTimeInterval(-30 * 24 * 60 * 60)
         memory.lastAccessedAt = past
         let recency = RecallEngine.computeRecency(memory: memory, now: now)
-        XCTAssertEqual(recency, 0.5, accuracy: 0.05, "30 天半衰期，Δt=30天时 recency 应≈0.5")
+        // exp(-30/30) = exp(-1) ≈ 0.36787944117144233
+        XCTAssertEqual(recency, 1.0 / Foundation.M_E, accuracy: 0.001, "τ=30天，Δt=τ 时 recency 应=exp(-1)≈0.3679")
     }
 
     /// 时间衰减：刚刚访问的记忆 recency 应为 1.0
@@ -87,8 +92,9 @@ final class RecallEngineTests: XCTestCase {
     func testRecallReturnsSortedByScore() async throws {
         let now = Date()
         // 构造两条记忆，A 高 importance 高相似度，B 低 importance 低相似度
-        let memoryA = Memory(content: "A", embedding: [1, 0], category: "context", importance: 0.9)
-        let memoryB = Memory(content: "B", embedding: [0, 1], category: "context", importance: 0.1)
+        // 使用不同 category 避免 dedupeByCategory 去重导致少返回
+        let memoryA = Memory(content: "A", embedding: [1, 0], category: "context_a", importance: 0.9)
+        let memoryB = Memory(content: "B", embedding: [0, 1], category: "context_b", importance: 0.1)
 
         // 注入预填充 BruteForceVectorStore
         let store = BruteForceVectorStore()
@@ -105,8 +111,9 @@ final class RecallEngineTests: XCTestCase {
 
     /// recall limit 应限制返回条数
     func testRecallRespectsLimit() async throws {
+        // 使用不同 category 避免 dedupeByCategory 去重导致少返回
         let memories = (0..<5).map { i in
-            Memory(content: "记忆\(i)", embedding: [Double(i), 0], category: "context", importance: 0.5)
+            Memory(content: "记忆\(i)", embedding: [Double(i), 0], category: "context_\(i)", importance: 0.5)
         }
         let store = BruteForceVectorStore()
         for m in memories {

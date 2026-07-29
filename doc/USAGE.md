@@ -34,7 +34,7 @@
    - 4.24 [Watch App](#424-watch-app)
    - 4.25 [桌面 Widget](#425-桌面-widget)
    - 4.26 [DeepLink](#426-deeplink)
-   - 4.27 [端侧多模态](#427-端侧多模态v13--v14)
+   - 4.27 [端侧多模态](#427-端侧多模态v13--v14--v16)
    - 4.28 [Windows 端](#428-windows-端)
    - 4.29 [Android 端](#429-android-端)
 5. [多平台支持](#5-多平台支持)
@@ -598,37 +598,38 @@ Aether 支持 `aether://` URL Scheme 的 DeepLink：
 
 对应代码：`Aether/App/AetherApp.swift`（`.onOpenURL` 处理）、`Aether/Services/Intents/IntentChatService.swift`。
 
-### 4.27 端侧多模态（v1.3 + v1.4）
+### 4.27 端侧多模态（v1.3 + v1.4 + v1.6）
 
-> v1.3 落地端侧多模态 Phase 1（协议抽象 + 占位实现 + 跨平台 OCR + 4 个多模态工具），v1.4 替换为 Apple 原生引擎实现（基于 Vision / Speech / AVFoundation 框架），三端原生可用无需外部模型。
+> v1.3 落地端侧多模态 Phase 1（协议抽象 + 占位实现 + 跨平台 OCR + 4 个多模态工具），v1.4 替换为 Apple 原生引擎实现（基于 Vision / Speech / AVFoundation 框架），三端原生可用无需外部模型；v1.6 集成 5 个端侧多模态引擎骨架 + 自动降级链路（详见 [Q22](#q22-v16-端侧多模态引擎如何启用)）。
 
 #### 4.27.1 整体架构
 
 - **协议层**（v1.3）：5 个引擎协议 `VisionInferenceEngine` / `ASREngine` / `TTSEngine` / `VoiceCloner` / `ImageGenerationEngine`，定义统一的加载 / 推理接口。
-- **门面层**（v1.3）：`MultimodalFacade`（`public actor`）统一调度，5 个引擎可注入切换，4 个工具方法暴露给 `ToolRegistry`。
-- **实现层**（v1.4）：`NativeVisionEngine` / `NativeASREngine` / `NativeTTSEngine`（Apple 原生框架，默认实现）；`PlaceholderVoiceCloner` / `PlaceholderImageGenerationEngine`（仍为占位，v1.6 集成 OpenVoice / SD Mobile）。
+- **门面层**（v1.3）：`MultimodalFacade`（`public actor`）统一调度，5 个引擎可注入切换，4 个工具方法暴露给 `ToolRegistry`；v1.6 新增 `createWithAutoFallback()` 静态工厂方法实现 MLX → Native → Placeholder 自动降级链路。
+- **实现层**（v1.4）：`NativeVisionEngine` / `NativeASREngine` / `NativeTTSEngine`（Apple 原生框架，默认实现）；`PlaceholderVoiceCloner` / `PlaceholderImageGenerationEngine`（仍为占位，v1.6 集成 OpenVoice / SD Mobile 骨架）。
+- **实现层**（v1.6）：`MLXVisionEngine` / `WhisperASREngine` / `MLXVoiceTTSEngine` / `OpenVoiceCloner` / `SDMobileEngine` 5 个骨架实现 + 条件编译降级兜底，真实推理待 SPM 依赖集成。
 - **基础设施**（v1.3）：`MemoryBudget`（全局内存预算器）/ `DeviceCapability`（设备能力分级）/ `MultimodalError`（16 种错误类型）。
 
 #### 4.27.2 引擎清单与平台支持
 
-| 引擎协议 | v1.3 占位 | v1.4 Native 实现 | v1.6 计划 | 平台支持 |
+| 引擎协议 | v1.3 占位 | v1.4 Native 实现 | v1.6 已交付（骨架 + 降级）| 平台支持 |
 |----------|----------|------------------|----------|----------|
-| `VisionInferenceEngine` | `PlaceholderVisionEngine` | `NativeVisionEngine`（Vision 框架）| `MLXVisionEngine`（MLX-VLM）| iOS / iPad / macOS |
-| `ASREngine` | `PlaceholderASREngine` | `NativeASREngine`（SFSpeech 文件识别）| `WhisperASREngine`（whisper.cpp）| iOS / iPad / macOS（需授权）|
-| `TTSEngine` | `PlaceholderTTSEngine` | `NativeTTSEngine`（AVSpeechSynthesizer.write）| `MLXVoiceTTSEngine`（MLX-Voice）| iOS / iPad / macOS |
-| `VoiceCloner` | `PlaceholderVoiceCloner` | —（仍为占位）| `OpenVoiceCloner`（OpenVoice v2）| 待 v1.6 |
-| `ImageGenerationEngine` | `PlaceholderImageGenerationEngine` | —（仍为占位）| `SDMobileEngine`（SD Mobile）| 待 v1.6 |
+| `VisionInferenceEngine` | `PlaceholderVisionEngine` | `NativeVisionEngine`（Vision 框架）| `MLXVisionEngine`（MLX-VLM，降级到 Native）| iOS / iPad / macOS |
+| `ASREngine` | `PlaceholderASREngine` | `NativeASREngine`（SFSpeech 文件识别）| `WhisperASREngine`（whisper.cpp，离线，降级到 Native）| iOS / iPad / macOS（需授权）|
+| `TTSEngine` | `PlaceholderTTSEngine` | `NativeTTSEngine`（AVSpeechSynthesizer.write）| `MLXVoiceTTSEngine`（MLX-Voice，降级到 Native）| iOS / iPad / macOS |
+| `VoiceCloner` | `PlaceholderVoiceCloner` | —（仍为占位）| `OpenVoiceCloner`（OpenVoice v2，桩实现 + Keychain 存储）| iOS / iPad / macOS |
+| `ImageGenerationEngine` | `PlaceholderImageGenerationEngine` | —（仍为占位）| `SDMobileEngine`（SD Mobile，条件编译，当前抛 `platformUnsupported`）| iOS / iPad / macOS |
 
 #### 4.27.3 LLM 工具调用入口
 
 LLM 通过 ReAct 循环调用以下 4 个工具（详见 [6.5 多模态工具](#65-多模态工具4-个跨平台v13-新增)）：
 
-| 工具 | 函数 | 触发示例 | v1.4 底层实现 |
+| 工具 | 函数 | 触发示例 | v1.6 底层实现 |
 |------|------|----------|--------------|
-| DescribeImageTool | `describe_image` | "分析这张图片中的文字" | NativeVisionEngine 5 并发请求，按 prompt 聚焦返回 |
-| TranscribeAudioTool | `transcribe_audio` | "把这段录音转成文字" | NativeASREngine 文件识别 |
-| CloneVoiceTool | `clone_voice` | "用我的声音克隆一个音色" | Placeholder（v1.6 集成 OpenVoice）|
-| GenerateImageTool | `generate_image` | "画一只猫" | Placeholder（v1.6 集成 SD Mobile）|
+| DescribeImageTool | `describe_image` | "分析这张图片中的文字" | MLXVisionEngine 骨架（降级到 NativeVisionEngine 5 并发请求）|
+| TranscribeAudioTool | `transcribe_audio` | "把这段录音转成文字" | WhisperASREngine 骨架（降级到 NativeASREngine 文件识别）|
+| CloneVoiceTool | `clone_voice` | "用我的声音克隆一个音色" | OpenVoiceCloner 桩实现（256 维 embedding + Keychain 存储，真实克隆待模型集成）|
+| GenerateImageTool | `generate_image` | "画一只猫" | SDMobileEngine 骨架（条件编译，当前抛 `platformUnsupported`，真实推理待 CoreML 模型集成）|
 
 #### 4.27.4 编程式使用
 
@@ -670,8 +671,9 @@ print("利用率：\(snapshot.utilizationPercentage)%")
 - **NativeVisionEngine**：Vision 框架无需加载模型，`isLoaded` 始终为 `true`；CI 环境下请求可能不稳定，相关测试已加 CI guard 跳过。
 
 - **对应代码**：
-  - `Aether/Services/Multimodal/MultimodalFacade.swift`：多模态门面
-  - `Aether/Services/Multimodal/NativeVisionEngine.swift` / `NativeASREngine.swift` / `NativeTTSEngine.swift`：Apple 原生引擎实现
+  - `Aether/Services/Multimodal/MultimodalFacade.swift`：多模态门面（含 v1.6 `createWithAutoFallback()` 静态工厂方法）
+  - `Aether/Services/Multimodal/NativeVisionEngine.swift` / `NativeASREngine.swift` / `NativeTTSEngine.swift`：Apple 原生引擎实现（v1.4）
+  - `Aether/Services/Multimodal/MLXVisionEngine.swift` / `WhisperASREngine.swift` / `MLXVoiceTTSEngine.swift` / `OpenVoiceCloner.swift` / `SDMobileEngine.swift`：v1.6 端侧多模态引擎骨架（条件编译 + 降级兜底）
   - `Aether/Services/Multimodal/MemoryBudget.swift` / `DeviceCapability.swift` / `MultimodalError.swift`：基础设施
 
 ### 4.28 Windows 端
@@ -907,8 +909,8 @@ Rust `aether-core-ffi` 通过 `AetherRustBin` xcframework 提供跨平台统一�
 |---|---|---|---|
 | 25 | DescribeImageTool | `describe_image` | 图像理解：参数 `image_path`（图片路径）+ `prompt`（文本提示，如 "描述这张图片" / "识别文字" / "检测人脸"）。底层 `NativeVisionEngine`（v1.4）基于 Vision 框架 5 个请求并发：分类（VNClassifyImageRequest）/ 人脸（VNDetectFaceRectanglesRequest）/ 矩形（VNDetectRectanglesRequest）/ 文字（VNRecognizeTextRequest，zh-Hans + en，`.accurate`）/ 条码（VNDetectBarcodesRequest）。按 prompt 关键字聚焦返回（"文字" → OCR 结果，"人脸" → 人脸数，"条码" → 条码列表，默认 → 全部汇总） |
 | 26 | TranscribeAudioTool | `transcribe_audio` | 音频转写：参数 `audio_path` + `language`（默认 "zh"）。底层 `NativeASREngine`（v1.4）基于 `SFSpeechURLRecognitionRequest` 文件识别，支持 wav / caf / m4a / mp3 / aac 格式；CI 环境识别器不可用时抛 `asrRecognitionFailed` |
-| 27 | CloneVoiceTool | `clone_voice` | 语音克隆：参数 `audio_path`（样本音频 ≥5s）+ `voice_name`（自定义音色名）。v1.3 占位实现返回 `engineNotLoaded`；v1.6 将集成 OpenVoice v2 蒸馏模型 |
-| 28 | GenerateImageTool | `generate_image` | 图像生成：参数 `prompt` + `negative_prompt` + `width`（默认 512）+ `height`（默认 512）+ `steps`（默认 20）+ `seed`。v1.3 占位实现返回 `platformUnsupported`；v1.6 将集成 SD Mobile |
+| 27 | CloneVoiceTool | `clone_voice` | 语音克隆：参数 `audio_path`（样本音频 ≥5s）+ `voice_name`（自定义音色名）。v1.6 `OpenVoiceCloner` 桩实现 + 256 维 embedding + Keychain 存储，真实克隆待 OpenVoice v2 模型集成 |
+| 28 | GenerateImageTool | `generate_image` | 图像生成：参数 `prompt` + `negative_prompt` + `width`（默认 512）+ `height`（默认 512）+ `steps`（默认 20）+ `seed`。v1.6 `SDMobileEngine` 骨架（条件编译 `#if canImport(CoreML)`），当前抛 `platformUnsupported`，真实推理待 CoreML 模型集成 |
 
 > **说明**：iOS 上可用工具 = 4 原有 + 6 跨平台 + 3 快捷指令 + 4 多模态 = **18 个**（ClipboardTool 注册 Read+Write 两项）；macOS 独有 11 个在 iOS 不可用。
 
@@ -933,7 +935,7 @@ xcodebuild build \
   -configuration Debug \
   CODE_SIGNING_ALLOWED=NO
 
-# 2. 运行 UT（3314 用例，0 skip）
+# 2. 运行 UT（3359 用例，0 skip）
 xcodebuild test \
   -project Aether.xcodeproj \
   -scheme Aether-iOS \
@@ -961,7 +963,7 @@ xcodebuild test \
 
 | 测试套件 | 用例总数 | skipped | failures |
 |---|---|---|---|
-| UT（`AetherTests`） | 3314 | 0 | 0 |
+| UT（`AetherTests`） | 3359 | 0 | 0 |
 | UIT（`AetherUITests`） | 30 | 0 | 0 |
 
 ### skipped 原因
@@ -1072,7 +1074,7 @@ GitHub Actions 配置文件：`.github/workflows/ci.yml`
 
 ### Q10: UIT 测试不稳定？
 
-**A**：`contextMenu` 长按触发、Picker 导航式选项、邮件 composer 在模拟器上行为有差异，已用 `throw XCTSkip` 兜底跳过不稳定用例。**底层逻辑已由 UT 覆盖**（`ChatStorageTests` / `ConversationListVMTests` / `TTSConfigTests` / `TTSVoiceCatalogTests` 等）。当前 UIT 规模 30 用例（0 skip，0 failures），UT 规模 3314 用例（0 skip，0 failures）。
+**A**：`contextMenu` 长按触发、Picker 导航式选项、邮件 composer 在模拟器上行为有差异，已用 `throw XCTSkip` 兜底跳过不稳定用例。**底层逻辑已由 UT 覆盖**（`ChatStorageTests` / `ConversationListVMTests` / `TTSConfigTests` / `TTSVoiceCatalogTests` 等）。当前 UIT 规模 30 用例（0 skip，0 failures），UT 规模 3359 用例（0 skip，0 failures）。
 
 ### Q11: App Intents / Siri 调用无响应？
 
@@ -1149,3 +1151,42 @@ GitHub Actions 配置文件：`.github/workflows/ci.yml`
 **A**：进入「设置 → 语言」Section，提供 8 种语言。选中后 `LanguageManager` 调用 `AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(<locale>))` 写入，**需 recreate Activity** 才能生效。`LanguageManager` 内部会调用 `activity.recreate()` 触发重建，所有 Composable 重新组合并加载新语言的 `strings.xml`。资源文件为 `android/app/src/main/res/values-<locale>/strings.xml`，共 8 种（默认 `values/strings.xml` 为 zh-Hans 源语言）。
 
 > **注意**：与 iOS / Windows 端「立即生效，无需重启」不同，Android 端必须 recreate Activity。若切换后界面未刷新，检查 `LanguageManager` 是否已调用 `activity.recreate()`。
+
+### Q22: v1.6 端侧多模态引擎如何启用？
+
+**A**：v1.6（2026-07-29 已发布）在 v1.4 Apple 原生引擎基础上新增 5 个端侧多模态引擎骨架，目前**当前 5 个引擎均走降级/桩实现路径**，真实 MLX 推理待 SPM 依赖集成。
+
+**5 个新引擎**（位于 `Aether/Services/Multimodal/`）：
+
+| 引擎 | 技术栈 | 条件编译 | 降级路径 | 当前状态 |
+|------|--------|----------|----------|----------|
+| `MLXVisionEngine` | MLX-VLM（Qwen2-VL-2B Q4 等） | `#if canImport(MLXLLM) && canImport(MLXLMCommon)` | → `NativeVisionEngine`（Apple Vision） | 降级到 Native |
+| `WhisperASREngine` | whisper.cpp Rust 绑定 | 无（`requiresNetwork = false`） | → `NativeASREngine`（SFSpeech） | 降级到 Native |
+| `MLXVoiceTTSEngine` | MLX-Voice（Kokoro/Matcha-TTS） | `#if canImport(MLXVoice)` | → `NativeTTSEngine`（AVSpeechSynthesizer） | 降级到 Native |
+| `OpenVoiceCloner` | OpenVoice v2 | 无 | → `PlaceholderVoiceCloner` | 桩实现 + 256 维 embedding + Keychain 存储 |
+| `SDMobileEngine` | Stable Diffusion Mobile / CoreML | `#if canImport(CoreML)` | → `PlaceholderImageGenerationEngine` | 当前抛 `platformUnsupported` |
+
+**启用方式**：
+
+```swift
+// 方式 1：使用自动降级工厂（推荐，v1.6 新增）
+let facade = await MultimodalFacade.createWithAutoFallback()
+// 自动按 MLX → Native → Placeholder 优先级选择可用引擎
+
+// 方式 2：手动注入引擎（待 SPM 依赖集成后可用）
+await facade.setVisionEngine(MLXVisionEngine())      // 需引入 MLX-VLM SPM 包
+await facade.setASREngine(WhisperASREngine())        // 需引入 whisper.cpp Rust FFI
+await facade.setTTSEngine(MLXVoiceTTSEngine())       // 需引入 MLX-Voice SPM 包
+```
+
+**降级链路**（MLX → Native → Placeholder 三级）：
+
+- VLM: `MLXVisionEngine`（v1.6）→ `NativeVisionEngine`（v1.4）→ `PlaceholderVisionEngine`（v1.3）
+- ASR: `WhisperASREngine`（v1.6）→ `NativeASREngine`（v1.4）→ `PlaceholderASREngine`（v1.3）
+- TTS: `MLXVoiceTTSEngine`（v1.6）→ `NativeTTSEngine`（v1.4）→ `PlaceholderTTSEngine`（v1.3）
+- VoiceCloner: `OpenVoiceCloner`（v1.6）→ `PlaceholderVoiceCloner`（v1.3）
+- ImageGen: `SDMobileEngine`（v1.6）→ `PlaceholderImageGenerationEngine`（v1.3）
+
+**测试覆盖**：新增 5 个测试文件（`AetherTests/Multimodal/`），共 45 个测试用例：MLXVisionEngineTests（8）/ WhisperASREngineTests（8）/ MLXVoiceTTSEngineTests（9）/ OpenVoiceClonerTests（12）/ SDMobileEngineTests（8）。
+
+**后续工作**：MLX-VLM / Whisper.cpp / MLX-Voice / OpenVoice / SD Mobile 的真实推理依赖尚未集成，需引入对应 SPM 包 / Rust FFI。待依赖集成后通过 `MultimodalFacade.setXxxEngine()` 切换到真实引擎，原生引擎作为兜底。

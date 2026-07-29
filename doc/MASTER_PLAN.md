@@ -62,7 +62,7 @@
 | v1.3 | 2026-07-25（已完成） | 端侧多模态 Phase 1（协议抽象 + 4 个多模态工具 + 跨平台 OCR + 占位引擎） |
 | v1.4 | 2026-07-25（已完成） | 端侧多模态 Phase 1.5（Apple 原生引擎：NativeVision / NativeASR / NativeTTS 替换占位） |
 | v1.5 | 2026-07-26（已完成） | 跨平台扩展（Windows + Android 双端交付） |
-| v1.6 | 2027 Q3 | 端侧多模态 Phase 2（MLX-VLM / Whisper.cpp / MLX-Voice / SD Mobile / 多模态融合） |
+| v1.6 | 2026-07-29（已完成） | 端侧多模态 Phase 2（5 个引擎骨架实现 + 条件编译降级 + 45 个测试用例） |
 | v2.0 | 2027 Q4 | 跨端协作（iCloud / Handoff / visionOS / Web 伴侣） |
 | v2.5 | 2028 Q1 | 生态扩展（插件市场 / 热更新 / MCP 共建 / Android 深化） |
 | v3.0 | 2028 Q2 | 智能平台（Apple Intelligence / 本地 RAG 增强 / AI Workflow / 多 Agent 协作） |
@@ -135,8 +135,8 @@ gantt
     section v1.5（已完成）
     跨平台扩展（Windows + Android） :done, v15a, 2026-07-26, 1d
 
-    section v1.6 (2027 Q3)
-    端侧多模态 Phase 2       :v16, 2027-07-01, 90d
+    section v1.6 (2026-07-29 已完成)
+    端侧多模态 Phase 2       :done, v16, 2026-07-29, 3d
 
     section v2.0 (2027 Q4)
     跨端协作（iCloud/Handoff/visionOS/Web） :v20, 2027-10-01, 90d
@@ -161,7 +161,7 @@ gantt
 | v1.3 ✅ | 多模态协议抽象（VisionInferenceEngine / ASREngine / TTSEngine / VoiceCloner / ImageGenerationEngine）/ 4 个多模态工具 / 跨平台 OCR / 占位实现 / MultimodalFacade + MemoryBudget + DeviceCapability | OnDeviceModelDownloader / 全局内存预算器 |
 | v1.4 ✅ | NativeVisionEngine（基于 Vision）/ NativeASREngine（基于 SFSpeech）/ NativeTTSEngine（基于 AVSpeechSynthesizer.write）替换占位实现；MultimodalFacade 默认切换为 Native 引擎 | v1.3 协议抽象与 Facade |
 | v1.5 ✅ | Windows 端（WPF .NET 8：会话 / 设置 / Markdown / i18n / DPAPI / 流式 / Rust FFI）/ Android 端（Kotlin + Compose：RAG UI / Health UI / Room / 长按菜单 / Markdown / i18n / Rust JNI 4 函数） | v1.0 Rust 核心 + BFF |
-| v1.6 | MLX-VLM / Whisper.cpp ASR + MLX-Voice TTS + OpenVoice 语音克隆 / 端侧图像生成（SD Mobile）/ 多模态融合 Facade | v1.4 Native 引擎作为兜底 |
+| v1.6 ✅ | MLX-VLM / Whisper.cpp ASR + MLX-Voice TTS + OpenVoice 语音克隆 / 端侧图像生成（SD Mobile）骨架实现 + 条件编译降级链路 + 45 个测试用例 | v1.4 Native 引擎作为兜底 |
 | v2.0 | iCloud 同步 / Handoff / visionOS 适配 / Web 伴侣 / macOS 多窗口 | v1.6 端侧 VLM / v1.2 设计升级 |
 | v2.5 | 社区插件市场 / 插件热更新 / MCP 共建 / Android 伴侣深化 | v2.0 跨端协作 |
 | v3.0 | Apple Intelligence 集成 / 本地 RAG 增强 / 多 Agent 协作 / AI Workflow | v1.3 VLM / v2.5 插件市场 |
@@ -2527,35 +2527,35 @@ end
 
 > **实施细节参见** 4.1 端侧多模态。本节给出 v1.3 ~ v1.6 的版本切片与优先级，专题文档中的架构图 / 内存预算表 / 技术选型表 / 5 阶段实施路径不再重复。
 >
-> **实施进度（v1.4 已发布）**：
+> **实施进度（v1.6 已发布）**：
 > - v1.3 已交付协议抽象（`VisionInferenceEngine` / `ASREngine` / `TTSEngine` / `VoiceCloner` / `ImageGenerationEngine`）、`MultimodalFacade` 门面、`MemoryBudget` 全局内存预算器、`DeviceCapability` 设备能力分级、4 个多模态工具（`describe_image` / `transcribe_audio` / `clone_voice` / `generate_image`）、跨平台 OCRTool 改造、占位实现。UT 3290。
 > - v1.4 已交付 Apple 原生引擎实现：`NativeVisionEngine`（Vision 框架 5 并发请求：分类 / 人脸 / 矩形 / 文字 / 条码）/ `NativeASREngine`（`SFSpeechURLRecognitionRequest` 文件识别）/ `NativeTTSEngine`（`AVSpeechSynthesizer.write` 收集 PCM Buffer 编码 WAV）。`MultimodalFacade` 默认从 Placeholder 切换为 Native 引擎，三端原生可用。新增 24 个测试用例，UT 3314。
-> - v1.6 规划中：集成 MLX-VLM / Whisper.cpp / MLX-Voice / OpenVoice v2 / SD Mobile，Native 引擎将作为 MLX 路径不可用时的兜底。
 > - v1.5 已交付跨平台扩展：Windows（WPF .NET 8）与 Android（Kotlin + Compose）双端落地，Rust 核心通过 FFI / JNI 跨端复用，详见 6.7 跨平台扩展展望。
+> - v1.6 已交付：5 个引擎骨架实现 + 条件编译降级 + 45 个测试用例。`MLXVisionEngine` / `WhisperASREngine` / `MLXVoiceTTSEngine` / `OpenVoiceCloner` / `SDMobileEngine` 骨架就绪，`MultimodalFacade.createWithAutoFallback()` 静态工厂方法实现 MLX → Native → Placeholder 自动降级链路。MLX-VLM / Whisper.cpp / MLX-Voice / OpenVoice / SD Mobile 的真实推理依赖尚未集成（需引入 SPM 包 / Rust FFI），当前 5 个引擎均走降级/桩实现路径。
 
 #### 6.1.1 端侧视觉理解（VLM）
 
-- **版本归属**：v1.3（协议 + 占位）/ v1.4（Native 实现）/ v1.6（MLX-VLM 集成）
+- **版本归属**：v1.3（协议 + 占位）/ v1.4（Native 实现）/ v1.6（MLX-VLM 骨架已交付，真实推理待集成）
 - **优先级**：P2
 - **依赖**：`OnDeviceModelDownloader`（已有，需扩展支持多模态模型分发）/ 全局内存预算器（v1.3 已建）/ 模型仓库（待建，托管量化产物）/ CoreML 量化工具链。
 - **关键交付**：iPhone 15 Pro 可加载 Qwen2-VL-2B Q4 模型并完成图像理解，首 token ≤2s；COCO 验证集图像描述准确率 >80%；`describe_image` 工具被 LLM 正确调用；内存峰值 ≤3GB。
-- **当前状态**：v1.4 `NativeVisionEngine` 提供 5 个 Vision 请求并发执行（VNClassifyImageRequest / VNDetectFaceRectanglesRequest / VNDetectRectanglesRequest / VNRecognizeTextRequest / VNDetectBarcodesRequest），按 prompt 关键字聚焦返回；MLX-VLM 待 v1.6 集成。
+- **当前状态**：v1.4 `NativeVisionEngine` 提供 5 个 Vision 请求并发执行（VNClassifyImageRequest / VNDetectFaceRectanglesRequest / VNDetectRectanglesRequest / VNRecognizeTextRequest / VNDetectBarcodesRequest），按 prompt 关键字聚焦返回；v1.6 `MLXVisionEngine` 骨架已交付（条件编译 `#if canImport(MLXLLM) && canImport(MLXLMCommon)`，不可用时降级到 `NativeVisionEngine`），MLX-VLM 真实推理待 SPM 依赖集成。
 
 #### 6.1.2 端侧语音增强
 
-- **版本归属**：v1.3（协议 + 占位）/ v1.4（Native 实现）/ v1.6（Whisper + MLX-Voice 集成）
+- **版本归属**：v1.3（协议 + 占位）/ v1.4（Native 实现）/ v1.6（Whisper + MLX-Voice 骨架已交付，真实推理待集成）
 - **优先级**：P2
 - **依赖**：whisper.cpp Swift 绑定 / MLX-Voice 开源仓库 / OpenVoice v2 蒸馏模型 / `KeychainManager`（已有）/ `TTSVoiceCatalog`（已有，需扩展支持定制音色）。
 - **关键交付**：离线状态下 Whisper tiny 中文 WER ≤15%；MLX-Voice TTS MOS ≥3.5；`VoiceCloner` 接受 5 秒样本生成定制音色；`VoiceService` 默认行为不变（SFSpeech + AVSpeech），现有调用方零改动。
-- **当前状态**：v1.4 `NativeASREngine` 基于 `SFSpeechURLRecognitionRequest` 实现文件级识别（支持 wav/caf/m4a/mp3/aac，CI 环境跳过）；`NativeTTSEngine` 基于 `AVSpeechSynthesizer.write` 收集 PCM Buffer 编码为 WAV（含 44 字节 RIFF/WAVE 头）；Whisper.cpp / MLX-Voice 待 v1.6 集成。
+- **当前状态**：v1.4 `NativeASREngine` 基于 `SFSpeechURLRecognitionRequest` 实现文件级识别（支持 wav/caf/m4a/mp3/aac，CI 环境跳过）；`NativeTTSEngine` 基于 `AVSpeechSynthesizer.write` 收集 PCM Buffer 编码为 WAV（含 44 字节 RIFF/WAVE 头）；v1.6 `WhisperASREngine`（`requiresNetwork = false`，降级到 `NativeASREngine`）与 `MLXVoiceTTSEngine`（条件编译 `#if canImport(MLXVoice)`，降级到 `NativeTTSEngine`）骨架已交付，whisper.cpp / MLX-Voice 真实推理待 Rust FFI / SPM 依赖集成。
 
 #### 6.1.3 端侧图像生成
 
-- **版本归属**：v1.3（占位）/ v1.6（SD Mobile 集成）
+- **版本归属**：v1.3（占位）/ v1.6（SD Mobile 骨架已交付，真实推理待集成）
 - **优先级**：P3
 - **依赖**：apple/swift-coreml Stable Diffusion 仓库 / Draw Things app / CoreML 模型转换工具 / 全局内存预算器。
 - **关键交付**：Mac 上 512×512 20 step 图像生成 ≤15s，内存峰值 ≤4GB；iPad Pro 可完成 256×256 4 step 生成 ≤30s；iPhone 15 Pro 限定 256×256 4 step，连续 5 次生成无 OOM；`generate_image` 工具被 LLM 正确调用，返回 PNG/JPEG 数据可在消息气泡内联显示。
-- **当前状态**：v1.3 `PlaceholderImageGenerationEngine` 占位实现返回 `platformUnsupported` 错误；v1.6 将由 `SDMobileEngine` 接管。
+- **当前状态**：v1.3 `PlaceholderImageGenerationEngine` 占位实现返回 `platformUnsupported` 错误；v1.6 `SDMobileEngine` 骨架已交付（条件编译 `#if canImport(CoreML)`，当前抛 `platformUnsupported`），SD Mobile 真实推理待 CoreML 模型集成。
 
 #### 6.1.4 跨平台 OCR
 
@@ -2567,21 +2567,21 @@ end
 
 #### 6.1.5 多模态融合
 
-- **版本归属**：v1.3（Facade + MemoryBudget + DeviceCapability 已交付）/ v1.6（4 个接口全部真实实现）
+- **版本归属**：v1.3（Facade + MemoryBudget + DeviceCapability 已交付）/ v1.6（4 个接口已全部有引擎实现，含降级兜底）
 - **优先级**：P2
 - **依赖**：6.1.1 VLM / 6.1.2 语音增强 / 6.1.3 图像生成 / 6.1.4 OCR 全部交付后方可整合。
 - **关键交付**：`MultimodalFacade` 4 个接口全部实现并注册到 `ToolRegistry`，LLM 可调用 4 个新工具；用户可一次输入"图片 + 文字"混合内容，VLM 正确理解并回答；全局内存预算器在峰值超限时自动降级，无 OOM 崩溃。
-- **当前状态**：v1.3 已交付 `MultimodalFacade` 门面（5 个引擎注入接口 + 4 个工具方法 + 内存预算快照），4 个多模态工具已注册到 `ToolRegistry`；v1.4 默认引擎已切换为 Native 实现；v1.6 待 SD Mobile 与 OpenVoice 落地后 4 个接口全部真实实现。
+- **当前状态**：v1.3 已交付 `MultimodalFacade` 门面（5 个引擎注入接口 + 4 个工具方法 + 内存预算快照），4 个多模态工具已注册到 `ToolRegistry`；v1.4 默认引擎已切换为 Native 实现；v1.6 已交付 5 个新引擎骨架 + `createWithAutoFallback()` 静态工厂方法，4 个接口已全部有引擎实现（含 MLX → Native → Placeholder 降级兜底），待 SPM 依赖集成后切换到真实引擎。
 
-#### 6.1.6 端侧多模态引擎状态汇总（v1.3 + v1.4）
+#### 6.1.6 端侧多模态引擎状态汇总（v1.3 + v1.4 + v1.6）
 
-| 引擎协议 | v1.3 占位实现 | v1.4 Native 实现 | v1.6 计划实现 |
+| 引擎协议 | v1.3 占位实现 | v1.4 Native 实现 | v1.6 已交付（骨架 + 降级）|
 |----------|--------------|------------------|--------------|
-| `VisionInferenceEngine` | `PlaceholderVisionEngine` | `NativeVisionEngine`（Vision 框架）| `MLXVisionEngine`（MLX-VLM）|
-| `ASREngine` | `PlaceholderASREngine` | `NativeASREngine`（SFSpeech 文件识别）| `WhisperASREngine`（whisper.cpp）|
-| `TTSEngine` | `PlaceholderTTSEngine` | `NativeTTSEngine`（AVSpeechSynthesizer.write）| `MLXVoiceTTSEngine`（MLX-Voice）|
-| `VoiceCloner` | `PlaceholderVoiceCloner` | —（仍为占位）| `OpenVoiceCloner`（OpenVoice v2）|
-| `ImageGenerationEngine` | `PlaceholderImageGenerationEngine` | —（仍为占位）| `SDMobileEngine`（SD Mobile）|
+| `VisionInferenceEngine` | `PlaceholderVisionEngine` | `NativeVisionEngine`（Vision 框架）| `MLXVisionEngine`（MLX-VLM，条件编译，降级到 Native）|
+| `ASREngine` | `PlaceholderASREngine` | `NativeASREngine`（SFSpeech 文件识别）| `WhisperASREngine`（whisper.cpp，离线，降级到 Native）|
+| `TTSEngine` | `PlaceholderTTSEngine` | `NativeTTSEngine`（AVSpeechSynthesizer.write）| `MLXVoiceTTSEngine`（MLX-Voice，条件编译，降级到 Native）|
+| `VoiceCloner` | `PlaceholderVoiceCloner` | —（仍为占位）| `OpenVoiceCloner`（OpenVoice v2，桩实现 + Keychain 存储）|
+| `ImageGenerationEngine` | `PlaceholderImageGenerationEngine` | —（仍为占位）| `SDMobileEngine`（SD Mobile，条件编译，当前抛 `platformUnsupported`）|
 
 ### 6.2 跨设备协同与生态展望（v2.0 ~ v2.5）
 
