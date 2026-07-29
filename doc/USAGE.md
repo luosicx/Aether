@@ -935,7 +935,7 @@ xcodebuild build \
   -configuration Debug \
   CODE_SIGNING_ALLOWED=NO
 
-# 2. 运行 UT（3314 用例，0 skip）
+# 2. 运行 UT（3359 用例，0 skip）
 xcodebuild test \
   -project Aether.xcodeproj \
   -scheme Aether-iOS \
@@ -963,7 +963,7 @@ xcodebuild test \
 
 | 测试套件 | 用例总数 | skipped | failures |
 |---|---|---|---|
-| UT（`AetherTests`） | 3314 | 0 | 0 |
+| UT（`AetherTests`） | 3359 | 0 | 0 |
 | UIT（`AetherUITests`） | 30 | 0 | 0 |
 
 ### skipped 原因
@@ -1074,7 +1074,7 @@ GitHub Actions 配置文件：`.github/workflows/ci.yml`
 
 ### Q10: UIT 测试不稳定？
 
-**A**：`contextMenu` 长按触发、Picker 导航式选项、邮件 composer 在模拟器上行为有差异，已用 `throw XCTSkip` 兜底跳过不稳定用例。**底层逻辑已由 UT 覆盖**（`ChatStorageTests` / `ConversationListVMTests` / `TTSConfigTests` / `TTSVoiceCatalogTests` 等）。当前 UIT 规模 30 用例（0 skip，0 failures），UT 规模 3314 用例（0 skip，0 failures）。
+**A**：`contextMenu` 长按触发、Picker 导航式选项、邮件 composer 在模拟器上行为有差异，已用 `throw XCTSkip` 兜底跳过不稳定用例。**底层逻辑已由 UT 覆盖**（`ChatStorageTests` / `ConversationListVMTests` / `TTSConfigTests` / `TTSVoiceCatalogTests` 等）。当前 UIT 规模 30 用例（0 skip，0 failures），UT 规模 3359 用例（0 skip，0 failures）。
 
 ### Q11: App Intents / Siri 调用无响应？
 
@@ -1187,6 +1187,6 @@ await facade.setTTSEngine(MLXVoiceTTSEngine())       // 需引入 MLX-Voice SPM 
 - VoiceCloner: `OpenVoiceCloner`（v1.6）→ `PlaceholderVoiceCloner`（v1.3）
 - ImageGen: `SDMobileEngine`（v1.6）→ `PlaceholderImageGenerationEngine`（v1.3）
 
-**测试覆盖**：新增 5 个测试文件（`AetherTests/Multimodal/`），共 40 个测试用例：MLXVisionEngineTests（7）/ WhisperASREngineTests（8）/ MLXVoiceTTSEngineTests（7）/ OpenVoiceClonerTests（11）/ SDMobileEngineTests（7）。
+**测试覆盖**：新增 5 个测试文件（`AetherTests/Multimodal/`），共 45 个测试用例：MLXVisionEngineTests（8）/ WhisperASREngineTests（8）/ MLXVoiceTTSEngineTests（9）/ OpenVoiceClonerTests（12）/ SDMobileEngineTests（8）。
 
 **后续工作**：MLX-VLM / Whisper.cpp / MLX-Voice / OpenVoice / SD Mobile 的真实推理依赖尚未集成，需引入对应 SPM 包 / Rust FFI。待依赖集成后通过 `MultimodalFacade.setXxxEngine()` 切换到真实引擎，原生引擎作为兜底。

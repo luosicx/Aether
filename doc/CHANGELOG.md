@@ -17,7 +17,7 @@
 - **OpenVoiceCloner**：基于 OpenVoice v2 的语音克隆引擎，桩实现 + 256 维 embedding 向量 + Keychain 存储
 - **SDMobileEngine**：基于 Stable Diffusion Mobile / CoreML 的端侧图像生成引擎，条件编译 `#if canImport(CoreML)`
 - **MultimodalFacade.createWithAutoFallback()**：新增静态工厂方法，实现 MLX → Native → Placeholder 自动降级链路
-- **测试**：新增 5 个测试文件（MLXVisionEngineTests / WhisperASREngineTests / MLXVoiceTTSEngineTests / OpenVoiceClonerTests / SDMobileEngineTests），共 40 个测试用例
+- **测试**：新增 5 个测试文件（MLXVisionEngineTests / WhisperASREngineTests / MLXVoiceTTSEngineTests / OpenVoiceClonerTests / SDMobileEngineTests），共 45 个测试用例
 
 #### 引擎降级策略
 - VLM: MLXVisionEngine（v1.6）→ NativeVisionEngine（v1.4）→ PlaceholderVisionEngine（v1.3）
@@ -30,6 +30,9 @@
 - MLX-VLM / Whisper.cpp / MLX-Voice / OpenVoice / SD Mobile 的真实推理依赖尚未集成（需引入 SPM 包 / Rust FFI）
 - 当前 5 个引擎均走降级/桩实现路径，架构接入点已就绪
 - 待 SPM 依赖集成后通过 `MultimodalFacade.setXxxEngine()` 切换到真实引擎
+
+#### Tests
+- **测试规模**：UT 从 3481 增至 3526（+45 用例：iOS/macOS 3314 → 3359，5 个新测试文件）。
 
 ---
 

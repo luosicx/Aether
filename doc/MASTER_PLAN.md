@@ -62,7 +62,7 @@
 | v1.3 | 2026-07-25（已完成） | 端侧多模态 Phase 1（协议抽象 + 4 个多模态工具 + 跨平台 OCR + 占位引擎） |
 | v1.4 | 2026-07-25（已完成） | 端侧多模态 Phase 1.5（Apple 原生引擎：NativeVision / NativeASR / NativeTTS 替换占位） |
 | v1.5 | 2026-07-26（已完成） | 跨平台扩展（Windows + Android 双端交付） |
-| v1.6 | 2026-07-29（已完成） | 端侧多模态 Phase 2（5 个引擎骨架实现 + 条件编译降级 + 40 个测试用例） |
+| v1.6 | 2026-07-29（已完成） | 端侧多模态 Phase 2（5 个引擎骨架实现 + 条件编译降级 + 45 个测试用例） |
 | v2.0 | 2027 Q4 | 跨端协作（iCloud / Handoff / visionOS / Web 伴侣） |
 | v2.5 | 2028 Q1 | 生态扩展（插件市场 / 热更新 / MCP 共建 / Android 深化） |
 | v3.0 | 2028 Q2 | 智能平台（Apple Intelligence / 本地 RAG 增强 / AI Workflow / 多 Agent 协作） |
@@ -161,7 +161,7 @@ gantt
 | v1.3 ✅ | 多模态协议抽象（VisionInferenceEngine / ASREngine / TTSEngine / VoiceCloner / ImageGenerationEngine）/ 4 个多模态工具 / 跨平台 OCR / 占位实现 / MultimodalFacade + MemoryBudget + DeviceCapability | OnDeviceModelDownloader / 全局内存预算器 |
 | v1.4 ✅ | NativeVisionEngine（基于 Vision）/ NativeASREngine（基于 SFSpeech）/ NativeTTSEngine（基于 AVSpeechSynthesizer.write）替换占位实现；MultimodalFacade 默认切换为 Native 引擎 | v1.3 协议抽象与 Facade |
 | v1.5 ✅ | Windows 端（WPF .NET 8：会话 / 设置 / Markdown / i18n / DPAPI / 流式 / Rust FFI）/ Android 端（Kotlin + Compose：RAG UI / Health UI / Room / 长按菜单 / Markdown / i18n / Rust JNI 4 函数） | v1.0 Rust 核心 + BFF |
-| v1.6 ✅ | MLX-VLM / Whisper.cpp ASR + MLX-Voice TTS + OpenVoice 语音克隆 / 端侧图像生成（SD Mobile）骨架实现 + 条件编译降级链路 + 40 个测试用例 | v1.4 Native 引擎作为兜底 |
+| v1.6 ✅ | MLX-VLM / Whisper.cpp ASR + MLX-Voice TTS + OpenVoice 语音克隆 / 端侧图像生成（SD Mobile）骨架实现 + 条件编译降级链路 + 45 个测试用例 | v1.4 Native 引擎作为兜底 |
 | v2.0 | iCloud 同步 / Handoff / visionOS 适配 / Web 伴侣 / macOS 多窗口 | v1.6 端侧 VLM / v1.2 设计升级 |
 | v2.5 | 社区插件市场 / 插件热更新 / MCP 共建 / Android 伴侣深化 | v2.0 跨端协作 |
 | v3.0 | Apple Intelligence 集成 / 本地 RAG 增强 / 多 Agent 协作 / AI Workflow | v1.3 VLM / v2.5 插件市场 |
@@ -2531,7 +2531,7 @@ end
 > - v1.3 已交付协议抽象（`VisionInferenceEngine` / `ASREngine` / `TTSEngine` / `VoiceCloner` / `ImageGenerationEngine`）、`MultimodalFacade` 门面、`MemoryBudget` 全局内存预算器、`DeviceCapability` 设备能力分级、4 个多模态工具（`describe_image` / `transcribe_audio` / `clone_voice` / `generate_image`）、跨平台 OCRTool 改造、占位实现。UT 3290。
 > - v1.4 已交付 Apple 原生引擎实现：`NativeVisionEngine`（Vision 框架 5 并发请求：分类 / 人脸 / 矩形 / 文字 / 条码）/ `NativeASREngine`（`SFSpeechURLRecognitionRequest` 文件识别）/ `NativeTTSEngine`（`AVSpeechSynthesizer.write` 收集 PCM Buffer 编码 WAV）。`MultimodalFacade` 默认从 Placeholder 切换为 Native 引擎，三端原生可用。新增 24 个测试用例，UT 3314。
 > - v1.5 已交付跨平台扩展：Windows（WPF .NET 8）与 Android（Kotlin + Compose）双端落地，Rust 核心通过 FFI / JNI 跨端复用，详见 6.7 跨平台扩展展望。
-> - v1.6 已交付：5 个引擎骨架实现 + 条件编译降级 + 40 个测试用例。`MLXVisionEngine` / `WhisperASREngine` / `MLXVoiceTTSEngine` / `OpenVoiceCloner` / `SDMobileEngine` 骨架就绪，`MultimodalFacade.createWithAutoFallback()` 静态工厂方法实现 MLX → Native → Placeholder 自动降级链路。MLX-VLM / Whisper.cpp / MLX-Voice / OpenVoice / SD Mobile 的真实推理依赖尚未集成（需引入 SPM 包 / Rust FFI），当前 5 个引擎均走降级/桩实现路径。
+> - v1.6 已交付：5 个引擎骨架实现 + 条件编译降级 + 45 个测试用例。`MLXVisionEngine` / `WhisperASREngine` / `MLXVoiceTTSEngine` / `OpenVoiceCloner` / `SDMobileEngine` 骨架就绪，`MultimodalFacade.createWithAutoFallback()` 静态工厂方法实现 MLX → Native → Placeholder 自动降级链路。MLX-VLM / Whisper.cpp / MLX-Voice / OpenVoice / SD Mobile 的真实推理依赖尚未集成（需引入 SPM 包 / Rust FFI），当前 5 个引擎均走降级/桩实现路径。
 
 #### 6.1.1 端侧视觉理解（VLM）
 

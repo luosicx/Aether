@@ -14,7 +14,7 @@
 - **Android 端**（Kotlin + Jetpack Compose）：RAG UI / Health UI / Room 数据库生产使用 / 消息长按菜单 / Markdown（Markwon 4.6.2）/ i18n / Rust JNI（4 函数）
 - **29 个工具**（18 跨平台含 4 多模态 + 11 macOS 独有），ReAct 循环最大 5 轮
 - **8 种语言** i18n（zh-Hans / zh-Hant / en / ja / ko / fr / de / es），888 keys
-- **3481 UT**（iOS/macOS 3314 + Windows 72 + Android 95）+ 30 UIT，0 failures / 0 skips
+- **3526 UT**（iOS/macOS 3359 + Windows 72 + Android 95）+ 30 UIT，0 failures / 0 skips
 - 多 Provider（DeepSeek / Qwen / MLX 端侧）+ SmartRouter + Fallback 自动降级
 - SwiftLint + SwiftFormat 代码质量工具链，CI 集成脚本
 - **Watch App 源代码**就绪（`AetherWatch/`，⚠️ 需手动创建 Xcode target）
@@ -237,7 +237,7 @@
 
 ### L.3 测试覆盖
 
-- [x] 5 个测试文件（MLXVisionEngineTests / WhisperASREngineTests / MLXVoiceTTSEngineTests / OpenVoiceClonerTests / SDMobileEngineTests），共 40 个测试用例
+- [x] 5 个测试文件（MLXVisionEngineTests / WhisperASREngineTests / MLXVoiceTTSEngineTests / OpenVoiceClonerTests / SDMobileEngineTests），共 45 个测试用例
 
 ### L.4 后续工作
 

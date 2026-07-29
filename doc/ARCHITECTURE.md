@@ -1724,7 +1724,7 @@ sequenceDiagram
 | PerformanceMonitor | `Services/Performance/PerformanceMonitor.swift` | iOS 17.0+ / macOS 14.0+ |
 | PrivacyInfo.xcprivacy | `Resources/PrivacyInfo.xcprivacy` | iOS 17.0+ / macOS 14.0+ / Xcode 16+（App Store 审核要求） |
 | AttributedString（Markdown） | `Views/Chat/Markdown*.swift` / `CodeSyntaxHighlighter.swift` | iOS 17.0+ / macOS 14.0+ / Foundation |
-| XCTest | `AetherTests/` 190 文件（3314 用例） | Xcode 16+ / Swift 5.9+ |
+| XCTest | `AetherTests/` 195 文件（3359 用例） | Xcode 16+ / Swift 5.9+ |
 | XCUITest | `AetherUITests/` 7 文件（30 用例） | Xcode 16+ / Swift 5.9+ |
 | GitHub Actions | `.github/workflows/ci.yml` | macos-14 runner / Xcode 16+ |
 | CoreLocation | CLLocationManager + CLGeocoder | LocationTool 定位与反地理编码 | iOS 17.0+ / macOS 14.0+ / CoreLocation.framework |
@@ -1769,7 +1769,7 @@ sequenceDiagram
 ### 7.1 单元测试（UT）
 
 - **Target**：`AetherTests`
-- **规模**：190 个测试文件，3314 用例（3314 pass / 0 skip / 0 failures）
+- **规模**：195 个测试文件，3359 用例（3359 pass / 0 skip / 0 failures）
 - **分层覆盖**：
 
 | 层级 | 测试文件 | 文件数 | 核心断言数（约） | skip 原因 |
@@ -2121,7 +2121,7 @@ CloudflareWorkers/               # BFF 代理网关
 ├── worker.js
 └── wrangler.toml
 
-AetherTests/                  # 190 个 UT 文件 / 3314 用例
+AetherTests/                  # 195 个 UT 文件 / 3359 用例
 ├── APIConfigTests.swift
 ├── AlarmToolTests.swift
 ├── BFFProxyClientTests.swift
@@ -2258,7 +2258,7 @@ README.md
   - `OpenVoiceCloner`：基于 OpenVoice v2，桩实现 + 256 维 embedding 向量 + Keychain 存储
   - `SDMobileEngine`：基于 Stable Diffusion Mobile / CoreML，条件编译 `#if canImport(CoreML)`，当前抛 `platformUnsupported`
   - `MultimodalFacade.createWithAutoFallback()`：新增静态工厂方法，实现 MLX → Native → Placeholder 自动降级链路
-  - 新增 5 个测试文件（40 个测试用例）：MLXVisionEngineTests / WhisperASREngineTests / MLXVoiceTTSEngineTests / OpenVoiceClonerTests / SDMobileEngineTests
+  - 新增 5 个测试文件（45 个测试用例）：MLXVisionEngineTests / WhisperASREngineTests / MLXVoiceTTSEngineTests / OpenVoiceClonerTests / SDMobileEngineTests
   - **状态说明**：MLX-VLM / Whisper.cpp / MLX-Voice / OpenVoice / SD Mobile 的真实推理依赖尚未集成（需引入 SPM 包 / Rust FFI），当前 5 个引擎均走降级/桩实现路径，架构接入点已就绪
 
 #### 9.1.1 VLM 集成点（v1.6 骨架已交付）
