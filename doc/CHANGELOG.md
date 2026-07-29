@@ -6,6 +6,33 @@
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-07-29
+
+### 端侧多模态 Phase 2 — MLX 引擎集成
+
+#### Added — iOS / macOS 端（5 个新引擎 + Facade 增强）
+- **MLXVisionEngine**：基于 MLX-VLM（Qwen2-VL-2B Q4 等）的视觉理解引擎，条件编译 `#if canImport(MLXLLM) && canImport(MLXLMCommon)`，不可用时降级到 `NativeVisionEngine`（Apple Vision 框架兜底）
+- **WhisperASREngine**：基于 whisper.cpp Rust 绑定的离线 ASR 引擎，`requiresNetwork = false`（完全离线），降级到 `NativeASREngine`（Apple Speech 框架兜底）
+- **MLXVoiceTTSEngine**：基于 MLX-Voice（Kokoro/Matcha-TTS）的端侧 TTS 引擎，条件编译 `#if canImport(MLXVoice)`，降级到 `NativeTTSEngine`（AVSpeechSynthesizer 兜底）
+- **OpenVoiceCloner**：基于 OpenVoice v2 的语音克隆引擎，桩实现 + 256 维 embedding 向量 + Keychain 存储
+- **SDMobileEngine**：基于 Stable Diffusion Mobile / CoreML 的端侧图像生成引擎，条件编译 `#if canImport(CoreML)`
+- **MultimodalFacade.createWithAutoFallback()**：新增静态工厂方法，实现 MLX → Native → Placeholder 自动降级链路
+- **测试**：新增 5 个测试文件（MLXVisionEngineTests / WhisperASREngineTests / MLXVoiceTTSEngineTests / OpenVoiceClonerTests / SDMobileEngineTests），共 40 个测试用例
+
+#### 引擎降级策略
+- VLM: MLXVisionEngine（v1.6）→ NativeVisionEngine（v1.4）→ PlaceholderVisionEngine（v1.3）
+- ASR: WhisperASREngine（v1.6）→ NativeASREngine（v1.4）→ PlaceholderASREngine（v1.3）
+- TTS: MLXVoiceTTSEngine（v1.6）→ NativeTTSEngine（v1.4）→ PlaceholderTTSEngine（v1.3）
+- VoiceCloner: OpenVoiceCloner（v1.6）→ PlaceholderVoiceCloner（v1.3）
+- ImageGen: SDMobileEngine（v1.6）→ PlaceholderImageGenerationEngine（v1.3）
+
+#### 状态说明
+- MLX-VLM / Whisper.cpp / MLX-Voice / OpenVoice / SD Mobile 的真实推理依赖尚未集成（需引入 SPM 包 / Rust FFI）
+- 当前 5 个引擎均走降级/桩实现路径，架构接入点已就绪
+- 待 SPM 依赖集成后通过 `MultimodalFacade.setXxxEngine()` 切换到真实引擎
+
+---
+
 ## [1.5.0] - 2026-07-26
 
 ### v1.5 跨平台扩展（Windows + Android 双端交付，Rust 核心通过 DLL FFI 与 JNI 多形态复用）

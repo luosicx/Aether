@@ -2232,8 +2232,9 @@ README.md
 
 > 本章节面向 v1.5~v3.0+ 远期演进（详见 `doc/MASTER_PLAN.md`），描述各方向的架构扩展点与关键技术决策。
 > **v1.3 / v1.4 已落地**：9.1 端侧多模态架构（协议抽象 + Apple 原生引擎）已实施，下方原规划保留作为 v1.6 MLX 集成参考。
+> **v1.6 已交付**：5 个端侧多模态引擎骨架（MLXVisionEngine / WhisperASREngine / MLXVoiceTTSEngine / OpenVoiceCloner / SDMobileEngine）+ `MultimodalFacade.createWithAutoFallback()` 自动降级链路，架构接入点就绪，真实推理待 SPM 依赖集成。
 
-### 9.1 端侧多模态架构（v1.3 + v1.4 已实施）
+### 9.1 端侧多模态架构（v1.3 + v1.4 + v1.6 已实施）
 
 #### 9.1.0 当前实施状态
 
@@ -2250,9 +2251,17 @@ README.md
   - `NativeASREngine`：基于 `SFSpeechURLRecognitionRequest` 文件级识别（支持 wav/caf/m4a/mp3/aac；CI 环境识别器不可用时抛 `asrRecognitionFailed`）
   - `NativeTTSEngine`：基于 `AVSpeechSynthesizer.write` 收集 PCM Buffer 编码为 WAV（44 字节 RIFF/WAVE 头；CI 环境返回最小空 WAV 头；30s 超时保护）
   - `MultimodalFacade.init()` 默认从 `PlaceholderXxx` 切换为 `NativeXxx`（`voiceCloner` / `imageGenEngine` 仍为占位，待 v1.6）
-- **v1.6 规划**：MLX-VLM / Whisper.cpp / MLX-Voice / OpenVoice v2 / SD Mobile 集成，Native 引擎作为 MLX 路径不可用时的兜底
+- **v1.6 已交付**：5 个端侧多模态引擎骨架实现 + 自动降级链路（2026-07-29）
+  - `MLXVisionEngine`：基于 MLX-VLM（Qwen2-VL-2B Q4 等），条件编译 `#if canImport(MLXLLM) && canImport(MLXLMCommon)`，不可用时降级到 `NativeVisionEngine`
+  - `WhisperASREngine`：基于 whisper.cpp Rust 绑定，`requiresNetwork = false`（完全离线），降级到 `NativeASREngine`
+  - `MLXVoiceTTSEngine`：基于 MLX-Voice（Kokoro/Matcha-TTS），条件编译 `#if canImport(MLXVoice)`，降级到 `NativeTTSEngine`
+  - `OpenVoiceCloner`：基于 OpenVoice v2，桩实现 + 256 维 embedding 向量 + Keychain 存储
+  - `SDMobileEngine`：基于 Stable Diffusion Mobile / CoreML，条件编译 `#if canImport(CoreML)`，当前抛 `platformUnsupported`
+  - `MultimodalFacade.createWithAutoFallback()`：新增静态工厂方法，实现 MLX → Native → Placeholder 自动降级链路
+  - 新增 5 个测试文件（40 个测试用例）：MLXVisionEngineTests / WhisperASREngineTests / MLXVoiceTTSEngineTests / OpenVoiceClonerTests / SDMobileEngineTests
+  - **状态说明**：MLX-VLM / Whisper.cpp / MLX-Voice / OpenVoice / SD Mobile 的真实推理依赖尚未集成（需引入 SPM 包 / Rust FFI），当前 5 个引擎均走降级/桩实现路径，架构接入点已就绪
 
-#### 9.1.1 VLM 集成点（v1.6 规划）
+#### 9.1.1 VLM 集成点（v1.6 骨架已交付）
 
 扩展现有 `MLXInferenceEngine`（位于 `Services/OnDevice/MLXInferenceEngine.swift`），新增 `generate(prompt:images:)` 接口支持图像输入：
 
@@ -2266,9 +2275,7 @@ extension MLXInferenceEngine {
 - 通过 `OfflineLLMProvider` 适配为 `LLMProvider` 协议，与现有 ChatViewModel 流式通路无缝衔接。
 - v1.4 临时方案：`NativeVisionEngine` 通过 Vision 框架的 5 个请求提供基础图像理解（分类 / 人脸 / 矩形 / 文字 / 条码），置信度 <0.6 时可作为 MLX-VLM 路径的兜底。
 
-#### 9.1.2 ASR / TTS 引擎抽象（v1.3 已实施 / v1.6 增强）
-
-引入 `ASREngine` 与 `TTSEngine` 协议，解耦具体实现（位于 `Aether/Services/Multimodal/ASREngine.swift` / `TTSEngine.swift`）：
+#### 9.1.2 ASR / TTS 引擎抽象（v1.3 已实施 / v1.4 Native / v1.6 骨架已交付）
 
 ```swift
 public protocol ASREngine: Sendable {
@@ -2289,7 +2296,7 @@ public protocol TTSEngine: Sendable {
 
 - **v1.3 占位实现**：`PlaceholderASREngine` / `PlaceholderTTSEngine`（返回提示信息或空 Data）
 - **v1.4 Native 实现**：`NativeASREngine`（基于 `SFSpeechURLRecognitionRequest` 文件识别）/ `NativeTTSEngine`（基于 `AVSpeechSynthesizer.write` PCM 收集 + WAV 编码）
-- **v1.6 计划实现**：`WhisperASREngine`（whisper.cpp Rust 绑定）/ `MLXVoiceTTSEngine`（端侧 TTS 模型）
+- **v1.6 已交付（骨架 + 降级兜底）**：`WhisperASREngine`（whisper.cpp Rust 绑定，`requiresNetwork = false`，降级到 `NativeASREngine`）/ `MLXVoiceTTSEngine`（MLX-Voice 端侧 TTS，条件编译 `#if canImport(MLXVoice)`，降级到 `NativeTTSEngine`）。真实推理依赖尚未集成，当前走降级路径。
 
 #### 9.1.3 MultimodalFacade 统一入口（v1.3 已实施）
 

@@ -595,6 +595,16 @@
 		A14000000000000000000007 /* NativeASREngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A14000000000000000000005 /* NativeASREngine.swift */; };
 		A14000000000000000000009 /* NativeTTSEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A14000000000000000000008 /* NativeTTSEngine.swift */; };
 		A1400000000000000000000A /* NativeTTSEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A14000000000000000000008 /* NativeTTSEngine.swift */; };
+		A1400000000000000000000F /* MLXVisionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1400000000000000000000E /* MLXVisionEngine.swift */; };
+		A14000000000000000000010 /* MLXVisionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1400000000000000000000E /* MLXVisionEngine.swift */; };
+		A14000000000000000000012 /* WhisperASREngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A14000000000000000000011 /* WhisperASREngine.swift */; };
+		A14000000000000000000013 /* WhisperASREngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A14000000000000000000011 /* WhisperASREngine.swift */; };
+		A14000000000000000000015 /* MLXVoiceTTSEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A14000000000000000000014 /* MLXVoiceTTSEngine.swift */; };
+		A14000000000000000000016 /* MLXVoiceTTSEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A14000000000000000000014 /* MLXVoiceTTSEngine.swift */; };
+		A14000000000000000000018 /* OpenVoiceCloner.swift in Sources */ = {isa = PBXBuildFile; fileRef = A14000000000000000000017 /* OpenVoiceCloner.swift */; };
+		A14000000000000000000019 /* OpenVoiceCloner.swift in Sources */ = {isa = PBXBuildFile; fileRef = A14000000000000000000017 /* OpenVoiceCloner.swift */; };
+		A1400000000000000000001B /* SDMobileEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1400000000000000000001A /* SDMobileEngine.swift */; };
+		A1400000000000000000001C /* SDMobileEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1400000000000000000001A /* SDMobileEngine.swift */; };
 		A1300000000000000000001D /* DescribeImageTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1300000000000000000001C /* DescribeImageTool.swift */; };
 		A1300000000000000000001E /* DescribeImageTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1300000000000000000001C /* DescribeImageTool.swift */; };
 		A13000000000000000000020 /* TranscribeAudioTool.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1300000000000000000001F /* TranscribeAudioTool.swift */; };
@@ -611,6 +621,11 @@
 		A13000000000000000000033 /* OCRCrossPlatformTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13000000000000000000032 /* OCRCrossPlatformTests.swift */; };
 		A13000000000000000000035 /* PlaceholderEnginesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13000000000000000000034 /* PlaceholderEnginesTests.swift */; };
 		A1400000000000000000000D /* NativeEnginesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1400000000000000000000C /* NativeEnginesTests.swift */; };
+		A1400000000000000000001E /* MLXVisionEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1400000000000000000001D /* MLXVisionEngineTests.swift */; };
+		A14000000000000000000020 /* WhisperASREngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1400000000000000000001F /* WhisperASREngineTests.swift */; };
+		A14000000000000000000022 /* MLXVoiceTTSEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A14000000000000000000021 /* MLXVoiceTTSEngineTests.swift */; };
+		A14000000000000000000024 /* OpenVoiceClonerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A14000000000000000000023 /* OpenVoiceClonerTests.swift */; };
+		A14000000000000000000026 /* SDMobileEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A14000000000000000000025 /* SDMobileEngineTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -1112,6 +1127,11 @@
 		A14000000000000000000002 /* NativeVisionEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NativeVisionEngine.swift; sourceTree = "<group>"; };
 		A14000000000000000000005 /* NativeASREngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NativeASREngine.swift; sourceTree = "<group>"; };
 		A14000000000000000000008 /* NativeTTSEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NativeTTSEngine.swift; sourceTree = "<group>"; };
+		A1400000000000000000000E /* MLXVisionEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MLXVisionEngine.swift; sourceTree = "<group>"; };
+		A14000000000000000000011 /* WhisperASREngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WhisperASREngine.swift; sourceTree = "<group>"; };
+		A14000000000000000000014 /* MLXVoiceTTSEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MLXVoiceTTSEngine.swift; sourceTree = "<group>"; };
+		A14000000000000000000017 /* OpenVoiceCloner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OpenVoiceCloner.swift; sourceTree = "<group>"; };
+		A1400000000000000000001A /* SDMobileEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SDMobileEngine.swift; sourceTree = "<group>"; };
 		A1300000000000000000001C /* DescribeImageTool.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DescribeImageTool.swift; sourceTree = "<group>"; };
 		A1300000000000000000001F /* TranscribeAudioTool.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TranscribeAudioTool.swift; sourceTree = "<group>"; };
 		A13000000000000000000022 /* CloneVoiceTool.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CloneVoiceTool.swift; sourceTree = "<group>"; };
@@ -1124,6 +1144,11 @@
 		A13000000000000000000032 /* OCRCrossPlatformTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OCRCrossPlatformTests.swift; sourceTree = "<group>"; };
 		A13000000000000000000034 /* PlaceholderEnginesTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlaceholderEnginesTests.swift; sourceTree = "<group>"; };
 		A1400000000000000000000C /* NativeEnginesTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NativeEnginesTests.swift; sourceTree = "<group>"; };
+		A1400000000000000000001D /* MLXVisionEngineTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MLXVisionEngineTests.swift; sourceTree = "<group>"; };
+		A1400000000000000000001F /* WhisperASREngineTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WhisperASREngineTests.swift; sourceTree = "<group>"; };
+		A14000000000000000000021 /* MLXVoiceTTSEngineTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MLXVoiceTTSEngineTests.swift; sourceTree = "<group>"; };
+		A14000000000000000000023 /* OpenVoiceClonerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OpenVoiceClonerTests.swift; sourceTree = "<group>"; };
+		A14000000000000000000025 /* SDMobileEngineTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SDMobileEngineTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1407,6 +1432,11 @@
 				A14000000000000000000002 /* NativeVisionEngine.swift */,
 				A14000000000000000000005 /* NativeASREngine.swift */,
 				A14000000000000000000008 /* NativeTTSEngine.swift */,
+				A1400000000000000000000E /* MLXVisionEngine.swift */,
+				A14000000000000000000011 /* WhisperASREngine.swift */,
+				A14000000000000000000014 /* MLXVoiceTTSEngine.swift */,
+				A14000000000000000000017 /* OpenVoiceCloner.swift */,
+				A1400000000000000000001A /* SDMobileEngine.swift */,
 			);
 			path = Multimodal;
 			sourceTree = "<group>";
@@ -1921,6 +1951,11 @@
 				A13000000000000000000032 /* OCRCrossPlatformTests.swift */,
 				A13000000000000000000034 /* PlaceholderEnginesTests.swift */,
 				A1400000000000000000000C /* NativeEnginesTests.swift */,
+				A1400000000000000000001D /* MLXVisionEngineTests.swift */,
+				A1400000000000000000001F /* WhisperASREngineTests.swift */,
+				A14000000000000000000021 /* MLXVoiceTTSEngineTests.swift */,
+				A14000000000000000000023 /* OpenVoiceClonerTests.swift */,
+				A14000000000000000000025 /* SDMobileEngineTests.swift */,
 			);
 			path = Multimodal;
 			sourceTree = "<group>";
@@ -2930,6 +2965,11 @@
 				A13000000000000000000033 /* OCRCrossPlatformTests.swift in Sources */,
 				A13000000000000000000035 /* PlaceholderEnginesTests.swift in Sources */,
 				A1400000000000000000000D /* NativeEnginesTests.swift in Sources */,
+				A1400000000000000000001E /* MLXVisionEngineTests.swift in Sources */,
+				A14000000000000000000020 /* WhisperASREngineTests.swift in Sources */,
+				A14000000000000000000022 /* MLXVoiceTTSEngineTests.swift in Sources */,
+				A14000000000000000000024 /* OpenVoiceClonerTests.swift in Sources */,
+				A14000000000000000000026 /* SDMobileEngineTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -3116,6 +3156,11 @@
 				A14000000000000000000004 /* NativeVisionEngine.swift in Sources */,
 				A14000000000000000000007 /* NativeASREngine.swift in Sources */,
 				A1400000000000000000000A /* NativeTTSEngine.swift in Sources */,
+				A14000000000000000000010 /* MLXVisionEngine.swift in Sources */,
+				A14000000000000000000013 /* WhisperASREngine.swift in Sources */,
+				A14000000000000000000016 /* MLXVoiceTTSEngine.swift in Sources */,
+				A14000000000000000000019 /* OpenVoiceCloner.swift in Sources */,
+				A1400000000000000000001C /* SDMobileEngine.swift in Sources */,
 				A1300000000000000000001A /* ImageGenerationEngine.swift in Sources */,
 				A1300000000000000000001D /* DescribeImageTool.swift in Sources */,
 				A13000000000000000000020 /* TranscribeAudioTool.swift in Sources */,

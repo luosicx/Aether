@@ -143,11 +143,11 @@
 
 ### I.1 端侧多模态
 
-- [~] 端侧视觉理解（v1.3 协议 + 占位已交付；v1.4 替换为 NativeVisionEngine 基于 Apple Vision 框架；MLX-VLM 待 v1.6 集成）
-- [~] 端侧语音识别（v1.3 协议 + 占位已交付；v1.4 替换为 NativeASREngine 基于 SFSpeech 文件识别；Whisper.cpp 待 v1.6 集成）
-- [~] 端侧 TTS 语音合成（v1.3 协议 + 占位已交付；v1.4 替换为 NativeTTSEngine 基于 AVSpeechSynthesizer.write；MLX-Voice 待 v1.6 集成）
-- [ ] 端侧图像生成（Stable Diffusion Mobile / Draw Things API，v1.3 占位已交付，v1.6 集成 SD Mobile）
-- [ ] 端侧语音克隆（OpenVoice v2 蒸馏，v1.3 占位已交付，v1.6 集成真实克隆）
+- [~] 端侧视觉理解（v1.3 协议 + 占位已交付；v1.4 替换为 NativeVisionEngine 基于 Apple Vision 框架；v1.6 集成 MLXVisionEngine 骨架 + 降级到 Native，MLX-VLM 真实推理待 SPM 依赖集成）
+- [~] 端侧语音识别（v1.3 协议 + 占位已交付；v1.4 替换为 NativeASREngine 基于 SFSpeech 文件识别；v1.6 集成 WhisperASREngine 骨架 + 降级到 Native，whisper.cpp 真实推理待 Rust FFI 集成）
+- [~] 端侧 TTS 语音合成（v1.3 协议 + 占位已交付；v1.4 替换为 NativeTTSEngine 基于 AVSpeechSynthesizer.write；v1.6 集成 MLXVoiceTTSEngine 骨架 + 降级到 Native，MLX-Voice 真实推理待 SPM 依赖集成）
+- [~] 端侧图像生成（v1.3 占位已交付；v1.6 集成 SDMobileEngine 骨架（条件编译 `#if canImport(CoreML)`），当前抛 `platformUnsupported`，SD Mobile 真实推理待 CoreML 模型集成）
+- [~] 端侧语音克隆（v1.3 占位已交付；v1.6 集成 OpenVoiceCloner 桩实现 + 256 维 embedding 向量 + Keychain 存储，OpenVoice v2 真实克隆待模型集成）
 - [x] 跨平台 OCR（v1.3 改造 OCRTool 跨平台，iOS + macOS 均可用，基于 Vision `VNRecognizeTextRequest`）
 
 ### I.2 本地化扩展
@@ -217,6 +217,35 @@
 
 ---
 
+## Phase L：端侧多模态 Phase 2（v1.6 已交付）
+
+> 目标：在 v1.4 Apple 原生引擎基础上，引入 MLX-VLM / Whisper.cpp / MLX-Voice / OpenVoice v2 / SD Mobile 五个端侧引擎骨架，建立 MLX → Native → Placeholder 三级降级链路。
+
+✅ v1.6 端侧多模态 Phase 2 已交付（2026-07-29）
+
+### L.1 MLX 引擎骨架集成（5 个新引擎）
+
+- [x] `MLXVisionEngine`：基于 MLX-VLM（Qwen2-VL-2B Q4 等），条件编译 `#if canImport(MLXLLM) && canImport(MLXLMCommon)`，降级到 `NativeVisionEngine`
+- [x] `WhisperASREngine`：基于 whisper.cpp Rust 绑定，`requiresNetwork = false`，降级到 `NativeASREngine`
+- [x] `MLXVoiceTTSEngine`：基于 MLX-Voice（Kokoro/Matcha-TTS），条件编译 `#if canImport(MLXVoice)`，降级到 `NativeTTSEngine`
+- [x] `OpenVoiceCloner`：基于 OpenVoice v2，桩实现 + 256 维 embedding + Keychain 存储
+- [x] `SDMobileEngine`：基于 Stable Diffusion Mobile / CoreML，条件编译 `#if canImport(CoreML)`
+
+### L.2 Facade 增强
+
+- [x] `MultimodalFacade.createWithAutoFallback()`：静态工厂方法，实现 MLX → Native → Placeholder 自动降级链路
+
+### L.3 测试覆盖
+
+- [x] 5 个测试文件（MLXVisionEngineTests / WhisperASREngineTests / MLXVoiceTTSEngineTests / OpenVoiceClonerTests / SDMobileEngineTests），共 40 个测试用例
+
+### L.4 后续工作
+
+- [ ] MLX-VLM / Whisper.cpp / MLX-Voice / OpenVoice / SD Mobile 的真实推理依赖集成（需引入 SPM 包 / Rust FFI）
+- [ ] 待 SPM 依赖集成后通过 `MultimodalFacade.setXxxEngine()` 切换到真实引擎
+
+---
+
 ## 品牌愿景与 Liquid Glass 演进路径
 
 ### 愿景
@@ -233,7 +262,7 @@
 | v1.3 | 端侧多模态 Phase 1（协议抽象 + 占位实现 + 跨平台 OCR + 4 个多模态工具） | ✅ 已完成 |
 | v1.4 | 端侧多模态 Phase 1.5（Apple 原生引擎：NativeVision / NativeASR / NativeTTS） | ✅ 已完成 |
 | v1.5 | 跨平台扩展（Windows WPF .NET 8 + Android Kotlin/Compose + Rust JNI） | ✅ 已完成 |
-| v1.6 | 端侧多模态 Phase 2（MLX-VLM + Whisper + MLX-Voice + SD Mobile） | 📋 规划中 |
+| v1.6 | 端侧多模态 Phase 2（MLX-VLM + Whisper + MLX-Voice + SD Mobile 骨架实现 + 降级兜底） | ✅ 已交付 |
 | v2.0 | 全沉浸式 3D 交互（visionOS 空间计算） | 🔮 远期 |
 
 ### 设计哲学
@@ -255,7 +284,7 @@
 | v1.3 ✅ | 端侧多模态 Phase 1 | 协议抽象、4 个多模态工具、跨平台 OCR、占位引擎 | 2026-07-25 已发布 |
 | v1.4 ✅ | 端侧多模态 Phase 1.5 | NativeVisionEngine / NativeASREngine / NativeTTSEngine 替换占位实现 | 2026-07-25 已发布 |
 | v1.5 ✅ | 跨平台扩展 | Windows WPF .NET 8 + Android Kotlin/Compose + Rust JNI 暴露 | 2026-07-26 已发布 |
-| v1.6 | 端侧多模态 Phase 2 | MLX-VLM、Whisper.cpp、MLX-Voice、SD Mobile 图像生成 | 2027 Q3 |
+| v1.6 ✅ | 端侧多模态 Phase 2 | MLX-VLM、Whisper.cpp、MLX-Voice、SD Mobile 图像生成（骨架实现 + 降级兜底） | 2026-07-29 已发布 |
 | v2.0 | 跨端协作 | iCloud 同步、Web 伴侣、团队协作、Windows ARM64 工具链 | 2027 Q4 |
 | v2.5 | 生态扩展 | 社区插件市场、多 Agent 协作、Android 深化（端侧 MLX/NNAPI 推理） | 2028 Q1 |
 | v3.0 | 生态平台 | SDK、插件市场、visionOS | 2028 Q2 |
@@ -272,7 +301,7 @@
 | BFF 令牌桶仅客户端 | 可被绕过 | v2.0 服务端限流强化 |
 | Candle iOS 受限 | iOS 端侧推理能力受限 | v1.3 评估 MLX 替代方案 |
 | ~~Vision OCR 仅 macOS~~ | ~~iOS 无法离线 OCR~~ | ✅ v1.3 已改造跨平台 OCR |
-| 多模态引擎为 Apple 原生（无 MLX） | 自然度不及 MLX-VLM/Whisper.cpp/MLX-Voice | v1.6 集成 MLX 后端，原生引擎作为兜底 |
+| 多模态引擎为 Apple 原生（MLX 骨架已就绪） | v1.6 仅交付条件编译骨架 + 降级，MLX-VLM/Whisper.cpp/MLX-Voice 真实推理未集成 | 待引入 SPM 包 / Rust FFI 后切换到真实引擎，原生引擎作为兜底 |
 | Plugin 热更新未实现 | 插件版本管理占位 | v2.5 实现热更新与依赖解析 |
 | visionOS target 缺失 | 空间计算体验缺失 | v2.0 新增 visionOS target |
 | Windows 仅 x64 / 无 ARM64 | Windows on ARM 设备不可用 | v2.0 评估 ARM64 工具链与发布 |
