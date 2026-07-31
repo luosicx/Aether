@@ -182,7 +182,7 @@ class MyService {
 
 - 单元测试（UT）放 `AetherTests/`，命名 `<ClassName>Tests.swift`
 - UI 测试（UIT）放 `AetherUITests/`，避免依赖真实网络（用 `UITEST_DISABLE_NETWORK` 启动参数桩回复）
-- 测试用例数：UT 3359 / UIT 30（每新增功能需补对应测试）
+- 测试用例数：UT 3416 / UIT 30（每新增功能需补对应测试）
 - 当前目标：0 skip；若必须跳过，需写明原因并在 Issue 跟踪
 
 ### 2.6 国际化规范
@@ -442,7 +442,7 @@ Closes #789
    ```bash
    # 4.1 代码质量由 CI SonarCloud job 检查（无需本地运行）
 
-   # 4.2 Apple 端：运行 UT（3359 用例，0 skip）
+   # 4.2 Apple 端：运行 UT（3416 用例，0 skip）
    xcodebuild test -project Aether.xcodeproj -scheme Aether-iOS \
      -destination 'platform=iOS Simulator,name=iPhone 17' \
      -only-testing:AetherTests \
@@ -485,7 +485,7 @@ Closes #789
   - **How to test**：测试步骤
   - **Checklist**：
     - [ ] 已通过 CI SonarCloud 代码质量检查
-    - [ ] 已通过本地 Apple UT (3359 用例)
+    - [ ] 已通过本地 Apple UT (3416 用例)
     - [ ] 已通过本地 Apple UIT (30 用例)
     - [ ] 已通过本地 Windows 测试（如涉及 `windows/`，`dotnet test`）
     - [ ] 已通过本地 Android 测试（如涉及 `android/`，`./gradlew testDebugUnitTest`）

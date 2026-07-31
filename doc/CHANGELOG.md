@@ -6,6 +6,54 @@
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-07-30
+
+### 跨端协作 — iCloud / Handoff / visionOS / Web 伴侣 / macOS 多窗口
+
+#### Added — iCloud 同步增强（P1）
+- **CloudKitSyncManager**：`@MainActor ObservableObject` 单例，管理 CloudKit 同步状态（lastSyncDate / pendingChangesCount / conflictCount / isSyncing），集成 `NSPersistentCloudKitContainer.eventChangedNotification` 事件监听，自动检测 CKError 冲突并记录
+- **SyncStatusView**：同步状态 SwiftUI 视图，显示上次同步时间 / 待同步条目数 / 冲突数 / 同步开关，提供手动触发同步按钮
+- **冲突解决策略**：默认 Last-Write-Wins（LWW），CloudKit 内部自动处理，字段级合并待后续扩展
+
+#### Added — Handoff 连续对话（P2）
+- **HandoffManager**：`@MainActor` 单例，管理 `NSUserActivity` 广播与接续
+  - `becomeCurrent(conversationId:lastMessageId:scrollPosition:)`：创建并广播 Handoff activity
+  - `handleContinueActivity(_:)`：解析接续 payload，恢复对话上下文与滚动位置
+  - Activity type：`com.aether.chat.continue`，三端（iPhone / iPad / Mac）共享
+- **HandoffPayload**：`Sendable` 结构体，携带 conversationId / lastMessageId / scrollPosition
+
+#### Added — visionOS 适配骨架（P3）
+- **SpatialChatView**：visionOS 3D 对话界面骨架，`#if os(visionOS)` 条件编译，RealityView 容器 + 消息沿 Z 轴 depth 排列 + SpatialTapGesture 占位
+- **SpatialMessageBubble**：3D 消息气泡组件，玻璃材质效果占位
+- **ToolRegistry+visionOS**：visionOS 工具注册，注册 14 个跨平台工具 + 3 个空间化工具占位（SpatialTool / PinchTool / GazeTool）
+- 所有 visionOS 文件使用 `#if os(visionOS)` 包裹，不影响 iOS/macOS 编译
+
+#### Added — Web 伴侣应用骨架（P3）
+- **HTML/CSS/JS 骨架**：基于 BFF 网关的轻量 Web 客户端，支持登录 / 对话列表 / 流式消息 / 输入发送
+- **BFFClient**：ES6 class，封装 BFF API 调用（login / fetchConversations / sendMessage SSE 流式），带 AbortController 超时与错误归一化
+- **SecureStorage**：基于 Web Crypto API（AES-GCM）+ IndexedDB 的安全存储，替代原生 Keychain
+- **品牌色板**：CSS 变量定义颜色令牌，与 Aether DesignTokens 对齐（DeepSpace / AetherPurple / ElectricBlue）
+- **架构规划**：SwiftWasm + React 集成路径已记录，当前为 HTML/CSS/JS 骨架
+
+#### Added — macOS 多窗口增强（P2）
+- **WindowStateManager**：`@MainActor` 单例，管理多窗口状态持久化
+  - `saveWindowState(conversationId:frame:isFocused:)`：保存窗口位置/大小/焦点状态
+  - `loadWindowState(conversationId:)`：恢复窗口状态
+  - 使用 UserDefaults + JSON 编码持久化，key 前缀 `aether.window.` 避免冲突
+- **WindowState**：`Codable Sendable` 结构体，包含 conversationId / frame / isFocused / lastActiveAt
+
+#### Tests
+- **测试规模**：新增 4 个测试文件，共 57 个测试用例（CloudKitSyncManagerTests 16 + HandoffManagerTests 21 + SpatialChatViewTests 8 + WindowStateManagerTests 12）
+- **UT 总数**：从 3526 增至 3583（+57 用例）
+
+#### 文件变更统计
+- 新增 7 个 Swift 源文件（Aether target）
+- 新增 4 个 Swift 测试文件（AetherTests target）
+- 新增 5 个 Web 文件（HTML / CSS / JS / README）
+- 修改 project.pbxproj（iOS + macOS 双 target 引用）
+
+---
+
 ## [1.6.0] - 2026-07-29
 
 ### 端侧多模态 Phase 2 — MLX 引擎集成
@@ -32,7 +80,7 @@
 - 待 SPM 依赖集成后通过 `MultimodalFacade.setXxxEngine()` 切换到真实引擎
 
 #### Tests
-- **测试规模**：UT 从 3481 增至 3526（+45 用例：iOS/macOS 3314 → 3359，5 个新测试文件）。
+- **测试规模**：UT 从 3481 增至 3583（+45 用例：iOS/macOS 3314 → 3416，5 个新测试文件）。
 - **Rust 单测**：`redact.rs` 新增 3 个 JSON 格式用例（password / token / api_key），Rust 单测从 13 增至 16。
 
 #### Fixed
@@ -129,7 +177,7 @@
   - NativeASREngine：协议契约（name / requiresNetwork）/ loadModel 为 no-op / 不存在文件抛错 / 不支持格式抛错 / 空文件处理
   - NativeTTSEngine：协议契约 / loadModel 为 no-op / 空文本抛错 / 合成返回非空 WAV / voiceId 回退 / 长文本稳定性 / 英文合成
   - MultimodalFacade：默认使用 Native 引擎 / 可切换回 Placeholder / describeImage 集成测试（CI 跳过）
-- **测试规模**：UT 从 3290 增至 3314（+24 用例），测试文件从 189 增至 190
+- **测试规模**：UT 从 3290 增至 3314（+24 用例），测试文件从 189 增至 199
 
 #### CI 修复
 - **NativeTTSEngine 编译错误**：`AVAudioBuffer` 不能直接转换为 `AVAudioPCMBuffer`，通过 `as? AVAudioPCMBuffer` 向下转型修复

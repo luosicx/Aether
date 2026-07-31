@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <title>Aether Web Companion</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <!-- 星空背景层（纯装饰，与 Aether 深空主题一致） -->
+  <div class="starfield" aria-hidden="true"></div>
+
+  <!-- ============ 登录视图 ============ -->
+  <section id="login-view" class="login-view" aria-labelledby="login-title">
+    <header class="login-header">
+      <h1 id="login-title" class="brand-title">Aether Web Companion</h1>
+      <p class="brand-subtitle">v2.0 跨平台 Web 伴侣</p>
+    </header>
+
+    <form id="login-form" class="login-form" autocomplete="on" novalidate>
+      <label class="field">
+        <span class="field-label">BFF 网关地址</span>
+        <input
+          id="bff-endpoint"
+          class="field-input"
+          type="url"
+          name="bff-endpoint"
+          placeholder="https://aether-bff.example.com"
+          autocomplete="url"
+          required
+        />
+      </label>
+
+      <label class="field">
+        <span class="field-label">BFF Token</span>
+        <input
+          id="bff-token"
+          class="field-input"
+          type="password"
+          name="bff-token"
+          placeholder="输入你的 BFF Token"
+          autocomplete="current-password"
+          required
+        />
+      </label>
+
+      <button id="login-button" class="btn btn-primary btn-block" type="submit">登录</button>
+      <p id="login-error" class="field-error" role="alert" hidden></p>
+    </form>
+
+    <!-- WASM 模块占位说明：当前为骨架，SwiftWasm 模块尚未接入 -->
+    <aside class="wasm-note" aria-label="WASM 模块状态">
+      <p>
+        当前为 HTML/CSS/JS 骨架。SwiftWasm 核心模块计划在后续迭代中通过
+        <code>WebAssembly.instantiateStreaming</code> 加载
+        (<code>aether_core.wasm</code>)，提供端侧 Token 校验与本地加密能力。
+      </p>
+    </aside>
+  </section>
+
+  <!-- ============ 主应用视图 ============ -->
+  <div id="app-view" class="app-view" hidden>
+    <header class="app-header">
+      <h1 class="app-title">Aether Web Companion</h1>
+      <button id="logout-button" class="btn btn-ghost" type="button">退出登录</button>
+    </header>
+
+    <main class="app-main">
+      <!-- 对话列表侧栏 -->
+      <aside class="sidebar" aria-label="对话列表">
+        <button id="new-conversation" class="btn btn-primary btn-block" type="button">新建对话</button>
+        <nav id="conversation-list" class="conversation-list" aria-label="历史对话">
+          <!-- 对话列表由 app.js 动态渲染 -->
+          <p class="empty-hint">暂无对话</p>
+        </nav>
+      </aside>
+
+      <!-- 消息显示区 + 输入框 -->
+      <section class="chat-panel" aria-label="消息区">
+        <div id="message-list" class="message-list" role="log" aria-live="polite" aria-label="对话消息">
+          <!-- 消息由 app.js 动态渲染 -->
+        </div>
+
+        <form id="message-form" class="message-form" aria-label="消息输入">
+          <textarea
+            id="message-input"
+            class="message-input"
+            placeholder="输入消息..."
+            rows="1"
+            aria-label="消息内容"
+          ></textarea>
+          <button id="send-button" class="btn btn-primary" type="submit">发送</button>
+        </form>
+      </section>
+    </main>
+  </div>
+
+  <!-- ============ 全局加载指示器 ============ -->
+  <div id="loading-overlay" class="loading-overlay" hidden role="status" aria-live="polite">
+    <div class="loading-spinner" aria-hidden="true"></div>
+    <p id="loading-text" class="loading-text">加载中...</p>
+  </div>
+
+  <!-- 配置须先于 app.js 加载，提供 window.AetherConfig -->
+  <script src="js/config.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

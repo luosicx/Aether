@@ -68,7 +68,7 @@
 - [ ] ToolRegistry.swift 注册数验证：18 个跨平台工具无条件注册，11 个 macOS 独有工具用 `#if os(macOS)` 条件注册
 
 ### 4.3 测试规模
-- [ ] UT 用例数：3359
+- [ ] UT 用例数：3416
 - [ ] UIT 用例数：30
 - [ ] iOS UT 运行：`xcodebuild test -destination 'platform=iOS Simulator,name=iPhone 17'` 全部通过（0 skipped，0 failures）
 - [ ] UIT 运行全部通过（0 failures）
@@ -209,7 +209,7 @@
 ## 4.12 测试规模审计
 
 ### 单元测试（UT）
-- [ ] UT 用例数 = 3359（3359 pass / 0 skip / 0 failures）
+- [ ] UT 用例数 = 3416（3416 pass / 0 skip / 0 failures）
 - [ ] UT 文件数 = 195
 - [ ] 验证命令：
   ```bash
@@ -220,7 +220,7 @@
     -only-testing:AetherTests \
     CODE_SIGNING_ALLOWED=NO 2>&1 | tail -5
   ```
-- [ ] 预期输出包含：`Executed 3359 tests, with 0 failures, 0 skipped`
+- [ ] 预期输出包含：`Executed 3416 tests, with 0 failures, 0 skipped`
 
 ### UI 测试（UIT）
 - [ ] UIT 用例数 = 30（30 pass / 0 skip / 0 failures）
@@ -260,7 +260,7 @@
 
 ### 跨平台测试汇总
 
-- [ ] iOS / macOS Swift UT = 3359（覆盖率 84.25%）
+- [ ] iOS / macOS Swift UT = 3416（覆盖率 84.25%）
 - [ ] Windows xUnit UT = 72
 - [ ] Android JUnit UT = 95
 - [ ] iOS UIT = 30
@@ -273,7 +273,7 @@
 - [ ] `doc/MANUAL_TEST_CHECKLIST.md` 存在且手测项完整
 - [ ] `doc/ReleaseChecklist.md` 存在且 4.1-4.21 审计项完整（含 4.7.1 端侧多模态功能验证）
 - [ ] `doc/BFF_DEPLOYMENT.md` 存在且部署步骤完整
-- [ ] `doc/CONTRIBUTING.md` 存在（贡献指南，UT 数 3359）
+- [ ] `doc/CONTRIBUTING.md` 存在（贡献指南，UT 数 3416）
 - [ ] `doc/CHANGELOG.md` 存在（变更日志，含 v1.4.0 条目）
 - [ ] `doc/API.md` 存在（API 契约文档，含第 9 章 MultimodalFacade API 契约）
 - [ ] `doc/ROADMAP.md` 存在（路线图，v1.0-v1.4 标注 ✅）
@@ -284,7 +284,7 @@
 - [ ] `doc/DMG_PACKAGING.md` 存在（macOS DMG 打包指南）
 - [ ] `README.md` 详细文档章节含 8 个文档链接
 - [ ] 文档间交叉引用链接全部有效（点击不报 404）
-- [ ] 运行 `bash scripts/check-doc-consistency.sh` 输出 PASS（i18n=888 / tools=29 / tests=3359）
+- [ ] 运行 `bash scripts/check-doc-consistency.sh` 输出 PASS（i18n=888 / tools=29 / tests=3416）
 
 ## 4.14 国际化与无障碍审计
 
