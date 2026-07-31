@@ -1,4 +1,6 @@
 import Foundation
+import AetherFoundation
+import AetherServices
 
 // MARK: - AppleIntelligenceProvider
 

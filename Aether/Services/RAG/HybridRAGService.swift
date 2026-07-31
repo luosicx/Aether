@@ -82,6 +82,17 @@ public final class HybridRAGService {
         bm25Retriever.clear()
     }
 
+    // MARK: - 内部类型
+
+    /// RRF 融合中间结果（避免 large_tuple 规则）
+    private struct FusedItem {
+        let id: String
+        let text: String
+        let vectorScore: Double
+        let bm25Score: Double
+        let fusedScore: Double
+    }
+
     // MARK: - 混合检索
 
     /// 执行混合检索
@@ -99,14 +110,9 @@ public final class HybridRAGService {
         let bm25Results = bm25Retriever.search(query: query, topK: 20)
         let bm25Map = Dictionary(bm25Results.map { ($0.documentId, $0.score) }, uniquingKeysWith: { a, _ in a })
 
-        // 2. 构建 RRF 融合输入
-        let vectorRanked = vectorResults.prefix(20).enumerated().map { (index, item) in
-            (id: item.id, text: item.text, rank: index + 1, vectorScore: item.score, bm25Score: bm25Map[item.id] ?? 0)
-        }
-
-        // 3. RRF 融合
-        let fused = vectorRanked.map { item -> (id: String, text: String, vectorScore: Double, bm25Score: Double, fusedScore: Double) in
-            let vectorRank = Double(item.rank)
+        // 2. RRF 融合
+        let fused: [FusedItem] = vectorResults.prefix(20).enumerated().map { index, item in
+            let vectorRank = Double(index + 1)
             let bm25Rank: Double
             if let idx = bm25Results.firstIndex(where: { $0.documentId == item.id }) {
                 bm25Rank = Double(idx + 1)
@@ -114,18 +120,24 @@ public final class HybridRAGService {
                 bm25Rank = Double(bm25Results.count + 1)
             }
             let rrfScore = 1.0 / (rrfK + vectorRank) + 1.0 / (rrfK + bm25Rank)
-            return (id: item.id, text: item.text, vectorScore: item.vectorScore, bm25Score: item.bm25Score, fusedScore: rrfScore)
+            return FusedItem(
+                id: item.id,
+                text: item.text,
+                vectorScore: item.score,
+                bm25Score: bm25Map[item.id] ?? 0,
+                fusedScore: rrfScore
+            )
         }
 
-        // 4. 取 Top10 进入重排序
+        // 3. 取 Top10 进入重排序
         let top10ForRerank = fused.sorted { $0.fusedScore > $1.fusedScore }.prefix(10)
 
-        // 5. Cross-Encoder 重排序
+        // 4. Cross-Encoder 重排序
         let rerankInput = top10ForRerank.map { ($0.id, $0.text) }
         let rerankResults = reranker.rerank(query: query, documents: rerankInput, topK: topK)
         let rerankMap = Dictionary(rerankResults.map { ($0.documentId, $0.score) }, uniquingKeysWith: { a, _ in a })
 
-        // 6. 组装最终结果
+        // 5. 组装最终结果
         return top10ForRerank.map { item in
             HybridResult(
                 documentId: item.id,
