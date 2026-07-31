@@ -160,16 +160,8 @@ final class CloudKitSyncManager: ObservableObject {
             return
         }
 
-        // 事件结束
-        if event.success {
-            lastSyncDate = event.endDate
-            AetherApp.lastICloudSyncDate = event.endDate
-            // 导出成功：减少待同步条目
-            if event.type == .export, pendingChangesCount > 0 {
-                pendingChangesCount = max(0, pendingChangesCount - 1)
-            }
-            Logger.sync.notice("CloudKit 事件成功: type=\(event.type.rawValue, privacy: .public)")
-        } else if let error = event.error {
+        // 事件结束：用 error==nil 判断成功（避免使用部分 SDK 不可用的 Event.success）
+        if let error = event.error {
             Logger.sync.error("CloudKit 事件失败: type=\(event.type.rawValue, privacy: .public) error=\(error.localizedDescription, privacy: .public)")
             // CKError 冲突检测：
             // - serverRecordChanged: 服务端记录已变更，触发 last writer wins 冲突
@@ -178,6 +170,14 @@ final class CloudKitSyncManager: ObservableObject {
                ckError.code == CKError.Code.serverRecordChanged || ckError.code == CKError.Code.batchRequestFailed {
                 recordConflict()
             }
+        } else {
+            lastSyncDate = event.endDate
+            AetherApp.lastICloudSyncDate = event.endDate
+            // 导出成功：减少待同步条目
+            if event.type == .export, pendingChangesCount > 0 {
+                pendingChangesCount = max(0, pendingChangesCount - 1)
+            }
+            Logger.sync.notice("CloudKit 事件成功: type=\(event.type.rawValue, privacy: .public)")
         }
 
         finishSync()
