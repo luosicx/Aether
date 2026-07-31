@@ -1,5 +1,7 @@
 import XCTest
 @testable import Aether
+import AetherFoundation
+import AetherServices
 
 /// v3.0: Apple Intelligence Provider 测试
 final class AppleIntelligenceProviderTests: XCTestCase {
