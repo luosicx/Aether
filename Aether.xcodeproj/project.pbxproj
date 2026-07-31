@@ -626,6 +626,24 @@
 		A14000000000000000000022 /* MLXVoiceTTSEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A14000000000000000000021 /* MLXVoiceTTSEngineTests.swift */; };
 		A14000000000000000000024 /* OpenVoiceClonerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A14000000000000000000023 /* OpenVoiceClonerTests.swift */; };
 		A14000000000000000000026 /* SDMobileEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A14000000000000000000025 /* SDMobileEngineTests.swift */; };
+		A0B201000000000000000101 /* CloudKitSyncManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B201000000000000000001 /* CloudKitSyncManager.swift */; };
+		A0B201000000000000000102 /* SyncStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B201000000000000000002 /* SyncStatusView.swift */; };
+		A0B201000000000000000103 /* HandoffManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B201000000000000000003 /* HandoffManager.swift */; };
+		A0B201000000000000000104 /* SpatialChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B201000000000000000004 /* SpatialChatView.swift */; };
+		A0B201000000000000000105 /* SpatialMessageBubble.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B201000000000000000005 /* SpatialMessageBubble.swift */; };
+		A0B201000000000000000106 /* ToolRegistry+visionOS.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B201000000000000000006 /* ToolRegistry+visionOS.swift */; };
+		A0B201000000000000000107 /* WindowStateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B201000000000000000007 /* WindowStateManager.swift */; };
+		A0B201000000000000000108 /* CloudKitSyncManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B201000000000000000008 /* CloudKitSyncManagerTests.swift */; };
+		A0B201000000000000000109 /* HandoffManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B201000000000000000009 /* HandoffManagerTests.swift */; };
+		A0B20100000000000000010A /* SpatialChatViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B20100000000000000000A /* SpatialChatViewTests.swift */; };
+		A0B20100000000000000010B /* WindowStateManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B20100000000000000000B /* WindowStateManagerTests.swift */; };
+		A0B201000000000000000201 /* CloudKitSyncManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B201000000000000000001 /* CloudKitSyncManager.swift */; };
+		A0B201000000000000000202 /* SyncStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B201000000000000000002 /* SyncStatusView.swift */; };
+		A0B201000000000000000203 /* HandoffManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B201000000000000000003 /* HandoffManager.swift */; };
+		A0B201000000000000000204 /* SpatialChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B201000000000000000004 /* SpatialChatView.swift */; };
+		A0B201000000000000000205 /* SpatialMessageBubble.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B201000000000000000005 /* SpatialMessageBubble.swift */; };
+		A0B201000000000000000206 /* ToolRegistry+visionOS.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B201000000000000000006 /* ToolRegistry+visionOS.swift */; };
+		A0B201000000000000000207 /* WindowStateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B201000000000000000007 /* WindowStateManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -1149,6 +1167,17 @@
 		A14000000000000000000021 /* MLXVoiceTTSEngineTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MLXVoiceTTSEngineTests.swift; sourceTree = "<group>"; };
 		A14000000000000000000023 /* OpenVoiceClonerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OpenVoiceClonerTests.swift; sourceTree = "<group>"; };
 		A14000000000000000000025 /* SDMobileEngineTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SDMobileEngineTests.swift; sourceTree = "<group>"; };
+		A0B201000000000000000001 /* CloudKitSyncManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CloudKitSyncManager.swift; sourceTree = "<group>"; };
+		A0B201000000000000000002 /* SyncStatusView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SyncStatusView.swift; sourceTree = "<group>"; };
+		A0B201000000000000000003 /* HandoffManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HandoffManager.swift; sourceTree = "<group>"; };
+		A0B201000000000000000004 /* SpatialChatView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SpatialChatView.swift; sourceTree = "<group>"; };
+		A0B201000000000000000005 /* SpatialMessageBubble.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SpatialMessageBubble.swift; sourceTree = "<group>"; };
+		A0B201000000000000000006 /* ToolRegistry+visionOS.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = "ToolRegistry+visionOS.swift"; sourceTree = "<group>"; };
+		A0B201000000000000000007 /* WindowStateManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WindowStateManager.swift; sourceTree = "<group>"; };
+		A0B201000000000000000008 /* CloudKitSyncManagerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CloudKitSyncManagerTests.swift; sourceTree = "<group>"; };
+		A0B201000000000000000009 /* HandoffManagerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HandoffManagerTests.swift; sourceTree = "<group>"; };
+		A0B20100000000000000000A /* SpatialChatViewTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SpatialChatViewTests.swift; sourceTree = "<group>"; };
+		A0B20100000000000000000B /* WindowStateManagerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WindowStateManagerTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1413,6 +1442,8 @@
 				F62BF6DCF3ED8FCD3AE58E39 /* Repositories */,
 				7E15004D000000000000D004 /* Export */,
 			A13000000000000000000050 /* Multimodal */,
+			A0B2010000000000000000C1 /* Sync */,
+			A0B2010000000000000000C2 /* Window */,
 		);
 		path = Services;
 		sourceTree = "<group>";
@@ -1686,6 +1717,7 @@
 				A1B2C3D4E5F6071809AB1002 /* ToolAuditLogger.swift */,
 				A1B2C3D4E5F6071809AB1007 /* ToolAuthorization.swift */,
 				32B243600898D3CA4E4F334A /* ToolRegistry+macOS.swift */,
+				A0B201000000000000000006 /* ToolRegistry+visionOS.swift */,
 			A1300000000000000000001C /* DescribeImageTool.swift */,
 			A1300000000000000000001F /* TranscribeAudioTool.swift */,
 			A13000000000000000000022 /* CloneVoiceTool.swift */,
@@ -1750,6 +1782,7 @@
 			isa = PBXGroup;
 			children = (
 				45D328796BB2BC7ED066B39C /* WatchConnectivityService.swift */,
+				A0B201000000000000000003 /* HandoffManager.swift */,
 			);
 			path = Connectivity;
 			sourceTree = "<group>";
@@ -1936,6 +1969,10 @@
 				FF31C32D67E245369A38B5F8 /* ChunkerRustTests.swift */,
 				F7DE67C0A3A1463B8F4CFF01 /* RateLimiterRustTests.swift */,
 				A13000000000000000000060 /* Multimodal */,
+				A0B2010000000000000000C4 /* Sync */,
+				A0B2010000000000000000C5 /* Connectivity */,
+				A0B2010000000000000000C6 /* visionOS */,
+				A0B2010000000000000000C7 /* Window */,
 			);
 			path = AetherTests;
 			sourceTree = "<group>";
@@ -1958,6 +1995,63 @@
 				A14000000000000000000025 /* SDMobileEngineTests.swift */,
 			);
 			path = Multimodal;
+			sourceTree = "<group>";
+		};
+		A0B2010000000000000000C1 /* Sync */ = {
+			isa = PBXGroup;
+			children = (
+				A0B201000000000000000001 /* CloudKitSyncManager.swift */,
+			);
+			path = Sync;
+			sourceTree = "<group>";
+		};
+		A0B2010000000000000000C2 /* Window */ = {
+			isa = PBXGroup;
+			children = (
+				A0B201000000000000000007 /* WindowStateManager.swift */,
+			);
+			path = Window;
+			sourceTree = "<group>";
+		};
+		A0B2010000000000000000C3 /* visionOS */ = {
+			isa = PBXGroup;
+			children = (
+				A0B201000000000000000004 /* SpatialChatView.swift */,
+				A0B201000000000000000005 /* SpatialMessageBubble.swift */,
+			);
+			path = visionOS;
+			sourceTree = "<group>";
+		};
+		A0B2010000000000000000C4 /* Sync */ = {
+			isa = PBXGroup;
+			children = (
+				A0B201000000000000000008 /* CloudKitSyncManagerTests.swift */,
+			);
+			path = Sync;
+			sourceTree = "<group>";
+		};
+		A0B2010000000000000000C5 /* Connectivity */ = {
+			isa = PBXGroup;
+			children = (
+				A0B201000000000000000009 /* HandoffManagerTests.swift */,
+			);
+			path = Connectivity;
+			sourceTree = "<group>";
+		};
+		A0B2010000000000000000C6 /* visionOS */ = {
+			isa = PBXGroup;
+			children = (
+				A0B20100000000000000000A /* SpatialChatViewTests.swift */,
+			);
+			path = visionOS;
+			sourceTree = "<group>";
+		};
+		A0B2010000000000000000C7 /* Window */ = {
+			isa = PBXGroup;
+			children = (
+				A0B20100000000000000000B /* WindowStateManagerTests.swift */,
+			);
+			path = Window;
 			sourceTree = "<group>";
 		};
 		A1B2C3D4E5F6071809AB1000 /* Security */ = {
@@ -2106,6 +2200,7 @@
 				3535057D76651E89174F8EBE /* MemorySettingsView.swift */,
 				54CF41368D08D28E86D3805B /* SettingsSection.swift */,
 				643246BA80F833ED71AEA0DC /* DebugPanelView.swift */,
+				A0B201000000000000000002 /* SyncStatusView.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -2189,6 +2284,7 @@
 				4773156FB406454A7FB621F7 /* OnDevice */,
 				DEADBEEF0011223344550A03 /* MenuBarExtra */,
 				9A1B2C3D4E5F607100B00004 /* Agent */,
+				A0B2010000000000000000C3 /* visionOS */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -2775,6 +2871,13 @@
 				A13000000000000000000021 /* TranscribeAudioTool.swift in Sources */,
 				A13000000000000000000024 /* CloneVoiceTool.swift in Sources */,
 				A13000000000000000000027 /* GenerateImageTool.swift in Sources */,
+				A0B201000000000000000101 /* CloudKitSyncManager.swift in Sources */,
+				A0B201000000000000000102 /* SyncStatusView.swift in Sources */,
+				A0B201000000000000000103 /* HandoffManager.swift in Sources */,
+				A0B201000000000000000104 /* SpatialChatView.swift in Sources */,
+				A0B201000000000000000105 /* SpatialMessageBubble.swift in Sources */,
+				A0B201000000000000000106 /* ToolRegistry+visionOS.swift in Sources */,
+				A0B201000000000000000107 /* WindowStateManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2975,6 +3078,10 @@
 				A14000000000000000000022 /* MLXVoiceTTSEngineTests.swift in Sources */,
 				A14000000000000000000024 /* OpenVoiceClonerTests.swift in Sources */,
 				A14000000000000000000026 /* SDMobileEngineTests.swift in Sources */,
+				A0B201000000000000000108 /* CloudKitSyncManagerTests.swift in Sources */,
+				A0B201000000000000000109 /* HandoffManagerTests.swift in Sources */,
+				A0B20100000000000000010A /* SpatialChatViewTests.swift in Sources */,
+				A0B20100000000000000010B /* WindowStateManagerTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -3172,6 +3279,13 @@
 				A13000000000000000000023 /* CloneVoiceTool.swift in Sources */,
 				A13000000000000000000026 /* GenerateImageTool.swift in Sources */,
 				A13000000000000000000070 /* OCRTool.swift in Sources */,
+				A0B201000000000000000201 /* CloudKitSyncManager.swift in Sources */,
+				A0B201000000000000000202 /* SyncStatusView.swift in Sources */,
+				A0B201000000000000000203 /* HandoffManager.swift in Sources */,
+				A0B201000000000000000204 /* SpatialChatView.swift in Sources */,
+				A0B201000000000000000205 /* SpatialMessageBubble.swift in Sources */,
+				A0B201000000000000000206 /* ToolRegistry+visionOS.swift in Sources */,
+				A0B201000000000000000207 /* WindowStateManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
