@@ -935,7 +935,7 @@ xcodebuild build \
   -configuration Debug \
   CODE_SIGNING_ALLOWED=NO
 
-# 2. 运行 UT（3416 用例，0 skip）
+# 2. 运行 UT（3502 用例，0 skip）
 xcodebuild test \
   -project Aether.xcodeproj \
   -scheme Aether-iOS \
@@ -963,7 +963,7 @@ xcodebuild test \
 
 | 测试套件 | 用例总数 | skipped | failures |
 |---|---|---|---|
-| UT（`AetherTests`） | 3416 | 0 | 0 |
+| UT（`AetherTests`） | 3502 | 0 | 0 |
 | UIT（`AetherUITests`） | 30 | 0 | 0 |
 
 ### skipped 原因
@@ -1074,7 +1074,7 @@ GitHub Actions 配置文件：`.github/workflows/ci.yml`
 
 ### Q10: UIT 测试不稳定？
 
-**A**：`contextMenu` 长按触发、Picker 导航式选项、邮件 composer 在模拟器上行为有差异，已用 `throw XCTSkip` 兜底跳过不稳定用例。**底层逻辑已由 UT 覆盖**（`ChatStorageTests` / `ConversationListVMTests` / `TTSConfigTests` / `TTSVoiceCatalogTests` 等）。当前 UIT 规模 30 用例（0 skip，0 failures），UT 规模 3416 用例（0 skip，0 failures）。
+**A**：`contextMenu` 长按触发、Picker 导航式选项、邮件 composer 在模拟器上行为有差异，已用 `throw XCTSkip` 兜底跳过不稳定用例。**底层逻辑已由 UT 覆盖**（`ChatStorageTests` / `ConversationListVMTests` / `TTSConfigTests` / `TTSVoiceCatalogTests` 等）。当前 UIT 规模 30 用例（0 skip，0 failures），UT 规模 3502 用例（0 skip，0 failures）。
 
 ### Q11: App Intents / Siri 调用无响应？
 

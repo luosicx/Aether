@@ -6,6 +6,68 @@
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-07-31
+
+### 智能平台 — Apple Intelligence / 本地 RAG 增强 / 多 Agent 协作 / AI Workflow
+
+#### Added — Apple Intelligence 集成（P2）
+- **AppleIntelligenceProvider**：实现 `LLMProvider` 协议，基于 Apple Foundation Models 框架的端侧 3B 模型 Provider
+  - `isAvailable` 运行时检测 FoundationModels 框架可用性（iOS 18+ / macOS 15+）
+  - `chat(messages:config:apiKey:)` 流式接口，占位模式返回提示文本
+  - `chat(messages:config:tools:apiKey:)` 工具调用降级为纯文本
+  - `embed(texts:apiKey:)` 返回 384 维占位向量（Apple Intelligence 未公开嵌入 API）
+  - 全端侧运行，无网络请求，隐私优先
+- **降级策略**：不可用时降级到 MLX / 云端 Provider（由 ModelProviderFactory 控制）
+
+#### Added — 本地 RAG 增强检索（P2）
+- **BM25Retriever**：基于 TF-IDF + BM25 算法的关键词检索引擎，纯内存实现
+  - `addDocument(id:text:)` / `addDocuments(_:)` 索引管理
+  - `search(query:topK:)` BM25 检索，k1=1.5 / b=0.75 标准参数
+  - 与向量检索互补，用于混合检索
+- **CrossEncoderReranker**：基于 Cross-Encoder 的重排序器（骨架）
+  - `rerank(query:documents:topK:)` 对 (query, document) 对计算精细相关度
+  - 启发式占位评分（精确匹配率 + 长度归一化），待 ONNX Runtime 集成后替换
+- **HybridRAGService**：混合检索服务，整合向量检索 + BM25 + RRF 融合 + 重排序
+  - `hybridSearch(query:vectorResults:topK:)` 混合检索主入口
+  - RRF（Reciprocal Rank Fusion）融合，k=60 标准参数
+  - `rewriteQuery(_:)` 查询改写占位（同义词扩展）
+  - 流程：向量 TopK=20 + BM25 TopK=20 → RRF 融合 TopK=10 → Cross-Encoder 重排序 TopK=5
+
+#### Added — 多 Agent 协作增强（P3）
+- **ArbiterAgent**：冲突仲裁 Agent，当多个 Agent 结果冲突时决策最终结果
+  - 三种决策策略：`majority`（多数表决，≥60% 一致）/ `priority`（角色优先级）/ `userIntervention`（用户介入）
+  - `maxRounds` 最大仲裁轮次（默认 5），超限强制用户介入
+  - 角色优先级：reviewer > researcher > coordinator > executor > planner
+- **AgentTeam**：Agent 团队定义与编排数据模型
+  - `TeamMember` 成员定义（role / isLead / delegates）
+  - 3 个预设模板：research（研究团队）/ coding（编码团队）/ critique（批判团队）
+  - `TeamOrchestrationResult` 编排结果（finalResult / agentResults / arbitrationResult / tokenConsumed）
+  - `AgentResultRecord` 单 Agent 执行记录
+
+#### Added — AI Workflow 自动化（P2）
+- **WorkflowEngine**：AI Workflow 执行引擎
+  - `validate(_:)` 验证工作流（有触发器 + 无循环 + 节点数上限）
+  - `execute(_:input:)` 执行工作流，线性遍历节点
+  - DFS 循环检测算法
+- **WorkflowNode**：工作流节点模型，9 种节点类型
+  - 触发器：`triggerTimer` / `triggerManual` / `triggerEvent`
+  - 动作：`actionLLM` / `actionTool` / `actionAgent`
+  - 控制流：`conditionIfElse`（MVP 仅线性 + 条件分支，循环后置）
+  - I/O：`input` / `output`
+- **Workflow**：完整工作流定义，支持 `toJSON()` / `fromJSON(_:)` 序列化导入导出
+- **WorkflowError**：6 种错误类型（noTriggerNode / cycleDetected / nodeNotFound / invalidJSON / executionFailed / maxNodesExceeded）
+
+#### Tests
+- **测试规模**：新增 4 个测试文件，共 86 个测试用例（AppleIntelligenceProviderTests 14 + HybridRAGServiceTests 24 + ArbiterAgentTests 20 + WorkflowEngineTests 28）
+- **UT 总数**：从 3583 增至 3669（+86 用例：iOS/macOS 3416 → 3502）
+
+#### 文件变更统计
+- 新增 7 个 Swift 源文件（Aether target，iOS + macOS 双 target）
+- 新增 4 个 Swift 测试文件（AetherTests target）
+- 修改 project.pbxproj（iOS + macOS 双 target Sources 引用 + 测试 Sources 引用）
+
+---
+
 ## [2.0.0] - 2026-07-30
 
 ### 跨端协作 — iCloud / Handoff / visionOS / Web 伴侣 / macOS 多窗口

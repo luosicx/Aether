@@ -644,6 +644,24 @@
 		A0B201000000000000000205 /* SpatialMessageBubble.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B201000000000000000005 /* SpatialMessageBubble.swift */; };
 		A0B201000000000000000206 /* ToolRegistry+visionOS.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B201000000000000000006 /* ToolRegistry+visionOS.swift */; };
 		A0B201000000000000000207 /* WindowStateManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B201000000000000000007 /* WindowStateManager.swift */; };
+		A0B301000000000000000301 /* AppleIntelligenceProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B301000000000000000101 /* AppleIntelligenceProvider.swift */; };
+		A0B301000000000000000302 /* BM25Retriever.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B301000000000000000102 /* BM25Retriever.swift */; };
+		A0B301000000000000000303 /* CrossEncoderReranker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B301000000000000000103 /* CrossEncoderReranker.swift */; };
+		A0B301000000000000000304 /* HybridRAGService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B301000000000000000104 /* HybridRAGService.swift */; };
+		A0B301000000000000000305 /* ArbiterAgent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B301000000000000000105 /* ArbiterAgent.swift */; };
+		A0B301000000000000000306 /* AgentTeam.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B301000000000000000106 /* AgentTeam.swift */; };
+		A0B301000000000000000307 /* WorkflowEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B301000000000000000107 /* WorkflowEngine.swift */; };
+		A0B301000000000000000401 /* AppleIntelligenceProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B301000000000000000108 /* AppleIntelligenceProviderTests.swift */; };
+		A0B301000000000000000402 /* HybridRAGServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B301000000000000000109 /* HybridRAGServiceTests.swift */; };
+		A0B301000000000000000403 /* ArbiterAgentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B30100000000000000010A /* ArbiterAgentTests.swift */; };
+		A0B301000000000000000404 /* WorkflowEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B30100000000000000010B /* WorkflowEngineTests.swift */; };
+		A0B301000000000000000501 /* AppleIntelligenceProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B301000000000000000101 /* AppleIntelligenceProvider.swift */; };
+		A0B301000000000000000502 /* BM25Retriever.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B301000000000000000102 /* BM25Retriever.swift */; };
+		A0B301000000000000000503 /* CrossEncoderReranker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B301000000000000000103 /* CrossEncoderReranker.swift */; };
+		A0B301000000000000000504 /* HybridRAGService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B301000000000000000104 /* HybridRAGService.swift */; };
+		A0B301000000000000000505 /* ArbiterAgent.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B301000000000000000105 /* ArbiterAgent.swift */; };
+		A0B301000000000000000506 /* AgentTeam.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B301000000000000000106 /* AgentTeam.swift */; };
+		A0B301000000000000000507 /* WorkflowEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B301000000000000000107 /* WorkflowEngine.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -1178,6 +1196,17 @@
 		A0B201000000000000000009 /* HandoffManagerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HandoffManagerTests.swift; sourceTree = "<group>"; };
 		A0B20100000000000000000A /* SpatialChatViewTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SpatialChatViewTests.swift; sourceTree = "<group>"; };
 		A0B20100000000000000000B /* WindowStateManagerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WindowStateManagerTests.swift; sourceTree = "<group>"; };
+		A0B301000000000000000101 /* AppleIntelligenceProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppleIntelligenceProvider.swift; sourceTree = "<group>"; };
+		A0B301000000000000000102 /* BM25Retriever.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BM25Retriever.swift; sourceTree = "<group>"; };
+		A0B301000000000000000103 /* CrossEncoderReranker.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CrossEncoderReranker.swift; sourceTree = "<group>"; };
+		A0B301000000000000000104 /* HybridRAGService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HybridRAGService.swift; sourceTree = "<group>"; };
+		A0B301000000000000000105 /* ArbiterAgent.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ArbiterAgent.swift; sourceTree = "<group>"; };
+		A0B301000000000000000106 /* AgentTeam.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AgentTeam.swift; sourceTree = "<group>"; };
+		A0B301000000000000000107 /* WorkflowEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WorkflowEngine.swift; sourceTree = "<group>"; };
+		A0B301000000000000000108 /* AppleIntelligenceProviderTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppleIntelligenceProviderTests.swift; sourceTree = "<group>"; };
+		A0B301000000000000000109 /* HybridRAGServiceTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HybridRAGServiceTests.swift; sourceTree = "<group>"; };
+		A0B30100000000000000010A /* ArbiterAgentTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ArbiterAgentTests.swift; sourceTree = "<group>"; };
+		A0B30100000000000000010B /* WorkflowEngineTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WorkflowEngineTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1444,6 +1473,7 @@
 			A13000000000000000000050 /* Multimodal */,
 			A0B2010000000000000000C1 /* Sync */,
 			A0B2010000000000000000C2 /* Window */,
+			A0B3010000000000000000D1 /* Workflow */,
 		);
 		path = Services;
 		sourceTree = "<group>";
@@ -1650,6 +1680,9 @@
 				33CA17C53B9626062C3D8FF7 /* EmbeddingService.swift */,
 				FAF92749FCE229D0E7C27266 /* RAGService.swift */,
 				AA000000000000000000A001 /* PDFExtractor.swift */,
+				A0B301000000000000000102 /* BM25Retriever.swift */,
+				A0B301000000000000000103 /* CrossEncoderReranker.swift */,
+				A0B301000000000000000104 /* HybridRAGService.swift */,
 			);
 			path = RAG;
 			sourceTree = "<group>";
@@ -1810,6 +1843,8 @@
 				9A1B2C3D4E5F607100B00109 /* DAGExecutionEngine.swift */,
 				BEEF11000000000000000001 /* AgentInstance.swift */,
 				BEEF11000000000000000004 /* AgentMessageBus.swift */,
+				A0B301000000000000000105 /* ArbiterAgent.swift */,
+				A0B301000000000000000106 /* AgentTeam.swift */,
 			);
 			path = Agent;
 			sourceTree = "<group>";
@@ -1842,6 +1877,7 @@
 				BEEF11000000000000000007 /* AgentInstanceTests.swift */,
 				BEEF11000000000000000009 /* AgentMessageBusTests.swift */,
 				BEEF1100000000000000000B /* DAGExecutionEngineMultiAgentTests.swift */,
+				A0B30100000000000000010A /* ArbiterAgentTests.swift */,
 			);
 			path = Agent;
 			sourceTree = "<group>";
@@ -1973,8 +2009,11 @@
 				A0B2010000000000000000C5 /* Connectivity */,
 				A0B2010000000000000000C6 /* visionOS */,
 				A0B2010000000000000000C7 /* Window */,
-			);
-			path = AetherTests;
+				A0B3010000000000000000D2 /* LLM */,
+				A0B3010000000000000000D3 /* RAG */,
+				A0B3010000000000000000D4 /* Workflow */,
+		);
+		path = AetherTests;
 			sourceTree = "<group>";
 		};
 		A13000000000000000000060 /* Multimodal */ = {
@@ -2011,6 +2050,14 @@
 				A0B201000000000000000007 /* WindowStateManager.swift */,
 			);
 			path = Window;
+			sourceTree = "<group>";
+		};
+		A0B3010000000000000000D1 /* Workflow */ = {
+			isa = PBXGroup;
+			children = (
+				A0B301000000000000000107 /* WorkflowEngine.swift */,
+			);
+			path = Workflow;
 			sourceTree = "<group>";
 		};
 		A0B2010000000000000000C3 /* visionOS */ = {
@@ -2052,6 +2099,30 @@
 				A0B20100000000000000000B /* WindowStateManagerTests.swift */,
 			);
 			path = Window;
+			sourceTree = "<group>";
+		};
+		A0B3010000000000000000D2 /* LLM */ = {
+			isa = PBXGroup;
+			children = (
+				A0B301000000000000000108 /* AppleIntelligenceProviderTests.swift */,
+			);
+			path = LLM;
+			sourceTree = "<group>";
+		};
+		A0B3010000000000000000D3 /* RAG */ = {
+			isa = PBXGroup;
+			children = (
+				A0B301000000000000000109 /* HybridRAGServiceTests.swift */,
+			);
+			path = RAG;
+			sourceTree = "<group>";
+		};
+		A0B3010000000000000000D4 /* Workflow */ = {
+			isa = PBXGroup;
+			children = (
+				A0B30100000000000000010B /* WorkflowEngineTests.swift */,
+			);
+			path = Workflow;
 			sourceTree = "<group>";
 		};
 		A1B2C3D4E5F6071809AB1000 /* Security */ = {
@@ -2319,6 +2390,7 @@
 				03385CCF11D1C2F7897A459A /* FallbackLLMProvider.swift */,
 				9973368500D82552A2CF8091 /* BFFProxyClient.swift */,
 				36C1A7ADD3C6AC8D09F043C9 /* RateLimiter.swift */,
+				A0B301000000000000000101 /* AppleIntelligenceProvider.swift */,
 			);
 			path = LLM;
 			sourceTree = "<group>";
@@ -2878,6 +2950,13 @@
 				A0B201000000000000000105 /* SpatialMessageBubble.swift in Sources */,
 				A0B201000000000000000106 /* ToolRegistry+visionOS.swift in Sources */,
 				A0B201000000000000000107 /* WindowStateManager.swift in Sources */,
+				A0B301000000000000000301 /* AppleIntelligenceProvider.swift in Sources */,
+				A0B301000000000000000302 /* BM25Retriever.swift in Sources */,
+				A0B301000000000000000303 /* CrossEncoderReranker.swift in Sources */,
+				A0B301000000000000000304 /* HybridRAGService.swift in Sources */,
+				A0B301000000000000000305 /* ArbiterAgent.swift in Sources */,
+				A0B301000000000000000306 /* AgentTeam.swift in Sources */,
+				A0B301000000000000000307 /* WorkflowEngine.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -3082,6 +3161,10 @@
 				A0B201000000000000000109 /* HandoffManagerTests.swift in Sources */,
 				A0B20100000000000000010A /* SpatialChatViewTests.swift in Sources */,
 				A0B20100000000000000010B /* WindowStateManagerTests.swift in Sources */,
+				A0B301000000000000000401 /* AppleIntelligenceProviderTests.swift in Sources */,
+				A0B301000000000000000402 /* HybridRAGServiceTests.swift in Sources */,
+				A0B301000000000000000403 /* ArbiterAgentTests.swift in Sources */,
+				A0B301000000000000000404 /* WorkflowEngineTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -3286,6 +3369,13 @@
 				A0B201000000000000000205 /* SpatialMessageBubble.swift in Sources */,
 				A0B201000000000000000206 /* ToolRegistry+visionOS.swift in Sources */,
 				A0B201000000000000000207 /* WindowStateManager.swift in Sources */,
+				A0B301000000000000000501 /* AppleIntelligenceProvider.swift in Sources */,
+				A0B301000000000000000502 /* BM25Retriever.swift in Sources */,
+				A0B301000000000000000503 /* CrossEncoderReranker.swift in Sources */,
+				A0B301000000000000000504 /* HybridRAGService.swift in Sources */,
+				A0B301000000000000000505 /* ArbiterAgent.swift in Sources */,
+				A0B301000000000000000506 /* AgentTeam.swift in Sources */,
+				A0B301000000000000000507 /* WorkflowEngine.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
