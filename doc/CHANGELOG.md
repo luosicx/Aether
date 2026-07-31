@@ -80,7 +80,7 @@
 - 待 SPM 依赖集成后通过 `MultimodalFacade.setXxxEngine()` 切换到真实引擎
 
 #### Tests
-- **测试规模**：UT 从 3481 增至 3526（+45 用例：iOS/macOS 3314 → 3359，5 个新测试文件）。
+- **测试规模**：UT 从 3481 增至 3583（+45 用例：iOS/macOS 3314 → 3416，5 个新测试文件）。
 - **Rust 单测**：`redact.rs` 新增 3 个 JSON 格式用例（password / token / api_key），Rust 单测从 13 增至 16。
 
 #### Fixed
@@ -177,7 +177,7 @@
   - NativeASREngine：协议契约（name / requiresNetwork）/ loadModel 为 no-op / 不存在文件抛错 / 不支持格式抛错 / 空文件处理
   - NativeTTSEngine：协议契约 / loadModel 为 no-op / 空文本抛错 / 合成返回非空 WAV / voiceId 回退 / 长文本稳定性 / 英文合成
   - MultimodalFacade：默认使用 Native 引擎 / 可切换回 Placeholder / describeImage 集成测试（CI 跳过）
-- **测试规模**：UT 从 3290 增至 3314（+24 用例），测试文件从 189 增至 190
+- **测试规模**：UT 从 3290 增至 3314（+24 用例），测试文件从 189 增至 199
 
 #### CI 修复
 - **NativeTTSEngine 编译错误**：`AVAudioBuffer` 不能直接转换为 `AVAudioPCMBuffer`，通过 `as? AVAudioPCMBuffer` 向下转型修复

@@ -147,7 +147,8 @@ final class CloudKitSyncManager: ObservableObject {
 
     /// 处理 CloudKit 同步事件，更新状态
     private func handleCloudKitEvent(_ notification: Notification) {
-        guard let event = notification.userInfo?[NSPersistentCloudKitContainer.NotificationKey.event]
+        // 使用字符串 key 避免 SDK 版本差异（NSPersistentCloudKitContainer.Event.NotificationKey.event 的原始值即 "event"）
+        guard let event = notification.userInfo?["event"]
                 as? NSPersistentCloudKitContainer.Event else {
             return
         }
@@ -174,7 +175,7 @@ final class CloudKitSyncManager: ObservableObject {
             // - serverRecordChanged: 服务端记录已变更，触发 last writer wins 冲突
             // - batchRequestFailed: 批量请求失败（可能含冲突）
             if let ckError = error as? CKError,
-               ckError.code == .serverRecordChanged || ckError.code == .batchRequestFailed {
+               ckError.code == CKError.Code.serverRecordChanged || ckError.code == CKError.Code.batchRequestFailed {
                 recordConflict()
             }
         }
