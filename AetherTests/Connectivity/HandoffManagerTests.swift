@@ -109,7 +109,7 @@ final class HandoffManagerTests: XCTestCase {
 
         let activity = try XCTUnwrap(manager.currentActivity)
         let userInfo = try XCTUnwrap(activity.userInfo)
-        let storedScroll = userInfo["scrollPosition"] as? Double
+        let storedScroll = try XCTUnwrap(userInfo["scrollPosition"] as? Double)
         XCTAssertEqual(
             storedScroll,
             0.75,
