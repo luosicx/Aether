@@ -99,12 +99,8 @@ AETHER_EXPORT char *aether_sse_parse_with_tools(const char *line, struct AetherS
  */
 AETHER_EXPORT void aether_free_string(char *ptr);
 
-/**
- * 释放通用 void*（预留）。
- * # Safety
- * `ptr` 必须由本 crate 产生，且只能释放一次。
- */
-AETHER_EXPORT void aether_free(void *ptr);
+/* aether_free(void*) 已移除：其释放 layout 与本库任何分配方式均不匹配，误用为 UB。
+ * 字符串释放用 aether_free_string，SSE 状态释放用 aether_sse_state_free。 */
 
 /**
  * f32 余弦相似度。空指针或长度不等返回 0。

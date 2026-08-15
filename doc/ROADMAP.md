@@ -284,10 +284,10 @@
 | v1.3 ✅ | 端侧多模态 Phase 1 | 协议抽象、4 个多模态工具、跨平台 OCR、占位引擎 | 2026-07-25 已发布 |
 | v1.4 ✅ | 端侧多模态 Phase 1.5 | NativeVisionEngine / NativeASREngine / NativeTTSEngine 替换占位实现 | 2026-07-25 已发布 |
 | v1.5 ✅ | 跨平台扩展 | Windows WPF .NET 8 + Android Kotlin/Compose + Rust JNI 暴露 | 2026-07-26 已发布 |
-| v1.6 ✅ | 端侧多模态 Phase 2 | MLX-VLM、Whisper.cpp、MLX-Voice、SD Mobile 图像生成（骨架实现 + 降级兜底） | 2026-07-29 已发布 |
-| v2.0 | 跨端协作 | iCloud 同步、Web 伴侣、团队协作、Windows ARM64 工具链 | 2027 Q4 |
-| v2.5 | 生态扩展 | 社区插件市场、多 Agent 协作、Android 深化（端侧 MLX/NNAPI 推理） | 2028 Q1 |
-| v3.0 | 生态平台 | SDK、插件市场、visionOS | 2028 Q2 |
+| v1.6 ✅ | 端侧多模态 Phase 2 | MLX-VLM / Whisper.cpp / MLX-Voice / OpenVoice / SD Mobile 五引擎骨架 + `createWithAutoFallback()` 自动降级链（真实推理依赖待 SPM 集成） | 2026-07-29 已发布 |
+| v2.0 ✅ | 跨端协作 | CloudKit 同步、Handoff 连续对话、visionOS 适配骨架、Web 伴侣（BFF）、macOS 多窗口 | 2026-07-30 已发布 |
+| v2.5 | 生态扩展 | 社区插件市场、Android 深化（端侧 MLX/NNAPI 推理） | 2028 Q1 |
+| v3.0 ✅ | 智能平台 | Apple Intelligence 集成、本地 RAG 增强（BM25 + Cross-Encoder + RRF）、多 Agent 协作（ArbiterAgent + AgentTeam）、AI Workflow 自动化 | 2026-07-31 已发布 |
 | v3.0+ | 远期探索 | 隐私计算、实时协作、多模态记忆 | 2028 下半年 |
 
 ---
@@ -299,14 +299,18 @@
 | 债务项 | 影响 | 计划 |
 |--------|------|------|
 | BFF 令牌桶仅客户端 | 可被绕过 | v2.0 服务端限流强化 |
-| Candle iOS 受限 | iOS 端侧推理能力受限 | v1.3 评估 MLX 替代方案 |
+| Candle iOS 受限 | iOS 端侧推理能力受限 | ✅ v1.3+ 已引入 MLX 替代 |
 | ~~Vision OCR 仅 macOS~~ | ~~iOS 无法离线 OCR~~ | ✅ v1.3 已改造跨平台 OCR |
 | 多模态引擎为 Apple 原生（MLX 骨架已就绪） | v1.6 仅交付条件编译骨架 + 降级，MLX-VLM/Whisper.cpp/MLX-Voice 真实推理未集成 | 待引入 SPM 包 / Rust FFI 后切换到真实引擎，原生引擎作为兜底 |
 | Plugin 热更新未实现 | 插件版本管理占位 | v2.5 实现热更新与依赖解析 |
-| visionOS target 缺失 | 空间计算体验缺失 | v2.0 新增 visionOS target |
-| Windows 仅 x64 / 无 ARM64 | Windows on ARM 设备不可用 | v2.0 评估 ARM64 工具链与发布 |
+| ~~visionOS target 缺失~~ | ~~空间计算体验缺失~~ | ✅ v2.0 已交付 visionOS 适配骨架（SpatialChatView / SpatialMessageBubble / ToolRegistry+visionOS） |
+| Windows 仅 x64 / 无 ARM64 | Windows on ARM 设备不可用 | v2.5 评估 ARM64 工具链与发布 |
 | Android 无端侧 MLX 推理 | Android 端侧多模态能力缺失 | v2.5 评估 MLX Android / NNAPI 路径 |
-| JNI 累积器 thread_local 兜底 | 多线程 JNI 调用存在状态隔离风险 | v2.0 重构为显式上下文句柄 |
+| ~~RAGService 纯向量检索~~ | ~~检索准确率受限~~ | ✅ v3.0 已交付混合检索（BM25 + RRF 融合 + Cross-Encoder 重排序） |
+| ~~多 Agent 结果冲突无仲裁~~ | ~~多 Agent 协作结果不一致~~ | ✅ v3.0 已交付 ArbiterAgent（多数表决 / 优先级 / 用户介入） |
+| JNI 累积器 thread_local 兜底 | 多线程 JNI 调用存在状态隔离风险 | v2.5 重构为显式上下文句柄 |
+| Cross-Encoder 为启发式占位评分 | 重排序精度有限 | v3.x 集成 ONNX Runtime 后替换 |
+| AppleIntelligenceProvider 为骨架实现 | FoundationModels 真实调用未接入 | v3.x 待 Xcode 正式支持 FoundationModels 框架后替换 |
 
 ### 风险与应对
 

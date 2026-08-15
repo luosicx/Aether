@@ -56,6 +56,7 @@
   - **端侧 MLX 模型下载**：进入 设置 → 端侧推理，选择模型（如 Qwen2.5-0.5B-Instruct）开始下载，验证下载进度条更新、中断后重启可断点续传、下载完成自动执行 SHA256 校验；关闭网络后发起对话，验证自动切换为端侧推理并在 UI 标识
   - **HealthKit 授权**：首次进入 设置 → 健康洞察，验证系统弹出 HealthKit 授权弹窗并请求心率 / 睡眠 / 步数读取权限；授权后下拉刷新健康洞察，验证数据读取成功；在对话中验证健康上下文已注入 system prompt（助手可引用近 7 天健康数据）
   - **端侧多模态 v1.4**（v1.4 新增）：在对话中让助手调用 `describe_image` 工具分析含文字 / 二维码的图片，验证 NativeVisionEngine 返回 OCR 文字与条码 payload；调用 `transcribe_audio` 工具转写中文录音，验证 NativeASREngine 返回识别文字；首次使用 `transcribe_audio` 时系统会弹出语音识别授权对话框；底层 3 个 Native 引擎基于 Apple Vision / Speech / AVSpeechSynthesizer 框架，无需下载外部模型
+  - **智能平台 v3.0**（v3.0 新增，服务层骨架无 UI 入口）：v3.0 交付 Apple Intelligence Provider / 混合 RAG（BM25 + RRF + Cross-Encoder）/ 多 Agent 仲裁（ArbiterAgent）/ AI Workflow 引擎四个服务层模块，均由 86 个单元测试覆盖（AppleIntelligenceProviderTests 14 + HybridRAGServiceTests 24 + ArbiterAgentTests 20 + WorkflowEngineTests 28）；Apple Intelligence 在 FoundationModels 不可用的环境自动返回占位提示并降级到 MLX / 云端 Provider，无新增权限请求与网络行为变化
 
 ### 4.1 构建验证
 - [ ] iOS 构建：`xcodebuild build -destination 'platform=iOS Simulator,name=iPhone 17'` 成功

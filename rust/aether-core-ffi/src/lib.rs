@@ -5,7 +5,7 @@
 
 use std::collections::BTreeMap;
 use std::ffi::{CStr, CString};
-use std::os::raw::{c_char, c_void};
+use std::os::raw::c_char;
 
 use aether_core::{
     chunk_document, cosine_similarity_f32, cosine_similarity_f64, estimate_tokens, extract_content,
@@ -111,15 +111,9 @@ pub unsafe extern "C" fn aether_free_string(ptr: *mut c_char) {
     }
 }
 
-/// 释放通用 void*（预留）。
-/// # Safety
-/// `ptr` 必须由本 crate 产生，且只能释放一次。
-#[no_mangle]
-pub unsafe extern "C" fn aether_free(ptr: *mut c_void) {
-    if !ptr.is_null() {
-        drop(Box::from_raw(ptr as *mut u8));
-    }
-}
+// 注：曾有 aether_free(void*)「预留」导出，已移除——它按 Box<u8> layout 释放，
+// 与本 crate 任何分配方式（CString::into_raw / Box<AetherSseState>）都不匹配，
+// 误用必触发 dealloc layout 不一致 UB。字符串用 aether_free_string，状态用 aether_sse_state_free。
 
 fn to_cstring(s: &str) -> *mut c_char {
     CString::new(s)

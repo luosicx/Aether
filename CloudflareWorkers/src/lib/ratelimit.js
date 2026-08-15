@@ -8,14 +8,54 @@
  * 默认每 userId 每分钟 60 次（capacity=60, refillRate=1/sec）。
  */
 
-// RateLimiter WASM 懒加载单例
+// RateLimiter WASM 懒加载单例；WASM 产物不可用时降级纯 JS 令牌桶（算法等价）
 let _RateLimiterCtor = null;
+let _wasmLoadFailed = false;
 async function getRateLimiterCtor() {
   if (_RateLimiterCtor) return _RateLimiterCtor;
-  const mod = await import("../../wasm/aether_sse.js");
-  await mod.default();
-  _RateLimiterCtor = mod.RateLimiter;
+  if (_wasmLoadFailed) return null;
+  try {
+    const mod = await import("../../wasm/aether_sse.js");
+    await mod.default();
+    _RateLimiterCtor = mod.RateLimiter;
+  } catch (err) {
+    console.error("ratelimit: WASM 不可用，降级纯 JS 令牌桶:", err && err.message);
+    _wasmLoadFailed = true;
+  }
   return _RateLimiterCtor;
+}
+
+/**
+ * 纯 JS 令牌桶（WASM 不可用时的等价降级实现）
+ * 接口与 WASM RateLimiter 对齐：new (capacity, refillRate, nowMs) / acquire(n, nowMs) / availableTokens(nowMs)
+ */
+class JSRateLimiter {
+  constructor(capacity, refillRate, now) {
+    this.capacity = capacity;
+    this.tokens = capacity;
+    this.refillRate = refillRate; // tokens/sec
+    this.last = now;
+  }
+
+  refill(now) {
+    const dt = Math.max(0, now - this.last) / 1000;
+    this.tokens = Math.min(this.capacity, this.tokens + dt * this.refillRate);
+    this.last = now;
+  }
+
+  acquire(n, now) {
+    this.refill(now);
+    if (this.tokens >= n) {
+      this.tokens -= n;
+      return 0;
+    }
+    return (n - this.tokens) / this.refillRate; // 需等待的秒数
+  }
+
+  availableTokens(now) {
+    this.refill(now);
+    return this.tokens;
+  }
 }
 
 // 内存计数器：userId -> RateLimiter 实例
@@ -35,7 +75,7 @@ export async function checkRateLimit(userId, env, limit = 60) {
   let bucket = rateLimitMap.get(userId);
   if (!bucket) {
     // capacity = limit, refillRate = limit / 60 tokens/sec
-    bucket = new RateLimiter(limit, limit / 60.0, now);
+    bucket = new (RateLimiter || JSRateLimiter)(limit, limit / 60.0, now);
     rateLimitMap.set(userId, bucket);
   }
 

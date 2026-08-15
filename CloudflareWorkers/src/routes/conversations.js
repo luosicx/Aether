@@ -31,7 +31,8 @@ export async function handleListConversations(request, env, ctx) {
       .all();
     return jsonOk({ conversations: results || [] });
   } catch (err) {
-    return jsonError(500, "查询会话失败: " + (err && err.message));
+    console.error("查询会话失败:", err && err.message);
+    return jsonError(500, "查询会话失败");
   }
 }
 
@@ -103,7 +104,8 @@ export async function handleGetConversation(request, env, ctx, id) {
     if (!row) return jsonError(404, "会话不存在");
     return jsonOk({ conversation: row });
   } catch (err) {
-    return jsonError(500, "查询会话失败: " + (err && err.message));
+    console.error("查询会话失败:", err && err.message);
+    return jsonError(500, "查询会话失败");
   }
 }
 
@@ -179,8 +181,16 @@ export async function handleDeleteConversation(request, env, ctx, id) {
   if (!env.DB) return jsonError(503, "数据库未配置");
 
   try {
-    // 先删消息（外键级联在 D1 需显式开启 PRAGMA，这里手动删更稳妥）
-    await env.DB.prepare(`DELETE FROM messages WHERE conversation_id = ?1`).bind(id).run();
+    // 先删消息：必须带所有权子查询，确保仅删除当前用户自己会话下的消息
+    // （否则可先于归属校验物理删除他人会话的消息，属 IDOR 越权删除；
+    //   外键级联在 D1 需显式开启 PRAGMA，这里手动删更稳妥）
+    await env.DB.prepare(
+      `DELETE FROM messages WHERE conversation_id IN (
+         SELECT id FROM conversations WHERE id = ?1 AND user_id = ?2
+       )`
+    )
+      .bind(id, auth.userId)
+      .run();
     const { changes } = await env.DB.prepare(
       `DELETE FROM conversations WHERE id = ?1 AND user_id = ?2`
     )
@@ -189,7 +199,8 @@ export async function handleDeleteConversation(request, env, ctx, id) {
     if (changes === 0) return jsonError(404, "会话不存在");
     return jsonOk({ deleted: true, id });
   } catch (err) {
-    return jsonError(500, "删除会话失败: " + (err && err.message));
+    console.error("删除会话失败:", err && err.message);
+    return jsonError(500, "删除会话失败");
   }
 }
 

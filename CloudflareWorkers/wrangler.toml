@@ -17,7 +17,12 @@ database_name = "aether-bff-db"
 database_id = "your-d1-database-id"
 
 # 上游 endpoint（非敏感，明文配置）
+# 注意：BASE_URL 统一不带 /v1 后缀（代码侧 joinUpstreamUrl 负责拼接 /v1/chat/completions，
+# 并兼容已带 /v1 的配置，避免 /v1/v1 双拼导致 404）
 # Secrets（DEEPSEEK_API_KEY / QWEN_API_KEY）通过 `wrangler secret put` 配置，不在此明文存储
 [vars]
 DEEPSEEK_BASE_URL = "https://api.deepseek.com"
-QWEN_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+QWEN_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode"
+# CORS Origin 白名单（逗号分隔）；为空 = 禁止所有跨域访问。
+# Web 伴侣部署时配置其源，如 "https://app.aether.example.com"
+ALLOWED_ORIGINS = ""

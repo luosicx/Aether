@@ -73,7 +73,8 @@ export async function handleGetHealthSummary(request, env, ctx, date) {
     if (!row) return jsonError(404, "该日期无健康摘要");
     return jsonOk({ summary: row });
   } catch (err) {
-    return jsonError(500, "查询健康摘要失败: " + (err && err.message));
+    console.error("查询健康摘要失败:", err && err.message);
+    return jsonError(500, "查询健康摘要失败");
   }
 }
 
