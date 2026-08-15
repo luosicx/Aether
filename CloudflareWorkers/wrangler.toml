@@ -16,6 +16,19 @@ binding = "DB"
 database_name = "aether-bff-db"
 database_id = "your-d1-database-id"
 
+# Durable Objects：全局限流器（跨边缘节点精确限流）
+# 每个 limit key（userId / authfail:IP / chat:userId）对应一个 DO 实例，
+# 全部边缘节点请求汇聚同一实例扣减令牌，配额不再按节点数放大。
+# 未绑定/调用异常时自动降级 isolate 内存令牌桶（见 src/lib/ratelimit.js）。
+# migrations.tag 首次部署后不可复用，后续 schema 变更新增 tag（v2、v3...）
+[[durable_objects.bindings]]
+name = "RATE_LIMITER"
+class_name = "RateLimiterDO"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RateLimiterDO"]
+
 # 上游 endpoint（非敏感，明文配置）
 # 注意：BASE_URL 统一不带 /v1 后缀（代码侧 joinUpstreamUrl 负责拼接 /v1/chat/completions，
 # 并兼容已带 /v1 的配置，避免 /v1/v1 双拼导致 404）
@@ -26,3 +39,8 @@ QWEN_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode"
 # CORS Origin 白名单（逗号分隔）；为空 = 禁止所有跨域访问。
 # Web 伴侣部署时配置其源，如 "https://app.aether.example.com"
 ALLOWED_ORIGINS = ""
+# 上游转发附加 Header 白名单（逗号分隔，如 "x-request-id,x-app-version"）；
+# 为空 = 仅默认白名单（content-type / accept）。
+# 凭证/代理类敏感头（authorization/cookie/x-forwarded-* 等）在代码侧永久拒绝，
+# 即使配置在此也不会透传（见 src/lib/llm.js UPSTREAM_DENIED_HEADERS）
+UPSTREAM_EXTRA_HEADERS = ""

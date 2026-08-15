@@ -1,5 +1,5 @@
 /**
- * 安全整改回归测试（第一批 hotfix）
+ * 安全整改回归测试（第一批 hotfix + 第二批扩展）
  *
  * 覆盖：
  * 1. Token SHA-256 哈希 KV 键（新格式生效 + 旧明文键自动迁移）
@@ -7,13 +7,16 @@
  * 3. LLM 透传代理路径白名单（非白名单路径 404，不再任意透传 + 借用上游 API Key）
  * 4. joinUpstreamUrl（Qwen baseUrl 含 /v1 不再双拼）
  * 5. 上游 Header 白名单（X-BFF-Token / Cookie 不透传，Authorization 注入）
+ * 6. 【第二批】上游 Header 附加白名单（env.UPSTREAM_EXTRA_HEADERS 可配置扩展，
+ *    凭证/代理类敏感头永久拒绝，误配置也不透传）
  *
  * 说明：本文件不 mock ratelimit.js，顺带覆盖 WASM 不可用时的纯 JS 令牌桶降级路径。
+ * Durable Object 全局限流见 test/ratelimit-do.test.js。
  */
 
 import { describe, it, expect, vi } from "vitest";
 import { createHash } from "node:crypto";
-import { joinUpstreamUrl } from "../src/lib/llm.js";
+import { joinUpstreamUrl, buildUpstreamHeaders } from "../src/lib/llm.js";
 import worker from "../worker.js";
 
 // ============ 测试基础设施 ============
@@ -232,6 +235,89 @@ describe("proxyLLM: 上游转发（白名单路径）", () => {
       expect(calledReq.headers.get("Authorization")).toBe("Bearer sk-qwen");
       expect(calledReq.headers.get("X-BFF-Token")).toBeNull();
       expect(calledReq.headers.get("Cookie")).toBeNull();
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+});
+
+describe("buildUpstreamHeaders: 附加白名单（第二批整改）", () => {
+  it("extraAllowed 中的 header 透传（如 x-request-id）", () => {
+    const h = new Headers({
+      "Content-Type": "application/json",
+      "X-Request-Id": "req-123",
+      "X-App-Version": "3.0.0",
+      "X-Custom-Trace": "trace-abc",
+    });
+    const out = buildUpstreamHeaders(h, "sk-test", "x-request-id,x-custom-trace");
+    expect(out.get("X-Request-Id")).toBe("req-123");
+    expect(out.get("X-Custom-Trace")).toBe("trace-abc");
+    // 未配置的附加头仍被剥离
+    expect(out.get("X-App-Version")).toBeNull();
+    expect(out.get("Authorization")).toBe("Bearer sk-test");
+  });
+
+  it("永久拒绝清单：extra 配置敏感头也不透传", () => {
+    const h = new Headers({
+      "Content-Type": "application/json",
+      Cookie: "session=leak",
+      "X-BFF-Token": "bff-secret",
+      "X-Forwarded-For": "1.2.3.4",
+      "Proxy-Authorization": "Basic xxx",
+      "X-Request-Id": "req-1",
+    });
+    // 恶意/误配置：把敏感头加进 extra
+    const out = buildUpstreamHeaders(
+      h,
+      "sk-test",
+      "cookie,x-bff-token,x-forwarded-for,proxy-authorization,x-request-id"
+    );
+    expect(out.get("Cookie")).toBeNull();
+    expect(out.get("X-BFF-Token")).toBeNull();
+    expect(out.get("X-Forwarded-For")).toBeNull();
+    expect(out.get("Proxy-Authorization")).toBeNull();
+    // 非敏感附加头正常透传
+    expect(out.get("X-Request-Id")).toBe("req-1");
+    expect(out.get("Authorization")).toBe("Bearer sk-test");
+  });
+
+  it("extraAllowed 大小写与空白容忍", () => {
+    const h = new Headers({ "X-App-Version": "3.0" });
+    const out = buildUpstreamHeaders(h, "sk", " X-App-Version , x-app-version ");
+    expect(out.get("X-App-Version")).toBe("3.0");
+  });
+
+  it("全链路：env.UPSTREAM_EXTRA_HEADERS 经 proxyLLM 生效（含敏感头拦截）", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ ok: true }), { status: 200 })
+    );
+    try {
+      const env = makeEnv({
+        kvSeed: hashedSeed(),
+        extra: {
+          UPSTREAM_EXTRA_HEADERS: "x-request-id,cookie,x-bff-token",
+        },
+      });
+      const req = makeRequest("/v1/chat/completions", {
+        method: "POST",
+        token: true,
+        body: { model: "deepseek-chat" },
+        headers: {
+          "X-Request-Id": "req-42",
+          Cookie: "session=leak",
+          "X-BFF-Token": TOKEN,
+        },
+      });
+      const resp = await worker.fetch(req, env, { waitUntil: () => {} });
+      expect(resp.status).toBe(200);
+
+      const calledReq = fetchSpy.mock.calls[0][0];
+      // 配置的附加白名单头透传
+      expect(calledReq.headers.get("X-Request-Id")).toBe("req-42");
+      // 永久拒绝清单优先于 extra 配置
+      expect(calledReq.headers.get("Cookie")).toBeNull();
+      expect(calledReq.headers.get("X-BFF-Token")).toBeNull();
+      expect(calledReq.headers.get("Authorization")).toBe("Bearer sk-test");
     } finally {
       fetchSpy.mockRestore();
     }
