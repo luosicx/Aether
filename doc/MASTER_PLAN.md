@@ -62,10 +62,10 @@
 | v1.3 | 2026-07-25（已完成） | 端侧多模态 Phase 1（协议抽象 + 4 个多模态工具 + 跨平台 OCR + 占位引擎） |
 | v1.4 | 2026-07-25（已完成） | 端侧多模态 Phase 1.5（Apple 原生引擎：NativeVision / NativeASR / NativeTTS 替换占位） |
 | v1.5 | 2026-07-26（已完成） | 跨平台扩展（Windows + Android 双端交付） |
-| v1.6 | 2026-07-29（已完成） | 端侧多模态 Phase 2（5 个引擎骨架实现 + 条件编译降级 + 45 个测试用例） |
-| v2.0 | 2027 Q4 | 跨端协作（iCloud / Handoff / visionOS / Web 伴侣） |
+| v1.6 | 2026-07-29（已完成） | 端侧多模态 Phase 2（MLX-VLM / Whisper.cpp / MLX-Voice / OpenVoice / SD Mobile 五引擎骨架 + 自动降级链 + 45 个测试用例） |
+| v2.0 | 2026-07-30（已完成） | 跨端协作（iCloud / Handoff / visionOS / Web 伴侣 / macOS 多窗口） |
 | v2.5 | 2028 Q1 | 生态扩展（插件市场 / 热更新 / MCP 共建 / Android 深化） |
-| v3.0 | 2028 Q2 | 智能平台（Apple Intelligence / 本地 RAG 增强 / AI Workflow / 多 Agent 协作） |
+| v3.0 | 2026-07-31（已完成） | 智能平台（Apple Intelligence / 本地 RAG 增强（BM25 + Cross-Encoder + RRF）/ AI Workflow / 多 Agent 协作（ArbiterAgent + AgentTeam）） |
 | v3.0+ | 2028 H2 | 远期探索（隐私计算 / 实时协作 / 多模态记忆） |
 
 **优先级约定**：
@@ -3264,6 +3264,10 @@ end
 | v1.1 动态星空背景 | `[x]` | 2.2 当前状态 / 6.4.5 | v1.1 已落地（StarfieldBackgroundView + AnimationTokens） |
 | Phase J.1（iCloud 同步） | `[~]` | 6.2.1 | v2.0 完整交付 |
 | Phase J.3（Aether SDK） | `[x]` | 3.6 / 6.2.4 / 6.2.5 | 已落地，Web / Android 复用 |
+| v3.0 Apple Intelligence 集成 | `[~]` | 6.6 | v3.0 已落地骨架（AppleIntelligenceProvider，FoundationModels 运行时检测 + 占位降级；真实调用待框架正式支持） |
+| v3.0 本地 RAG 增强 | `[x]` | 6.6 | v3.0 已落地（BM25Retriever + CrossEncoderReranker 启发式占位 + HybridRAGService RRF 融合） |
+| v3.0 多 Agent 协作增强 | `[x]` | 6.3 | v3.0 已落地（ArbiterAgent 三策略仲裁 + AgentTeam 三预设模板） |
+| v3.0 AI Workflow 自动化 | `[x]` | 6.6 | v3.0 已落地（WorkflowEngine DFS 循环检测 + 9 种节点类型 + JSON 导入导出） |
 
 ### 附录 D：变更记录
 
@@ -3271,6 +3275,7 @@ end
 |------|------|------|
 | 2026-07-23 | v1.0 | 初版创建，统合 12 份历史规划文档，覆盖 v1.0 已实施 + v1.1 ~ v3.0+ 规划 |
 | 2026-07-23 | v1.1 | 更新 v1.1 已完成能力：2.2 当前状态表格新增 MCP Server / Agent 多步协作 / 插件市场 MVP / 动态星空背景四项；4.2 插件系统扩展 v1.1 已实现清单；6.3.3 多 Agent 协作与 6.3.4 MCP 共建标注 v1.1 已交付基础；6.4.5 动态星空背景版本归属从 v2.0 提前到 v1.1；里程碑交付摘要表 v1.1 标 ✅；Gantt 图 v1.1 标 done |
+| 2026-07-31 | v3.0 | 更新 v1.6 / v2.0 / v3.0 已完成状态：v1.6（2026-07-29，五引擎骨架 + 自动降级链）、v2.0（2026-07-30，CloudKit / Handoff / visionOS / Web 伴侣 / macOS 多窗口）、v3.0（2026-07-31，AppleIntelligenceProvider + BM25Retriever + CrossEncoderReranker + HybridRAGService + ArbiterAgent + AgentTeam + WorkflowEngine，7 源文件 + 86 测试用例，UT 3583 → 3669）；附录 C 落地进度新增 v3.0 条目 |
 
 ---
 

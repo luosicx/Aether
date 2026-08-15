@@ -37,6 +37,7 @@
    - 4.27 [端侧多模态](#427-端侧多模态v13--v14--v16)
    - 4.28 [Windows 端](#428-windows-端)
    - 4.29 [Android 端](#429-android-端)
+   - 4.30 [智能平台（v3.0）](#430-智能平台v30)
 5. [多平台支持](#5-多平台支持)
 6. [工具能力清单](#6-工具能力清单)
 7. [开发工作流](#7-开发工作流)
@@ -776,6 +777,56 @@ print("利用率：\(snapshot.utilizationPercentage)%")
 - `android/app/src/main/res/values-*/strings.xml`：8 种语言资源
 
 > **常见问题**：见 [Q19 Android 端 Room 数据库如何工作](#q19-android-端-room-数据库如何工作) / [Q20 Android 端 Rust JNI 在测试中如何回退](#q20-android-端-rust-jni-在测试中如何回退) / [Q21 Android 端如何切换语言](#q21-android-端如何切换语言)。
+
+---
+
+### 4.30 智能平台（v3.0）
+
+> v3.0 交付四大智能能力：Apple Intelligence 端侧 Provider、本地 RAG 混合检索增强、多 Agent 冲突仲裁、AI Workflow 自动化。当前 Apple Intelligence 与 Cross-Encoder 为骨架/占位实现，架构接入点已就绪。
+
+#### 4.30.1 Apple Intelligence 端侧 Provider
+
+- **平台要求**：iOS 18.0+ / macOS 15.0+（FoundationModels 框架可用时）。
+- **可用性检测**：`AppleIntelligenceProvider.isAvailable` 通过 `NSClassFromString("FoundationModels.LanguageModelSession")` 运行时检测，无需编译期依赖。
+- **占位模式**：环境不可用时（`enabled = false`），`chat` 流返回提示文本 `[Apple Intelligence 占位]`，由 `ModelProviderFactory` 自动降级到 MLX / 云端 Provider。
+- **隐私优先**：全端侧运行，无网络请求；`embed` 返回 384 维占位向量（Apple Intelligence 未公开嵌入 API，由 EmbeddingService 兜底）。
+- **工具调用**：暂不支持，`chat(tools:)` 降级为纯文本响应。
+
+#### 4.30.2 本地 RAG 混合检索增强
+
+- **混合检索流程**：向量检索 TopK=20 + BM25 关键词检索 TopK=20 → RRF 融合（k=60）TopK=10 → Cross-Encoder 重排序 TopK=5。
+- **BM25Retriever**：纯内存 BM25 关键词检索（k1=1.5 / b=0.75 标准参数），`addDocument(id:text:)` 索引、`search(query:topK:)` 检索，与向量检索互补（专有名词 / 精确关键词场景更优）。
+- **HybridRAGService**：混合检索主入口 `hybridSearch(query:vectorResults:topK:)`，返回 `HybridResult`（含 vectorScore / bm25Score / fusedScore / rerankedScore 四路分数）。
+- **查询改写**：`rewriteQuery(_:)` 占位实现（去问号变体），待 LLM 集成后扩展同义词 / HyDE。
+- **Cross-Encoder 重排序**：当前为启发式占位评分（精确匹配率 80% + 长度归一化 20%），待 ONNX Runtime 集成后替换为真实模型评分。
+
+#### 4.30.3 多 Agent 冲突仲裁（ArbiterAgent）
+
+- **三种决策策略**：
+  - `majority`（多数表决）：≥60% Agent 结果一致时通过，平票取置信度最高者；
+  - `priority`（角色优先级）：reviewer > researcher > coordinator > executor > planner；
+  - `userIntervention`（用户介入）：多数表决与优先级均无法决出，或超过 `maxRounds`（默认 5）轮次时强制人工介入。
+- **AgentTeam 预设模板**：`research`（researcher + reviewer + coordinator）、`coding`（编码团队）、`critique`（批判团队），支持 `tokenBudget` 预算控制与 `enableArbitration` 开关。
+- **编排结果**：`TeamOrchestrationResult` 记录最终结果、各 Agent 执行记录（`AgentResultRecord`）、仲裁结果与 token 消耗。
+
+#### 4.30.4 AI Workflow 自动化
+
+- **工作流模型**：`Workflow` = 触发器 + 节点 + 连线，9 种节点类型：
+  - 触发器：`triggerTimer` / `triggerManual` / `triggerEvent`
+  - 动作：`actionLLM` / `actionTool` / `actionAgent`
+  - 控制流：`conditionIfElse`（MVP 仅线性 + 条件分支）
+  - I/O：`input` / `output`
+- **验证**：`WorkflowEngine.validate(_:)` 检查必须有触发器、无循环（DFS 检测）、节点数上限（`maxNodesExceeded`）。
+- **执行**：`WorkflowEngine.execute(_:input:)` 线性遍历节点，逐节点记录 `NodeExecutionResult`（输入 / 输出 / 耗时 / 状态）。
+- **导入导出**：`Workflow.toJSON()` / `Workflow.fromJSON(_:)` 支持 JSON 序列化，便于分享与备份。
+
+#### 4.30.5 对应代码
+
+- `Aether/Services/LLM/AppleIntelligenceProvider.swift`：Apple Intelligence Provider
+- `Aether/Services/RAG/BM25Retriever.swift` / `CrossEncoderReranker.swift` / `HybridRAGService.swift`：混合检索三件套
+- `Aether/Services/Agent/ArbiterAgent.swift` / `AgentTeam.swift`：多 Agent 仲裁与团队编排
+- `Aether/Services/Workflow/WorkflowEngine.swift`：AI Workflow 执行引擎
+- 测试：`AetherTests/LLM/AppleIntelligenceProviderTests.swift`（14 用例）/ `AetherTests/RAG/HybridRAGServiceTests.swift`（24 用例）/ `AetherTests/Agent/ArbiterAgentTests.swift`（20 用例）/ `AetherTests/Workflow/WorkflowEngineTests.swift`（28 用例）
 
 ---
 

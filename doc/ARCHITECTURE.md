@@ -384,6 +384,7 @@ flowchart LR
 | Health | `Services/Health/HealthKitService.swift` | Day 18 HealthKit 读取：步数 / 心率 / 睡眠 / 活动能量，按日期范围查询。 |
 | Health | `Services/Health/HealthInsightGenerator.swift` | Day 18 健康洞察生成：基于 HealthKitService 数据生成中文洞察文本，持久化到 `HealthInsight` @Model。 |
 | Intents | `Services/Intents/IntentChatService.swift` | Day 18 App Intents 路由：根据 Intent 类型（Ask / NewConversation / SwitchConversation）解析参数并切换/创建会话。 |
+| LLM | `Services/LLM/AppleIntelligenceProvider.swift` | v3.0 Apple Intelligence 端侧 Provider：实现 `LLMProvider` 协议，`isAvailable` 运行时检测 FoundationModels 框架（iOS 18+ / macOS 15+），不可用时占位降级到 MLX / 云端；全端侧运行，隐私优先。当前为骨架实现（FoundationModels 真实调用待框架正式支持）。 |
 | LLM | `Services/LLM/DeepSeekClient.swift` | `nonisolated final class`，实现 `LLMProvider`，提供 DeepSeek chat 流式 + embed。 |
 | LLM | `Services/LLM/QwenClient.swift` | Day 13 Qwen 客户端，走阿里云百炼 DashScope OpenAI 兼容端点，实现 `LLMProvider`。 |
 | LLM | `Services/LLM/BFFProxyClient.swift` | Day 15 BFF 代理客户端：请求经 Cloudflare Workers 中转，仅传 `userToken`，不持上游 API Key；支持 chat / embed / 限流。 |
@@ -396,8 +397,11 @@ flowchart LR
 | OnDevice | `Services/OnDevice/OnDeviceModelDownloader.swift` | Day 16 模型下载器：从 HuggingFace CDN 下载 + SHA256 校验 + 断点续传。 |
 | OnDevice | `Services/OnDevice/OfflineLLMProvider.swift` | Day 16 端侧 LLMProvider 实现：包装 MLXInferenceEngine，对外暴露 `LLMProvider` 协议。 |
 | Performance | `Services/Performance/PerformanceMonitor.swift` | Day 14 性能监控：首屏渲染 / 流式首字 / 工具执行 / RAG 检索等关键耗时记录。 |
+| RAG | `Services/RAG/BM25Retriever.swift` | v3.0 BM25 关键词检索引擎：纯内存实现，k1=1.5 / b=0.75 标准参数，`addDocument(id:text:)` 索引 + `search(query:topK:)` 检索，与向量检索互补。 |
+| RAG | `Services/RAG/CrossEncoderReranker.swift` | v3.0 Cross-Encoder 重排序器：`rerank(query:documents:topK:)` 对 (query, document) 对计算精细相关度；当前为启发式占位评分（精确匹配率 + 长度归一化），待 ONNX Runtime 集成后替换。 |
 | RAG | `Services/RAG/DocumentChunker.swift` | 基于 `NLTokenizer` 的文档分块器，支持 overlap。 |
 | RAG | `Services/RAG/EmbeddingService.swift` | 嵌入服务，封装 LLM embedding API 调用。 |
+| RAG | `Services/RAG/HybridRAGService.swift` | v3.0 混合检索服务：向量 TopK=20 + BM25 TopK=20 → RRF 融合（k=60）TopK=10 → Cross-Encoder 重排序 TopK=5；`hybridSearch(query:vectorResults:topK:)` 主入口，返回四路分数（vectorScore / bm25Score / fusedScore / rerankedScore）；含 `rewriteQuery(_:)` 查询改写占位。 |
 | RAG | `Services/RAG/PDFExtractor.swift` | 基于 `PDFKit` 的 PDF 文本提取器。 |
 | RAG | `Services/RAG/RAGService.swift` | `@MainActor` RAG 检索增强服务，提供 `indexDocument` 索引、`retrieve` topK 检索、`buildAugmentedContext` 构建带 `[1][2]` 编号的 prompt 并复用 queryEmbedding。 |
 | RemoteConfig | `Services/RemoteConfig/RemoteConfigService.swift` | Day 14 远程配置拉取：从远端拉取 featureFlags / rateLimits，缓存到 `RemoteConfig` @Model，支持过期重拉。 |
@@ -412,6 +416,40 @@ flowchart LR
 | Voice | `Services/Voice/VoiceService.swift` | 语音服务，`AVAudioSession` + `SFSpeechRecognizer` 录音识别 + `AVSpeechSynthesizer` 朗读合成，朗读前应用 `TTSConfig`。 |
 | Voice | `Services/Voice/TTSConfig.swift` | Day 19 TTS 配置：voiceID / rate / pitch / volume，Codable + Sendable，UserDefaults 持久化。 |
 | Voice | `Services/Voice/TTSVoiceCatalog.swift` | Day 19 TTS 音色目录：枚举 `AVSpeechSynthesisVoice` 系统音色，按语言分组供 Picker 展示。 |
+
+#### v3.0 新增：Agent 域扩展与 Workflow 子模块（智能平台）
+
+> v3.0 在既有 Agent 域（v1.1 引入的 10 文件：AgentInstance / AgentMessageBus / AgentOrchestrator / DAGExecutionEngine 等）基础上扩展冲突仲裁与团队编排，并新增 Workflow 子模块。
+
+| 子模块 | 文件 | 职责 |
+|--------|------|------|
+| Agent | `Services/Agent/ArbiterAgent.swift` | v3.0 冲突仲裁 Agent：多 Agent 结果冲突时决策最终结果。三种策略：`majority`（≥60% 多数表决，平票取置信度最高）/ `priority`（角色优先级 reviewer > researcher > coordinator > executor > planner）/ `userIntervention`（用户介入）；`maxRounds` 默认 5 轮，超限强制人工介入。 |
+| Agent | `Services/Agent/AgentTeam.swift` | v3.0 Agent 团队数据模型：`TeamMember`（role / isLead / delegates）+ 3 预设模板（research / coding / critique）+ `TeamOrchestrationResult` 编排结果（finalResult / agentResults / arbitrationResult / tokenConsumed）。 |
+| Workflow | `Services/Workflow/WorkflowEngine.swift` | v3.0 AI Workflow 执行引擎：`validate(_:)` 验证（触发器存在 + DFS 循环检测 + 节点数上限）、`execute(_:input:)` 线性遍历执行；`WorkflowNode` 9 种节点类型（3 触发器 + 3 动作 + 1 条件分支 + 2 I/O）；`Workflow` 支持 `toJSON()` / `fromJSON(_:)` 序列化；`WorkflowError` 6 种错误类型。 |
+
+```mermaid
+flowchart LR
+    subgraph HybridRAG["v3.0 混合检索流水线"]
+        V["向量检索<br/>TopK=20"] --> RRF["RRF 融合<br/>k=60"]
+        B["BM25 检索<br/>TopK=20"] --> RRF
+        RRF --> TOP10["TopK=10"]
+        TOP10 --> CE["Cross-Encoder<br/>重排序"]
+        CE --> OUT["TopK=5 结果"]
+    end
+
+    subgraph AgentArb["v3.0 多 Agent 仲裁"]
+        A1["Agent 结果 ×N"] --> MAJ{多数表决<br/>≥60%?}
+        MAJ -- 是 --> WIN["胜出结果"]
+        MAJ -- 否 --> PRIO{角色优先级}
+        PRIO -- 决出 --> WIN
+        PRIO -- 未决 --> USER["用户介入"]
+    end
+
+    subgraph WF["v3.0 AI Workflow"]
+        TRG["触发器<br/>Timer/Manual/Event"] --> NODE["节点链<br/>LLM/Tool/Agent/条件"]
+        NODE --> RES["执行结果<br/>逐节点耗时记录"]
+    end
+```
 
 #### 关键公开 API 一览（按子模块）
 
