@@ -56,10 +56,13 @@ import {
   handleSearchDocuments,
   handleUploadDocument,
 } from "./src/routes/rag.js";
-import {
-  handleUploadHealthSummary,
+import { handleUploadHealthSummary,
   handleGetHealthSummary,
 } from "./src/routes/health.js";
+
+// Durable Object 导出（wrangler.toml durable_objects.bindings 引用）：
+// 全局限流器，每 limit key 一个实例，跨边缘节点精确扣减配额
+export { RateLimiterDO } from "./src/do/rate-limiter.js";
 
 // LLM 透传代理白名单：仅放行上游对话/嵌入/模型端点，
 // 防止任意路径透传 + 注入上游 API Key（等同把上游凭证借给客户端）
@@ -334,11 +337,12 @@ async function proxyLLM(request, env, ctx) {
   }
 
   // 4. 构造上游请求：URL 归一化（避免 /v1/v1 双拼）+ Header 白名单构造
+  //    附加白名单经 env.UPSTREAM_EXTRA_HEADERS 配置（敏感头永不放开，见 llm.js 拒绝清单）
   const url = new URL(request.url);
   const upstreamUrl = joinUpstreamUrl(upstream.baseUrl, url.pathname);
   const upstreamInit = {
     method: request.method,
-    headers: buildUpstreamHeaders(request.headers, upstream.apiKey),
+    headers: buildUpstreamHeaders(request.headers, upstream.apiKey, env.UPSTREAM_EXTRA_HEADERS),
     body: request.body,
   };
   // 流式 body 必须声明 duplex（Node/undici 测试环境要求；Workers runtime 兼容）
