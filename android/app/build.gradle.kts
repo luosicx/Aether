@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.aether.app"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.aether.app"
