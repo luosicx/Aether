@@ -114,7 +114,8 @@ export async function handleDeleteMemory(request, env, ctx, id) {
     if (changes === 0) return jsonError(404, "记忆不存在或无权删除");
     return jsonOk({ deleted: true, id });
   } catch (err) {
-    return jsonError(500, "删除记忆失败: " + (err && err.message));
+    console.error("删除记忆失败:", err && err.message);
+    return jsonError(500, "删除记忆失败");
   }
 }
 

@@ -107,7 +107,8 @@ export async function handleSubmitFeedback(request, env, ctx, messageId) {
     if (changes === 0) return jsonError(404, "消息不存在或无权操作");
     return jsonOk({ id: messageId, feedback: feedbackValue });
   } catch (err) {
-    return jsonError(500, "反馈失败: " + (err && err.message));
+    console.error("反馈失败:", err && err.message);
+    return jsonError(500, "反馈失败");
   }
 }
 

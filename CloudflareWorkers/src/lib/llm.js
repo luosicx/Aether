@@ -24,18 +24,46 @@ export function resolveUpstream(provider, env) {
   }
 }
 
+// 上游转发 Header 白名单：仅保留无敏感语义的通用头，其余（Cookie / X-BFF-Token /
+// X-Forwarded-* 等）一律剥离；Authorization 由 BFF 注入上游凭证，绝不透传客户端值
+const UPSTREAM_ALLOWED_HEADERS = new Set(["content-type", "accept"]);
+
 /**
- * 构造转发到上游的 Header：移除 BFF 专有头，注入上游 Authorization
+ * 构造转发到上游的 Header：白名单构造 + 注入上游 Authorization
  * @param {Headers} headers
  * @param {string} apiKey
  * @returns {Headers}
  */
 export function buildUpstreamHeaders(headers, apiKey) {
-  const out = new Headers(headers);
-  out.delete("X-BFF-Token");
-  out.delete("X-Provider");
+  const out = new Headers();
+  for (const [key, value] of headers.entries()) {
+    if (UPSTREAM_ALLOWED_HEADERS.has(key.toLowerCase())) {
+      out.set(key, value);
+    }
+  }
   out.set("Authorization", "Bearer " + apiKey);
   return out;
+}
+
+/**
+ * 拼接上游 URL（归一化 /v1，避免双拼）
+ *
+ * - baseUrl 末尾斜杠容忍
+ * - baseUrl 已以 /v1 结尾且 path 以 /v1/ 开头时去重（Qwen compatible-mode 兼容：
+ *   https://x.com/compatible-mode/v1 + /v1/chat/completions → .../v1/chat/completions）
+ *
+ * @param {string} baseUrl - 上游基础 URL（可带或不带 /v1 后缀）
+ * @param {string} path - 以 / 开头的 API 路径（如 /v1/chat/completions）
+ * @returns {string}
+ */
+export function joinUpstreamUrl(baseUrl, path) {
+  const base = String(baseUrl || "").replace(/\/+$/, "");
+  let p = String(path || "");
+  if (!p.startsWith("/")) p = "/" + p;
+  if (/\/v1$/.test(base) && p.startsWith("/v1/")) {
+    p = p.slice("/v1".length);
+  }
+  return base + p;
 }
 
 /**
@@ -123,7 +151,7 @@ export async function* callLLMStream(env, model, messages, opts = {}) {
     throw new Error("LLM 上游未配置: provider=" + provider);
   }
 
-  const upstreamUrl = upstream.baseUrl.replace(/\/$/, "") + "/v1/chat/completions";
+  const upstreamUrl = joinUpstreamUrl(upstream.baseUrl, "/v1/chat/completions");
   const payload = {
     model,
     messages,

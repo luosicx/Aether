@@ -256,6 +256,35 @@ describe("E2E /conversations CRUD", () => {
     expect(resp.status).toBe(404);
   });
 
+  it("DELETE /conversations/:id 越权删除他人会话返回 404 且消息删除带所有权过滤（IDOR 回归）", async () => {
+    // 场景：攻击者（VALID_TOKEN / user-conv-1）尝试删除他人会话 victim-conv
+    let messagesBinds = null;
+    const env = makeEnv([
+      [
+        "DELETE FROM messages WHERE conversation_id IN",
+        {
+          run: (binds) => {
+            messagesBinds = binds;
+            // 模拟真实 D1 语义：所有权子查询未命中（会话不属于攻击者）→ 0 行被删
+            return { success: true, changes: 0 };
+          },
+        },
+      ],
+      ["DELETE FROM conversations WHERE id = ?1 AND user_id", { run: () => ({ success: true, changes: 0 }) }],
+    ]);
+    const req = makeRequest("/conversations/victim-conv", {
+      method: "DELETE",
+      token: VALID_TOKEN,
+    });
+    const resp = await worker.fetch(req, env, {});
+    expect(resp.status).toBe(404);
+    // 回归断言：消息删除必须携带所有权过滤（binds = [conversationId, userId]）。
+    // 旧实现仅按 conversation_id 删除（binds 长度 1），会先于归属校验物理删除他人消息
+    expect(messagesBinds).not.toBeNull();
+    expect(messagesBinds).toHaveLength(2);
+    expect(messagesBinds[1]).toBe(USER_ID);
+  });
+
   it("GET /conversations 响应 Content-Type 为 application/json", async () => {
     const env = makeEnv([
       ["WHERE user_id = ?1 ORDER BY", { all: () => ({ results: [] }) }],

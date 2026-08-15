@@ -90,7 +90,8 @@ export async function handleChatStream(request, env, ctx) {
           .bind(conversationId, auth.userId, title, now, now, systemPrompt, now)
           .run();
       } catch (err) {
-        return jsonError(500, "创建会话失败: " + (err && err.message));
+        console.error("创建会话失败:", err && err.message);
+        return jsonError(500, "创建会话失败");
       }
     }
   } else {
