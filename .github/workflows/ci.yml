@@ -913,8 +913,16 @@ jobs:
       - name: Build Debug APK and run unit tests
         # wrapper 已随仓库提交，无需再用系统 gradle 重新生成；
         # 合并为一次 Gradle 调用，避免重复配置阶段。
+        # Runner 访问 services.gradle.org 偶发很慢：先带重试地预热 wrapper，
+        # 避免发行包下载超时把整个 job 直接打死。
         working-directory: android
-        run: ./gradlew assembleDebug testDebugUnitTest --no-daemon --stacktrace
+        run: |
+          for i in 1 2 3; do
+            ./gradlew --version && break
+            echo "Gradle 发行包下载失败，第 $i 次重试..."
+            sleep 10
+          done
+          ./gradlew assembleDebug testDebugUnitTest --no-daemon --stacktrace
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v7
