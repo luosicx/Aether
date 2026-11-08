@@ -318,7 +318,7 @@ Android 端通过 JNI 调用 Rust core，桥接代码位于 `com.aether.rust` �
 
 ## 12. CI 集成
 
-CI 工作流定义于 `.github/workflows/ci.yml` 的 `android-build` job（第 967-1048 行），运行在 `ubuntu-latest` runner，超时 20 分钟，依赖 `rust` job。
+CI 工作流定义于 `.github/workflows/ci.yml` 的 `android-build` job，运行在 `ubuntu-latest` runner，超时 20 分钟，依赖 `rust` job 上传的 `.so` artifact。
 
 关键步骤：
 

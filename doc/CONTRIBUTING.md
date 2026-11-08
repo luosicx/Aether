@@ -497,7 +497,7 @@ Closes #789
 - PR 自动触发 GitHub Actions CI（`.github/workflows/ci.yml`）
 - 必须 **Build 成功** + **Test 0 failures**
 - CI 通过 SonarCloud 进行代码质量检查（`code-quality` job），存在 error 会阻断合并
-- 跨平台 PR：CI 必须全部 **14 个 job 通过**（含 iOS-build / macOS-build / windows-build / android-build / Rust 各 target / coverage-summary 等），Coverage 当前阈值 84.25%
+- 跨平台 PR：CI 必须全部 **job 通过**（含 iOS-build / macOS-build / windows-build / android-build / Rust 各 target / coverage-summary 等），Coverage 当前阈值 84.25%
 - Reviewer 审核通过后合并
 
 ### 4.4 Windows 端 PR 测试要求
@@ -540,7 +540,7 @@ cd android
 同时影响多端的 PR（如修改 Rust crate `aether-core-ffi`）：
 
 - **本地**：必须分别在三端跑测试（Apple UT/UIT + Windows `dotnet test` + Android `./gradlew testDebugUnitTest`）
-- **CI**：14 个 job 全部 pass，Coverage ≥ 84.25%
+- **CI**：全部 job pass，Coverage ≥ 84.25%
 - **PR 描述**：必须列出每个平台的测试结果与影响范围
 - **回滚预案**：若某端 CI 失败且无法快速修复，可在 PR 描述中说明并临时跳过该端 CI（需 Reviewer 同意），但合并后必须立即开 follow-up Issue 跟进
 

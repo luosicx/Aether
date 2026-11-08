@@ -5,7 +5,9 @@
 # 供 SonarCloud Scan 上传。
 #
 # 用法：
-#   python3 scripts/merge-coverage.py <ios.xml> <macos.xml> <rust.xml> <sdk.xml> <output.xml>
+#   python3 scripts/merge-coverage.py <ios.xml> <macos-1.xml> [<macos-2.xml> ...] <rust.xml> <sdk.xml> <output.xml>
+#
+# macOS 覆盖率可能来自多个 CI 分片，允许传入任意数量的 macOS XML。
 #
 # 支持两类输入格式：
 #   - iOS / macOS / AetherSDK：SonarCloud 兼容的 <file><lineToCover> 格式
@@ -164,26 +166,32 @@ def write_merged_xml(output_path, merged_files):
 def main():
     if len(sys.argv) < 6:
         print(
-            "Usage: merge-coverage.py <ios.xml> <macos.xml> <rust.xml> <sdk.xml> <output.xml>",
+            "Usage: merge-coverage.py <ios.xml> <macos-1.xml> [<macos-2.xml> ...] <rust.xml> <sdk.xml> <output.xml>",
             file=sys.stderr,
         )
         sys.exit(1)
 
-    ios_path, macos_path, rust_path, sdk_path, output_path = sys.argv[1:6]
+    ios_path = sys.argv[1]
+    macos_paths = sys.argv[2:-3]
+    rust_path, sdk_path, output_path = sys.argv[-3:]
 
     ios = parse_swift_coverage(ios_path)
-    macos = parse_swift_coverage(macos_path)
+    macos_sources = [parse_swift_coverage(path) for path in macos_paths]
     rust = parse_rust_coverage(rust_path)
     sdk = parse_sdk_coverage(sdk_path)
 
-    merged_files, total_covered, total_lines = merge_files([ios, macos, rust, sdk])
+    merged_files, total_covered, total_lines = merge_files([ios, *macos_sources, rust, sdk])
     write_merged_xml(output_path, merged_files)
+
+    macos_files = set()
+    for source in macos_sources:
+        macos_files.update(source.keys())
 
     rate = total_covered / total_lines if total_lines else 0
     print(f"Merged coverage: line-rate={rate:.4f} ({total_covered}/{total_lines} lines)")
     print(
-        f"Files: iOS={len(ios)}, macOS={len(macos)}, Rust={len(rust)}, "
-        f"AetherSDK={len(sdk)}, merged={len(merged_files)}"
+        f"Files: iOS={len(ios)}, macOS={len(macos_files)} (shards={len(macos_sources)}), "
+        f"Rust={len(rust)}, AetherSDK={len(sdk)}, merged={len(merged_files)}"
     )
 
 
