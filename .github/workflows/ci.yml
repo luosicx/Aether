@@ -30,8 +30,8 @@ jobs:
     needs: [rust-apple, rust]
     runs-on: macos-15
     # v1.6: 45min 不足以跑完全部测试（v1.6 新增 45 个多模态测试后总时长接近 49min），
-    # 增至 60min 给足 buffer，避免超时 cancelled 导致 coverage-summary 失败。
-    timeout-minutes: 60
+    # 实测已达 55m42s，60min 只剩几分钟余量，放宽到 75min 避免被 cancelled。
+    timeout-minutes: 75
     outputs:
       coverage_pct: ${{ steps.coverage.outputs.coverage_pct }}
       coverage_pass: ${{ steps.coverage.outputs.coverage_pass }}
@@ -469,8 +469,12 @@ jobs:
 
   # 按测试类分片并行执行完整 macOS 套件。实测完整套件单次约 80 分钟，
   # 2 片后单片约 40 分钟，显著缩短 PR 关键路径；覆盖率 XML 由 code-quality 合并。
-  # 按测试数分片后实测仍可能偏差（慢测试集中在同一片时单卡可达约 1 小时），
-  # timeout 放宽到 90min 留出余量，避免接近上限被取消。
+  # 分片权重优先取 .github/macos-test-durations.json 中的类级实测耗时，缺失的类按
+  # 中位单测耗时估算。数据用 scripts/extract-macos-test-durations.py 从分片日志重新生成：
+  #   gh api repos/<owner>/<repo>/actions/jobs/<job-id>/logs > shard.log
+  #   python3 scripts/extract-macos-test-durations.py shard*.log -o .github/macos-test-durations.json
+  # 只按测试数装箱时，慢类（含被 60s 上限杀掉的挂起用例）扎堆的那片可达 1 小时以上，
+  # 与另一片相差一倍多；按耗时装箱后两片预计各约 39 分钟。
   unit-tests-macos:
     needs: rust-apple
     runs-on: macos-15
@@ -531,6 +535,7 @@ jobs:
         env:
           SHARD: ${{ matrix.shard }}
           SHARD_COUNT: 2
+          DURATIONS_FILE: .github/macos-test-durations.json
         run: |
           xcodebuild test-without-building \
             -project Aether.xcodeproj \
@@ -544,7 +549,8 @@ jobs:
             -test-enumeration-output-path /tmp/tests.json \
             CODE_SIGNING_ALLOWED=NO SWIFT_STRICT_CONCURRENCY=complete
           python3 - <<'PY' > /tmp/shard-args.txt
-          import json, os, sys
+          import json, os, statistics, sys
+
           data = json.load(open("/tmp/tests.json"))
           entries = []
           for plan in data.get("values", []):
@@ -555,20 +561,34 @@ jobs:
                       tests = [t for t in cls.get("children", []) if t.get("kind") == "test"]
                       if tests:
                           entries.append((cls["name"], len(tests)))
-          # 按测试数从大到小贪心装箱到当前负载最小的分片，避免分片间耗时失衡
-          entries.sort(key=lambda item: (-item[1], item[0]))
+
+          try:
+              durations = json.load(open(os.environ["DURATIONS_FILE"]))
+          except FileNotFoundError:
+              durations = {}
+              print("# durations file not found, falling back to test counts", file=sys.stderr)
+
+          # 未知类的耗时按「已知类的每测试中位耗时 × 测试数」估算，否则按测试数装箱
+          ratio = [durations[name] / count for name, count in entries if name in durations and count]
+          per_test = statistics.median(ratio) if ratio else 1.0
+
+          def weight(name, count):
+              return durations.get(name, count * per_test)
+
+          entries.sort(key=lambda item: (-weight(*item), item[0]))
           shard = int(os.environ["SHARD"])
           count = int(os.environ["SHARD_COUNT"])
-          loads = [0] * count
+          loads = [0.0] * count
           buckets = [[] for _ in range(count)]
           for name, test_count in entries:
               index = min(range(count), key=lambda i: (loads[i], i))
-              loads[index] += test_count
+              loads[index] += weight(name, test_count)
               buckets[index].append(name)
           for name in sorted(buckets[shard - 1]):
               print(f"-only-testing:AetherTests/{name}")
           print(f"# shard {shard}/{count}: {len(buckets[shard - 1])} classes, "
-                f"{loads[shard - 1]} tests (all shards: {loads})", file=sys.stderr)
+                f"~{loads[shard - 1]:.0f}s (all shards: {[round(load) for load in loads]})",
+                file=sys.stderr)
           PY
           echo "macOS test shard ${SHARD}/${SHARD_COUNT}: $(wc -l < /tmp/shard-args.txt) classes"
 
