@@ -216,7 +216,7 @@ pwsh scripts/build-windows.ps1 -Command publish -Configuration Release -Runtime 
 | TypingIndicator | ✅ | 流式响应三圆点闪烁 |
 | 流式聊天（SSE） | ✅ | Rust DLL + 纯 C# 双路径 |
 | Rust FFI 集成 | ✅ | SSE 解析 + 向量数学 + 脱敏 |
-| 单元测试 | ✅ | Aether.Windows.Tests xUnit，7 文件 72 用例 |
+| 单元测试 | ✅ | Aether.Windows.Tests xUnit，7 文件 102 用例 |
 
 ---
 

@@ -469,6 +469,8 @@ jobs:
 
   # 按测试类分片并行执行完整 macOS 套件。实测完整套件单次约 80 分钟，
   # 2 片后单片约 40 分钟，显著缩短 PR 关键路径；覆盖率 XML 由 code-quality 合并。
+  # 按测试数分片后实测仍可能偏差（慢测试集中在同一片时单卡可达约 1 小时），
+  # timeout 放宽到 90min 留出余量，避免接近上限被取消。
   unit-tests-macos:
     needs: rust-apple
     runs-on: macos-15
@@ -476,7 +478,7 @@ jobs:
       fail-fast: false
       matrix:
         shard: [1, 2]
-    timeout-minutes: 70
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v5
 
@@ -823,6 +825,7 @@ jobs:
           # 原因：iOS xccov 在 Xcode 26.3 上不稳定，导致 new_coverage 指标波动；
           # 待 xccov 稳定或迁移到 xcresulttool 后可在 properties 中恢复为 true。
           args: >
+            -Dsonar.scanner.skipJreProvisioning=true
             ${{ github.event_name == 'pull_request' && format('-Dsonar.pullrequest.key={0} -Dsonar.pullrequest.branch={1} -Dsonar.pullrequest.base={2} -Dsonar.pullrequest.provider=github -Dsonar.pullrequest.github.repository={3}', github.event.pull_request.number, github.head_ref, github.base_ref, github.repository) || '' }}
 
       - name: Post SonarCloud report to PR

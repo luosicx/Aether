@@ -1762,7 +1762,7 @@ sequenceDiagram
 | PerformanceMonitor | `Services/Performance/PerformanceMonitor.swift` | iOS 17.0+ / macOS 14.0+ |
 | PrivacyInfo.xcprivacy | `Resources/PrivacyInfo.xcprivacy` | iOS 17.0+ / macOS 14.0+ / Xcode 16+（App Store 审核要求） |
 | AttributedString（Markdown） | `Views/Chat/Markdown*.swift` / `CodeSyntaxHighlighter.swift` | iOS 17.0+ / macOS 14.0+ / Foundation |
-| XCTest | `AetherTests/` 203 文件（3539 用例） | Xcode 16+ / Swift 5.9+ |
+| XCTest | `AetherTests/` 203 文件（3541 用例） | Xcode 16+ / Swift 5.9+ |
 | XCUITest | `AetherUITests/` 7 文件（30 用例） | Xcode 16+ / Swift 5.9+ |
 | GitHub Actions | `.github/workflows/ci.yml` | macos-14 runner / Xcode 16+ |
 | CoreLocation | CLLocationManager + CLGeocoder | LocationTool 定位与反地理编码 | iOS 17.0+ / macOS 14.0+ / CoreLocation.framework |
@@ -1784,7 +1784,7 @@ sequenceDiagram
 | DPAPI（ProtectedData） | `windows/Aether.Windows/Services/BffConfigStore.cs` | UserToken 加密（`CurrentUser` 范围，Base64 存储） | `System.Security.Cryptography.ProtectedData` NuGet |
 | P/Invoke | `windows/Aether.Windows/Native/AetherNativeBridge.cs` | 调用 `aether_core_ffi.dll` C ABI（`aether_sse_parse_chunk` / `aether_cosine_f32` / `aether_redact` / `aether_free_string`） | .NET 8 内置 |
 | .resx 多语言资源 | `windows/Aether.Windows/Properties/Strings.Designer.cs` + 8 `.resx` | 8 种语言（zh-Hans / zh-Hant / en / ja / ko / fr / de / es），`LanguageService` 动态切换 | .NET 8 内置 |
-| xUnit | `windows/Aether.Windows.Tests/` | 7 个测试文件 / 72 用例 | xUnit 2.6+ |
+| xUnit | `windows/Aether.Windows.Tests/` | 7 个测试文件 / 102 用例 | xUnit 2.6+ |
 | **Android 端技术栈** | | | |
 | Kotlin + Jetpack Compose | `android/app/build.gradle.kts` | 现代 UI 工具包 + 协程 + StateFlow | Kotlin 1.9+ / Compose BOM 2024+ / AGP 8+ |
 | Ktor Client | `android/app/src/main/java/com/aether/data/api/{AetherApi,ChatStreamClient,HttpClientFactory}.kt` | BFF HTTP + SSE 流式（`Flow<String>`） | Ktor 2.3+ |
@@ -1795,7 +1795,7 @@ sequenceDiagram
 | JNI | `android/app/src/main/java/com/aether/rust/{SseBridge,VectorMath,Redact}.kt` | 调用 `libaether_core_ffi.so`（4 个 `Java_com_aether_rust_*` 导出函数） | JDK 17+ / `jni = "0.21"`（Rust 侧） |
 | Markwon / RichText | `android/app/src/main/java/com/aether/ui/chat/MarkdownText.kt` | Markdown 渲染 | Markwon 4.x+ |
 | res/values-* 多语言资源 | `android/app/src/main/res/values-{zh-rCN,zh-rTW,en,ja,ko,fr,de,es}/strings.xml` | 8 种语言资源 | AGP 内置 |
-| JUnit + Robolectric | `android/app/src/test/java/com/aether/` | 12 个测试文件 / 95 用例 | JUnit 4.13+ / Robolectric 4.11+ |
+| JUnit + Robolectric | `android/app/src/test/java/com/aether/` | 12 个测试文件 / 105 用例 | JUnit 4.13+ / Robolectric 4.11+ |
 | **Rust 核心多形态分发** | | | |
 | aether_core_ffi.dll | `rust/aether-core-ffi/` 编译产物 | Windows x64 动态库（cdylib） | Rust 1.75+ / MSVC toolchain |
 | libaether_core_ffi.so | `rust/aether-core-ffi/` 编译产物 | Android arm64-v8a + x86_64 动态库（cdylib + jni 0.21） | Rust 1.75+ / NDK r25+ |
@@ -1807,7 +1807,7 @@ sequenceDiagram
 ### 7.1 单元测试（UT）
 
 - **Target**：`AetherTests`
-- **规模**：203 个测试文件，3539 用例（3539 pass / 0 skip / 0 failures）
+- **规模**：203 个测试文件，3541 用例（3541 pass / 0 skip / 0 failures）
 - **分层覆盖**：
 
 | 层级 | 测试文件 | 文件数 | 核心断言数（约） | skip 原因 |
@@ -2159,7 +2159,7 @@ CloudflareWorkers/               # BFF 代理网关
 ├── worker.js
 └── wrangler.toml
 
-AetherTests/                  # 203 个 UT 文件 / 3539 用例
+AetherTests/                  # 203 个 UT 文件 / 3541 用例
 ├── APIConfigTests.swift
 ├── AlarmToolTests.swift
 ├── BFFProxyClientTests.swift

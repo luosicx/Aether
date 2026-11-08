@@ -17,8 +17,6 @@ import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.json.Json
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -79,10 +77,9 @@ class ConversationRepositoryRoomTest {
                     if (behavior == MockBehavior.LIST_FAILS) {
                         throw RuntimeException("network error")
                     }
-                    val json = Json.encodeToString(
-                        ListSerializer(Conversation.serializer()),
-                        listPayload
-                    )
+                    val json = """{"conversations":[${
+                        listPayload.joinToString(",") { conversationJson(it) }
+                    }]}"""
                     respond(
                         content = json,
                         status = HttpStatusCode.OK,
@@ -101,7 +98,7 @@ class ConversationRepositoryRoomTest {
                         updatedAt = 0L
                     )
                     respond(
-                        content = Json.encodeToString(Conversation.serializer(), response),
+                        content = """{"conversation":${conversationJson(response)}}""",
                         status = HttpStatusCode.OK,
                         headers = headersOf(HttpHeaders.ContentType, "application/json")
                     )
@@ -125,7 +122,7 @@ class ConversationRepositoryRoomTest {
                         isPinned = true
                     )
                     respond(
-                        content = Json.encodeToString(Conversation.serializer(), response),
+                        content = """{"conversation":${conversationJson(response)}}""",
                         status = HttpStatusCode.OK,
                         headers = headersOf(HttpHeaders.ContentType, "application/json")
                     )
@@ -150,6 +147,22 @@ class ConversationRepositoryRoomTest {
         updatedAt = updatedAt,
         isPinned = isPinned
     )
+
+    /** 按 BFF 契约（snake_case）序列化会话，供 MockEngine 返回。 */
+    private fun conversationJson(conv: Conversation): String = """
+        {
+          "id": "${conv.id}",
+          "title": "${conv.title}",
+          "system_prompt": "${conv.systemPrompt}",
+          "parent_id": ${conv.parentId?.let { "\"$it\"" } ?: "null"},
+          "created_at": ${conv.createdAt},
+          "updated_at": ${conv.updatedAt},
+          "last_message_preview": "${conv.lastMessagePreview}",
+          "is_pinned": ${if (conv.isPinned) 1 else 0},
+          "unread_count": ${conv.unreadCount},
+          "order_field": ${conv.order}
+        }
+    """.trimIndent()
 
     private enum class MockBehavior {
         SUCCESS, CREATE_FAILS, DELETE_FAILS, UPDATE_FAILS, LIST_FAILS

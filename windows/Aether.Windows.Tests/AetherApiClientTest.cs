@@ -128,9 +128,12 @@ public class AetherApiClientTest
         var request = Assert.Single(handler.Requests);
         Assert.Equal(HttpMethod.Patch, request.Method);
         Assert.Equal("/conversations/c1", request.Path);
-        Assert.Contains("\"isPinned\":true", request.Body);
-        Assert.Contains("\"title\":\"标题\"", request.Body);
-        Assert.DoesNotContain("createdAt", request.Body);
+        // Body 是合法 JSON 而非固定字符串：中文可能被转义（如 \u6807\u9898），按语义断言
+        using var doc = JsonDocument.Parse(request.Body);
+        var root = doc.RootElement;
+        Assert.Equal("标题", root.GetProperty("title").GetString());
+        Assert.True(root.GetProperty("isPinned").GetBoolean());
+        Assert.False(root.TryGetProperty("createdAt", out _));
     }
 
     [Fact]
