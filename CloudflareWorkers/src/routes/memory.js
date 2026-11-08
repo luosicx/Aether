@@ -1,21 +1,21 @@
 /**
  * 长期记忆路由：记忆的增删查搜
  *
- * 所有端点需要鉴权（X-BFF-Token），数据按 user_id 隔离。
+ * 所有端点需要鉴权（X-BFF-Token）。数据访问统一经 ctx.db（tenant-db 访问器），
+ * user_id 由访问器绑定，路由层不直接持有 env.DB。
  * 路由函数签名统一 (request, env, ctx)，ctx 可选。
  */
 
 import { jsonError } from "../lib/llm.js";
-import { fetchRelevantMemories, createMemory } from "../lib/memory.js";
 
 /**
  * GET /memory - 列出当前用户的记忆
  * query: ?limit=50&offset=0&category=xxx
  */
 export async function handleListMemory(request, env, ctx) {
-  const auth = ctx && ctx.auth;
-  if (!auth) return jsonError(401, "未鉴权");
-  if (!env.DB) return jsonError(503, "数据库未配置");
+  if (!ctx || !ctx.auth) return jsonError(401, "未鉴权");
+  const db = ctx.db;
+  if (!db) return jsonError(503, "数据库未配置");
 
   const url = new URL(request.url);
   const limit = Math.min(parseInt(url.searchParams.get("limit") || "50", 10), 200);
@@ -23,16 +23,8 @@ export async function handleListMemory(request, env, ctx) {
   const category = url.searchParams.get("category");
 
   try {
-    let sql, binds;
-    if (category) {
-      sql = `SELECT * FROM memories WHERE user_id = ?1 AND category = ?2 ORDER BY importance DESC, created_at DESC LIMIT ?3 OFFSET ?4`;
-      binds = [auth.userId, category, limit, offset];
-    } else {
-      sql = `SELECT * FROM memories WHERE user_id = ?1 ORDER BY importance DESC, created_at DESC LIMIT ?2 OFFSET ?3`;
-      binds = [auth.userId, limit, offset];
-    }
-    const { results } = await env.DB.prepare(sql).bind(...binds).all();
-    return jsonOk({ memories: results || [] });
+    const memories = await db.listMemories({ limit, offset, category });
+    return jsonOk({ memories });
   } catch (err) {
     return jsonError(500, "查询记忆失败: " + (err && err.message));
   }
@@ -43,9 +35,9 @@ export async function handleListMemory(request, env, ctx) {
  * body: { content, category?, importance?, sourceConversationId? }
  */
 export async function handleCreateMemory(request, env, ctx) {
-  const auth = ctx && ctx.auth;
-  if (!auth) return jsonError(401, "未鉴权");
-  if (!env.DB) return jsonError(503, "数据库未配置");
+  if (!ctx || !ctx.auth) return jsonError(401, "未鉴权");
+  const db = ctx.db;
+  if (!db) return jsonError(503, "数据库未配置");
 
   let body;
   try {
@@ -57,20 +49,18 @@ export async function handleCreateMemory(request, env, ctx) {
     return jsonError(400, "content 不能为空");
   }
 
-  const id = genId();
-  const memory = {
-    id,
-    user_id: auth.userId,
-    content: body.content,
-    category: body.category || null,
-    importance: typeof body.importance === "number" ? body.importance : 0.5,
-    source_conversation_id: body.sourceConversationId || null,
-    created_at: Date.now(),
-  };
-
-  const ok = await createMemory(env, memory);
-  if (!ok) return jsonError(500, "创建记忆失败");
-  return jsonOk({ memory }, 201);
+  try {
+    const memory = await db.createMemory({
+      content: body.content,
+      category: body.category || null,
+      importance: typeof body.importance === "number" ? body.importance : 0.5,
+      sourceConversationId: body.sourceConversationId || null,
+    });
+    return jsonOk({ memory }, 201);
+  } catch (err) {
+    console.error("创建记忆失败:", err && err.message);
+    return jsonError(500, "创建记忆失败");
+  }
 }
 
 /**
@@ -78,8 +68,7 @@ export async function handleCreateMemory(request, env, ctx) {
  * body: { query, limit? }
  */
 export async function handleSearchMemory(request, env, ctx) {
-  const auth = ctx && ctx.auth;
-  if (!auth) return jsonError(401, "未鉴权");
+  if (!ctx || !ctx.auth) return jsonError(401, "未鉴权");
 
   let body;
   try {
@@ -92,7 +81,8 @@ export async function handleSearchMemory(request, env, ctx) {
   }
 
   const limit = typeof body.limit === "number" ? body.limit : 5;
-  const memories = await fetchRelevantMemories(env, auth.userId, body.query, limit);
+  // 无 DB 时降级为空结果，不阻断检索接口
+  const memories = ctx.db ? await ctx.db.searchMemories(body.query, limit) : [];
   return jsonOk({ memories, query: body.query });
 }
 
@@ -100,31 +90,19 @@ export async function handleSearchMemory(request, env, ctx) {
  * DELETE /memory/:id - 删除一条记忆
  */
 export async function handleDeleteMemory(request, env, ctx, id) {
-  const auth = ctx && ctx.auth;
-  if (!auth) return jsonError(401, "未鉴权");
+  if (!ctx || !ctx.auth) return jsonError(401, "未鉴权");
+  const db = ctx.db;
   if (!id) return jsonError(400, "缺少 id");
-  if (!env.DB) return jsonError(503, "数据库未配置");
+  if (!db) return jsonError(503, "数据库未配置");
 
   try {
-    const result = await env.DB.prepare(
-      `DELETE FROM memories WHERE id = ?1 AND user_id = ?2`
-    )
-      .bind(id, auth.userId)
-      .run();
-    if ((result.meta?.changes ?? 0) === 0) return jsonError(404, "记忆不存在或无权删除");
+    const deleted = await db.deleteMemory(id);
+    if (!deleted) return jsonError(404, "记忆不存在或无权删除");
     return jsonOk({ deleted: true, id });
   } catch (err) {
     console.error("删除记忆失败:", err && err.message);
     return jsonError(500, "删除记忆失败");
   }
-}
-
-/// 生成 UUID
-function genId() {
-  if (typeof crypto !== "undefined" && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return "id-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
 }
 
 /// 构造 JSON 成功响应

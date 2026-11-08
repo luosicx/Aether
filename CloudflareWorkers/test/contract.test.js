@@ -261,7 +261,7 @@ const probes = {
     request: { path: "/conversations/conv-1/messages" },
     handlers: [
       ["SELECT id FROM conversations", { first: () => ({ id: "conv-1" }) }],
-      ["FROM messages WHERE conversation_id", { all: () => ({ results: [MESSAGE_ROW] }) }],
+      ["FROM messages m", { all: () => ({ results: [MESSAGE_ROW] }) }],
     ],
   },
   "messages.delete": {

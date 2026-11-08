@@ -21,7 +21,7 @@
 │  │  auth        │   │  chat            │    │
 │  │  ratelimit   │   │  conversations   │    │
 │  │  llm         │   │  messages        │    │
-│  │  memory      │   │  memory          │    │
+│  │  tenant-db   │   │  memory          │    │
 │  │  rag         │   │  rag             │    │
 │  │              │   │  health          │    │
 │  └──────────────┘   └──────────────────┘    │
@@ -33,6 +33,12 @@
    Cloudflare KV    Cloudflare D1   DeepSeek / Qwen
    (BFF Token)     (业务数据)        (上游 LLM)
 ```
+
+### 租户隔离
+
+路由层不直接持有 `env.DB`：`worker.js` 鉴权后通过 `createTenantDB(env, userId)` 构造访问器注入 `ctx.db`，所有 SQL 集中写在 `src/lib/tenant-db.js` 并强制绑定当前 `user_id`；根表（会话/记忆/文档/健康摘要）显式过滤租户，子表（消息/文档分块）通过父表 JOIN 或子查询限定归属，多语句写统一走 `DB.batch` 单事务。
+
+该边界由 `test/tenant-boundary.test.js` 守护：静态扫描路由文件禁止出现 `env.DB` 或裸 SQL，动态校验每条语句的租户绑定与 batch 使用。
 
 ### 目录结构
 
@@ -48,8 +54,8 @@ CloudflareWorkers/
     │   ├── auth.js        # 鉴权中间件（X-BFF-Token → KV 查询）
     │   ├── ratelimit.js   # 内存限流（每 userId 每分钟 60 次）
     │   ├── llm.js         # 上游解析 + 流式调用 + 上下文构建
-    │   ├── memory.js      # 长期记忆检索（LIKE 文本匹配）
-    │   └── rag.js         # RAG 检索 + 文档分块
+    │   ├── tenant-db.js   # 租户隔离数据访问器（所有 SQL + user_id 绑定 + batch）
+    │   └── rag.js         # 文档分块与 token 估算（纯函数）
     └── routes/
         ├── chat.js            # POST /chat/stream（SSE 流式聊天）
         ├── conversations.js   # 会话 CRUD

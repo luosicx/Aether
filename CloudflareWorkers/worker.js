@@ -24,6 +24,7 @@
 
 import { authenticate } from "./src/lib/auth.js";
 import { checkRateLimit, rateLimitResponse } from "./src/lib/ratelimit.js";
+import { createTenantDB } from "./src/lib/tenant-db.js";
 import {
   resolveUpstream,
   buildUpstreamHeaders,
@@ -253,9 +254,11 @@ async function dispatch(route, request, env, ctx) {
     return rateLimitResponse(rl.retryAfter);
   }
 
-  // 3. 构造增强 ctx：注入 auth + 透传 waitUntil
+  // 3. 构造增强 ctx：注入 auth + 租户数据访问器 + 透传 waitUntil
+  //    路由层只允许通过 ctx.db 访问 D1，user_id 由访问器绑定，避免漏写租户条件
   const routeCtx = {
     auth,
+    db: createTenantDB(env, auth.userId),
     waitUntil: ctx && typeof ctx.waitUntil === "function" ? ctx.waitUntil.bind(ctx) : undefined,
   };
 

@@ -26,8 +26,7 @@
 import { jsonError } from "../lib/llm.js";
 import { redact } from "../lib/redact.js";
 import { buildContext, callLLMStream } from "../lib/llm.js";
-import { fetchRelevantMemories } from "../lib/memory.js";
-import { searchDocuments } from "../lib/rag.js";
+import { newId } from "../lib/tenant-db.js";
 
 // 加载历史消息条数
 const HISTORY_LIMIT = 20;
@@ -56,21 +55,17 @@ export async function handleChatStream(request, env, ctx) {
   const model = body.model || "deepseek-chat";
   const provider = body.provider || "deepseek";
   const memoryEnabled = body.memoryEnabled !== false; // 默认开启
-  const now = Date.now();
+  const db = ctx.db;
 
-  // 2. 加载或创建会话
+  // 2. 加载或创建会话（DB 不可用时只生成临时会话 id，不持久化）
   let conversationId = body.conversationId;
   let systemPrompt = body.systemPrompt || "你是一个有帮助的AI助手。";
 
-  if (env.DB) {
+  if (db) {
     if (conversationId) {
       // 校验会话归属并取 system_prompt
       try {
-        const conv = await env.DB.prepare(
-          `SELECT id, system_prompt FROM conversations WHERE id = ?1 AND user_id = ?2`
-        )
-          .bind(conversationId, auth.userId)
-          .first();
+        const conv = await db.getConversationPrompt(conversationId);
         if (!conv) {
           return jsonError(404, "会话不存在或无权访问");
         }
@@ -80,37 +75,26 @@ export async function handleChatStream(request, env, ctx) {
       }
     } else {
       // 自动创建新会话
-      conversationId = genId();
-      const title = deriveTitle(body.message);
       try {
-        await env.DB.prepare(
-          `INSERT INTO conversations (id, user_id, title, parent_id, created_at, updated_at, system_prompt, order_field)
-           VALUES (?1, ?2, ?3, NULL, ?4, ?5, ?6, ?7)`
-        )
-          .bind(conversationId, auth.userId, title, now, now, systemPrompt, now)
-          .run();
+        const conversation = await db.createConversation({
+          title: deriveTitle(body.message),
+          systemPrompt,
+        });
+        conversationId = conversation.id;
       } catch (err) {
         console.error("创建会话失败:", err && err.message);
         return jsonError(500, "创建会话失败");
       }
     }
-  } else {
-    if (!conversationId) conversationId = genId();
+  } else if (!conversationId) {
+    conversationId = newId();
   }
 
   // 3. 拉取历史消息（DB 可用时）
   let history = [];
-  if (env.DB && body.conversationId) {
+  if (db && body.conversationId) {
     try {
-      const { results } = await env.DB.prepare(
-        `SELECT role, content FROM messages
-         WHERE conversation_id = ?1
-         ORDER BY created_at DESC LIMIT ?2`
-      )
-        .bind(conversationId, HISTORY_LIMIT)
-        .all();
-      // 反转为时间正序
-      history = (results || []).reverse();
+      history = await db.loadHistory(conversationId, HISTORY_LIMIT);
     } catch (err) {
       console.error("load history error:", err && err.message);
     }
@@ -118,8 +102,8 @@ export async function handleChatStream(request, env, ctx) {
 
   // 4 & 5. 并行检索记忆 + RAG 文档
   const [memories, relevantDocs] = await Promise.all([
-    memoryEnabled ? fetchRelevantMemories(env, auth.userId, body.message, 5) : Promise.resolve([]),
-    searchDocuments(env, auth.userId, body.message, 3),
+    db && memoryEnabled ? db.searchMemories(body.message, 5) : Promise.resolve([]),
+    db ? db.searchChunks(body.message, 3) : Promise.resolve([]),
   ]);
 
   // 6. 构建上下文
@@ -134,28 +118,17 @@ export async function handleChatStream(request, env, ctx) {
   const writer = writable.getWriter();
 
   // 持久化用户消息（先写入，不等流式完成）
-  const userMessageId = genId();
-  if (env.DB) {
+  let userMessageId = newId();
+  if (db) {
     try {
-      await env.DB.prepare(
-        `INSERT INTO messages (id, conversation_id, role, content, created_at)
-         VALUES (?1, ?2, 'user', ?3, ?4)`
-      )
-        .bind(userMessageId, conversationId, body.message, now)
-        .run();
-      // 更新会话 last_message_preview + updated_at
-      await env.DB.prepare(
-        `UPDATE conversations SET updated_at = ?1, last_message_preview = ?2 WHERE id = ?3`
-      )
-        .bind(now, body.message.slice(0, 200), conversationId)
-        .run();
+      userMessageId = await db.appendUserMessage(conversationId, body.message);
     } catch (err) {
       console.error("persist user message error:", err && err.message);
     }
   }
 
   // 后台流式调用 LLM 并写 SSE
-  const assistantMessageId = genId();
+  const assistantMessageId = newId();
   let fullResponse = "";
 
   const streamTask = (async () => {
@@ -193,20 +166,9 @@ export async function handleChatStream(request, env, ctx) {
       }
     } finally {
       // 后台持久化助手响应（即使流式出错，已收到的部分也保存）
-      if (env.DB && fullResponse) {
+      if (db && fullResponse) {
         try {
-          await env.DB.prepare(
-            `INSERT INTO messages (id, conversation_id, role, content, created_at)
-             VALUES (?1, ?2, 'assistant', ?3, ?4)`
-          )
-            .bind(assistantMessageId, conversationId, fullResponse, Date.now())
-            .run();
-          // 更新会话 last_message_preview + updated_at
-          await env.DB.prepare(
-            `UPDATE conversations SET updated_at = ?1, last_message_preview = ?2 WHERE id = ?3`
-          )
-            .bind(Date.now(), fullResponse.slice(0, 200), conversationId)
-            .run();
+          await db.appendAssistantMessage(conversationId, fullResponse, assistantMessageId);
         } catch (err) {
           console.error("persist assistant message error:", err && err.message);
         }
@@ -243,12 +205,4 @@ function deriveTitle(message) {
   if (!message) return "新会话";
   const trimmed = String(message).trim().replace(/\s+/g, " ");
   return trimmed.length > 20 ? trimmed.slice(0, 20) + "…" : trimmed;
-}
-
-/// 生成 UUID
-function genId() {
-  if (typeof crypto !== "undefined" && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return "id-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
 }

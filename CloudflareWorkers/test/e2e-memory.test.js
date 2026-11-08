@@ -208,7 +208,7 @@ describe("E2E /memory", () => {
   });
 
   it("POST /memory/search 无 DB 时降级返回空数组（200）", async () => {
-    // 不配置 DB → fetchRelevantMemories 返回 []
+    // 不配置 DB → ctx.db 为空，检索降级为 []
     const env = { bff_tokens: makeKV() };
     const req = makeRequest("/memory/search", {
       method: "POST",

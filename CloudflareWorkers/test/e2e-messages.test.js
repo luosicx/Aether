@@ -101,7 +101,7 @@ describe("E2E /messages", () => {
     ];
     const env = makeEnv([
       ["SELECT id FROM conversations WHERE id = ?1 AND user_id", { first: () => ({ id: "c1" }) }],
-      ["FROM messages WHERE conversation_id", { all: () => ({ results: rows }) }],
+      ["FROM messages m", { all: () => ({ results: rows }) }],
     ]);
     const resp = await worker.fetch(
       makeRequest("/conversations/c1/messages", { token: VALID_TOKEN }),
