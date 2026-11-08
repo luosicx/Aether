@@ -1,20 +1,19 @@
 /**
  * RAG 路由：文档检索与上传
  *
- * 所有端点需要鉴权（X-BFF-Token），数据按 user_id 隔离。
+ * 所有端点需要鉴权（X-BFF-Token）。数据访问统一经 ctx.db（tenant-db 访问器），
+ * user_id 由访问器绑定，路由层不直接持有 env.DB。
  * 路由函数签名统一 (request, env, ctx)，ctx 可选。
  */
 
 import { jsonError } from "../lib/llm.js";
-import { searchDocuments, createDocumentWithChunks } from "../lib/rag.js";
 
 /**
  * POST /rag/search - 检索与查询相关的文档分块
  * body: { query, limit? }
  */
 export async function handleSearchDocuments(request, env, ctx) {
-  const auth = ctx && ctx.auth;
-  if (!auth) return jsonError(401, "未鉴权");
+  if (!ctx || !ctx.auth) return jsonError(401, "未鉴权");
 
   let body;
   try {
@@ -27,8 +26,9 @@ export async function handleSearchDocuments(request, env, ctx) {
   }
 
   const limit = typeof body.limit === "number" ? body.limit : 3;
-  const chunks = await searchDocuments(env, auth.userId, body.query, limit);
-  return jsonOk({ chunks: chunks || [], query: body.query });
+  // 无 DB 时降级为空结果，不阻断检索接口
+  const chunks = ctx.db ? await ctx.db.searchChunks(body.query, limit) : [];
+  return jsonOk({ chunks, query: body.query });
 }
 
 /**
@@ -36,9 +36,9 @@ export async function handleSearchDocuments(request, env, ctx) {
  * body: { title, content, source? }
  */
 export async function handleUploadDocument(request, env, ctx) {
-  const auth = ctx && ctx.auth;
-  if (!auth) return jsonError(401, "未鉴权");
-  if (!env.DB) return jsonError(503, "数据库未配置");
+  if (!ctx || !ctx.auth) return jsonError(401, "未鉴权");
+  const db = ctx.db;
+  if (!db) return jsonError(503, "数据库未配置");
 
   let body;
   try {
@@ -50,8 +50,7 @@ export async function handleUploadDocument(request, env, ctx) {
     return jsonError(400, "content 不能为空");
   }
 
-  const result = await createDocumentWithChunks(env, {
-    user_id: auth.userId,
+  const result = await db.createDocumentWithChunks({
     title: body.title,
     source: body.source,
     content: body.content,
