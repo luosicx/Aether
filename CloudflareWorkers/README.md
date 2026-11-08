@@ -177,6 +177,10 @@ npm run dev
 
 完整契约见 [`openapi.yaml`](./openapi.yaml)。
 
+该文件是**唯一契约源**：每个 operation 的 `operationId` 与 `worker.js` 的 handler 一一对应，
+响应 envelope、状态码、客户端 DTO 字段均由 `test/contract.test.js` 在 CI 中校验。
+修改协议时先改 `openapi.yaml`，再同步 Worker 与各端 DTO，否则契约测试会失败。
+
 ## 鉴权
 
 请求头携带 BFF Token：

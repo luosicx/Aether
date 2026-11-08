@@ -41,12 +41,15 @@ export async function handleUploadHealthSummary(request, env, ctx) {
       .bind(auth.userId, body.date, steps, sleepHours, restingHeartRate)
       .run();
 
+    // 与 GET /health/summary/{date} 保持同一 envelope + snake_case 字段
     return jsonOk({
-      userId: auth.userId,
-      date: body.date,
-      steps,
-      sleepHours,
-      restingHeartRate,
+      summary: {
+        user_id: auth.userId,
+        date: body.date,
+        steps,
+        sleep_hours: sleepHours,
+        resting_heart_rate: restingHeartRate,
+      },
     });
   } catch (err) {
     return jsonError(500, "上报健康摘要失败: " + (err && err.message));

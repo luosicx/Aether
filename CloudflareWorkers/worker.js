@@ -149,7 +149,7 @@ export default {
  * @param {string} path
  * @returns {{handler:string, params:Object, rateLimited?:boolean}|null}
  */
-function matchRoute(method, path) {
+export function matchRoute(method, path) {
   // 去除末尾斜杠（保留根路径）
   const cleanPath = path.length > 1 && path.endsWith("/") ? path.slice(0, -1) : path;
   const segments = cleanPath.split("/").filter(Boolean);
