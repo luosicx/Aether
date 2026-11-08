@@ -879,7 +879,7 @@ Rust `aether-core-ffi` 通过 `AetherRustBin` xcframework 提供跨平台统一�
 
 | # | 工具名 | 函数 | 用途 |
 |---|---|---|---|
-| 11 | AppleScriptTool | `run_applescript` | 执行任意 AppleScript 脚本 |
+| 11 | AppleScriptTool | `run_applescript` | 执行预定义安全动作：`get_finder_selection` / `get_frontmost_application` / `get_safari_current_url` / `get_system_version` / `reveal_in_finder` / `open_url`（固定模板，不接受任意脚本） |
 | 12 | ScreenshotTool | `take_screenshot` | 截屏保存 PNG 到临时目录，返回文件路径（`CGDisplayCreateImage`） |
 | 13 | OCRTool | `extract_text_from_image` | 识别图片文字（`VNRecognizeTextRequest`，zh-Hans + en，`.accurate` 精度）；无 `image_path` 先截屏再识别 |
 | 14 | TerminalCommandTool | `run_terminal_command` | 执行 shell 命令（`Process`，30s 超时）；危险命令防护拒绝 `rm -rf /` / `mkfs` / `dd if=` / `shutdown` / `reboot` |

@@ -14,8 +14,10 @@ final class PluginMarketplaceService {
     let registryURL: URL
     /// 用于网络请求的 URLSession（默认 shared，测试可注入 mock session）
     let urlSession: URLSession
-    /// 用于验签的 Ed25519 公钥（base64 编码）。nil 表示跳过验签。
+    /// 用于验签的 Ed25519 公钥（base64 编码）。nil 表示未配置信任锚，安装会被拒绝（fail-closed）。
     var publicKeyBase64: String?
+    /// 单次插件下载体积上限（5 MB）
+    static let maxPluginSize = 5 * 1024 * 1024
     /// 已获取的插件列表
     private(set) var plugins: [PluginManifest] = []
     /// 当前下载中的插件 ID 集合（用于 UI 进度展示）
@@ -28,13 +30,23 @@ final class PluginMarketplaceService {
     /// 默认注册中心 URL（占位常量，实际请求在测试中 mock）
     static let defaultRegistryURL = URL(string: "https://raw.githubusercontent.com/luosicx/Aether/main/plugins/registry.json")!
 
+    /// 从 App 的 Info.plist 读取内置信任锚（键 `PluginTrustAnchorEd25519`，Ed25519 公钥 base64）。
+    /// 未配置时返回 nil，插件安装会因缺少验签公钥而失败（fail-closed）。
+    nonisolated static var bundledTrustAnchorBase64: String? {
+        guard let value = Bundle.main.object(forInfoDictionaryKey: "PluginTrustAnchorEd25519") as? String else {
+            return nil
+        }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
     /// 初始化
     /// - Parameters:
     ///   - registryURL: 远程插件列表 JSON URL
-    ///   - publicKeyBase64: Ed25519 公钥（base64），nil 跳过验签
+    ///   - publicKeyBase64: Ed25519 公钥（base64），默认读取 Info.plist 信任锚；nil 时拒绝安装未验签插件
     ///   - urlSession: 网络会话（默认 shared，测试可注入）
     init(registryURL: URL = PluginMarketplaceService.defaultRegistryURL,
-         publicKeyBase64: String? = nil,
+         publicKeyBase64: String? = PluginMarketplaceService.bundledTrustAnchorBase64,
          urlSession: URLSession = .shared) {
         self.registryURL = registryURL
         self.publicKeyBase64 = publicKeyBase64
@@ -64,13 +76,35 @@ final class PluginMarketplaceService {
     // MARK: - 下载插件
 
     /// 下载插件到 AppSupport/Plugins/{pluginID}/，包含 manifest.json 与入口 JS 文件。
-    /// 下载完成后验签（如果配置了公钥且 manifest 带 signature）。
+    /// 下载完成后强制验签：未配置公钥、缺少签名或签名不匹配都会拒绝安装。
     /// - Parameter manifest: 插件清单
-    /// - Throws: 下载失败、验签失败或文件写入错误
+    /// - Throws: 下载失败、路径越界、验签失败或文件写入错误
     func downloadPlugin(manifest: PluginManifest) async throws {
         guard let downloadURL = manifest.downloadURL else {
             throw NSError(domain: "PluginMarketplaceService", code: 1,
                           userInfo: [NSLocalizedDescriptionKey: "插件 \(manifest.id) 无下载地址"])
+        }
+        // 只允许 HTTPS 下载，避免恶意清单通过 file:// 读取本地文件或走明文传输
+        guard downloadURL.scheme?.lowercased() == "https",
+              downloadURL.user == nil, downloadURL.password == nil else {
+            throw NSError(domain: "PluginMarketplaceService", code: 6,
+                          userInfo: [NSLocalizedDescriptionKey: "插件 \(manifest.id) 下载地址必须是 HTTPS 且不能包含凭据"])
+        }
+        guard PluginPathPolicy.isValidPluginID(manifest.id) else {
+            throw PluginPathError.invalidPluginID(manifest.id)
+        }
+        guard let pubKey = publicKeyBase64?.trimmingCharacters(in: .whitespacesAndNewlines), !pubKey.isEmpty else {
+            throw NSError(domain: "PluginMarketplaceService", code: 3,
+                          userInfo: [NSLocalizedDescriptionKey: "未配置插件验签公钥，已拒绝安装 \(manifest.id)。请在 Info.plist 配置 PluginTrustAnchorEd25519"])
+        }
+        guard let signature = manifest.signature?.trimmingCharacters(in: .whitespacesAndNewlines), !signature.isEmpty else {
+            throw NSError(domain: "PluginMarketplaceService", code: 4,
+                          userInfo: [NSLocalizedDescriptionKey: "插件 \(manifest.id) 缺少签名，已拒绝安装"])
+        }
+        let pluginDir = pluginDirectory(for: manifest.id)
+        let entryURL = try PluginPathPolicy.entryPointURL(root: pluginDir, entryPoint: manifest.entryPoint)
+        guard entryURL.lastPathComponent.lowercased() != "manifest.json" else {
+            throw PluginPathError.invalidEntryPoint("入口点不能占用 manifest.json")
         }
         downloadingPluginIDs.insert(manifest.id)
         downloadProgress[manifest.id] = 0
@@ -87,20 +121,21 @@ final class PluginMarketplaceService {
             }
             downloadProgress[manifest.id] = 0.5
 
-            // 签名校验（配置了公钥且 manifest 带 signature 时）
-            if let pubKey = publicKeyBase64, let signature = manifest.signature {
-                guard Self.verifySignature(data: data, signature: signature, publicKeyBase64: pubKey) else {
-                    throw NSError(domain: "PluginMarketplaceService", code: 2,
-                                  userInfo: [NSLocalizedDescriptionKey: "插件 \(manifest.id) 签名校验失败"])
-                }
+            guard data.count <= Self.maxPluginSize else {
+                throw NSError(domain: "PluginMarketplaceService", code: 5,
+                              userInfo: [NSLocalizedDescriptionKey: "插件 \(manifest.id) 体积超过 \(Self.maxPluginSize / 1024 / 1024) MB 上限"])
+            }
+
+            // 强制签名校验：公钥与签名已在下载前校验存在
+            guard Self.verifySignature(data: data, signature: signature, publicKeyBase64: pubKey) else {
+                throw NSError(domain: "PluginMarketplaceService", code: 2,
+                              userInfo: [NSLocalizedDescriptionKey: "插件 \(manifest.id) 签名校验失败"])
             }
 
             // 写入文件
-            let pluginDir = pluginDirectory(for: manifest.id)
             try FileManager.default.createDirectory(at: pluginDir, withIntermediateDirectories: true)
 
-            // 写入 JS 入口文件（下载的内容即为 JS 代码）
-            let entryURL = pluginDir.appendingPathComponent(manifest.entryPoint)
+            // 写入 JS 入口文件（下载的内容即为 JS 代码），entryURL 已校验位于插件目录内
             try data.write(to: entryURL, options: .atomic)
 
             // 写入 manifest.json
@@ -121,13 +156,15 @@ final class PluginMarketplaceService {
     // MARK: - 签名校验
 
     /// Ed25519 签名校验。
+    /// 未配置公钥时返回 false（fail-closed），不再跳过验签。
     /// - Parameters:
     ///   - data: 原始数据
     ///   - signature: 签名（base64 编码）
-    ///   - publicKeyBase64: 公钥（base64 编码）
     /// - Returns: 签名有效返回 true
     func verifySignature(data: Data, signature: String) -> Bool {
-        guard let pubKey = publicKeyBase64 else { return true } // 未配置公钥，跳过验签
+        guard let pubKey = publicKeyBase64?.trimmingCharacters(in: .whitespacesAndNewlines), !pubKey.isEmpty else {
+            return false
+        }
         return Self.verifySignature(data: data, signature: signature, publicKeyBase64: pubKey)
     }
 

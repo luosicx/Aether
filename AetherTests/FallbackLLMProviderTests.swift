@@ -15,9 +15,12 @@ final class FallbackLLMProviderTests: XCTestCase {
         var shouldFail: Bool = false
         var embedResult: [[Float]] = []
         var embedError: Error?
+        /// 记录每次 chat 调用收到的 apiKey（用于验证跨供应商 Key 隔离）
+        private(set) var capturedApiKeys: [String] = []
 
         func chat(messages: [APIMessage], config: ChatConfig, apiKey: String) -> AsyncStream<String> {
-            AsyncStream { cont in
+            capturedApiKeys.append(apiKey)
+            return AsyncStream { cont in
                 if !self.shouldFail {
                     for content in self.chatContents {
                         cont.yield(content)
@@ -28,7 +31,8 @@ final class FallbackLLMProviderTests: XCTestCase {
         }
 
         func chat(messages: [APIMessage], config: ChatConfig, tools: [ToolDef], apiKey: String) -> AsyncStream<ParsedChunk> {
-            AsyncStream { cont in
+            capturedApiKeys.append(apiKey)
+            return AsyncStream { cont in
                 if !self.shouldFail {
                     for content in self.chatContents {
                         cont.yield(ParsedChunk(content: content, toolCalls: nil))
@@ -86,6 +90,65 @@ final class FallbackLLMProviderTests: XCTestCase {
         XCTAssertEqual(collected, "Fallback", "主失败应用 fallback 内容")
         XCTAssertEqual(provider.lastUsedProvider, .qwen, "lastUsedProvider 应为 fallback")
         XCTAssertEqual(provider.didFallback, true, "应触发降级")
+    }
+
+    /// P1-9 回归：降级时备用供应商必须使用自己的 API Key
+    func testFallbackUsesItsOwnApiKey() async {
+        let primary = StubLLMProvider()
+        primary.shouldFail = true
+        let fallback = StubLLMProvider()
+        fallback.chatContents = ["Fallback"]
+
+        let provider = FallbackLLMProvider(
+            primary: primary, fallback: fallback,
+            primaryProvider: .deepseek, fallbackProvider: .qwen,
+            fallbackApiKey: "qwen-key"
+        )
+
+        for await _ in provider.chat(messages: [], config: .default, apiKey: "deepseek-key") {}
+
+        XCTAssertEqual(primary.capturedApiKeys, ["deepseek-key"],
+                       "主 provider 应使用调用方传入的 Key")
+        XCTAssertEqual(fallback.capturedApiKeys, ["qwen-key"],
+                       "备用供应商应使用自己的 Key，不能复用主 provider 的 Key")
+    }
+
+    /// P1-9 回归：工具调用路径同样使用备用供应商自己的 API Key
+    func testFallbackUsesItsOwnApiKeyForTools() async {
+        let primary = StubLLMProvider()
+        primary.shouldFail = true
+        let fallback = StubLLMProvider()
+        fallback.chatContents = ["Fallback"]
+
+        let provider = FallbackLLMProvider(
+            primary: primary, fallback: fallback,
+            primaryProvider: .deepseek, fallbackProvider: .qwen,
+            fallbackApiKey: "qwen-key"
+        )
+
+        for await _ in provider.chat(messages: [], config: .default, tools: [], apiKey: "deepseek-key") {}
+
+        XCTAssertEqual(primary.capturedApiKeys, ["deepseek-key"])
+        XCTAssertEqual(fallback.capturedApiKeys, ["qwen-key"],
+                       "工具路径降级也应使用备用供应商的 Key")
+    }
+
+    /// 未显式提供 fallbackApiKey 时保持旧行为（回退到传入的 apiKey）
+    func testFallbackWithoutOwnKeyUsesPassedApiKey() async {
+        let primary = StubLLMProvider()
+        primary.shouldFail = true
+        let fallback = StubLLMProvider()
+        fallback.chatContents = ["Fallback"]
+
+        let provider = FallbackLLMProvider(
+            primary: primary, fallback: fallback,
+            primaryProvider: .deepseek, fallbackProvider: .qwen
+        )
+
+        for await _ in provider.chat(messages: [], config: .default, apiKey: "shared-key") {}
+
+        XCTAssertEqual(fallback.capturedApiKeys, ["shared-key"],
+                       "未配置独立 Key 时应回退到传入的 apiKey")
     }
 
     func testBothFailYieldsNothing() async {

@@ -56,9 +56,10 @@ final class RetrievalCoordinatorTests: XCTestCase {
         selectedProvider: ModelProvider = .deepseek,
         ragEnabled: Bool = false,
         toolsEnabled: Bool = false,
-        cache: SemanticCache = SemanticCache(),
+        cache: SemanticCache? = nil,
         ragService: RAGService? = nil
     ) -> RetrievalFixture {
+        let cache = cache ?? SemanticCache()
         let selectedBox = NonIsolatedBox<ModelProvider>(selectedProvider)
         let ragEnabledBox = NonIsolatedBox<Bool>(ragEnabled)
         let toolsEnabledBox = NonIsolatedBox<Bool>(toolsEnabled)

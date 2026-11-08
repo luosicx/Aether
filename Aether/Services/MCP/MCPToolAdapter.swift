@@ -43,12 +43,28 @@ final class MCPToolAdapter: ToolProtocol, @unchecked Sendable {
 
     /// 执行 MCP 工具：委托 mcpClient.callTool，拼接返回的文本内容块。
     /// 多个 text 块以换行连接；若无 text 块则返回空字符串。
-    /// 执行前后记录审计日志（含 Server ID、工具名、参数摘要、结果摘要）。
+    /// 执行前校验运行时授权（默认拒绝），执行前后记录真实授权状态的审计日志。
     /// - Parameter arguments: 工具参数
     /// - Returns: 拼接后的文本结果
     func execute(arguments: [String: Any]) async throws -> String {
         // 参数摘要（仅记录键名，不记录敏感值）
         let argSummary = arguments.keys.sorted().joined(separator: ",")
+
+        // 防御纵深：不依赖调用方是否已走授权流程，未授权一律拒绝
+        guard isAuthorized else {
+            MCPAuditLogger.shared.logToolCall(
+                serverID: serverID,
+                toolName: originalToolName,
+                argumentsSummary: argSummary,
+                resultSummary: "error: unauthorized",
+                authorized: false
+            )
+            throw NSError(
+                domain: "MCPToolAdapter",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "MCP 工具 \(prefixedToolName) 未授权，调用已被拒绝"]
+            )
+        }
 
         do {
             let result = try await mcpClient.callTool(name: originalToolName, arguments: arguments)
@@ -76,6 +92,14 @@ final class MCPToolAdapter: ToolProtocol, @unchecked Sendable {
             )
             throw error
         }
+    }
+
+    /// 当前是否已获得运行时授权（始终允许或本次启动内允许）
+    private var isAuthorized: Bool {
+        if case .authorized = ToolAuthorization.shared.authorizationStatus(for: prefixedToolName) {
+            return true
+        }
+        return false
     }
 
     /// 返回工具原名（不含 Server 前缀，内部使用）

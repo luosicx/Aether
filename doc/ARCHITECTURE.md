@@ -114,88 +114,58 @@ flowchart TB
 
 ### 2.1 Apple 三端分层架构
 
-Aether Apple 三端采用 5 层分层架构（表现层 / 领域层 / 服务层 / Rust FFI 层 / 数据层），依赖方向自上而下单向流动。下图使用 Mermaid `flowchart TB` 描述，每个 subgraph 代表一个分层。
+Aether 的 iOS 与 macOS target 共用大部分 SwiftUI 源码，但平台入口和系统集成不同。这里按**代码归属**描述模块，而不是把整个工程简化成单一、严格自上而下的五层：App 本地功能与 `AetherCore` Swift Package 是两个并列的实现边界。
 
 ```mermaid
 flowchart TB
-    subgraph Presentation["表现层 (Views)"]
-        ChatView["ChatView"]
-        ConversationList["ConversationList"]
-        SettingsView["SettingsView"]
-        KnowledgeBaseView["KnowledgeBaseView"]
-        OnDeviceModelView["OnDeviceModelView"]
-    end
-    subgraph Domain["领域层 (ViewModels)"]
-        ChatViewModel["ChatViewModel"]
-        SettingsViewModel["SettingsViewModel"]
-    end
-    subgraph Services["服务层 (Services)"]
-        LLMProvider["LLMProvider<br/>DeepSeek/Qwen/BFF/OnDevice"]
-        RAGService["RAGService"]
-        ToolRegistry["ToolRegistry<br/>14+11 tools"]
-        SemanticCache["SemanticCache"]
-        SmartRouter["SmartRouter"]
-        VoiceService["VoiceService"]
-        RemoteConfig["RemoteConfigService"]
-        Telemetry["TelemetryService"]
-    end
-    subgraph RUST["Rust FFI 层 (AetherRust)"]
-        AetherRustBin["AetherRustBin<br/>xcframework<br/>（10 个 C FFI 模块）"]
-    end
-    subgraph Data["数据层 (Models/Storage)"]
-        SwiftData[("SwiftData<br/>Conversation/ChatMessage<br/>DocumentChunk/MessageFeedback<br/>HealthInsight/UserPreference")]
-        Keychain["KeychainManager<br/>(API Keys)"]
-        UserDefaults[("UserDefaults<br/>(Settings/Cache)")]
-    end
+    IOS["Aether-iOS entry"] --> SharedApp["共享 App composition / RootView"]
+    SharedApp --> Views["Views · SwiftUI"]
+    Views --> VMs["ViewModels · @Observable"]
+    VMs --> Coords["Coordinators · 用例编排"]
+    VMs --> AppServices["Aether/Services · 平台与功能集成"]
+    Coords --> AppServices
+    VMs --> Models["Models / ModelContext"]
+    AppServices --> Models
+    VMs --> Package["AetherCore products"]
+    AppServices --> Package
+    Package --> Rust["AetherRust / xcframework"]
+    SharedApp --> Intents["AppIntents"]
+    SharedApp -. sibling targets .-> Watch["AetherWatch"]
+    SharedApp -. sibling targets .-> Widgets["AetherWidgets"]
 ```
 
-**依赖方向说明**：
+**iOS App 模块职责**：
 
-| 上层模块 | 下层依赖 |
-|---------|---------|
-| 表现层 (Views) | 领域层 (ViewModels) |
-| 领域层 (ViewModels) | 服务层 (Services) + 数据层 (Models) |
-| 服务层 (Services) | Rust FFI 层 (AetherRust) + 数据层 (SwiftData / Keychain / UserDefaults) |
-| Rust FFI 层 (AetherRust) | aether-core-ffi Rust 库 / xcframework |
-| Tests | 所有层 |
+| 模块 | 职责与边界 |
+|------|------------|
+| `App/` | iOS/macOS 平台入口；共享启动代码配置 SwiftData `ModelContainer`、RootView 与场景生命周期。 |
+| `Views/` | SwiftUI 页面与组件，呈现状态并转发用户操作。 |
+| `ViewModels/` | `@Observable` UI 状态与页面级业务入口；`ChatViewModel.processMessage` 是聊天主流程入口。 |
+| `Coordinators/` | 从 ChatViewModel 拆出的用例编排：RAG/缓存、Provider 网络回退、工具执行、语音、反馈、提示词等。 |
+| `Services/` | App 侧功能与系统集成，包括 RAG、Tools、Voice、OnDevice、Health、MCP、Memory、Multimodal、Repositories、Storage、Watch Connectivity 等。工具实现位于 `Services/Tools/`，顶层 `Aether/Tools/` 不是工具实现目录。 |
+| `Models/`、`Core/`、`Resources/` | SwiftData 持久化模型、App 专属模型及资源。当前 `Aether/Core/` 仅有 `Models/`；共享协议和基础类型主要来自 Swift Package。 |
+| `AppIntents/` | Shortcuts / Siri 等系统入口；Intent 路由服务与 App 会话能力集成。 |
 
-**各层职责概览**：
+**共享包边界**：`Aether-iOS` target 链接 `AetherFoundation`、`AetherServices`、`AetherDesign` 和 `AetherUI`。`AetherCore/Package.swift` 还定义 `AetherRust` 与 `AetherSDK`；Rust FFI 由包内 `AetherRust` 封装。`AetherServices` 包内包含 LLM、Cache、Routing、RemoteConfig、Telemetry 等共享服务实现，不应与 `Aether/Services/` 的 App 本地目录混为一谈。`AetherWatch` 与 `AetherWidgets` 是相邻 targets，通过系统能力或共享容器与主 App 集成，不是 iOS App 内部目录。
 
-| 层级 | 职责 | 文件数 |
-|------|------|--------|
-| 表现层 (Views) | SwiftUI 视图，6 个子模块（Chat / Components / Conversation / OnDevice / RAG / Settings），含液态玻璃 + 深空主题 DesignSystem | 37 |
-| 领域层 (ViewModels) | `@Observable` 状态管理 + 业务编排（ChatViewModel / ConversationListVM / KnowledgeBaseVM / SettingsViewModel） | 4 |
-| 服务层 (Services) | 20 个子模块业务实现（Auth / Cache / Connectivity / Crash / Feedback / Health / Intents / LLM / Language / Network / OnDevice / Performance / RAG / RemoteConfig / Routing / Search / Storage / Telemetry / Tools / Voice） | 54 |
-| Rust FFI 层 (AetherRust) | 10 个 Swift 包装器，通过 `AetherRustBin` xcframework 调用 Rust aether-core-ffi C ABI，提供高性能核心算法（Sha256 / Token / Chunker / Vector / SSE / Sandbox / Inference / RateLimiter / Redactor / FFIError） | 10 |
-| 数据层 (Models/Storage) | SwiftData `@Model`（7 实体）+ KeychainManager（API Keys）+ UserDefaults（Settings/Cache） | 7 |
+#### 2.1.1 聊天模块依赖
 
-#### 2.1.1 Apple 三端模块依赖图
-
-下图使用 Mermaid `classDiagram` 展示核心 ViewModel 对 LLMProvider 协议及其 4 个实现的依赖关系。`ChatViewModel` 依赖 `LLMProvider` / `RAGService` / `ToolRegistry` 三个服务编排 ReAct 循环。
+ChatViewModel 保留页面状态与流程入口，协调器负责可拆分的用例步骤；协议实现由共享包提供，SwiftData 访问仍可能经 `ModelContext` 或 `ChatStorage` 完成。
 
 ```mermaid
-classDiagram
-    class ChatViewModel {
-        +processMessage()
-        +sendMessage()
-        +resendMessage()
-    }
-    class LLMProvider {
-        <<protocol>>
-        +chat()
-        +embed()
-    }
-    class DeepSeekClient
-    class QwenClient
-    class BFFProxyClient
-    class OfflineLLMProvider
-    LLMProvider <|.. DeepSeekClient
-    LLMProvider <|.. QwenClient
-    LLMProvider <|.. BFFProxyClient
-    LLMProvider <|.. OfflineLLMProvider
-    ChatViewModel --> LLMProvider
-    ChatViewModel --> RAGService
-    ChatViewModel --> ToolRegistry
+flowchart LR
+    ChatView --> ChatViewModel
+    ChatViewModel --> RetrievalCoordinator
+    ChatViewModel --> NetworkFallbackCoordinator
+    ChatViewModel --> ToolExecutionCoordinator
+    ChatViewModel --> PromptBuilder
+    RetrievalCoordinator --> RAGService
+    RetrievalCoordinator --> SemanticCache
+    NetworkFallbackCoordinator --> Provider["LLMProvider implementation"]
+    ToolExecutionCoordinator --> ToolRegistry
+    ChatViewModel --> Persistence["ModelContext / ChatStorage"]
+    Provider --> AetherServices
+    AetherServices --> AetherRust
 ```
 
 ### 2.2 Windows 端分层架构（v1.5.0）
@@ -296,116 +266,87 @@ flowchart TB
 
 ### 3.1 Core 层
 
-Core 层除协议/常量/扩展/Actor 外，新增 `Core/Models` 子目录承载 BFF、端侧推理等配置数据模型（非 SwiftData `@Model`，仅 `Codable + Sendable` 结构）。
-
-| 文件 | 职责 |
-|------|------|
-| `Core/Actors/ChatActor.swift` | ~~自定义 `@globalActor`，目前仅占位未实际应用到具体方法上。~~ **已移除**（ChatActor.swift 已删除）。 |
-| `Core/Constants/APIConfig.swift` | 定义 `APIConfig`（DeepSeek 端点 URL + 模型名常量）与 `ChatConfig`（model / systemPrompt / maxTokens / temperature）。 |
-| `Core/Constants/ModelProvider.swift` | Day 13 LLM 供应商抽象 enum：`deepseek` / `qwen` / `onDevice` 三 case，承载 displayName / baseURL / chatEndpoint / embeddingEndpoint / defaultChatModel / defaultReasonerModel / defaultEmbeddingModel / keychainAccount / fallback（deepseek ↔ qwen 互备，onDevice 备用 deepseek）。 |
-| `Core/Extensions/String+TokenCount.swift` | `estimatedTokens` 扩展，按空格分词后乘 1.3 系数粗略估算 token 数，用于 tokenLimit 截断。 |
-| `Core/Models/BFFConfig.swift` | Day 15 BFF 代理配置：enabled / endpointURL / userToken / chatRateLimitPerMin / embedRateLimitPerMin，Codable + Sendable，UserDefaults 持久化（键 `bff_config_cache`）。 |
-| `Core/Models/OnDeviceConfig.swift` | Day 16 端侧推理配置：enabled / modelPath / autoSwitchOnNetworkLoss / maxTokens / temperature / modelName / downloadURL / expectedSHA256，UserDefaults 持久化（键 `ondevice_config_cache`）。 |
-| `Core/Models/OnDeviceError.swift` | Day 16 端侧推理错误枚举：insufficientMemory / modelNotFound / sha256Mismatch / unsupportedQuantization / loadFailed，`LocalizedError` 提供用户友好描述。 |
-| `Core/Protocols/LLMProvider.swift` | `LLMProvider` 协议（chat 流式 + embed）+ `APIMessage` / `ToolCallParam` / `FunctionCall` 数据结构。 |
-| `Core/Protocols/ToolProtocol.swift` | `ToolDefinition`（name + description + JSON Schema parameters）+ `ToolProtocol` 协议（definition + execute）。 |
-
-#### 关键公开 API 一览
-
-| 类型 | 方法签名 | 返回值 | 备注 |
-|------|---------|--------|------|
-| `LLMProvider` | `chat(messages:config:apiKey:)` | `AsyncStream<String>` | 纯文本流式 chat |
-| `LLMProvider` | `chat(messages:config:tools:apiKey:)` | `AsyncStream<ParsedChunk>` | 带工具调用流式 chat |
-| `LLMProvider` | `embed(texts:apiKey:)` | `[[Float]]` | 批量嵌入，HTTP 错误抛 `LLMError` |
-| `ToolProtocol` | `definition` (getter) | `ToolDefinition` | 暴露给 LLM 的元信息 |
-| `ToolProtocol` | `execute(arguments:)` | `String` | 接收参数字典执行实际逻辑 |
+`Aether/Core/` 是 App target 的本地目录，目前仅包含 `Models/AgentTask.swift`。共享基础协议、常量及配置模型由 `Packages/AetherCore/Sources/AetherFoundation/` 提供；LLM 服务接口与实现位于 `AetherServices`，不要将它们标注为 `Aether/Core/` 文件。
 
 ### 3.2 Models 层
 
-| 文件 | 职责 |
-|------|------|
-| `Models/ChatMessage.swift` | 持久化聊天消息 `@Model`，含 role / content / imageData / attachedImage / toolCallData / toolCallId / toolName，提供 `toAPIMessage()` 转换。 |
-| `Models/Conversation.swift` | `Conversation` `@Model`（title / systemPrompt / isPinned / messages cascade 关系）+ `UserPreference` `@Model`（preferredTone / preferredTools / customFact）。 |
-| `Models/DocumentChunk.swift` | RAG 文档分块 `@Model`，含 content / source / embedding 向量，供 RAGService 检索。 |
-| `Models/HealthInsight.swift` | Day 18 HealthKit 健康洞察 `@Model`：type / summary / detail / generatedAt / relatedDateRange，持久化 `HealthInsightGenerator` 生成结果。 |
-| `Models/MessageFeedback.swift` | Day 12 用户反馈 `@Model`：messageId / conversationId / rating（like/dislike）/ comment / createdAt，供 FeedbackService 与 FeedbackBar 使用。 |
-| `Models/RemoteConfig.swift` | Day 14 远程配置 `@Model`：featureFlags / rateLimits / updatedAt，缓存 RemoteConfigService 拉取的配置。 |
-| `Models/ChatChunk.swift` | SSE 响应数据结构集合：`ChatChunk`（SSE chunk）+ `AccumulatedToolCall`（跨 chunk 累积的工具调用）+ `ParsedChunk`（解析结果）+ `ChatRequestBody`（请求体）+ `ToolDef`（工具定义）+ `AnyCodable`（动态类型包装）+ `EmbeddingResponse`（嵌入响应）+ `LLMError`（统一错误枚举）。 |
+`Aether/Models/` 放置 App 的 SwiftData 持久化实体与 UI/功能模型；共享 API DTO、LLM 配置和协议类型属于 `AetherFoundation`，不是此目录。
 
-### 3.3 Services 层（19 个子模块）
+| 代表模型 | 职责 |
+|----------|------|
+| `ChatMessage.swift`、`Conversation.swift` | 持久化消息与会话；会话包含消息关系。 |
+| `DocumentChunk.swift` | RAG 文档片段与向量数据。 |
+| `HealthInsight.swift`、`MessageFeedback.swift` | 健康洞察与消息反馈数据。 |
+| `Memory.swift`、`DebugInfo.swift` | 长期记忆与请求调试信息。 |
+| `Core/Models/AgentTask.swift` | App 内 Agent 任务模型；与 Swift Package 的共享 DTO 分开。 |
 
-#### 子模块业务域分布
+SSE/API 请求类型（如 `ChatChunk`、`ParsedChunk`、`ChatRequestBody`）、`BFFConfig`、`OnDeviceConfig` 和 `RemoteConfig` 位于 `AetherFoundation` 的 `Models/` 子目录。
 
-下图使用 Mermaid `flowchart LR` 按 4 个业务域分组 19 个子模块，颜色仅作视觉区分。
+### 3.3 Services 层（App 本地 + 共享包）
+
+服务能力横跨 App target 与 `AetherCore`，不能按单个 `Aether/Services/` 目录统计。当前 App 本地目录主要提供平台集成与产品功能；共享协议、Provider、缓存、路由、遥测等实现位于 `AetherServices`。
+
+| 代码归属 | 主要模块 |
+|----------|----------|
+| `Aether/Services/` | Auth、Connectivity、Crash、Export、Feedback、Health、Log、MCP、Memory、Multimodal、Network、OnDevice、Plugin、RAG、Repositories、Search、Storage、Tools、Voice。 |
+| `AetherServices` package product | Cache、Intents、LLM、Performance、Plugin、Protocols、RemoteConfig、Routing、Security、Telemetry。 |
+
+文档其余技术映射表中的 `Services/LLM`、`Services/Cache`、`Services/Performance`、`Services/RemoteConfig`、`Services/Routing`、`Services/Telemetry` 和 `Services/Intents` 是相对 `Packages/AetherCore/Sources/AetherServices/` 的简写；其他 App 功能路径以 `Aether/Services/` 为根。
+
+#### 服务能力分布
+
+服务代码按 App 平台集成与跨平台共享能力分属两个 target；此图表达边界，不代表文件数或完整子模块清单。
 
 ```mermaid
 flowchart LR
-    subgraph AI["AI / LLM 域"]
-        LLM["LLM<br/>7 文件"]
-        RAG["RAG<br/>4 文件"]
-        Cache["Cache<br/>1 文件"]
-        Tools["Tools<br/>21 文件"]
-        Voice["Voice<br/>3 文件"]
+    subgraph AppServices["Aether/Services · App target"]
+        AppRAG["RAG / Repositories / Storage"]
+        AppTools["Tools / MCP / Plugin"]
+        AppPlatform["Health / Voice / OnDevice / Connectivity"]
+        AppFeatures["Memory / Multimodal / Export / Search"]
     end
-
-    subgraph Local["本地能力域"]
-        OnDevice["OnDevice<br/>3 文件"]
-        Storage["Storage<br/>1 文件"]
-        Auth["Auth<br/>1 文件"]
-        Health["Health<br/>2 文件"]
-    end
-
-    subgraph System["系统 / 平台域"]
-        Network["Network<br/>1 文件"]
-        Connectivity["Connectivity<br/>1 文件"]
-        Intents["Intents<br/>1 文件"]
-        Search["Search<br/>1 文件"]
-        Routing["Routing<br/>1 文件"]
-        Performance["Performance<br/>1 文件"]
-    end
-
-    subgraph Ops["工程 / 运维域"]
-        Crash["Crash<br/>1 文件"]
-        Feedback["Feedback<br/>1 文件"]
-        RemoteConfig["RemoteConfig<br/>1 文件"]
-        Telemetry["Telemetry<br/>2 文件"]
+    subgraph PackageServices["AetherServices · SPM product"]
+        SharedLLM["LLM / Protocols"]
+        SharedInfra["Cache / Routing / RemoteConfig / Telemetry"]
+        SharedPlugin["Plugin / Security / Performance / Intents"]
     end
 ```
 
-#### 子模块清单与职责
+
+下表给出主要职责；实际源码位置以本节开头的 target 边界及当前目录为准。包内 API 详细目录不在此重复罗列。
 
 | 子模块 | 文件 | 职责 |
 |--------|------|------|
 | Auth | `Services/Auth/KeychainManager.swift` | Keychain 单例，封装 API Key 的 save / load / delete，按 `ModelProvider.keychainAccount` 隔离存储。 |
-| Cache | `Services/Cache/SemanticCache.swift` | `@MainActor` 语义缓存，基于 embedding 余弦相似度（阈值 0.92）匹配历史 query，命中跳过 LLM 请求；FIFO 容量 100。 |
+| Cache | `Packages/AetherCore/Sources/AetherServices/Cache/SemanticCache.swift` | `@MainActor` 语义缓存，基于 embedding 余弦相似度匹配历史 query。 |
 | Connectivity | `Services/Connectivity/WatchConnectivityService.swift` | Day 17 WatchConnectivity 双向通信，与 AetherWatch 同步 Quick Chat 与健康洞察。 |
 | Crash | `Services/Crash/CrashReportService.swift` | Day 14 崩溃监控：捕获未捕获异常与信号崩溃（SIGABRT/SIGSEGV），落盘到本地，下次启动时上报。 |
 | Feedback | `Services/Feedback/FeedbackService.swift` | Day 12 用户反馈/投诉：写入 `MessageFeedback` @Model，提供按会话查询与批量导出。 |
 | Health | `Services/Health/HealthKitService.swift` | Day 18 HealthKit 读取：步数 / 心率 / 睡眠 / 活动能量，按日期范围查询。 |
 | Health | `Services/Health/HealthInsightGenerator.swift` | Day 18 健康洞察生成：基于 HealthKitService 数据生成中文洞察文本，持久化到 `HealthInsight` @Model。 |
-| Intents | `Services/Intents/IntentChatService.swift` | Day 18 App Intents 路由：根据 Intent 类型（Ask / NewConversation / SwitchConversation）解析参数并切换/创建会话。 |
-| LLM | `Services/LLM/DeepSeekClient.swift` | `nonisolated final class`，实现 `LLMProvider`，提供 DeepSeek chat 流式 + embed。 |
-| LLM | `Services/LLM/QwenClient.swift` | Day 13 Qwen 客户端，走阿里云百炼 DashScope OpenAI 兼容端点，实现 `LLMProvider`。 |
-| LLM | `Services/LLM/BFFProxyClient.swift` | Day 15 BFF 代理客户端：请求经 Cloudflare Workers 中转，仅传 `userToken`，不持上游 API Key；支持 chat / embed / 限流。 |
-| LLM | `Services/LLM/FallbackLLMProvider.swift` | Day 12 Fallback 包装器：primary 失败自动切 fallback provider，记录失败原因与遥测。 |
-| LLM | `Services/LLM/ModelProviderFactory.swift` | Day 13 Provider 工厂：根据 `ModelProvider` enum 与当前配置创建对应 client（DeepSeek / Qwen / BFFProxy / Offline）。 |
-| LLM | `Services/LLM/RateLimiter.swift` | Day 13 客户端令牌桶限流：按 `BFFConfig.chatRateLimitPerMin` / `embedRateLimitPerMin` 控制请求速率。 |
-| LLM | `Services/LLM/SSEParser.swift` | SSE 流解析器，`parseChunk` 解析纯文本 chunk，`parseWithToolAccumulation` 累积跨 chunk 的 tool_calls。 |
+| Intents | `Packages/AetherCore/Sources/AetherServices/Intents/IntentChatService.swift` | App Intents 路由：处理 Ask / NewConversation / SwitchConversation 请求。 |
+| LLM | `Packages/AetherCore/Sources/AetherServices/LLM/DeepSeekClient.swift` | 实现 `LLMProvider`，提供 DeepSeek chat 流式与 embed。 |
+| LLM | `Packages/AetherCore/Sources/AetherServices/LLM/QwenClient.swift` | Qwen 客户端，走阿里云百炼 DashScope OpenAI 兼容端点。 |
+| LLM | `Packages/AetherCore/Sources/AetherServices/LLM/BFFProxyClient.swift` | BFF 代理客户端：请求经 Cloudflare Workers 中转，仅传 `userToken`；支持 chat / embed。 |
+| LLM | `Packages/AetherCore/Sources/AetherServices/LLM/FallbackLLMProvider.swift` | Fallback 包装器：主 Provider 失败时切换到备用 Provider。 |
+| LLM | `Packages/AetherCore/Sources/AetherServices/LLM/ModelProviderFactory.swift` | Provider 工厂，根据模型配置创建对应 client。 |
+| LLM | `Packages/AetherCore/Sources/AetherServices/LLM/RateLimiter.swift` | 客户端请求限流。 |
+| LLM | `Packages/AetherCore/Sources/AetherServices/LLM/SSEParser.swift` | SSE 流解析器，解析内容 chunk 并累积跨 chunk 的 tool calls。 |
 | Network | `Services/Network/NetworkMonitor.swift` | Day 16 网络监听：`NWPathMonitor` 实时检测 Wi-Fi/蜂窝/无网状态，触发 OnDeviceConfig.autoSwitchOnNetworkLoss。 |
 | OnDevice | `Services/OnDevice/MLXInferenceEngine.swift` | Day 16 MLX 推理引擎：在设备本地运行 Llama-3.2-1B-Instruct Q4_K_M 量化模型，流式生成 token。 |
 | OnDevice | `Services/OnDevice/OnDeviceModelDownloader.swift` | Day 16 模型下载器：从 HuggingFace CDN 下载 + SHA256 校验 + 断点续传。 |
 | OnDevice | `Services/OnDevice/OfflineLLMProvider.swift` | Day 16 端侧 LLMProvider 实现：包装 MLXInferenceEngine，对外暴露 `LLMProvider` 协议。 |
-| Performance | `Services/Performance/PerformanceMonitor.swift` | Day 14 性能监控：首屏渲染 / 流式首字 / 工具执行 / RAG 检索等关键耗时记录。 |
+| Performance | `Packages/AetherCore/Sources/AetherServices/Performance/PerformanceMonitor.swift` | 性能指标记录与读取。 |
 | RAG | `Services/RAG/DocumentChunker.swift` | 基于 `NLTokenizer` 的文档分块器，支持 overlap。 |
 | RAG | `Services/RAG/EmbeddingService.swift` | 嵌入服务，封装 LLM embedding API 调用。 |
 | RAG | `Services/RAG/PDFExtractor.swift` | 基于 `PDFKit` 的 PDF 文本提取器。 |
 | RAG | `Services/RAG/RAGService.swift` | `@MainActor` RAG 检索增强服务，提供 `indexDocument` 索引、`retrieve` topK 检索、`buildAugmentedContext` 构建带 `[1][2]` 编号的 prompt 并复用 queryEmbedding。 |
-| RemoteConfig | `Services/RemoteConfig/RemoteConfigService.swift` | Day 14 远程配置拉取：从远端拉取 featureFlags / rateLimits，缓存到 `RemoteConfig` @Model，支持过期重拉。 |
-| Routing | `Services/Routing/SmartRouter.swift` | Day 12 智能路由：基于规则与历史成功率在多 Provider 间路由，失败自动 Fallback，记录遥测。 |
+| RemoteConfig | `Packages/AetherCore/Sources/AetherServices/RemoteConfig/RemoteConfigService.swift` | 拉取并管理远程配置。 |
+| Routing | `Packages/AetherCore/Sources/AetherServices/Routing/SmartRouter.swift` | 根据请求特征选择模型路由。 |
 | Search | `Services/Search/SpotlightIndexer.swift` | Day 18 Spotlight 索引：为 Conversation 创建/更新 `CSSearchableItem`，删除时清理索引。 |
 | Storage | `Services/Storage/ChatStorage.swift` | `@MainActor` SwiftData 持久化服务，封装 Conversation / ChatMessage / UserPreference 的 CRUD，含 `fetchPreference` / `savePreference` / `cleanupEmptyConversations`（批量清理空会话）。 |
-| Telemetry | `Services/Telemetry/TelemetryService.swift` | Day 14 遥测采集：收集 Provider 选择 / 路由决策 / Fallback 触发 / 缓存命中等事件，脱敏后批量上报。 |
-| Telemetry | `Services/Telemetry/LogUploader.swift` | Day 14 日志上传：脱敏后压缩上传到服务端，配合 CrashReportService 在下次启动时上报崩溃日志。 |
+| Telemetry | `Packages/AetherCore/Sources/AetherServices/Telemetry/TelemetryService.swift` | 遥测事件采集。 |
+| Telemetry | `Packages/AetherCore/Sources/AetherServices/Telemetry/LogUploader.swift` | 脱敏日志上传。 |
 | Tools | `Services/Tools/ToolRegistry.swift` | `@MainActor` 单例工具注册中心，注册 18 跨平台 + 11 macOS 独有工具（共 29 个），含 `NotificationService`（UNUserNotificationCenter 本地通知）。 |
 | Tools | `Services/Tools/AlarmTool.swift` | 基于 `EventKit EKAlarm` 的闹钟工具。 |
 | Tools | `Services/Tools/ReminderTool.swift` | 基于 `EventKit EKReminder` 的提醒工具。 |
@@ -511,8 +452,8 @@ flowchart LR
 
 | 方法签名 | 返回值 | 备注 |
 |---------|--------|------|
-| `init(primary:fallback:primaryProvider:fallbackProvider:)` | `FallbackLLMProvider` | 包装主备 provider |
-| `chat(messages:config:apiKey:)` | `AsyncStream<String>` | 主 provider 未产出则降级 |
+| `init(primary:fallback:primaryProvider:fallbackProvider:fallbackApiKey:)` | `FallbackLLMProvider` | 包装主备 provider；`fallbackApiKey` 为备用供应商独立 Key（nil 时回退到调用方 apiKey） |
+| `chat(messages:config:apiKey:)` | `AsyncStream<String>` | 主 provider 未产出则降级；降级时使用备用供应商自己的 Key |
 | `chat(messages:config:tools:apiKey:)` | `AsyncStream<ParsedChunk>` | 降级逻辑同纯文本路径 |
 | `embed(texts:apiKey:)` | `[[Float]]`（async throws） | 不降级，直接调主 provider |
 
@@ -724,9 +665,9 @@ P2-6 重构将 ChatViewModel 中职责清晰的子模块抽取为 10 个 Coordin
 | `FeedbackCoordinator` | `Aether/Coordinators/FeedbackCoordinator.swift` | 反馈状态（`feedbackStates`）+ Toast 提示（`feedbackToast`，2s 自动清除，新点击取消未触发的清除 Task）+ 持久化（`saveFeedback` / `updateFeedback` 触发 RAG chunk 权重调整） | `ChatStorage`（按需构造，传入 ModelContext） | `@MainActor` |
 | `WatchQuickChatCoordinator` | `Aether/Coordinators/WatchQuickChatCoordinator.swift` | 监听 `.wcQuickChatReceived` 通知，桥接 Watch 快速对话消息到 ChatViewModel.`pendingWatchMessage` | `NotificationCenter`（间接依赖 `WatchConnectivityService` 广播通知） | `@unchecked Sendable`（NSLock 包裹 `NSObjectProtocol` token，支持跨 actor 读写） |
 | `HealthContextInjector` | `Aether/Coordinators/HealthContextInjector.swift` | iOS HealthKit 上下文注入：构建最近 24h 健康摘要片段（睡眠 / 心率 / 步数），追加到 systemPrompt 末尾；未授权 / 未启用 / 服务为 nil / fetch 抛错时返回空字符串优雅降级 | `HealthKitService`（通过闭包读取，nil 时降级为空字符串） | `@MainActor`，整个类型 `#if os(iOS)` 包裹 |
-| `NetworkFallbackCoordinator` | `Aether/Coordinators/NetworkFallbackCoordinator.swift` | 网络监听（订阅 `NetworkMonitor.statusStream`，断网切端侧 / 联网切回）+ 端侧 ↔ 云端 provider 切换（`switchToOnDevice` / `switchToOriginalProvider`）+ Provider 工厂（BFF / Fallback / 直连三种路径）+ SmartRouter 模型名映射（`mapModelName`） | `NetworkMonitor.shared` / `ModelProviderFactory` / `FallbackLLMProvider` / `BFFProxyClient` / `DeepSeekClient` | `@MainActor` |
+| `NetworkFallbackCoordinator` | `Aether/Coordinators/NetworkFallbackCoordinator.swift` | 网络监听（订阅 `NetworkMonitor.statusStream`，断网切端侧 / 联网切回）+ 端侧 ↔ 云端 provider 切换（`switchToOnDevice` / `switchToOriginalProvider`）+ Provider 工厂（BFF / Fallback / 直连三种路径，主备供应商各自携带独立 API Key）+ SmartRouter 模型名映射（`mapModelName`） | `NetworkMonitor.shared` / `ModelProviderFactory` / `FallbackLLMProvider` / `BFFProxyClient` / `DeepSeekClient` | `@MainActor` |
 | `RetrievalCoordinator` | `Aether/Coordinators/RetrievalCoordinator.swift` | RAG 检索（`handleRAGRetrieving`）+ 语义缓存读写（`checkCache` / `writeCache`，仅非工具模式）+ embedding 降级（DeepSeek 不支持 embedding 时设置错误并清空 citations）+ `ragService` / `ragEmbeddingProvider` 按 `selectedProvider` 懒加载缓存（provider 变化时自动失效重建） | `RAGService` / `SemanticCache`（构造器注入）/ `EmbeddingService` / `KeychainManager.shared` / `DeepSeekClient`（兜底） | `@MainActor` |
-| `PromptBuilder` | `Aether/Coordinators/PromptBuilder.swift` | systemPrompt 构建（base + 【用户偏好】 + 【AI人设】）+ token 截断（`limitTokens`，从尾部累加保留最近消息） | 纯值类型（struct），无 Service 依赖 | 纯值类型（struct），无并发隔离标注（纯函数式逻辑） |
+| `PromptBuilder` | `Aether/Coordinators/PromptBuilder.swift` | systemPrompt 构建（base + 【用户偏好】 + 【AI人设】）+ token 截断（`limitTokens`，以完整对话轮次为最小单位从尾部累加，保证 assistant(tool_calls) 与 tool 结果、user 与 assistant 回复不被拆散） | 纯值类型（struct），无 Service 依赖 | 纯值类型（struct），无并发隔离标注（纯函数式逻辑） |
 | `InjectionGuard` | `Aether/Coordinators/InjectionGuard.swift` | 提示注入检测弹窗（`detect` 调用 `PromptInjectionDetector.isSuspicious`）+ 决策回调（`setDecisionHandler` / `proceed` / `cancel` 三态机，包装闭包路由到 proceed/cancel） | `PromptInjectionDetector`（静态调用） | `@MainActor` |
 | `ToolExecutionCoordinator` | `Aether/Coordinators/ToolExecutionCoordinator.swift` | ReAct 工具执行循环：编码 toolCalls 持久化 assistant 消息（含 toolCallData）、逐个执行工具（启用检查 / 授权确认 / 超时保护 `withThrowingTaskGroup` / 审计日志 / 成功通知 / 失败埋点）、追加 tool 结果消息、重置下一轮 apiMessages；`ToolStep` / `ToolStepStatus` 类型迁移至此，ChatViewModel 通过 typealias 兼容 | `ToolRegistry.shared` / `ToolAuthorization.shared` / `ToolAuditLogger.shared` / `NotificationService.shared` / `TelemetryService.shared` | `@MainActor` |
 
@@ -1191,7 +1132,7 @@ sequenceDiagram
 
 ### 4.3 主流程
 
-从用户输入到 AI 回复的完整数据流，含 Provider 选择与流式输出更新。参与者包括用户、ChatView、ChatViewModel、SmartRouter 与 LLMClient。
+`ChatViewModel.processMessage` 按 preparing → ragRetrieving → cacheChecking → (llmStreaming ↔ toolCalling)* → finishing 驱动流程。图中展示协调器边界；缓存命中会在 cacheChecking 阶段直接保存回复并结束，不进入 LLM 请求。
 
 ```mermaid
 sequenceDiagram
@@ -1199,35 +1140,50 @@ sequenceDiagram
     participant U as 用户
     participant V as ChatView
     participant VM as ChatViewModel
+    participant RC as RetrievalCoordinator
     participant SR as SmartRouter
-    participant LC as LLMClient
+    participant NF as NetworkFallbackCoordinator
+    participant LLM as LLMProvider
+    participant TEC as ToolExecutionCoordinator
+    participant DB as SwiftData ModelContext
 
-    U->>V: 输入文本点击发送
-    V->>VM: sendMessage(in: modelContext)
-    VM->>VM: 清理 streamingText / isLoading=true
-    VM->>VM: startLiveActivity(思考中)
-    VM->>VM: streamingTask = Task(processMessage)
-    VM->>SR: route(input:toolsEnabled:hasImage:)
-    SR-->>VM: 返回模型名（chat / reasoner）
-    VM->>VM: 注入 preference systemPrompt / 计算 queryEmbedding
-    VM->>LC: client.chat(messages:config:tools:apiKey:)
-
-    loop 流式 chunk
-        LC-->>VM: yield ParsedChunk(content, toolCalls)
-        Note over VM: streamingText += content<br/>MessageListView 实时刷新<br/>MarkdownText / CodeBlockView 重新渲染
+    U->>V: 输入并发送
+    V->>VM: sendMessage(...)
+    VM->>VM: processMessage / preparing
+    VM->>RC: handleRAGRetrieving(...)
+    RC-->>VM: ragContext + queryEmbedding
+    VM->>RC: checkCache(query, embedding)
+    alt 缓存命中
+        RC-->>VM: cached response
+        VM->>DB: 保存 assistant 消息
+    else 缓存未命中
+        VM->>SR: route(input, toolsEnabled, hasImage)
+        SR-->>VM: 模型名
+        VM->>NF: 选择/构造实际 Provider
+        NF-->>VM: LLMProvider
+        loop 流式响应，最多 5 轮工具循环
+            VM->>LLM: chat(messages, config, tools?)
+            LLM-->>VM: ParsedChunk(content, toolCalls)
+            VM->>V: 更新 streamingText
+            opt 返回 toolCalls
+                VM->>TEC: 执行并追加工具结果
+                TEC-->>VM: 更新后的 apiMessages
+            end
+        end
+        VM->>DB: 保存 assistant 消息
+        VM->>RC: writeCache(query, embedding, response)
     end
-
-    VM->>VM: 持久化 assistantMsg / streamingText=""
-    VM->>VM: isLoading=false
-    VM->>VM: TTSConfig 应用 → VoiceService.speak 可选朗读
-    VM->>VM: endLiveActivity(完成)
-    VM-->>V: UI 更新完成
-    V-->>U: 显示最终回复
+    opt 启用语音朗读
+        VM->>VM: VoiceCoordinator → VoiceService.speak
+    end
+    VM-->>V: 完成状态与最终消息
+    V-->>U: 显示回复
 ```
 
 **关键说明**：
-- 流式输出期间 `streamingText` 累积，MessageListView / MarkdownText / CodeBlockView / MarkdownTableView 实时重新渲染，每帧约 8–16ms。
-- SmartRouter 在工具或图片启用时强制 `deepseek-chat`（reasoner 对 function calling 不稳定）；长文本（≥50 字符）或推理关键词触发 `deepseek-reasoner`。
+- `RetrievalCoordinator` 封装 RAG 检索、embedding 与语义缓存读写；RAG 上下文在构造 LLM 请求前注入。
+- `SmartRouter` 选择模型名；`NetworkFallbackCoordinator` 根据 Provider / BFF / 网络回退配置提供实际 `LLMProvider`。聊天流程结束时经 `ModelContext` 保存消息。
+- 工具请求由 `ToolExecutionCoordinator` 执行，工具结果注入后继续下一轮 LLM 请求；循环上限为 5 轮。流式内容累积到 `streamingText` 驱动界面更新。
 
 ### 4.4 路径 1：UITEST_DISABLE_NETWORK 桩回复
 
@@ -1298,7 +1254,7 @@ sequenceDiagram
     RS->>RS: embed query → fetch 全部分块 → cosine 排序取前 5
     RS-->>VM: (context 带 [1][2] 编号, citations, queryEmbedding)
     Note over VM: queryEmbedding 复用写缓存<br/>apiMessages.insert(system: context, at: 1)
-    VM->>VM: limitTokens(apiMessages, max: tokenLimit) 逆序截断
+    VM->>VM: limitTokens(apiMessages, max: tokenLimit) 按完整轮次逆序截断
 
     loop ReAct 循环（loopCount < maxReActLoops=5）
         VM->>LC: client.chat(messages:config:tools:apiKey:)
@@ -1568,7 +1524,7 @@ sequenceDiagram
 | # | 决策 | 选型理由 | 对应文件 | 影响范围 |
 |---|------|---------|---------|---------|
 | 9 | 智能路由 SmartRouter + 自动 Fallback | 多 Provider 可用时按规则与历史成功率动态选择，单点失败自动切 fallback provider，提升可用性。 | `Services/Routing/SmartRouter.swift` / `Services/LLM/FallbackLLMProvider.swift` | SmartRouter + FallbackLLMProvider + ChatViewModel + ModelProviderFactory |
-| 10 | BFF Token 设备端不持上游 API Key | 设备端仅持 `userToken`，上游 Key 仅在 Cloudflare Workers secrets 中，避免 Key 泄露与配额盗用。 | `Core/Models/BFFConfig.swift` / `Services/LLM/BFFProxyClient.swift` | BFFConfig + BFFProxyClient + ModelProviderFactory + SettingsViewModel + CloudflareWorkers/ |
+| 10 | BFF Token 设备端不持上游 API Key | 设备端仅持 `userToken`，上游 Key 仅在 Cloudflare Workers secrets 中，避免 Key 泄露与配额盗用。 | `Packages/AetherCore/Sources/AetherFoundation/Models/BFFConfig.swift` / `Services/LLM/BFFProxyClient.swift` | BFFConfig + BFFProxyClient + ModelProviderFactory + SettingsViewModel + CloudflareWorkers/ |
 | 11 | MLX 端侧模型断网自动切换 | `OnDeviceConfig.autoSwitchOnNetworkLoss` 默认 true，NetworkMonitor 检测断网即切端侧推理，网络恢复自动切回，保证离线可用。 | `Services/Network/NetworkMonitor.swift` / `Services/OnDevice/OfflineLLMProvider.swift` | NetworkMonitor + OfflineLLMProvider + MLXInferenceEngine + OnDeviceModelDownloader + ChatViewModel |
 | 12 | TTSConfig UserDefaults 持久化不用 SwiftData | TTS 配置为轻量键值，UserDefaults 比 SwiftData 更轻量，避免迁移复杂度。 | `Services/Voice/TTSConfig.swift` | TTSConfig + VoiceService + TTSVoicePickerView + SettingsViewModel |
 | 13 | `UITEST_RESET_DATA` 数据隔离 | UIT 启动时通过环境变量清理历史会话与缓存，保证用例独立可重复执行，避免脏数据干扰。 | `AetherApp.swift` 启动逻辑 | AetherApp + ChatStorage.wipeAllData + AetherUITests |
@@ -1724,7 +1680,7 @@ sequenceDiagram
 | PerformanceMonitor | `Services/Performance/PerformanceMonitor.swift` | iOS 17.0+ / macOS 14.0+ |
 | PrivacyInfo.xcprivacy | `Resources/PrivacyInfo.xcprivacy` | iOS 17.0+ / macOS 14.0+ / Xcode 16+（App Store 审核要求） |
 | AttributedString（Markdown） | `Views/Chat/Markdown*.swift` / `CodeSyntaxHighlighter.swift` | iOS 17.0+ / macOS 14.0+ / Foundation |
-| XCTest | `AetherTests/` 190 文件（3314 用例） | Xcode 16+ / Swift 5.9+ |
+| XCTest | `AetherTests/` 与 `AetherCoreTests` / `AetherSDKTests` | Xcode 16+ / Swift 5.9+ |
 | XCUITest | `AetherUITests/` 7 文件（30 用例） | Xcode 16+ / Swift 5.9+ |
 | GitHub Actions | `.github/workflows/ci.yml` | macos-14 runner / Xcode 16+ |
 | CoreLocation | CLLocationManager + CLGeocoder | LocationTool 定位与反地理编码 | iOS 17.0+ / macOS 14.0+ / CoreLocation.framework |
@@ -1768,89 +1724,17 @@ sequenceDiagram
 
 ### 7.1 单元测试（UT）
 
-- **Target**：`AetherTests`
-- **规模**：190 个测试文件，3314 用例（3314 pass / 0 skip / 0 failures）
-- **分层覆盖**：
+`AetherTests` 覆盖 App 功能、共享包与多平台条件代码。以下按模块列出代表性映射，不固定测试文件/用例总数，避免把易变的快照数字当作架构事实。
 
-| 层级 | 测试文件 | 文件数 | 核心断言数（约） | skip 原因 |
-|------|---------|--------|----------------|-----------|
-| Service 层 | `DeepSeekClientTests` | 1 | 8 | 网络环境依赖 / API Key 缺失 |
-| Service 层 | `QwenClientTests` | 1 | 6 | 网络环境依赖 / API Key 缺失 |
-| Service 层 | `BFFProxyClientTests` | 1 | 7 | BFF endpoint 未配置 |
-| Service 层 | `FallbackLLMProviderTests` | 1 | 6 | — |
-| Service 层 | `ModelProviderTests` | 1 | 5 | — |
-| Service 层 | `RateLimiterTests` | 1 | 4 | — |
-| Service 层 | `SSEParserTests` | 1 | 9 | — |
-| Service 层 | `SemanticCacheTests` | 1 | 6 | — |
-| Service 层 | `SemanticCacheEdgeTests` | 1 | 5 | — |
-| Service 层 | `DocumentChunkerTests` | 1 | 13 | NLTokenizer 未切分多块时 skip；含 Swift fallback 路径测试 |
-| Service 层 | `EmbeddingServiceTests` | 1 | 4 | API Key 缺失 |
-| Service 层 | `RAGServiceTests` | 1 | 6 | — |
-| Service 层 | `PDFExtractorTests` | 1 | 3 | 测试 PDF 资源缺失 |
-| Service 层 | `ChatStorageTests` | 1 | 8 | — |
-| Service 层 | `KeychainManagerTests` | 1 | 5 | 模拟器 Keychain entitlement 限制 |
-| Service 层 | `KeychainManagerMultiProviderTests` | 1 | 4 | 模拟器 Keychain entitlement 限制 |
-| Service 层 | `ToolRegistryTests` | 1 | 6 | — |
-| Service 层 | `AlarmToolTests` | 1 | 4 | EventKit 权限拒绝 |
-| Service 层 | `ReminderToolTests` | 1 | 4 | EventKit 权限拒绝 |
-| Service 层 | `CalculatorToolTests` | 1 | 6 | — |
-| Service 层 | `DateTimeToolTests` | 1 | 3 | — |
-| Service 层 | `NotificationServiceTests` | 1 | 3 | 通知授权拒绝 |
-| Service 层 | `VoiceServiceTests` | 1 | 5 | 语音识别器不可用（模拟器） |
-| Service 层 | `TTSConfigTests` | 1 | 5 | — |
-| Service 层 | `TTSVoiceCatalogTests` | 1 | 4 | — |
-| Service 层 | `SmartRouterTests` | 1 | 6 | — |
-| Service 层 | `NetworkMonitorTests` | 1 | 4 | — |
-| Service 层 | `OfflineLLMProviderTests` | 1 | 5 | MLX 模型未下载 |
-| Service 层 | `OnDeviceConfigTests` | 1 | 4 | — |
-| Service 层 | `RemoteConfigServiceTests` | 1 | 5 | — |
-| Service 层 | `TelemetryServiceTests` | 1 | 5 | — |
-| Service 层 | `LogUploaderTests` | 1 | 4 | 上报 endpoint 不可达 |
-| Service 层 | `CrashReportServiceTests` | 1 | 3 | — |
-| Service 层 | `PerformanceMonitorTests` | 1 | 4 | — |
-| Service 层 | `SpotlightIndexerTests` | 1 | 3 | — |
-| Service 层 | `IntentChatServiceTests` | 1 | 4 | — |
-| Service 层 | `HealthKitServiceTests` | 1 | 4 | HealthKit 授权未授予 |
-| Service 层 | `HealthInsightGeneratorTests` | 1 | 4 | HealthKit 授权未授予 |
-| Service 层 | `FeedbackServiceTests` | 1 | 4 | — |
-| Service 层 | `WatchConnectivityServiceTests` | 1 | 3 | 设备不支持 WatchConnectivity |
-| Service 层 | `MCPErrorTests` | 1 | 21 | — |
-| Service 层 | `SSETransportTests` | 1 | 8 | — |
-| Service 层 | `StdioTransportTests` | 1 | 8 | macOS only（`#if os(macOS)`） |
-| Model 层 | `ChatMessageTests` | 1 | 4 | — |
-| Model 层 | `ConversationModelTests` | 1 | 5 | — |
-| Model 层 | `MessageFeedbackTests` | 1 | 3 | — |
-| Model 层 | `StringTokenCountTests` | 1 | 3 | — |
-| Model 层 | `APIConfigTests` | 1 | 3 | — |
-| Model 层 | `PresetPromptsTests` | 1 | 4 | — |
-| ViewModel 层 | `ChatViewModelTests` | 1 | 6 | — |
-| ViewModel 层 | `ConversationListVMTests` | 1 | 4 | — |
-| ViewModel 层 | `KnowledgeBaseVMTests` | 1 | 3 | — |
-| ViewModel 层 | `SettingsViewModelTests` | 1 | 4 | — |
-| 跨层 / 行为 | `ConversationActivityTests`（NSUserActivity / Handoff） | 1 | 4 | — |
-| 合计 | — | 160 | — | — |
+| 模块 | 代表性测试 | 覆盖范围 |
+|------|------------|----------|
+| 聊天 ViewModel | `ChatViewModelTests.swift`、`ChatViewModelToolSecurityTests.swift` | 消息状态、流式交互、工具调用安全边界。 |
+| 协调器 | `Coordinators/` 下的 `RetrievalCoordinatorTests`、`ToolExecutionCoordinatorTests`、`NetworkFallbackCoordinatorTests`、`PromptBuilderTests` 等 | RAG/缓存、ReAct 执行、Provider 回退和提示词构造。 |
+| 服务与能力 | LLM、RAG、Tools、Health、MCP、Memory、Multimodal、Plugin 等对应测试目录/文件 | Provider、检索、工具、平台服务及共享能力。 |
+| 模型与持久化 | `ChatStorageTests.swift`、`SwiftDataRepositoryTests.swift`、模型测试 | SwiftData CRUD、仓储实现与模型行为。 |
+| SPM | `Packages/AetherCore/Tests/AetherCoreTests/`、`AetherSDKTests/` | 共享包产品及 SDK 的独立测试 target。 |
 
-> **注**：核心断言数为约数（基于测试方法数与典型 XCTest 断言密度估算），实际值以代码为准。skip 用例总数为 3，分布于 Keychain / NLTokenizer / 语音识别器不可用等场景。
-
-- **新增关键测试文件**：
-  - `TTSConfigTests.swift`：TTS 配置持久化与默认值
-  - `TTSVoiceCatalogTests.swift`：系统音色目录枚举与语言分组
-  - `RoutingServiceTests.swift`（实为 `SmartRouterTests.swift`）：智能路由规则与 Fallback 触发
-  - `BFFProxyClientTests.swift`：BFF 代理请求构造与 userToken 注入
-  - `OfflineLLMProviderTests.swift` / `OnDeviceConfigTests.swift`：端侧推理与配置
-  - `HealthKitServiceTests.swift` / `HealthInsightGeneratorTests.swift`：HealthKit 数据读取与洞察生成
-  - `IntentChatServiceTests.swift`：App Intents 路由
-  - `SpotlightIndexerTests.swift`：Spotlight 索引创建/清理
-  - `CrashReportServiceTests.swift` / `PerformanceMonitorTests.swift` / `TelemetryServiceTests.swift` / `LogUploaderTests.swift`：监控与遥测
-  - `FeedbackServiceTests.swift` / `MessageFeedbackTests.swift`：反馈持久化
-  - `WatchConnectivityServiceTests.swift`：Watch 通信
-  - `PresetPromptsTests.swift`：预设系统提示词清单（11 个角色完整性 / prompt 非空 / 角色唯一 / ≥ 150 字校验，4 用例）
-  - `MCPErrorTests.swift`：MCP 错误类型全覆盖（8 个 enum case × errorDescription / diagnosticDescription / WithCause 底层错误保留 / LocalizedError 一致性 / catch 匹配，21 用例）
-  - `SSETransportTests.swift`：SSE 传输层（init / send 未连接抛错 / HTTP 错误状态码 / disconnect 幂等 / messages 流 / handleSSEEvent 同源 endpoint 通过 + 跨域劫持拒绝，8 用例）
-  - `StdioTransportTests.swift`：stdio 传输层（macOS `#if os(macOS)`，init / connect 成功 + 无效命令抛错 / send 回显 / disconnect 清理 / messages 流 / 多行分割，8 用例）
-  - `DocumentChunkerTests.swift`（增量）：新增 9 个 Swift fallback 路径测试（`useRust` 改为 `internal static var` 支持测试注入，覆盖短文本 / 空文本 / 单字符 / 中文长文本 / chunkIndex 递增 / source 透传 / trimming / 直接调用 chunkDocumentSwift / 混合文本）
-
-- **skip 场景**：Keychain 不可用（模拟器 entitlement 限制）/ 语音识别器不可用 / NLTokenizer 未切分多块 / 权限拒绝 / HealthKit 授权未授予 / MLX 模型未下载 / 网络环境依赖等场景，用 `XCTSkip` / `XCTSkipUnless` 兜底。
+当前未在 `AetherTests` 中发现针对 App 入口/共享初始化或 BGTask 注册调度的专门测试。仓储实现有独立测试，但这不等于聊天主流程通过仓储访问；当前 `ChatViewModel` 流程仍显式接收 `ModelContext`。
 
 ### 7.2 UI 测试（UIT）
 
@@ -1935,39 +1819,27 @@ sequenceDiagram
 
 ## 8. 目录结构
 
-完整目录树，与磁盘一致：
+以下为模块结构概览，不是逐文件索引；当前职责与代码归属以第 2.1 和 3.1–3.3 节为准。
 
 ```
 Aether/
-├── App/
-│   └── AetherApp.swift
+├── App/                      # AetherApp-iOS.swift / AetherApp-macOS.swift / AetherApp+Shared.swift
 ├── AppIntents/
 │   ├── AskAetherIntent.swift
 │   ├── NewConversationIntent.swift
 │   └── SwitchConversationIntent.swift
 ├── Core/
-│   ├── Actors/
-│   │   └── ChatActor.swift          # 已移除（文件已删除）
-│   ├── Constants/
-│   │   ├── APIConfig.swift
-│   │   └── ModelProvider.swift
-│   ├── Extensions/
-│   │   └── String+TokenCount.swift
-│   ├── Models/
-│   │   ├── BFFConfig.swift
-│   │   ├── OnDeviceConfig.swift
-│   │   └── OnDeviceError.swift
-│   └── Protocols/
-│       ├── LLMProvider.swift
-│       └── ToolProtocol.swift
+│   └── Models/AgentTask.swift
 ├── Models/
-│   ├── ChatChunk.swift
 │   ├── ChatMessage.swift
 │   ├── Conversation.swift
+│   ├── DebugInfo.swift
 │   ├── DocumentChunk.swift
 │   ├── HealthInsight.swift
-│   ├── MessageFeedback.swift
-│   └── RemoteConfig.swift
+│   ├── Memory.swift
+│   └── MessageFeedback.swift
+├── AetherTests/                  # 单元测试（按 Chat / Coordinators / MCP / Multimodal 等领域组织）
+├── AetherUITests/                # UI 测试（含 iOS 与 macOS 场景）
 ├── Resources/
 │   ├── Assets.xcassets/
 │   │   ├── AccentColor.colorset/
@@ -1981,8 +1853,6 @@ Aether/
 ├── Services/
 │   ├── Auth/
 │   │   └── KeychainManager.swift
-│   ├── Cache/
-│   │   └── SemanticCache.swift
 │   ├── Connectivity/
 │   │   └── WatchConnectivityService.swift
 │   ├── Crash/
@@ -1992,40 +1862,21 @@ Aether/
 │   ├── Health/
 │   │   ├── HealthInsightGenerator.swift
 │   │   └── HealthKitService.swift
-│   ├── Intents/
-│   │   └── IntentChatService.swift
-│   ├── LLM/
-│   │   ├── BFFProxyClient.swift
-│   │   ├── DeepSeekClient.swift
-│   │   ├── FallbackLLMProvider.swift
-│   │   ├── ModelProviderFactory.swift
-│   │   ├── QwenClient.swift
-│   │   ├── RateLimiter.swift
-│   │   └── SSEParser.swift
 │   ├── Network/
 │   │   └── NetworkMonitor.swift
 │   ├── OnDevice/
 │   │   ├── MLXInferenceEngine.swift
 │   │   ├── OfflineLLMProvider.swift
 │   │   └── OnDeviceModelDownloader.swift
-│   ├── Performance/
-│   │   └── PerformanceMonitor.swift
 │   ├── RAG/
 │   │   ├── DocumentChunker.swift
 │   │   ├── EmbeddingService.swift
 │   │   ├── PDFExtractor.swift
 │   │   └── RAGService.swift
-│   ├── RemoteConfig/
-│   │   └── RemoteConfigService.swift
-│   ├── Routing/
-│   │   └── SmartRouter.swift
 │   ├── Search/
 │   │   └── SpotlightIndexer.swift
 │   ├── Storage/
 │   │   └── ChatStorage.swift
-│   ├── Telemetry/
-│   │   ├── LogUploader.swift
-│   │   └── TelemetryService.swift
 │   ├── Tools/
 │   │   ├── AlarmTool.swift
 │   │   ├── AppManagementTool.swift                # macOS
@@ -2121,7 +1972,7 @@ CloudflareWorkers/               # BFF 代理网关
 ├── worker.js
 └── wrangler.toml
 
-AetherTests/                  # 190 个 UT 文件 / 3314 用例
+AetherTests/                  # 按功能域组织的单元测试 target
 ├── APIConfigTests.swift
 ├── AlarmToolTests.swift
 ├── BFFProxyClientTests.swift
@@ -2192,9 +2043,9 @@ Packages/
 └── AetherCore/                # SPM 模块化包
     ├── Package.swift
     ├── Sources/
-    │   ├── AetherFoundation/  # 核心协议与常量（LLMProvider / ToolProtocol / APIConfig）
+    │   ├── AetherFoundation/  # 共享协议、常量与 DTO
     │   ├── AetherRust/        # Rust FFI Swift 包装器（10 个文件）
-    │   ├── AetherServices/    # 服务层（LLM / RAG / Cache / Plugin / Telemetry 等）
+    │   ├── AetherServices/    # 共享服务（LLM / Cache / Routing / Plugin / Telemetry 等）
     │   ├── AetherDesign/      # 设计系统 Token（颜色 / 字体 / 圆角 / 布局）
     │   └── AetherUI/          # 通用 UI 组件（AvatarView / CardStyle / ErrorBanner 等）
     ├── Tests/

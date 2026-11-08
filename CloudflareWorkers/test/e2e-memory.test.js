@@ -43,13 +43,13 @@ function makeDB() {
         async run() {
           return matched && matched.run
             ? await matched.run(binds)
-            : { success: true, changes: 1 };
+            : { success: true, meta: { changes: 1 } };
         },
       };
       return stmt;
     },
     async batch(stmts) {
-      return stmts.map(() => ({ success: true, changes: 1 }));
+      return Promise.all(stmts.map((stmt) => stmt.run()));
     },
     on(match, fns) {
       handlers.push({ match, ...fns });
@@ -223,7 +223,7 @@ describe("E2E /memory", () => {
 
   it("DELETE /memory/:id 成功返回 deleted:true", async () => {
     const env = makeEnv([
-      ["DELETE FROM memories WHERE id = ?1 AND user_id", { run: () => ({ success: true, changes: 1 }) }],
+      ["DELETE FROM memories WHERE id = ?1 AND user_id", { run: () => ({ success: true, meta: { changes: 1 } }) }],
     ]);
     const req = makeRequest("/memory/mem-1", {
       method: "DELETE",
@@ -238,7 +238,7 @@ describe("E2E /memory", () => {
 
   it("DELETE /memory/:id 不存在返回 404", async () => {
     const env = makeEnv([
-      ["DELETE FROM memories WHERE id = ?1 AND user_id", { run: () => ({ success: true, changes: 0 }) }],
+      ["DELETE FROM memories WHERE id = ?1 AND user_id", { run: () => ({ success: true, meta: { changes: 0 } }) }],
     ]);
     const req = makeRequest("/memory/nope", {
       method: "DELETE",

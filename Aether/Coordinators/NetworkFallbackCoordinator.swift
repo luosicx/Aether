@@ -126,12 +126,14 @@ final class NetworkFallbackCoordinator: Coordinator {
     ///   - fallbackProvider: 备用供应商（nil=不降级；非 nil 时用 FallbackLLMProvider 装饰主 provider）
     ///   - bffConfig: BFF 代理配置（启用后请求经服务端中转，上游 API Key 不落设备）
     ///   - injectedClient: 测试注入的 client（非 nil 时直接返回，绕过工厂构造）
+    ///   - fallbackApiKey: 备用供应商的 API Key（不同供应商 Key 不可互换）
     /// - Returns: 构造好的 LLMProvider（BFFProxyClient / FallbackLLMProvider / 直连 client / 注入 client）
     func makeLLMProvider(
         selectedProvider: ModelProvider,
         fallbackProvider: ModelProvider?,
         bffConfig: BFFConfig,
-        injectedClient: LLMProvider?
+        injectedClient: LLMProvider?,
+        fallbackApiKey: String? = nil
     ) -> LLMProvider {
         // 测试侧：若注入了 client，则优先用注入的（绕过工厂）
         if let injected = injectedClient {
@@ -146,7 +148,8 @@ final class NetworkFallbackCoordinator: Coordinator {
             let fallback = ModelProviderFactory.make(fb)
             return FallbackLLMProvider(
                 primary: primary, fallback: fallback,
-                primaryProvider: selectedProvider, fallbackProvider: fb
+                primaryProvider: selectedProvider, fallbackProvider: fb,
+                fallbackApiKey: fallbackApiKey
             )
         }
         return primary

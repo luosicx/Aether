@@ -25,15 +25,19 @@ export function resolveUpstream(provider, env) {
 }
 
 /**
- * 构造转发到上游的 Header：移除 BFF 专有头，注入上游 Authorization
+ * 构造转发到上游的 Header：仅保留必要字段，注入上游 Authorization
+ *
+ * 不透传客户端的其他 Header（Cookie、X-Forwarded-*、内部凭证等），
+ * 避免把用户侧信息或 BFF 内部元数据泄露给上游。
  * @param {Headers} headers
  * @param {string} apiKey
  * @returns {Headers}
  */
 export function buildUpstreamHeaders(headers, apiKey) {
-  const out = new Headers(headers);
-  out.delete("X-BFF-Token");
-  out.delete("X-Provider");
+  const out = new Headers();
+  const contentType = headers.get("Content-Type");
+  if (contentType) out.set("Content-Type", contentType);
+  out.set("Accept", headers.get("Accept") || "application/json");
   out.set("Authorization", "Bearer " + apiKey);
   return out;
 }

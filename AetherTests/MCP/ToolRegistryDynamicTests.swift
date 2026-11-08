@@ -126,6 +126,8 @@ final class ToolRegistryDynamicTests: XCTestCase {
         ])
         let tool = MCPTool(name: "mcp_tool_exec", description: "执行", inputSchema: [:])
         let adapter = MCPToolAdapter(tool: tool, client: client, serverID: "srv2")
+        ToolAuthorization.shared.grantSessionAuthorization(toolName: adapter.registeredName)
+        defer { ToolAuthorization.shared.revokeAuthorization(toolName: adapter.registeredName) }
         let result = try await adapter.execute(arguments: ["q": "hello"])
         XCTAssertEqual(result, "line1\nline2", "应拼接多个 text 内容块")
     }
@@ -137,8 +139,26 @@ final class ToolRegistryDynamicTests: XCTestCase {
         ])
         let adapter = MCPToolAdapter(tool: MCPTool(name: "t", description: "d", inputSchema: [:]),
                                      client: client, serverID: "srv3")
+        ToolAuthorization.shared.grantSessionAuthorization(toolName: adapter.registeredName)
+        defer { ToolAuthorization.shared.revokeAuthorization(toolName: adapter.registeredName) }
         let executeResult = try await adapter.execute(arguments: [:])
         XCTAssertEqual(executeResult, "only")
+    }
+
+    /// 注册后的 MCP 工具应被判定为需要显式授权（默认拒绝）
+    func testRegisteredMCPToolRequiresAuthorization() {
+        let client = StubToolCallClient(contents: [])
+        let adapter = MCPToolAdapter(
+            tool: MCPTool(name: "needs_auth", description: "", inputSchema: [:]),
+            client: client,
+            serverID: "auth_srv"
+        )
+        defer { registry.unregister(name: adapter.registeredName) }
+        registry.register(tool: adapter)
+        XCTAssertTrue(registry.requiresAuthorization(name: adapter.registeredName),
+                      "MCP 远程工具应一律需要显式授权")
+        XCTAssertTrue(registry.isRemoteTool(name: adapter.registeredName),
+                      "MCP 适配器注册的工具应识别为远程工具")
     }
 
     // MARK: - MCPClientManager 自动注册/注销集成
@@ -159,11 +179,17 @@ final class ToolRegistryDynamicTests: XCTestCase {
         XCTAssertNil(registry.getTool(named: "autoreg_server__mcp_autoreg_a"), "连接前工具不应注册")
         XCTAssertNil(registry.getTool(named: "autoreg_server__mcp_autoreg_b"))
 
+        // 清理上一次运行可能残留的启用状态，保证默认启用策略可被验证
+        UserDefaults.standard.removeObject(forKey: "aether.tool.enabled.autoreg_server__mcp_autoreg_a")
+        UserDefaults.standard.removeObject(forKey: "aether.tool.enabled.autoreg_server__mcp_autoreg_b")
+
         try await manager.connect(config: config)
 
         XCTAssertNotNil(registry.getTool(named: "autoreg_server__mcp_autoreg_a"), "连接后应自动注册工具 A")
         XCTAssertNotNil(registry.getTool(named: "autoreg_server__mcp_autoreg_b"), "连接后应自动注册工具 B")
         XCTAssertTrue(registry.getToolNames().contains("autoreg_server__mcp_autoreg_a"))
+        XCTAssertTrue(registry.isEnabled(name: "autoreg_server__mcp_autoreg_a"), "连接后 MCP 工具应自动启用")
+        XCTAssertTrue(registry.requiresAuthorization(name: "autoreg_server__mcp_autoreg_a"), "MCP 工具应需显式授权")
 
         await manager.disconnect(serverID: "autoreg_server")
 

@@ -18,6 +18,9 @@ public final class FallbackLLMProvider: LLMProvider, @unchecked Sendable {
     private let primaryProvider: ModelProvider
     /// 备用 provider 对应的 ModelProvider
     private let fallbackProvider: ModelProvider
+    /// 备用 provider 的 API Key。不同供应商 Key 不可互换（deepseek ↔ qwen 会 401），
+    /// 为 nil 时回退到调用方传入的 apiKey（保持旧行为，兼容测试与单供应商场景）。
+    private let fallbackApiKey: String?
 
     /// 最近一次请求实际命中的 provider（初值为主 provider，触发降级后改为备用）。
     /// 用 OSAllocatedUnfairLock 保护跨 actor 读写。
@@ -35,11 +38,16 @@ public final class FallbackLLMProvider: LLMProvider, @unchecked Sendable {
         didFallbackLock.withLock { $0 }
     }
 
-    public init(primary: LLMProvider, fallback: LLMProvider, primaryProvider: ModelProvider, fallbackProvider: ModelProvider) {
+    public init(primary: LLMProvider,
+                fallback: LLMProvider,
+                primaryProvider: ModelProvider,
+                fallbackProvider: ModelProvider,
+                fallbackApiKey: String? = nil) {
         self.primary = primary
         self.fallback = fallback
         self.primaryProvider = primaryProvider
         self.fallbackProvider = fallbackProvider
+        self.fallbackApiKey = fallbackApiKey
         self.lastUsedProviderLock = OSAllocatedUnfairLock(initialState: primaryProvider)
         self.didFallbackLock = OSAllocatedUnfairLock(initialState: false)
     }
@@ -48,48 +56,66 @@ public final class FallbackLLMProvider: LLMProvider, @unchecked Sendable {
     /// 降级判定：主 provider stream finish 时 yieldedAny 为 false（覆盖 HTTP 错误提前 finish 的场景）。
     public func chat(messages: [APIMessage], config: ChatConfig, apiKey: String) -> AsyncStream<String> {
         AsyncStream { continuation in
-            Task {
+            let task = Task {
                 var yieldedAny = false
                 let primaryStream = self.primary.chat(messages: messages, config: config, apiKey: apiKey)
                 for await content in primaryStream {
                     yieldedAny = true
                     continuation.yield(content)
                 }
+                // 取消不是“无输出”，不得触发降级
+                guard !Task.isCancelled else {
+                    continuation.finish()
+                    return
+                }
                 if !yieldedAny {
                     // 主 provider 未产出任何内容，触发降级（线程安全写入）
                     self.lastUsedProviderLock.withLock { $0 = self.fallbackProvider }
                     self.didFallbackLock.withLock { $0 = true }
-                    let fallbackStream = self.fallback.chat(messages: messages, config: config, apiKey: apiKey)
+                    // 备用供应商必须使用自己的 API Key，不能复用主 provider 的 Key
+                    let fallbackKey = self.fallbackApiKey ?? apiKey
+                    let fallbackStream = self.fallback.chat(messages: messages, config: config, apiKey: fallbackKey)
                     for await content in fallbackStream {
+                        if Task.isCancelled { break }
                         continuation.yield(content)
                     }
                 }
                 continuation.finish()
             }
+            continuation.onTermination = { _ in task.cancel() }
         }
     }
 
     /// 带工具调用 chat 流：降级逻辑与纯文本路径一致。
     public func chat(messages: [APIMessage], config: ChatConfig, tools: [ToolDef], apiKey: String) -> AsyncStream<ParsedChunk> {
         AsyncStream { continuation in
-            Task {
+            let task = Task {
                 var yieldedAny = false
                 let primaryStream = self.primary.chat(messages: messages, config: config, tools: tools, apiKey: apiKey)
                 for await chunk in primaryStream {
                     yieldedAny = true
                     continuation.yield(chunk)
                 }
+                // 取消不是“无输出”，不得触发降级
+                guard !Task.isCancelled else {
+                    continuation.finish()
+                    return
+                }
                 if !yieldedAny {
                     // 主 provider 未产出，降级到 fallback（线程安全写入）
                     self.lastUsedProviderLock.withLock { $0 = self.fallbackProvider }
                     self.didFallbackLock.withLock { $0 = true }
-                    let fallbackStream = self.fallback.chat(messages: messages, config: config, tools: tools, apiKey: apiKey)
+                    // 备用供应商必须使用自己的 API Key，不能复用主 provider 的 Key
+                    let fallbackKey = self.fallbackApiKey ?? apiKey
+                    let fallbackStream = self.fallback.chat(messages: messages, config: config, tools: tools, apiKey: fallbackKey)
                     for await chunk in fallbackStream {
+                        if Task.isCancelled { break }
                         continuation.yield(chunk)
                     }
                 }
                 continuation.finish()
             }
+            continuation.onTermination = { _ in task.cancel() }
         }
     }
 

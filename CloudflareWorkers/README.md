@@ -173,7 +173,7 @@ npm run dev
 | POST | `/rag/documents` | 上传文档 |
 | POST | `/health/summary` | 上报健康摘要 |
 | GET | `/health/summary/{date}` | 获取健康摘要 |
-| POST | `/*`（兜底） | LLM 透传代理（向后兼容） |
+| POST | `/v1/chat/completions`、`/v1/embeddings`（兜底） | LLM 透传代理（向后兼容） |
 
 完整契约见 [`openapi.yaml`](./openapi.yaml)。
 
@@ -210,13 +210,16 @@ data: {"type":"error","message":"LLM 上游错误 401: ..."}\n\n
 
 ## 向后兼容
 
-POST 到任意未匹配路径（如 `/v1/chat/completions`、`/v1/embeddings`）走原 LLM 透传代理逻辑：
+POST 到 `/v1/chat/completions` 或 `/v1/embeddings` 走 LLM 透传代理（其余路径返回 404，避免开放代理）：
 
-1. 校验 `X-BFF-Token`（KV）
-2. 内存限流（每 token 每分钟 60 次）
-3. 按 `X-Provider` 头（默认 `deepseek`）解析上游
-4. 剥离 BFF 专有头，注入上游 `Authorization: Bearer <apiKey>`
-5. 流式透传响应（TransformStream）
+1. 校验 `X-BFF-Token`（KV，含 `expiresAt` 强制过期校验）
+2. 内存限流（每 userId 每分钟 60 次）
+3. 路径白名单：仅 `/v1/chat/completions`、`/v1/embeddings`
+4. 按 `X-Provider` 头（默认 `deepseek`）解析上游，并校验 model 与 provider/路径匹配
+   （`deepseek-*` 走 deepseek；`qwen-*` / `qwq-*` / `text-embedding-*` 走 qwen）
+5. 请求体上限 1 MiB，超限返回 413
+6. 仅转发必要 Header，注入上游 `Authorization: Bearer <apiKey>`
+7. 流式透传响应（TransformStream）
 
 旧客户端无需改动即可继续工作。
 

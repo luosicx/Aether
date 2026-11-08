@@ -79,7 +79,7 @@ export async function handleCreateConversation(request, env, ctx) {
       unread_count: 0,
       order_field: now,
     };
-    return jsonOk(conv, 201);
+    return jsonOk({ conversation: conv }, 201);
   } catch (err) {
     return jsonError(500, "创建会话失败: " + (err && err.message));
   }
@@ -152,12 +152,12 @@ export async function handleUpdateConversation(request, env, ctx, id) {
   values.push(id, auth.userId);
 
   try {
-    const { changes } = await env.DB.prepare(
+    const result = await env.DB.prepare(
       `UPDATE conversations SET ${fields.join(", ")} WHERE id = ? AND user_id = ?`
     )
       .bind(...values)
       .run();
-    if (changes === 0) return jsonError(404, "会话不存在或无变更");
+    if ((result.meta?.changes ?? 0) === 0) return jsonError(404, "会话不存在或无变更");
     const row = await env.DB.prepare(
       `SELECT * FROM conversations WHERE id = ?1 AND user_id = ?2`
     )
@@ -179,14 +179,19 @@ export async function handleDeleteConversation(request, env, ctx, id) {
   if (!env.DB) return jsonError(503, "数据库未配置");
 
   try {
-    // 先删消息（外键级联在 D1 需显式开启 PRAGMA，这里手动删更稳妥）
-    await env.DB.prepare(`DELETE FROM messages WHERE conversation_id = ?1`).bind(id).run();
-    const { changes } = await env.DB.prepare(
-      `DELETE FROM conversations WHERE id = ?1 AND user_id = ?2`
-    )
-      .bind(id, auth.userId)
-      .run();
-    if (changes === 0) return jsonError(404, "会话不存在");
+    // 消息删除与会话删除放在同一 batch 中，且都按 user_id 限定，避免跨租户删除
+    const results = await env.DB.batch([
+      env.DB.prepare(
+        `DELETE FROM messages WHERE conversation_id IN (
+           SELECT id FROM conversations WHERE id = ?1 AND user_id = ?2
+         )`
+      ).bind(id, auth.userId),
+      env.DB.prepare(
+        `DELETE FROM conversations WHERE id = ?1 AND user_id = ?2`
+      ).bind(id, auth.userId),
+    ]);
+    const convChanges = results?.[1]?.meta?.changes ?? 0;
+    if (convChanges === 0) return jsonError(404, "会话不存在");
     return jsonOk({ deleted: true, id });
   } catch (err) {
     return jsonError(500, "删除会话失败: " + (err && err.message));

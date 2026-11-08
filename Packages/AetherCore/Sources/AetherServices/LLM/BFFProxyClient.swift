@@ -47,18 +47,20 @@ nonisolated public final class BFFProxyClient: LLMProvider, @unchecked Sendable 
     /// 纯文本 chat 流，返回 AsyncStream<String>，逐 chunk yield 文本内容
     public func chat(messages: [APIMessage], config: ChatConfig, apiKey: String) -> AsyncStream<String> {
         AsyncStream { continuation in
-            Task {
+            let task = Task {
                 await self.streamChat(messages: messages, config: config, apiKey: apiKey, continuation: continuation)
             }
+            continuation.onTermination = { _ in task.cancel() }
         }
     }
 
     /// 带工具调用 chat 流，返回 AsyncStream<ParsedChunk>，yield 含 content 和累积后的 toolCalls
     public func chat(messages: [APIMessage], config: ChatConfig, tools: [ToolDef], apiKey: String) -> AsyncStream<ParsedChunk> {
         AsyncStream { continuation in
-            Task {
+            let task = Task {
                 await self.streamChatWithTools(messages: messages, config: config, tools: tools, apiKey: apiKey, continuation: continuation)
             }
+            continuation.onTermination = { _ in task.cancel() }
         }
     }
 
@@ -268,13 +270,15 @@ nonisolated public final class BFFProxyClient: LLMProvider, @unchecked Sendable 
                 continuation.yield(content)
             }
         } catch {
-            let err = LLMError.networkError(error.localizedDescription)
-            await MainActor.run {
-                NotificationCenter.default.post(
-                    name: .llmErrorOccurred,
-                    object: nil,
-                    userInfo: ["error": err]
-                )
+            if !Task.isCancelled, !isRequestCancellation(error) {
+                let err = LLMError.networkError(error.localizedDescription)
+                await MainActor.run {
+                    NotificationCenter.default.post(
+                        name: .llmErrorOccurred,
+                        object: nil,
+                        userInfo: ["error": err]
+                    )
+                }
             }
         }
         continuation.finish()
@@ -323,13 +327,15 @@ nonisolated public final class BFFProxyClient: LLMProvider, @unchecked Sendable 
                 }
             }
         } catch {
-            let err = LLMError.networkError(error.localizedDescription)
-            await MainActor.run {
-                NotificationCenter.default.post(
-                    name: .llmErrorOccurred,
-                    object: nil,
-                    userInfo: ["error": err]
-                )
+            if !Task.isCancelled, !isRequestCancellation(error) {
+                let err = LLMError.networkError(error.localizedDescription)
+                await MainActor.run {
+                    NotificationCenter.default.post(
+                        name: .llmErrorOccurred,
+                        object: nil,
+                        userInfo: ["error": err]
+                    )
+                }
             }
         }
         continuation.finish()

@@ -1510,12 +1510,13 @@
 
 ### 22.2 macOS 独有工具
 
-- [ ] AppleScriptTool 执行脚本
+- [ ] AppleScriptTool 执行预定义安全动作
   - **前置条件**：macOS 平台
   - **操作步骤**：
-    1. 发送「用 AppleScript 弹窗」
-  - **预期结果**：AppleScriptTool：run_applescript 执行 `return "hello"` 返回 hello
-  - **失败排查**：检查 NSAppleScript；查看 executionPolicy
+    1. 发送「查看 macOS 版本」
+    2. 尝试让模型执行任意 AppleScript（如「用 AppleScript 弹窗」）
+  - **预期结果**：`run_applescript` 以 `get_system_version` 动作返回版本号；携带 `script` 的调用返回「不再支持任意 AppleScript 脚本，请使用 action 参数选择预定义动作」
+  - **失败排查**：检查 NSAppleScript；查看 action 白名单
 
 - [ ] ScreenshotTool 截屏
   - **前置条件**：macOS 平台，屏幕录制权限已授权
@@ -1959,12 +1960,13 @@
 
 ### macOS 独有工具 11 项
 
-- [ ] AppleScriptTool：发送「用 AppleScript 弹窗」
+- [ ] AppleScriptTool：发送「查看 macOS 版本」→ 返回系统版本，任意脚本被拒绝
   - **前置条件**：macOS 平台，自动化权限已授权
   - **操作步骤**：
-    1. 发送「用 AppleScript 弹窗」
-  - **预期结果**：弹出系统对话框，返回执行结果
-  - **失败排查**：检查 NSAppleScript；查看 executionPolicy；查看自动化权限
+    1. 发送「查看 macOS 版本」
+    2. 尝试执行任意 AppleScript 脚本
+  - **预期结果**：仅执行预定义动作（如返回 macOS 版本号）；任意 `script` 参数被拒绝并提示改用 action
+  - **失败排查**：检查 NSAppleScript；查看 action 白名单；查看自动化权限
 
 - [ ] ScreenshotTool：发送「截屏」
   - **前置条件**：macOS 平台，屏幕录制权限已授权

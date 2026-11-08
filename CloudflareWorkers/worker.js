@@ -5,7 +5,7 @@
  * 1. 鉴权：所有受保护端点经 X-BFF-Token (KV `bff_tokens`) 校验
  * 2. 限流：chat 端点每 userId 每分钟 60 次（内存计数器）
  * 3. 路由分发：基于 URL pathname 分发到 src/routes/* 模块
- * 4. 兜底：保留原 LLM 透传代理行为（POST 到未匹配路径走旧逻辑），向后兼容
+ * 4. 兜底：仅 /v1/chat/completions 与 /v1/embeddings 走 LLM 透传代理（路径/模型白名单 + 1 MiB 上限）
  *
  * 错误约定（与 iOS BFFProxyClient 对齐）：
  * - 401：BFF Token 缺失/无效
@@ -71,7 +71,7 @@ export default {
       }
 
       // ============ 兜底：保留原 LLM 透传代理行为 ============
-      // POST 到任意其他路径（如 /v1/chat/completions / /v1/embeddings）走旧逻辑
+      // 仅允许 POST 到明确的上游路径，避免 BFF 沦为任意路径转发器
       if (method === "POST") {
         return await proxyLLM(request, env, ctx);
       }
@@ -247,56 +247,164 @@ async function dispatch(route, request, env, ctx) {
 /**
  * 原 LLM 透传代理逻辑（向后兼容）
  *
- * 复刻原 worker.js 行为：
- *   1. 校验 BFF Token (KV)
- *   2. 限流（内存计数器）
- *   3. 按 X-Provider 路由到上游，注入 Authorization
- *   4. 流式透传响应（TransformStream pipeTo）
+ * 安全约束（P1-5）：
+ *   1. 鉴权复用 authenticate()，强制执行 token TTL（expiresAt）
+ *   2. 路径白名单：仅 /v1/chat/completions 与 /v1/embeddings，其余路径 404
+ *   3. 模型白名单：按 provider 前缀校验，且路径与模型类型匹配
+ *   4. 请求体上限 1 MiB，超限返回 413
+ *   5. 只向上游转发必要 Header，避免透传客户端凭证/内部头
  */
-async function proxyLLM(request, env, ctx) {
-  // 1. 校验 BFF Token
-  const bffToken = request.headers.get("X-BFF-Token");
-  if (!bffToken) {
-    return jsonError(401, "BFF Token 缺失");
+const PROXY_ALLOWED_PATHS = new Set(["/v1/chat/completions", "/v1/embeddings"]);
+const PROXY_MAX_BODY_BYTES = 1024 * 1024;
+const PROXY_MODEL_PREFIXES = {
+  deepseek: ["deepseek-"],
+  qwen: ["qwen-", "qwq-", "text-embedding-"],
+};
+
+/**
+ * 归一化代理路径：去除末尾斜杠（保留根路径）
+ * @param {string} pathname
+ * @returns {string}
+ */
+function normalizeProxyPath(pathname) {
+  return pathname.length > 1 && pathname.endsWith("/")
+    ? pathname.slice(0, -1)
+    : pathname;
+}
+
+/**
+ * 校验模型是否属于 provider 且与请求路径类型匹配
+ * @param {string} provider
+ * @param {string} path
+ * @param {string} model
+ * @returns {boolean}
+ */
+function isModelAllowed(provider, path, model) {
+  const prefixes = PROXY_MODEL_PREFIXES[provider];
+  if (!prefixes || typeof model !== "string" || !model) return false;
+  if (!prefixes.some((prefix) => model.startsWith(prefix))) return false;
+  const isEmbeddingPath = path === "/v1/embeddings";
+  return isEmbeddingPath === model.includes("embedding");
+}
+
+/**
+ * 读取请求体并强制大小上限（不信任 Content-Length，按实际字节数计数）
+ * @param {Request} request
+ * @param {number} maxBytes
+ * @returns {Promise<{data: Uint8Array}|{tooLarge: true}>}
+ */
+async function readBodyWithLimit(request, maxBytes) {
+  if (!request.body) return { data: new Uint8Array(0) };
+  const reader = request.body.getReader();
+  const chunks = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) {
+        await reader.cancel().catch(() => {});
+        return { tooLarge: true };
+      }
+      chunks.push(value);
+    }
+  } finally {
+    try {
+      reader.releaseLock();
+    } catch (_) {
+      /* noop */
+    }
   }
-  const tokenRecord = await env.bff_tokens.get(bffToken);
-  if (!tokenRecord) {
-    return jsonError(401, "BFF Token 无效");
+  const data = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    data.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return { data };
+}
+
+async function proxyLLM(request, env, ctx) {
+  // 1. 鉴权：复用统一实现，确保 expiresAt 过期 token 被拒绝
+  const auth = await authenticate(request, env);
+  if (!auth) {
+    return jsonError(401, "BFF Token 缺失或无效");
   }
 
-  // 2. 限流：复用内存计数器（按 token 维度，与原实现一致）
-  const rl = await checkRateLimit(bffToken, env, 60);
+  // 2. 路径白名单：禁止把 BFF 当作任意路径的上游代理
+  const url = new URL(request.url);
+  const path = normalizeProxyPath(url.pathname);
+  if (!PROXY_ALLOWED_PATHS.has(path)) {
+    return jsonError(
+      404,
+      "不支持的代理路径，仅支持 /v1/chat/completions 与 /v1/embeddings"
+    );
+  }
+
+  // 3. 限流：按 userId 维度（与业务端点一致）
+  const rl = await checkRateLimit(auth.userId, env, 60);
   if (!rl.allowed) {
     return rateLimitResponse(rl.retryAfter);
   }
 
-  // 3. 按 X-Provider 路由到上游
+  // 4. 按 X-Provider 路由到上游
   const provider = request.headers.get("X-Provider") || "deepseek";
   const upstream = resolveUpstream(provider, env);
-  if (!upstream) {
-    return jsonError(400, "未知的 X-Provider: " + provider);
+  if (!upstream || !upstream.baseUrl || !upstream.apiKey) {
+    return jsonError(400, "未知或未配置的 X-Provider: " + provider);
   }
 
-  // 4. 构造上游请求：保留原 path，剥离 BFF 专有 Header，注入上游 Authorization
-  const url = new URL(request.url);
-  const upstreamUrl = upstream.baseUrl + url.pathname;
+  // 5. 读取请求体（大小上限 + JSON 解析 + 模型白名单）
+  const bodyResult = await readBodyWithLimit(request, PROXY_MAX_BODY_BYTES);
+  if (bodyResult.tooLarge) {
+    return jsonError(413, "请求体超过 1 MiB 限制");
+  }
+  let text;
+  let payload;
+  try {
+    text = new TextDecoder("utf-8", { fatal: true }).decode(bodyResult.data);
+    payload = JSON.parse(text);
+  } catch (_) {
+    return jsonError(400, "请求体不是合法 JSON");
+  }
+  if (!payload || typeof payload !== "object") {
+    return jsonError(400, "请求体必须是 JSON 对象");
+  }
+  if (!isModelAllowed(provider, path, payload.model)) {
+    return jsonError(400, "不支持的 model: " + String(payload.model));
+  }
+
+  // 6. 构造上游请求：仅转发必要 Header，注入上游 Authorization
+  const upstreamUrl = upstream.baseUrl.replace(/\/$/, "") + path;
   const upstreamReq = new Request(upstreamUrl, {
-    method: request.method,
+    method: "POST",
     headers: buildUpstreamHeaders(request.headers, upstream.apiKey),
-    body: request.body,
+    body: text,
   });
 
-  // 5. 转发并流式返回
+  // 7. 转发并流式返回
   try {
     const upstreamResp = await fetch(upstreamReq);
 
     // 上游 2xx：流式透传 SSE
     if (upstreamResp.ok) {
+      const respHeaders = forwardHeaders(upstreamResp.headers);
+      if (!upstreamResp.body) {
+        return new Response(null, {
+          status: upstreamResp.status,
+          headers: respHeaders,
+        });
+      }
       const { readable, writable } = new TransformStream();
-      ctx.waitUntil(upstreamResp.body.pipeTo(writable).catch(() => {}));
+      if (ctx && typeof ctx.waitUntil === "function") {
+        ctx.waitUntil(upstreamResp.body.pipeTo(writable).catch(() => {}));
+      } else {
+        upstreamResp.body.pipeTo(writable).catch(() => {});
+      }
       return new Response(readable, {
         status: upstreamResp.status,
-        headers: forwardHeaders(upstreamResp.headers),
+        headers: respHeaders,
       });
     }
 

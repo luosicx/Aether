@@ -14,6 +14,31 @@ import AetherFoundation
 @MainActor
 final class MCPToolAdapterTests: XCTestCase {
 
+    /// 本次测试授予的运行时授权，tearDown 时撤销，避免单例状态污染其他用例
+    private var grantedToolNames: [String] = []
+
+    override func setUp() {
+        super.setUp()
+        grantedToolNames = []
+    }
+
+    override func tearDown() {
+        for name in grantedToolNames {
+            ToolAuthorization.shared.revokeAuthorization(toolName: name)
+        }
+        grantedToolNames = []
+        super.tearDown()
+    }
+
+    /// 为适配器注册名授予本次启动内有效授权
+    private func authorize(_ adapter: MCPToolAdapter) {
+        let name = adapter.registeredName
+        ToolAuthorization.shared.grantSessionAuthorization(toolName: name)
+        if !grantedToolNames.contains(name) {
+            grantedToolNames.append(name)
+        }
+    }
+
     // MARK: - 构造与元信息
 
     /// definition.name 应为 serverID__toolName 格式
@@ -60,6 +85,7 @@ final class MCPToolAdapterTests: XCTestCase {
             client: client,
             serverID: "srv"
         )
+        authorize(adapter)
         let result = try await adapter.execute(arguments: ["key": "value"])
         XCTAssertEqual(result, "hello world")
     }
@@ -77,6 +103,7 @@ final class MCPToolAdapterTests: XCTestCase {
             client: client,
             serverID: "srv"
         )
+        authorize(adapter)
         let result = try await adapter.execute(arguments: [:])
         XCTAssertEqual(result, "line1\nline2\nline3")
     }
@@ -92,6 +119,7 @@ final class MCPToolAdapterTests: XCTestCase {
             client: client,
             serverID: "srv"
         )
+        authorize(adapter)
         let result = try await adapter.execute(arguments: [:])
         XCTAssertEqual(result, "", "无 text 块应返回空字符串")
     }
@@ -105,6 +133,7 @@ final class MCPToolAdapterTests: XCTestCase {
             client: client,
             serverID: "srv"
         )
+        authorize(adapter)
         let result = try await adapter.execute(arguments: [:])
         XCTAssertEqual(result, "")
     }
@@ -120,6 +149,7 @@ final class MCPToolAdapterTests: XCTestCase {
             client: client,
             serverID: "srv"
         )
+        authorize(adapter)
         do {
             _ = try await adapter.execute(arguments: [:])
             XCTFail("应抛出错误")
@@ -140,8 +170,48 @@ final class MCPToolAdapterTests: XCTestCase {
             client: client,
             serverID: "srv"
         )
+        authorize(adapter)
         _ = try await adapter.execute(arguments: ["k": "v"])
         XCTAssertEqual(client.lastCallToolName, "original_name", "应使用原名调用 client")
+    }
+
+    // MARK: - 授权
+
+    /// 未授权时 execute 应直接拒绝，且不得调用 mcpClient.callTool
+    func testExecuteWithoutAuthorizationDoesNotCallClient() async throws {
+        let client = StubMCPClient()
+        client.callToolResult = MCPToolCallResult(content: [.init(type: "text", text: "should not run")])
+        let adapter = MCPToolAdapter(
+            tool: MCPTool(name: "unauthorized_tool", description: "", inputSchema: [:]),
+            client: client,
+            serverID: "guard"
+        )
+        ToolAuthorization.shared.revokeAuthorization(toolName: adapter.registeredName)
+
+        do {
+            _ = try await adapter.execute(arguments: [:])
+            XCTFail("未授权应抛出错误")
+        } catch {
+            let nsError = error as NSError
+            XCTAssertEqual(nsError.domain, "MCPToolAdapter")
+            XCTAssertEqual(client.callToolCallCount, 0, "未授权时不应发起远端调用")
+        }
+    }
+
+    /// 授权后 execute 应正常调用 mcpClient.callTool
+    func testExecuteAfterSessionAuthorizationCallsClient() async throws {
+        let client = StubMCPClient()
+        client.callToolResult = MCPToolCallResult(content: [.init(type: "text", text: "ok")])
+        let adapter = MCPToolAdapter(
+            tool: MCPTool(name: "authorized_tool", description: "", inputSchema: [:]),
+            client: client,
+            serverID: "guard"
+        )
+        authorize(adapter)
+
+        let result = try await adapter.execute(arguments: [:])
+        XCTAssertEqual(result, "ok")
+        XCTAssertEqual(client.callToolCallCount, 1)
     }
 
     // MARK: - 测试桩
@@ -154,6 +224,7 @@ final class MCPToolAdapterTests: XCTestCase {
         var callToolResult: MCPToolCallResult = MCPToolCallResult(content: [])
         var callToolError: Error?
         var lastCallToolName: String?
+        var callToolCallCount = 0
 
         func connect() async throws {}
         func disconnect() async {}
@@ -161,6 +232,7 @@ final class MCPToolAdapterTests: XCTestCase {
         func listResources() async throws -> [MCPResource] { [] }
         func listPrompts() async throws -> [MCPPrompt] { [] }
         func callTool(name: String, arguments: [String: Any]) async throws -> MCPToolCallResult {
+            callToolCallCount += 1
             lastCallToolName = name
             if let error = callToolError { throw error }
             return callToolResult

@@ -106,12 +106,12 @@ export async function handleDeleteMemory(request, env, ctx, id) {
   if (!env.DB) return jsonError(503, "数据库未配置");
 
   try {
-    const { changes } = await env.DB.prepare(
+    const result = await env.DB.prepare(
       `DELETE FROM memories WHERE id = ?1 AND user_id = ?2`
     )
       .bind(id, auth.userId)
       .run();
-    if (changes === 0) return jsonError(404, "记忆不存在或无权删除");
+    if ((result.meta?.changes ?? 0) === 0) return jsonError(404, "记忆不存在或无权删除");
     return jsonOk({ deleted: true, id });
   } catch (err) {
     return jsonError(500, "删除记忆失败: " + (err && err.message));

@@ -17,7 +17,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
-import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -87,13 +86,27 @@ class KnowledgeBaseViewModelTest {
         // handler 在 Dispatchers.IO 上执行（ktor 框架默认）。
         val engine = MockEngine(handler)
         val client = HttpClient(engine) {
-            install(ContentNegotiation) { json() }
+            install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
         }
         return AetherApi(client, BffConfig(baseUrl = "http://test", userToken = "tok"))
     }
 
-    private fun jsonChunks(chunks: List<DocumentChunk>): String =
-        Json.encodeToString(ListSerializer(DocumentChunk.serializer()), chunks)
+    private fun jsonChunks(chunks: List<DocumentChunk>): String {
+        val rows = chunks.joinToString(",") { chunk ->
+            """
+                {
+                  "id": "${chunk.id}",
+                  "document_id": ${chunk.documentId?.let { "\"$it\"" } ?: "null"},
+                  "content": "${chunk.content}",
+                  "metadata": null,
+                  "chunk_index": ${chunk.chunkIndex},
+                  "weight": ${chunk.weight},
+                  "document_title": "${chunk.source}"
+                }
+            """.trimIndent()
+        }
+        return """{"chunks": [$rows], "query": "test"}"""
+    }
 
     /**
      * 等待 viewModelScope 中的异步操作完成。
