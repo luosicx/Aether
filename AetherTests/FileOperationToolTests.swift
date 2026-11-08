@@ -164,6 +164,79 @@ final class FileOperationToolTests: XCTestCase {
         XCTAssertTrue(result.contains("错误"), "不存在的文件应返回错误：\(result)")
     }
 
+    // MARK: - rename 路径穿越防护
+
+    /// 新文件名含 ../ 时应被拒绝，且不得在父目录生成文件
+    func testExecuteRenameRejectsTraversalName() async throws {
+        let fm = FileManager.default
+        let dir = (NSTemporaryDirectory() as NSString).appendingPathComponent("aether_rename_traversal_\(UUID().uuidString)")
+        try fm.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(atPath: dir) }
+        let src = (dir as NSString).appendingPathComponent("victim.txt")
+        try "x".write(toFile: src, atomically: true, encoding: .utf8)
+        let escapedName = "escaped_\(UUID().uuidString).txt"
+        let escaped = ((dir as NSString).deletingLastPathComponent as NSString).appendingPathComponent(escapedName)
+        defer { try? fm.removeItem(atPath: escaped) }
+
+        let result = try await tool.execute(arguments: [
+            "action": "rename", "path": src, "name": "../\(escapedName)"
+        ])
+
+        XCTAssertEqual(result, "错误：新文件名无效")
+        XCTAssertTrue(fm.fileExists(atPath: src), "源文件应仍在原位置")
+        XCTAssertFalse(fm.fileExists(atPath: escaped), "不应在父目录创建文件")
+    }
+
+    /// 新文件名为绝对路径时应被拒绝
+    func testExecuteRenameRejectsAbsoluteName() async throws {
+        let fm = FileManager.default
+        let dir = (NSTemporaryDirectory() as NSString).appendingPathComponent("aether_rename_abs_\(UUID().uuidString)")
+        try fm.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(atPath: dir) }
+        let src = (dir as NSString).appendingPathComponent("victim.txt")
+        try "x".write(toFile: src, atomically: true, encoding: .utf8)
+        let absolute = (NSTemporaryDirectory() as NSString).appendingPathComponent("aether_abs_\(UUID().uuidString).txt")
+        defer { try? fm.removeItem(atPath: absolute) }
+
+        let result = try await tool.execute(arguments: ["action": "rename", "path": src, "name": absolute])
+
+        XCTAssertEqual(result, "错误：新文件名无效")
+        XCTAssertFalse(fm.fileExists(atPath: absolute), "不应按绝对路径创建文件")
+    }
+
+    /// 新文件名含路径分隔符 / . / .. 时应被拒绝
+    func testExecuteRenameRejectsSeparatorAndDotNames() async throws {
+        let fm = FileManager.default
+        let dir = (NSTemporaryDirectory() as NSString).appendingPathComponent("aether_rename_sep_\(UUID().uuidString)")
+        try fm.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(atPath: dir) }
+        let src = (dir as NSString).appendingPathComponent("victim.txt")
+        try "x".write(toFile: src, atomically: true, encoding: .utf8)
+
+        for name in ["sub/evil.txt", "..", ".", "sub\\evil.txt"] {
+            let result = try await tool.execute(arguments: ["action": "rename", "path": src, "name": name])
+            XCTAssertEqual(result, "错误：新文件名无效", "非法文件名 \(name) 应被拒绝")
+            XCTAssertTrue(fm.fileExists(atPath: src), "非法重命名后源文件应保持不变")
+        }
+    }
+
+    /// 合法的新文件名应在原目录内完成重命名
+    func testExecuteRenameValidNameSucceeds() async throws {
+        let fm = FileManager.default
+        let dir = (NSTemporaryDirectory() as NSString).appendingPathComponent("aether_rename_ok_\(UUID().uuidString)")
+        try fm.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(atPath: dir) }
+        let src = (dir as NSString).appendingPathComponent("before.txt")
+        let dst = (dir as NSString).appendingPathComponent("after.txt")
+        try "x".write(toFile: src, atomically: true, encoding: .utf8)
+
+        let result = try await tool.execute(arguments: ["action": "rename", "path": src, "name": "after.txt"])
+
+        XCTAssertEqual(result, "已重命名")
+        XCTAssertFalse(fm.fileExists(atPath: src), "源文件应已移动")
+        XCTAssertTrue(fm.fileExists(atPath: dst), "目标文件应存在")
+    }
+
     // MARK: - delete 错误处理
 
     /// delete 缺少 path 参数应返回错误
@@ -306,10 +379,10 @@ final class FileOperationToolTests: XCTestCase {
     /// 路径遍历（..）标准化后命中敏感目录应被拒绝
     func testPathTraversalToSensitivePathRejected() async throws {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
-        // 假设当前目录在 home 下，使用 ../../.ssh 尝试访问
+        // Documents/../.ssh 标准化后应为 home/.ssh
         let result = try await tool.execute(arguments: [
             "action": "list",
-            "path": "\(home)/Documents/../../.ssh"
+            "path": "\(home)/Documents/../.ssh"
         ])
         XCTAssertEqual(result, "错误：拒绝访问敏感路径")
     }

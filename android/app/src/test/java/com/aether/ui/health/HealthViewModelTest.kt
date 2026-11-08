@@ -18,7 +18,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
-import kotlinx.serialization.json.Json
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -81,8 +80,16 @@ class HealthViewModelTest {
         return AetherApi(client, BffConfig(baseUrl = "http://test", userToken = "tok"))
     }
 
-    private fun jsonSummary(s: HealthSummary): String =
-        Json.encodeToString(HealthSummary.serializer(), s)
+    private fun jsonSummary(s: HealthSummary): String = """
+        {
+          "summary": {
+            "date": "${s.date}",
+            "steps": ${s.steps ?: "null"},
+            "sleep_hours": ${s.sleepHours ?: "null"},
+            "resting_heart_rate": ${s.restingHeartRate ?: "null"}
+          }
+        }
+    """.trimIndent()
 
     /**
      * 等待 viewModelScope 中的异步操作完成。

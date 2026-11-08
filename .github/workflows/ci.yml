@@ -10,6 +10,11 @@ on:
 permissions:
   contents: read
 
+# 同一 PR 的新推送会取消旧运行，避免排队浪费 runner 时间（main 推送不取消）。
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 # CI 全局变量：集中管理易变配置，便于跨 job 复用与统一调整
 # M-C1: 模拟器名称曾硬编码为 "iPhone 17"，Xcode 升级后若模拟器名称变更需逐处修改；
 #       改为 env 变量后只需修改此一处。
@@ -459,194 +464,20 @@ jobs:
           fi
           echo "xcodebuild exited non-zero but all UIT tests passed (simulator instability)"
 
-  security-tests:
-    needs: rust-apple
-    runs-on: macos-15
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v5
+  # 安全相关测试（ToolRegistry/ToolAuthorization/Keychain/Telemetry 等）已包含在
+  # unit-tests 与 unit-tests-macos 的完整测试集中，不再单独起 job 重复构建与执行。
 
-      - name: Select Xcode (latest)
-        id: setup-xcode
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: 'latest'
-
-      - name: 缓存 DerivedData 和 SPM
-        # 缓存 Xcode 构建产物和 Swift Package Manager 依赖，
-        # 基于锁文件生成 cache key，支持部分命中回退
-        uses: actions/cache@v5
-        with:
-          path: |
-            build/DerivedData
-            ~/Library/Developer/Xcode/DerivedData
-            ~/Library/Caches/org.swift.swiftpm
-            .build
-          key: ${{ runner.os }}-xcode-${{ steps.setup-xcode.outputs.xcode-version }}-ios-security-${{ hashFiles('Packages/AetherCore/Package.resolved', 'Aether.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
-          restore-keys: |
-            ${{ runner.os }}-xcode-ios-security-
-
-      - name: Download xcframework
-        uses: actions/download-artifact@v7
-        with:
-          name: aether-core-xcframework
-          path: Packages/AetherCore
-
-      - name: Setup iOS Simulator
-        run: bash scripts/ci-setup-simulator.sh
-
-      - name: Build for Testing
-        id: build
-        run: |
-          xcodebuild build-for-testing \
-            -project Aether.xcodeproj \
-            -scheme Aether-iOS \
-            -destination 'platform=iOS Simulator,name=${{ env.IOS_SIMULATOR_NAME }},arch=arm64' \
-            -configuration Debug \
-            -derivedDataPath build \
-            CODE_SIGNING_ALLOWED=NO ARCHS=arm64 SWIFT_STRICT_CONCURRENCY=complete 2>&1 | tee /tmp/build.log
-          status=${PIPESTATUS[0]}
-          if [ $status -ne 0 ]; then
-            echo "## Build for Testing Failed (exit $status)" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            grep -E "error:|Undefined symbol|linker command failed|cannot find|Could not build|no such file" /tmp/build.log | head -40 >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-          fi
-          exit $status
-
-      - name: Run Security Tests
-        id: test
-        continue-on-error: true
-        run: |
-          xcodebuild test-without-building \
-            -project Aether.xcodeproj \
-            -scheme Aether-iOS \
-            -destination 'platform=iOS Simulator,name=${{ env.IOS_SIMULATOR_NAME }},arch=arm64' \
-            -configuration Debug \
-            -derivedDataPath build \
-            -only-testing:AetherTests/ToolRegistryTests \
-            -only-testing:AetherTests/ToolAuthorizationTests \
-            -only-testing:AetherTests/KeychainManagerTests \
-            -only-testing:AetherTests/TelemetrySanitizerTests \
-            -only-testing:AetherTests/PromptInjectionDetectorTests \
-            -only-testing:AetherTests/ChatViewModelToolSecurityTests \
-            -only-testing:AetherTests/LogUploaderTests \
-            -only-testing:AetherTests/TelemetryServiceTests \
-            -test-timeouts-enabled YES \
-            -default-test-execution-time-allowance 30 \
-            -maximum-test-execution-time-allowance 60 \
-            -resultBundlePath SecurityTestResults.xcresult \
-            CODE_SIGNING_ALLOWED=NO ARCHS=arm64 SWIFT_STRICT_CONCURRENCY=complete
-
-      - name: Verify Security Test Results
-        if: steps.test.outcome != 'success'
-        run: |
-          echo "xcodebuild test exited non-zero, verifying security test results..."
-          if [ ! -d "SecurityTestResults.xcresult" ]; then
-            echo "ERROR: No test results generated (SecurityTestResults.xcresult missing)"
-            exit 1
-          fi
-          FAILED_TESTS=$(xcrun xcresulttool get test-results summary --path SecurityTestResults.xcresult 2>/dev/null | grep -c '"failed"' | tr -d '\n')
-          FAILED_TESTS=${FAILED_TESTS:-0}
-          if [ "$FAILED_TESTS" -gt 0 ]; then
-            echo "ERROR: $FAILED_TESTS security test(s) failed"
-            xcrun xcresulttool get test-results summary --path SecurityTestResults.xcresult
-            exit 1
-          fi
-          echo "xcodebuild exited non-zero but all security tests passed (simulator instability)"
-
-  security-tests-macos:
-    needs: rust-apple
-    runs-on: macos-15
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Select Xcode (latest)
-        id: setup-xcode
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: 'latest'
-
-      - name: 缓存 DerivedData 和 SPM
-        # 缓存 Xcode 构建产物和 Swift Package Manager 依赖，
-        # 基于锁文件生成 cache key，支持部分命中回退
-        uses: actions/cache@v5
-        with:
-          path: |
-            build/DerivedData
-            ~/Library/Developer/Xcode/DerivedData
-            ~/Library/Caches/org.swift.swiftpm
-            .build
-          key: ${{ runner.os }}-xcode-${{ steps.setup-xcode.outputs.xcode-version }}-macos-security-${{ hashFiles('Packages/AetherCore/Package.resolved', 'Aether.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
-          restore-keys: |
-            ${{ runner.os }}-xcode-macos-security-
-
-      - name: Download xcframework
-        uses: actions/download-artifact@v7
-        with:
-          name: aether-core-xcframework
-          path: Packages/AetherCore
-
-      - name: Build for Testing (macOS)
-        id: build_macos
-        run: |
-          xcodebuild build-for-testing \
-            -project Aether.xcodeproj \
-            -scheme Aether-macOS \
-            -destination 'platform=macOS,arch=arm64' \
-            -configuration Debug \
-            -derivedDataPath build \
-            CODE_SIGNING_ALLOWED=NO SWIFT_STRICT_CONCURRENCY=complete 2>&1 | tee /tmp/build_macos.log
-          status=${PIPESTATUS[0]}
-          if [ $status -ne 0 ]; then
-            echo "## Build for Testing macOS Failed (exit $status)" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            grep -E "error:|Undefined symbol|linker command failed|cannot find|Could not build|no such file" /tmp/build_macos.log | head -40 >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-          fi
-          exit $status
-
-      - name: Run macOS Security Tests
-        id: test
-        continue-on-error: true
-        run: |
-          xcodebuild test-without-building \
-            -project Aether.xcodeproj \
-            -scheme Aether-macOS \
-            -destination 'platform=macOS,arch=arm64' \
-            -configuration Debug \
-            -derivedDataPath build \
-            -only-testing:AetherTests/TerminalCommandToolTests \
-            -test-timeouts-enabled YES \
-            -default-test-execution-time-allowance 30 \
-            -maximum-test-execution-time-allowance 60 \
-            -resultBundlePath SecurityTestResultsMacOS.xcresult \
-            CODE_SIGNING_ALLOWED=NO SWIFT_STRICT_CONCURRENCY=complete
-
-      - name: Verify macOS Security Test Results
-        if: steps.test.outcome != 'success'
-        run: |
-          echo "xcodebuild test exited non-zero, verifying security test results..."
-          if [ ! -d "SecurityTestResultsMacOS.xcresult" ]; then
-            echo "ERROR: No test results generated (SecurityTestResultsMacOS.xcresult missing)"
-            exit 1
-          fi
-          FAILED_TESTS=$(xcrun xcresulttool get test-results summary --path SecurityTestResultsMacOS.xcresult 2>/dev/null | grep -c '"failed"' | tr -d '\n')
-          FAILED_TESTS=${FAILED_TESTS:-0}
-          if [ "$FAILED_TESTS" -gt 0 ]; then
-            echo "ERROR: $FAILED_TESTS macOS security test(s) failed"
-            xcrun xcresulttool get test-results summary --path SecurityTestResultsMacOS.xcresult
-            exit 1
-          fi
-          echo "xcodebuild exited non-zero but all macOS security tests passed (simulator instability)"
-
+  # 按测试类分片并行执行完整 macOS 套件。实测完整套件单次约 80 分钟，
+  # 2 片后单片约 40 分钟，显著缩短 PR 关键路径；覆盖率 XML 由 code-quality 合并。
+  # 按测试数分片后实测仍可能偏差（慢测试集中在同一片时单卡可达约 1 小时），
+  # timeout 放宽到 90min 留出余量，避免接近上限被取消。
   unit-tests-macos:
     needs: rust-apple
     runs-on: macos-15
-    # M-C13: macOS 单测规模与 iOS 相当（实测 ~57 分钟），但 CI runner 性能波动大。
-    #        原 60 分钟 margin 仅 3 分钟，实测偶发超时 cancelled（run 29783239627）。
-    #        90 分钟给足 buffer，避免性能波动导致误判失败；若持续接近 90 分钟需排查卡死。
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v5
@@ -696,9 +527,10 @@ jobs:
           fi
           exit $status
 
-      - name: Run Unit Tests (macOS)
-        id: test
-        continue-on-error: true
+      - name: Enumerate tests and build shard filter
+        env:
+          SHARD: ${{ matrix.shard }}
+          SHARD_COUNT: 2
         run: |
           xcodebuild test-without-building \
             -project Aether.xcodeproj \
@@ -707,6 +539,53 @@ jobs:
             -configuration Debug \
             -derivedDataPath build \
             -skip-testing:AetherUITests \
+            -enumerate-tests \
+            -test-enumeration-format json \
+            -test-enumeration-output-path /tmp/tests.json \
+            CODE_SIGNING_ALLOWED=NO SWIFT_STRICT_CONCURRENCY=complete
+          python3 - <<'PY' > /tmp/shard-args.txt
+          import json, os, sys
+          data = json.load(open("/tmp/tests.json"))
+          entries = []
+          for plan in data.get("values", []):
+              for target in plan.get("children", []):
+                  if target.get("name") != "AetherTests":
+                      continue
+                  for cls in target.get("children", []):
+                      tests = [t for t in cls.get("children", []) if t.get("kind") == "test"]
+                      if tests:
+                          entries.append((cls["name"], len(tests)))
+          # 按测试数从大到小贪心装箱到当前负载最小的分片，避免分片间耗时失衡
+          entries.sort(key=lambda item: (-item[1], item[0]))
+          shard = int(os.environ["SHARD"])
+          count = int(os.environ["SHARD_COUNT"])
+          loads = [0] * count
+          buckets = [[] for _ in range(count)]
+          for name, test_count in entries:
+              index = min(range(count), key=lambda i: (loads[i], i))
+              loads[index] += test_count
+              buckets[index].append(name)
+          for name in sorted(buckets[shard - 1]):
+              print(f"-only-testing:AetherTests/{name}")
+          print(f"# shard {shard}/{count}: {len(buckets[shard - 1])} classes, "
+                f"{loads[shard - 1]} tests (all shards: {loads})", file=sys.stderr)
+          PY
+          echo "macOS test shard ${SHARD}/${SHARD_COUNT}: $(wc -l < /tmp/shard-args.txt) classes"
+
+      - name: Run Unit Tests (macOS)
+        id: test
+        continue-on-error: true
+        run: |
+          ONLY_ARGS=()
+          while IFS= read -r arg; do ONLY_ARGS+=("$arg"); done < /tmp/shard-args.txt
+          xcodebuild test-without-building \
+            -project Aether.xcodeproj \
+            -scheme Aether-macOS \
+            -destination 'platform=macOS,arch=arm64' \
+            -configuration Debug \
+            -derivedDataPath build \
+            -skip-testing:AetherUITests \
+            "${ONLY_ARGS[@]}" \
             -test-timeouts-enabled YES \
             -default-test-execution-time-allowance 30 \
             -maximum-test-execution-time-allowance 60 \
@@ -749,7 +628,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: coverage-report-macos
+          name: coverage-report-macos-${{ matrix.shard }}
           path: coverage-report-macos/coverage.xml
           if-no-files-found: error
           retention-days: 7
@@ -808,9 +687,9 @@ jobs:
   # Note: xcrun xccov view --report 在 Xcode 26.3 上不可用（返回空），
   # coverage_pass 可能为空。仅在显式 coverage_pass=false 时阻塞。
   coverage-summary:
-    # 统合所有平台测试 job 的结果（iOS / macOS / Android / Windows / Rust / Security）
+    # 统合所有平台测试 job 的结果（iOS / macOS / Android / Windows / Rust）
     # 任一上游测试失败均会反映到此处，作为 PR 合并的总质量门
-    needs: [unit-tests, unit-tests-macos, ui-tests, android-build, windows-build, rust, security-tests, security-tests-macos]
+    needs: [unit-tests, unit-tests-macos, ui-tests, android-build, windows-build, rust]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -826,8 +705,6 @@ jobs:
           echo "android-build (test):    ${{ needs.android-build.result }}"
           echo "windows-build (test):    ${{ needs.windows-build.result }}"
           echo "rust (core test):         ${{ needs.rust.result }}"
-          echo "security-tests:          ${{ needs.security-tests.result }}"
-          echo "security-tests-macos:    ${{ needs.security-tests-macos.result }}"
           echo ""
           echo "=== Coverage Gate ==="
           echo "Coverage pass: '${{ needs.unit-tests.outputs.coverage_pass }}'"
@@ -858,7 +735,8 @@ jobs:
   code-quality:
     # 依赖 coverage-summary（即所有测试 job 完成）后再运行 SonarQube 分析
     needs: [unit-tests, unit-tests-macos, rust]
-    runs-on: macos-15
+    # 仅做覆盖率合并与 Sonar 扫描，不依赖 Xcode，放到 Linux runner 更快也更省
+    runs-on: ubuntu-latest
     if: always()
     permissions:
       contents: read
@@ -869,11 +747,6 @@ jobs:
         with:
           fetch-depth: 0  # Shallow clones should be disabled for SonarQube
 
-      - name: Select Xcode (latest)
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: 'latest'
-
       - name: Download iOS coverage report
         continue-on-error: true
         uses: actions/download-artifact@v7
@@ -882,10 +755,11 @@ jobs:
           path: coverage-ios
 
       - name: Download macOS coverage report
+        # 分片执行，每个分片上传独立的 coverage-report-macos-<shard>
         continue-on-error: true
         uses: actions/download-artifact@v7
         with:
-          name: coverage-report-macos
+          pattern: coverage-report-macos-*
           path: coverage-macos
 
       - name: Download Rust coverage report
@@ -906,13 +780,13 @@ jobs:
           path: coverage-sdk
 
       - name: Merge coverage reports
-        # 合并 iOS + macOS (Swift, lineToCover 格式) + Rust + AetherSDK (cobertura <line hits> 格式)
-        # 调用 scripts/merge-coverage.py 完成四源覆盖率合并（union 策略）
+        # 合并 iOS + macOS 分片（Swift, lineToCover 格式）+ Rust + AetherSDK（cobertura <line hits>）
+        # merge-coverage.py 支持传入任意数量的 macOS 分片文件（union 策略）
         run: |
           mkdir -p coverage-report
           python3 scripts/merge-coverage.py \
             coverage-ios/coverage.xml \
-            coverage-macos/coverage.xml \
+            coverage-macos/*/coverage.xml \
             coverage-rust/coverage.xml \
             coverage-sdk/coverage.xml \
             coverage-report/coverage.xml
@@ -931,6 +805,13 @@ jobs:
             echo "Merged coverage.xml verified successfully"
           fi
 
+      - name: Setup Java 21 (SonarScanner)
+        # SonarScanner CLI 8.x 要求 Java 21+，Java 17 会在启动时直接报错退出
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v8
         env:
@@ -944,7 +825,9 @@ jobs:
           # qualitygate.wait 不在 args 中覆盖，使用 sonar-project.properties 中的设置（false）。
           # 原因：iOS xccov 在 Xcode 26.3 上不稳定，导致 new_coverage 指标波动；
           # 待 xccov 稳定或迁移到 xcresulttool 后可在 properties 中恢复为 true。
+          # 用上一步装好的 JDK 21（skipJreProvisioning），避免扫描器再下载 JRE
           args: >
+            -Dsonar.scanner.skipJreProvisioning=true
             ${{ github.event_name == 'pull_request' && format('-Dsonar.pullrequest.key={0} -Dsonar.pullrequest.branch={1} -Dsonar.pullrequest.base={2} -Dsonar.pullrequest.provider=github -Dsonar.pullrequest.github.repository={3}', github.event.pull_request.number, github.head_ref, github.base_ref, github.repository) || '' }}
 
       - name: Post SonarCloud report to PR
@@ -1029,17 +912,19 @@ jobs:
           find downloaded-so -name "libaether_core_ffi.so" -path "*x86_64*" -exec cp {} android/app/src/main/jniLibs/x86_64/ \;
           ls -R android/app/src/main/jniLibs/
 
-      - name: Generate Gradle Wrapper
+      - name: Build Debug APK and run unit tests
+        # wrapper 已随仓库提交，无需再用系统 gradle 重新生成；
+        # 合并为一次 Gradle 调用，避免重复配置阶段。
+        # Runner 访问 services.gradle.org 偶发很慢：先带重试地预热 wrapper，
+        # 避免发行包下载超时把整个 job 直接打死。
         working-directory: android
-        run: gradle wrapper --gradle-version 8.10
-
-      - name: Build Debug APK
-        working-directory: android
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
-
-      - name: Run unit tests
-        working-directory: android
-        run: ./gradlew testDebugUnitTest --no-daemon --stacktrace
+        run: |
+          for i in 1 2 3; do
+            ./gradlew --version && break
+            echo "Gradle 发行包下载失败，第 $i 次重试..."
+            sleep 10
+          done
+          ./gradlew assembleDebug testDebugUnitTest --no-daemon --stacktrace
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v7
@@ -1050,8 +935,8 @@ jobs:
           retention-days: 7
 
   # Windows 客户端构建验证
+  # 自带 Rust 工具链构建 DLL，不依赖 rust job，可立即并行启动。
   windows-build:
-    needs: rust
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
@@ -1088,12 +973,12 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: Download Rust DLL into Native/
-        # 下载刚上传的 DLL 到 windows/Aether.Windows/Native/，供 csproj 引用并复制到输出目录
-        uses: actions/download-artifact@v7
-        with:
-          name: aether-core-windows-dll
-          path: windows/Aether.Windows/Native
+      - name: Stage Rust DLL into Native/
+        # 同一 job 内直接复制，省去上传后再下载 artifact 的往返
+        shell: bash
+        run: |
+          mkdir -p windows/Aether.Windows/Native
+          cp rust/target/x86_64-pc-windows-msvc/release/aether_core_ffi.dll windows/Aether.Windows/Native/
 
       - name: Restore dependencies
         working-directory: windows/Aether.Windows
@@ -1233,7 +1118,7 @@ jobs:
           retention-days: 7
 
   # Apple xcframework 构建：编译 Rust 静态库 → 打包为 xcframework。
-  # 所有 Swift 测试 job 依赖此 job 的 artifact（unit-tests/ui-tests/security-tests/-macos）。
+  # 所有 Swift 测试 job 依赖此 job 的 artifact（unit-tests/ui-tests/unit-tests-macos）。
   # 构建 iOS device + iOS Simulator + macOS 三个 slice（macos-15 runner 为 Apple Silicon）。
   # AetherTests 的 SDKROOT=iphoneos，macOS scheme 构建时 implicit dependency 会拉入
   # Aether-iOS target（为 iOS device 构建），xcframework 必须含 iOS device slice。

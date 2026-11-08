@@ -1,7 +1,7 @@
 # Aether（以太）
 
-<!-- doc-stats: i18n=888 tools=29 tests=3502 -->
-<!-- doc-stats-total: iOS/macOS 3502 + Windows 72 + Android 95 = 3669 -->
+<!-- doc-stats: i18n=888 tools=29 tests=3541 -->
+<!-- doc-stats-total: iOS/macOS 3541 + Windows 102 + Android 105 = 3748 -->
 
 > 一个跨平台 AI 对话助手，覆盖 iOS / iPad / macOS / Windows / Android 五端，采用**液态玻璃 + 深空主题**视觉语言。基于多 LLM Provider（DeepSeek / Qwen / BFF 代理 / 端侧 MLX），覆盖流式对话、RAG 知识库、ReAct 工具调用、语义缓存、端侧离线推理、语音合成与识别、健康洞察、灵动岛 Live Activity、Watch App、桌面 Widget、DeepLink 等能力。底层引入 Rust 核心引擎（aether-core-ffi，xcframework / DLL / JNI 多形态分发），为 Apple / Windows / Android 平台提供统一的跨平台高性能算法（SHA-256 哈希、Token 计数、文档分块、向量相似度、SSE 解析、WASM 沙箱、Candle 推理、令牌桶限流、敏感信息脱敏）。支持 8 种语言（简中 / 繁中 / 英 / 日 / 韩 / 法 / 德 / 西）。
 
@@ -139,14 +139,14 @@ Aether/                     # 主 App（iOS / iPad / macOS）
 └── Views/                  # SwiftUI 视图（Chat / Components / Conversation / OnDevice / RAG / Settings）
 AetherWatch/                # watchOS App（TabView：快速对话 / 健康洞察 / 设置）
 AetherWidgets/              # Widget Extension（QuickChat / HealthInsight / RecentConversations）
-windows/                    # Windows 端（WPF .NET 8，13 个 .cs 文件 + 72 测试用例）
+windows/                    # Windows 端（WPF .NET 8，13 个 .cs 文件 + 102 测试用例）
 ├── Aether.Windows/         # 主项目（MVVM：ViewModels / Views / Services / Native / Design / Converters）
 │   ├── Native/             # Rust FFI 桥接（AetherNativeBridge.cs，P/Invoke aether_core_ffi.dll）
 │   ├── Services/           # BffConfigStore（DPAPI 加密）/ MarkdownRenderer（Markdig）/ LanguageService（8 .resx）
 │   └── ViewModels/         # ChatViewModel / ConversationListViewModel / SettingsViewModel
-├── Aether.Windows.Tests/   # 单元测试（xUnit，72 用例）
+├── Aether.Windows.Tests/   # 单元测试（xUnit，102 用例）
 └── README.md               # Windows 构建说明
-android/                    # Android 端（Kotlin + Jetpack Compose，22 个 .kt 文件 + 95 测试用例）
+android/                    # Android 端（Kotlin + Jetpack Compose，22 个 .kt 文件 + 105 测试用例）
 ├── app/src/main/java/com/aether/
 │   ├── rust/               # Rust JNI 桥接（SseBridge / VectorMath / Redact，含 *Safe 回退）
 │   ├── data/               # data 层（db / repository / api / model）
@@ -154,9 +154,9 @@ android/                    # Android 端（Kotlin + Jetpack Compose，22 个 .k
 │   │   └── api/            # BFF 网关（BffConfigStore / ChatStreamClient / AetherApi）
 │   ├── ui/                 # UI 层（chat / conversation / rag / health / settings / theme / navigation）
 │   └── app/                # MainActivity.kt 入口
-└── app/src/test/           # 单元测试（JUnit / MockK，95 用例）
+└── app/src/test/           # 单元测试（JUnit / MockK，105 用例）
 CloudflareWorkers/          # BFF 代理层（worker.js + wrangler.toml）
-AetherTests/                # 单元测试（iOS / macOS，199 文件 / 3502 用例，覆盖 Multimodal / Tools / Services 全模块）
+AetherTests/                # 单元测试（iOS / macOS，203 文件 / 3541 用例，覆盖 Multimodal / Tools / Services 全模块）
 AetherUITests/              # UI 测试（7 文件 / 30 用例）
 ```
 

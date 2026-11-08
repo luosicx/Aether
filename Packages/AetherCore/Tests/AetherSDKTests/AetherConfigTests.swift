@@ -61,6 +61,20 @@ final class AetherConfigTests: XCTestCase {
         XCTAssertNil(reason, "onDevice 应允许空 apiKey")
     }
 
+    func testValidateBFFRequiresBaseURL() {
+        let config = AetherConfig(provider: .bff, apiKey: "bff-token")
+        XCTAssertEqual(config.validate(), "BFF 模式必须提供 baseURL（BFF 网关地址）")
+    }
+
+    func testValidateBFFWithGatewayURLPasses() {
+        let config = AetherConfig(
+            provider: .bff,
+            apiKey: "bff-token",
+            baseURL: URL(string: "https://bff.example.com")
+        )
+        XCTAssertNil(config.validate())
+    }
+
     func testValidateInvalidSimilarityThreshold() {
         let config = AetherConfig(
             provider: .deepSeek,

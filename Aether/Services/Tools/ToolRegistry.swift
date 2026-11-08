@@ -198,9 +198,17 @@ final class ToolRegistry {
 
     /// 指定工具是否需要显式授权（敏感工具）。
     /// 支持父工具名匹配其敏感子操作（如 `control_safari` 匹配 `control_safari.run_js`）。
+    /// 远程 MCP 工具一律需要授权：Server 提供的工具定义不可信，且调用会越过本机边界。
     func requiresAuthorization(name: String) -> Bool {
+        if isRemoteTool(name: name) { return true }
         if sensitiveTools.contains(name) { return true }
         return sensitiveTools.contains { $0.hasPrefix("\(name).") }
+    }
+
+    /// 是否为远程 MCP 工具（由 MCPToolAdapter 注册）。
+    /// 远程工具定义可被 Server 随时替换，因此只提供会话级授权，不提供持久「始终允许」。
+    func isRemoteTool(name: String) -> Bool {
+        tools[name] is MCPToolAdapter
     }
 
     // MARK: - Private Helpers

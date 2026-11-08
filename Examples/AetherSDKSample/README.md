@@ -44,7 +44,8 @@ All samples use `AetherConfig` to configure the SDK:
 ```swift
 let config = AetherConfig(
     provider: .deepSeek,        // or .qwen / .bff / .onDevice
-    apiKey: "sk-your-api-key",  // DeepSeek API key
+    apiKey: "sk-your-api-key",  // DeepSeek API key (BFF user token when provider is .bff)
+    baseURL: nil,               // Required BFF gateway URL when provider is .bff
     cache: .default,            // Enable semantic cache
     auth: .apiKey,              // API Key authentication
     retryPolicy: .default       // 3 attempts, 1s/2s/4s backoff

@@ -72,14 +72,18 @@ public class AetherApiClient
     }
 
     // 会话
-    public async Task<List<Conversation>?> GetConversationsAsync() =>
-        await _http.GetFromJsonAsync<List<Conversation>>($"{_baseUrl}/conversations");
+    public async Task<List<Conversation>?> GetConversationsAsync()
+    {
+        var envelope = await _http.GetFromJsonAsync<ConversationsEnvelope>($"{_baseUrl}/conversations");
+        return envelope?.Conversations.Select(c => c.ToModel()).ToList();
+    }
 
     public async Task<Conversation?> CreateConversationAsync(string title)
     {
         var response = await _http.PostAsJsonAsync($"{_baseUrl}/conversations",
             new { title });
-        return await response.Content.ReadFromJsonAsync<Conversation>();
+        var envelope = await response.Content.ReadFromJsonAsync<ConversationEnvelope>();
+        return envelope?.Conversation?.ToModel();
     }
 
     public async Task DeleteConversationAsync(string id) =>
@@ -88,11 +92,21 @@ public class AetherApiClient
     /// <summary>更新会话（用于置顶 / 取消置顶等）。</summary>
     public async Task UpdateConversationAsync(Conversation conv)
     {
-        await _http.PutAsJsonAsync($"{_baseUrl}/conversations/{conv.Id}", conv);
+        using var request = new HttpRequestMessage(
+            HttpMethod.Patch, $"{_baseUrl}/conversations/{conv.Id}")
+        {
+            Content = JsonContent.Create(new { title = conv.Title, isPinned = conv.IsPinned })
+        };
+        using var response = await _http.SendAsync(request);
+        response.EnsureSuccessStatusCode();
     }
 
-    public async Task<List<ChatMessage>?> GetMessagesAsync(string conversationId) =>
-        await _http.GetFromJsonAsync<List<ChatMessage>>($"{_baseUrl}/conversations/{conversationId}/messages");
+    public async Task<List<ChatMessage>?> GetMessagesAsync(string conversationId)
+    {
+        var envelope = await _http.GetFromJsonAsync<MessagesEnvelope>(
+            $"{_baseUrl}/conversations/{conversationId}/messages");
+        return envelope?.Messages.Select(m => m.ToModel()).ToList();
+    }
 
     // SSE 流式聊天
     public async IAsyncEnumerable<string> StreamChatAsync(ChatRequest request,
@@ -157,26 +171,33 @@ public class AetherApiClient
 
     public async Task SubmitFeedbackAsync(string messageId, bool? isPositive, List<string>? citations = null)
     {
+        // 服务端契约：feedback 为 1 / -1 / 0（0 表示取消反馈）
+        var feedback = isPositive switch { true => 1, false => -1, _ => 0 };
         await _http.PostAsJsonAsync($"{_baseUrl}/messages/{messageId}/feedback",
-            new { isPositive, citations });
+            new { feedback });
     }
 
     // 记忆
-    public async Task<List<Memory>?> ListMemoryAsync() =>
-        await _http.GetFromJsonAsync<List<Memory>>($"{_baseUrl}/memory");
+    public async Task<List<Memory>?> ListMemoryAsync()
+    {
+        var envelope = await _http.GetFromJsonAsync<MemoriesEnvelope>($"{_baseUrl}/memory");
+        return envelope?.Memories.Select(m => m.ToModel()).ToList();
+    }
 
     public async Task<Memory?> CreateMemoryAsync(string content, string category = "context", double importance = 0.5)
     {
         var response = await _http.PostAsJsonAsync($"{_baseUrl}/memory",
             new { content, category, importance });
-        return await response.Content.ReadFromJsonAsync<Memory>();
+        var envelope = await response.Content.ReadFromJsonAsync<MemoryEnvelope>();
+        return envelope?.Memory?.ToModel();
     }
 
     public async Task<List<Memory>?> SearchMemoryAsync(string query, int limit = 5)
     {
         var response = await _http.PostAsJsonAsync($"{_baseUrl}/memory/search",
             new { query, limit });
-        return await response.Content.ReadFromJsonAsync<List<Memory>>();
+        var envelope = await response.Content.ReadFromJsonAsync<MemoriesEnvelope>();
+        return envelope?.Memories.Select(m => m.ToModel()).ToList();
     }
 
     public async Task DeleteMemoryAsync(string id) =>

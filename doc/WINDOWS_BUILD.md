@@ -199,7 +199,7 @@ pwsh scripts/build-windows.ps1 -Command publish -Configuration Release -Runtime 
 - **消息气泡左右区分 + TypingIndicator**：用户消息右对齐 AetherPurple，AI 消息左对齐 LiquidGlass；流式响应时显示三圆点闪烁动画。
 - **Markdown 渲染（Markdig 0.37.0）**：AI 消息用 `RichTextBox` + `FlowDocument` 渲染（支持标题 / 代码块 / 表格 / 任务列表 / 链接 / 加粗斜体）。
 - **i18n 国际化（8 种语言 .resx）**：8 种语言 `.resx` 文件（zh-Hans / en / ja / ko / fr / de / es / zh-Hant），`LanguageService` 管理语言切换。
-- **已集成 Rust DLL（SSE 解析 + 向量数学 + 脱敏）**：通过 `windows/Aether.Windows/Native/` 目录引用 `aether_core_ffi.dll`，CI 在 `windows-build` job 中自动构建并下载到该目录；`AetherNativeBridge` 提供 P/Invoke 桥接（DLL 不存在时安全降级），`AetherApiClient.UseRustSse` 可切换 SSE 解析路径。
+- **已集成 Rust DLL（SSE 解析 + 向量数学 + 脱敏）**：通过 `windows/Aether.Windows/Native/` 目录引用 `aether_core_ffi.dll`，CI 在 `windows-build` job 中自动构建并复制到该目录；`AetherNativeBridge` 提供 P/Invoke 桥接（DLL 不存在时安全降级），`AetherApiClient.UseRustSse` 可切换 SSE 解析路径。
 - **流式聊天（SSE）**：`AetherApiClient` 通过 SSE 接收 BFF 流式响应，支持 Rust DLL 与纯 C# 双路径。
 - **已新增 Aether.Windows.Tests xUnit 项目**：`windows/Aether.Windows.Tests/` 提供 7 个测试文件、72 个测试用例，CI 在 `windows-build` job 中执行 `dotnet test`，`scripts/build-windows.ps1 -Command test` 同样会扫描并运行测试项目。
 
@@ -216,7 +216,7 @@ pwsh scripts/build-windows.ps1 -Command publish -Configuration Release -Runtime 
 | TypingIndicator | ✅ | 流式响应三圆点闪烁 |
 | 流式聊天（SSE） | ✅ | Rust DLL + 纯 C# 双路径 |
 | Rust FFI 集成 | ✅ | SSE 解析 + 向量数学 + 脱敏 |
-| 单元测试 | ✅ | Aether.Windows.Tests xUnit，7 文件 72 用例 |
+| 单元测试 | ✅ | Aether.Windows.Tests xUnit，7 文件 102 用例 |
 
 ---
 
@@ -235,7 +235,7 @@ pwsh scripts/build-windows.ps1 -Command publish -Configuration Release -Runtime 
 
 ## 9. CI 集成
 
-CI 工作流定义于 `.github/workflows/ci.yml` 的 `windows-build` job（第 1051-1114 行），运行在 `windows-latest` runner，超时 20 分钟，依赖 `rust` job。
+CI 工作流定义于 `.github/workflows/ci.yml` 的 `windows-build` job，运行在 `windows-latest` runner，超时 20 分钟。该 job 自带 Rust 工具链构建 DLL，不依赖 `rust` job，可与其他 job 并行。
 
 关键步骤：
 

@@ -20,8 +20,9 @@ info:
     - `data: [DONE]\n\n`
 
     ## 向后兼容
-    - POST 到任意未匹配路径（如 `/v1/chat/completions`、`/v1/embeddings`）走原 LLM 透传代理
-      逻辑，按 `X-Provider` 路由到 DeepSeek / Qwen，注入上游 Authorization。
+    - POST 到 `/v1/chat/completions` 或 `/v1/embeddings` 走 LLM 透传代理，按 `X-Provider` 路由到
+      DeepSeek / Qwen 并注入上游 Authorization；校验 token 过期时间、model 白名单与 1 MiB 请求体上限。
+      其余路径返回 404，避免 BFF 成为开放代理。
 
 servers:
   - url: https://aether-bff.<your-subdomain>.workers.dev

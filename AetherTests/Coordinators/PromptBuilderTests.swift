@@ -213,4 +213,65 @@ final class PromptBuilderTests: XCTestCase {
         let limited = builder.limitTokens(messages, max: 1)
         XCTAssertTrue(limited.isEmpty, "单条消息超过 limit 时应返回空数组")
     }
+
+    // MARK: - limitTokens 消息对完整性（P1-8 回归）
+
+    /// 构造带 tool_calls 的 assistant 消息
+    private func toolCallMessage(_ content: String, id: String = "call-1") -> APIMessage {
+        APIMessage(role: "assistant", content: content, toolCalls: [
+            ToolCallParam(id: id, type: "function", function: FunctionCall(name: "calculate", arguments: "{}"))
+        ])
+    }
+
+    /// 工具轮次整体超限时必须整组丢弃，不能只保留末尾的 tool 结果（会形成孤立 tool 消息）
+    func testLimitTokensDropsWholeToolGroupInsteadOfLeavingOrphanToolMessage() {
+        let builder = PromptBuilder()
+        // user(2) + assistant tool_calls(1) + tool(2) + tool(2) = 7 tokens；limit=4
+        // 旧实现会保留两条 tool（4 tokens），丢掉 assistant(tool_calls) → API 400
+        let messages = [
+            APIMessage(role: "user", content: "a b"),
+            toolCallMessage("x"),
+            APIMessage(role: "tool", content: "i j", toolCallId: "call-1", toolName: "calculate"),
+            APIMessage(role: "tool", content: "k l", toolCallId: "call-1", toolName: "calculate")
+        ]
+        let limited = builder.limitTokens(messages, max: 4)
+        XCTAssertTrue(limited.isEmpty,
+                      "工具轮次整体超限时应整组丢弃，不能留下孤立 tool 消息")
+    }
+
+    /// 工具轮次可容纳时应完整保留 assistant(tool_calls) + 全部 tool 结果
+    func testLimitTokensKeepsToolCallAndResultsTogether() {
+        let builder = PromptBuilder()
+        // 轮次 1: user(2) + assistant(2) = 4；轮次 2: user(2) + assistant tool_calls(2) + tool(2) + tool(2) = 8
+        let messages = [
+            APIMessage(role: "user", content: "a b"),
+            APIMessage(role: "assistant", content: "c d"),
+            APIMessage(role: "user", content: "e f"),
+            toolCallMessage("g h"),
+            APIMessage(role: "tool", content: "i j", toolCallId: "call-1", toolName: "calculate"),
+            APIMessage(role: "tool", content: "k l", toolCallId: "call-1", toolName: "calculate")
+        ]
+        let limited = builder.limitTokens(messages, max: 10)
+        XCTAssertEqual(limited.map(\.role), ["user", "assistant", "tool", "tool"],
+                       "应保留完整的第二轮：user + assistant(tool_calls) + 两条 tool 结果")
+        XCTAssertEqual(limited.first?.content, "e f", "应丢弃更早的第一轮")
+        XCTAssertEqual(limited[1].toolCalls?.first?.id, "call-1", "assistant 应保留 tool_calls")
+        XCTAssertTrue(limited.dropFirst(2).allSatisfy { $0.toolCallId == "call-1" },
+                      "tool 结果应与 assistant 的 tool_calls 匹配")
+    }
+
+    /// user/assistant 成对保留：预算只够 assistant 回复时，应整组丢弃而不是留下孤立 assistant
+    func testLimitTokensKeepsUserAssistantPairAsUnit() {
+        let builder = PromptBuilder()
+        // 每轮 user(2) + assistant(2) = 4 tokens；limit=3 无法容纳任何完整轮次
+        let messages = [
+            APIMessage(role: "user", content: "a b"),
+            APIMessage(role: "assistant", content: "c d"),
+            APIMessage(role: "user", content: "e f"),
+            APIMessage(role: "assistant", content: "g h")
+        ]
+        let limited = builder.limitTokens(messages, max: 3)
+        XCTAssertTrue(limited.isEmpty,
+                      "budget 不足一轮时应整组丢弃，不能留下孤立 assistant 回复")
+    }
 }

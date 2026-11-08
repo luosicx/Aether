@@ -10,7 +10,7 @@ import os
 /// - 编码 toolCalls 持久化 assistant 消息（含 toolCallData）
 /// - 逐个执行工具（启用检查 / 授权确认 / 超时保护 / 审计日志 / 成功通知 / 失败埋点）
 /// - 追加 tool 结果消息（成功 / 失败均构造 ChatMessage(role: "tool", ...)）
-/// - 重置下一轮 apiMessages 为最新会话消息序列
+/// - 在原始 apiMessages 上追加本轮 assistant/tool 消息（保留 system / RAG / 记忆上下文）
 ///
 /// 设计要点：
 /// - 类型迁移：`ToolStep` / `ToolStepStatus` 从 ChatViewModel 迁移至本类，
@@ -97,20 +97,26 @@ final class ToolExecutionCoordinator: Coordinator {
 
     /// SubTask 6.6 → Task 10: ReAct 工具调用阶段——编码 toolCalls 持久化助手消息（含 toolCallData）、
     /// 逐个执行工具（启用检查 / 授权确认 / 超时保护 / 审计日志 / 成功通知 / 失败埋点）、
-    /// 追加 tool 结果消息、重置 apiMessages 为最新会话消息序列供下一轮流式使用。
+    /// 追加 tool 结果消息，并在原始 apiMessages 上追加本轮 assistant/tool 消息。
     ///
     /// - Parameters:
     ///   - toolCalls: 本轮 LLM 解析出的工具调用列表
     ///   - lastChunkContent: 本轮流式输出累积的 chunk 文本（用作 assistant 消息内容与 thought）
     ///   - loopCount: 当前 ReAct 轮次（从 1 开始，用于 ToolStep.loopIndex）
+    ///   - apiMessages: 本轮请求使用的完整消息序列（含 system / RAG / 记忆 / 历史）
     ///   - conversation: 当前会话（用于追加 assistant / tool 消息）
     ///   - modelContext: SwiftData 上下文（用于持久化）
-    /// - Returns: 重置后的 apiMessages 数组（供下一轮 LLM 请求使用）
+    /// - Returns: 在 `apiMessages` 基础上追加 assistant(tool_calls) 与 tool 结果后的消息序列
+    ///
+    /// 注意：不能用 `conversation.messages` 重建消息序列——那会丢掉 system prompt、
+    /// RAG 文档片段与记忆上下文，导致多轮工具调用后人格与安全约束失效。
     func handle(toolCalls: [AccumulatedToolCall],
                 lastChunkContent: String,
                 loopCount: Int,
+                apiMessages: [APIMessage],
                 conversation: Conversation,
                 modelContext: ModelContext) async -> [APIMessage] {
+        var nextMessages = apiMessages
         let chunkContent = lastChunkContent
         let toolCallsData: Data? = {
             struct StoredToolCall: Codable {
@@ -133,6 +139,8 @@ final class ToolExecutionCoordinator: Coordinator {
         conversation.messages.append(assistantMsg)
         onMessageAppend(assistantMsg)
         do { try modelContext.save() } catch { Logger.chat.error("工具调用助手消息保存失败: \(error.localizedDescription, privacy: .public)") }
+        // 在原始 apiMessages 上追加 assistant(tool_calls)，保留 system / RAG / 记忆上下文
+        nextMessages.append(assistantMsg.toAPIMessage())
         // Day 8: thought 为 chunkContent（非空时显示思维链）
         let thought = chunkContent.isEmpty ? nil : chunkContent
         for tc in toolCalls {
@@ -162,7 +170,10 @@ final class ToolExecutionCoordinator: Coordinator {
                 }
                 if ToolRegistry.shared.requiresAuthorization(name: tc.name) {
                     let authResult: ToolAuthorizationResult
-                    if ToolRegistry.shared.defaultDisabledTools.contains(tc.name) {
+                    // 远程 MCP 工具与高危本地工具一样只提供会话级确认：
+                    // 远端可在重连后替换工具实现，不能持久「始终允许」。
+                    if ToolRegistry.shared.isRemoteTool(name: tc.name)
+                        || ToolRegistry.shared.defaultDisabledTools.contains(tc.name) {
                         let details = "工具：\(tc.name)\n参数：\(tc.arguments)"
                         authResult = await ToolAuthorization.shared.presentConfirmation(toolName: tc.name, details: details)
                     } else {
@@ -207,6 +218,7 @@ final class ToolExecutionCoordinator: Coordinator {
                 toolMsg.conversation = conversation
                 conversation.messages.append(toolMsg)
                 onMessageAppend(toolMsg)
+                nextMessages.append(toolMsg.toAPIMessage())
                 do { try modelContext.save() } catch { Logger.chat.error("工具结果消息保存失败: \(error.localizedDescription, privacy: .public)") }
             } catch {
                 // Task 7: 工具调用失败/未授权也记录审计日志
@@ -226,11 +238,12 @@ final class ToolExecutionCoordinator: Coordinator {
                 toolMsg.conversation = conversation
                 conversation.messages.append(toolMsg)
                 onMessageAppend(toolMsg)
+                nextMessages.append(toolMsg.toAPIMessage())
                 do { try modelContext.save() } catch { Logger.chat.error("工具失败消息保存失败: \(error.localizedDescription, privacy: .public)") }
                 onErrorMessageChange(String(format: NSLocalizedString("工具 %@ 执行失败: %@", comment: ""), tc.name, errMsg))
             }
         }
-        return conversation.messages.map { $0.toAPIMessage() }
+        return nextMessages
     }
 
     // MARK: - 私有辅助

@@ -98,3 +98,10 @@ public final class SSEParser: @unchecked Sendable {
         return ParsedChunk(content: content, toolCalls: toolCalls)
     }
 }
+
+/// 判断流式请求的错误是否由任务取消引发。取消属于正常控制流，不应作为网络错误上报给 UI。
+func isRequestCancellation(_ error: Error) -> Bool {
+    if error is CancellationError { return true }
+    if let urlError = error as? URLError, urlError.code == .cancelled { return true }
+    return false
+}

@@ -239,7 +239,7 @@
 
 ### Windows 单元测试（v1.5）
 
-- [ ] Windows 测试用例数 = 72（72 pass / 0 skip / 0 failures）
+- [ ] Windows 测试用例数 = 102（102 pass / 0 skip / 0 failures）
 - [ ] Windows 测试文件数 = 7（xUnit + WpfFact）
 - [ ] 验证命令：
   ```bash
@@ -250,7 +250,7 @@
 
 ### Android 单元测试（v1.5）
 
-- [ ] Android 测试用例数 = 95（95 pass / 0 skip / 0 failures）
+- [ ] Android 测试用例数 = 105（105 pass / 0 skip / 0 failures）
 - [ ] Android 测试文件数 = 12（JUnit + Robolectric）
 - [ ] 验证命令：
   ```bash
@@ -262,8 +262,8 @@
 ### 跨平台测试汇总
 
 - [ ] iOS / macOS Swift UT = 3502（覆盖率 84.25%）
-- [ ] Windows xUnit UT = 72
-- [ ] Android JUnit UT = 95
+- [ ] Windows xUnit UT = 102
+- [ ] Android JUnit UT = 105
 - [ ] iOS UIT = 30
 - [ ] 总 Coverage = 84.25%（iOS Swift + Rust core，SonarCloud 度量）
 

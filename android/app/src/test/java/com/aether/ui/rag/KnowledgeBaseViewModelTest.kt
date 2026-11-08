@@ -17,8 +17,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
-import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.json.Json
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -92,8 +90,21 @@ class KnowledgeBaseViewModelTest {
         return AetherApi(client, BffConfig(baseUrl = "http://test", userToken = "tok"))
     }
 
+    /** 按 BFF 契约（snake_case）序列化检索结果，供 MockEngine 返回。 */
     private fun jsonChunks(chunks: List<DocumentChunk>): String =
-        Json.encodeToString(ListSerializer(DocumentChunk.serializer()), chunks)
+        """{"chunks":[${chunks.joinToString(",") { chunkJson(it) }}]}"""
+
+    private fun chunkJson(chunk: DocumentChunk): String = """
+        {
+          "id": "${chunk.id}",
+          "document_id": ${chunk.documentId?.let { "\"$it\"" } ?: "null"},
+          "content": "${chunk.content}",
+          "document_title": "${chunk.source}",
+          "chunk_index": ${chunk.chunkIndex},
+          "weight": ${chunk.weight},
+          "created_at": ${chunk.createdAt}
+        }
+    """.trimIndent()
 
     /**
      * 等待 viewModelScope 中的异步操作完成。

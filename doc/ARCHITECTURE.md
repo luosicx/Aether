@@ -549,7 +549,7 @@ flowchart LR
 
 | 方法签名 | 返回值 | 备注 |
 |---------|--------|------|
-| `init(primary:fallback:primaryProvider:fallbackProvider:)` | `FallbackLLMProvider` | 包装主备 provider |
+| `init(primary:fallback:primaryProvider:fallbackProvider:fallbackApiKey:)` | `FallbackLLMProvider` | 包装主备 provider；fallback 使用独立 API Key，避免跨供应商复用主 Key 导致 401 |
 | `chat(messages:config:apiKey:)` | `AsyncStream<String>` | 主 provider 未产出则降级 |
 | `chat(messages:config:tools:apiKey:)` | `AsyncStream<ParsedChunk>` | 降级逻辑同纯文本路径 |
 | `embed(texts:apiKey:)` | `[[Float]]`（async throws） | 不降级，直接调主 provider |
@@ -764,9 +764,9 @@ P2-6 重构将 ChatViewModel 中职责清晰的子模块抽取为 10 个 Coordin
 | `HealthContextInjector` | `Aether/Coordinators/HealthContextInjector.swift` | iOS HealthKit 上下文注入：构建最近 24h 健康摘要片段（睡眠 / 心率 / 步数），追加到 systemPrompt 末尾；未授权 / 未启用 / 服务为 nil / fetch 抛错时返回空字符串优雅降级 | `HealthKitService`（通过闭包读取，nil 时降级为空字符串） | `@MainActor`，整个类型 `#if os(iOS)` 包裹 |
 | `NetworkFallbackCoordinator` | `Aether/Coordinators/NetworkFallbackCoordinator.swift` | 网络监听（订阅 `NetworkMonitor.statusStream`，断网切端侧 / 联网切回）+ 端侧 ↔ 云端 provider 切换（`switchToOnDevice` / `switchToOriginalProvider`）+ Provider 工厂（BFF / Fallback / 直连三种路径）+ SmartRouter 模型名映射（`mapModelName`） | `NetworkMonitor.shared` / `ModelProviderFactory` / `FallbackLLMProvider` / `BFFProxyClient` / `DeepSeekClient` | `@MainActor` |
 | `RetrievalCoordinator` | `Aether/Coordinators/RetrievalCoordinator.swift` | RAG 检索（`handleRAGRetrieving`）+ 语义缓存读写（`checkCache` / `writeCache`，仅非工具模式）+ embedding 降级（DeepSeek 不支持 embedding 时设置错误并清空 citations）+ `ragService` / `ragEmbeddingProvider` 按 `selectedProvider` 懒加载缓存（provider 变化时自动失效重建） | `RAGService` / `SemanticCache`（构造器注入）/ `EmbeddingService` / `KeychainManager.shared` / `DeepSeekClient`（兜底） | `@MainActor` |
-| `PromptBuilder` | `Aether/Coordinators/PromptBuilder.swift` | systemPrompt 构建（base + 【用户偏好】 + 【AI人设】）+ token 截断（`limitTokens`，从尾部累加保留最近消息） | 纯值类型（struct），无 Service 依赖 | 纯值类型（struct），无并发隔离标注（纯函数式逻辑） |
+| `PromptBuilder` | `Aether/Coordinators/PromptBuilder.swift` | systemPrompt 构建（base + 【用户偏好】 + 【AI人设】）+ token 截断（`limitTokens`，按完整对话轮次分组，从尾部整组保留，避免拆散 assistant(tool_calls) 与 tool 结果） | 纯值类型（struct），无 Service 依赖 | 纯值类型（struct），无并发隔离标注（纯函数式逻辑） |
 | `InjectionGuard` | `Aether/Coordinators/InjectionGuard.swift` | 提示注入检测弹窗（`detect` 调用 `PromptInjectionDetector.isSuspicious`）+ 决策回调（`setDecisionHandler` / `proceed` / `cancel` 三态机，包装闭包路由到 proceed/cancel） | `PromptInjectionDetector`（静态调用） | `@MainActor` |
-| `ToolExecutionCoordinator` | `Aether/Coordinators/ToolExecutionCoordinator.swift` | ReAct 工具执行循环：编码 toolCalls 持久化 assistant 消息（含 toolCallData）、逐个执行工具（启用检查 / 授权确认 / 超时保护 `withThrowingTaskGroup` / 审计日志 / 成功通知 / 失败埋点）、追加 tool 结果消息、重置下一轮 apiMessages；`ToolStep` / `ToolStepStatus` 类型迁移至此，ChatViewModel 通过 typealias 兼容 | `ToolRegistry.shared` / `ToolAuthorization.shared` / `ToolAuditLogger.shared` / `NotificationService.shared` / `TelemetryService.shared` | `@MainActor` |
+| `ToolExecutionCoordinator` | `Aether/Coordinators/ToolExecutionCoordinator.swift` | ReAct 工具执行循环：编码 toolCalls 持久化 assistant 消息（含 toolCallData）、逐个执行工具（启用检查 / 授权确认 / 超时保护 `withThrowingTaskGroup` / 审计日志 / 成功通知 / 失败埋点）、在传入的原始 `apiMessages` 上追加 assistant + tool 结果（保留 system / RAG / 记忆上下文）；`ToolStep` / `ToolStepStatus` 类型迁移至此，ChatViewModel 通过 typealias 兼容 | `ToolRegistry.shared` / `ToolAuthorization.shared` / `ToolAuditLogger.shared` / `NotificationService.shared` / `TelemetryService.shared` | `@MainActor` |
 
 **关键设计要点**：
 
@@ -1336,7 +1336,7 @@ sequenceDiagram
     RS->>RS: embed query → fetch 全部分块 → cosine 排序取前 5
     RS-->>VM: (context 带 [1][2] 编号, citations, queryEmbedding)
     Note over VM: queryEmbedding 复用写缓存<br/>apiMessages.insert(system: context, at: 1)
-    VM->>VM: limitTokens(apiMessages, max: tokenLimit) 逆序截断
+    VM->>VM: limitTokens(apiMessages, max: tokenLimit) 按完整轮次截断
 
     loop ReAct 循环（loopCount < maxReActLoops=5）
         VM->>LC: client.chat(messages:config:tools:apiKey:)
@@ -1356,7 +1356,7 @@ sequenceDiagram
             TR-->>VM: 工具结果字符串
             VM->>VM: NotificationService.sendNotification 本地通知
             VM->>VM: yield ToolStep → StepCardView 显示思维链
-            VM->>VM: apiMessages = conversation.messages.map(toAPIMessage) → continue
+            VM->>VM: apiMessages += assistant(tool_calls) + tool 结果 → continue<br/>保留 system / RAG / 记忆
         else 无 tool_calls
             Note over VM: break 退出循环
         end
@@ -1762,7 +1762,7 @@ sequenceDiagram
 | PerformanceMonitor | `Services/Performance/PerformanceMonitor.swift` | iOS 17.0+ / macOS 14.0+ |
 | PrivacyInfo.xcprivacy | `Resources/PrivacyInfo.xcprivacy` | iOS 17.0+ / macOS 14.0+ / Xcode 16+（App Store 审核要求） |
 | AttributedString（Markdown） | `Views/Chat/Markdown*.swift` / `CodeSyntaxHighlighter.swift` | iOS 17.0+ / macOS 14.0+ / Foundation |
-| XCTest | `AetherTests/` 199 文件（3502 用例） | Xcode 16+ / Swift 5.9+ |
+| XCTest | `AetherTests/` 203 文件（3541 用例） | Xcode 16+ / Swift 5.9+ |
 | XCUITest | `AetherUITests/` 7 文件（30 用例） | Xcode 16+ / Swift 5.9+ |
 | GitHub Actions | `.github/workflows/ci.yml` | macos-14 runner / Xcode 16+ |
 | CoreLocation | CLLocationManager + CLGeocoder | LocationTool 定位与反地理编码 | iOS 17.0+ / macOS 14.0+ / CoreLocation.framework |
@@ -1784,7 +1784,7 @@ sequenceDiagram
 | DPAPI（ProtectedData） | `windows/Aether.Windows/Services/BffConfigStore.cs` | UserToken 加密（`CurrentUser` 范围，Base64 存储） | `System.Security.Cryptography.ProtectedData` NuGet |
 | P/Invoke | `windows/Aether.Windows/Native/AetherNativeBridge.cs` | 调用 `aether_core_ffi.dll` C ABI（`aether_sse_parse_chunk` / `aether_cosine_f32` / `aether_redact` / `aether_free_string`） | .NET 8 内置 |
 | .resx 多语言资源 | `windows/Aether.Windows/Properties/Strings.Designer.cs` + 8 `.resx` | 8 种语言（zh-Hans / zh-Hant / en / ja / ko / fr / de / es），`LanguageService` 动态切换 | .NET 8 内置 |
-| xUnit | `windows/Aether.Windows.Tests/` | 7 个测试文件 / 72 用例 | xUnit 2.6+ |
+| xUnit | `windows/Aether.Windows.Tests/` | 7 个测试文件 / 102 用例 | xUnit 2.6+ |
 | **Android 端技术栈** | | | |
 | Kotlin + Jetpack Compose | `android/app/build.gradle.kts` | 现代 UI 工具包 + 协程 + StateFlow | Kotlin 1.9+ / Compose BOM 2024+ / AGP 8+ |
 | Ktor Client | `android/app/src/main/java/com/aether/data/api/{AetherApi,ChatStreamClient,HttpClientFactory}.kt` | BFF HTTP + SSE 流式（`Flow<String>`） | Ktor 2.3+ |
@@ -1795,7 +1795,7 @@ sequenceDiagram
 | JNI | `android/app/src/main/java/com/aether/rust/{SseBridge,VectorMath,Redact}.kt` | 调用 `libaether_core_ffi.so`（4 个 `Java_com_aether_rust_*` 导出函数） | JDK 17+ / `jni = "0.21"`（Rust 侧） |
 | Markwon / RichText | `android/app/src/main/java/com/aether/ui/chat/MarkdownText.kt` | Markdown 渲染 | Markwon 4.x+ |
 | res/values-* 多语言资源 | `android/app/src/main/res/values-{zh-rCN,zh-rTW,en,ja,ko,fr,de,es}/strings.xml` | 8 种语言资源 | AGP 内置 |
-| JUnit + Robolectric | `android/app/src/test/java/com/aether/` | 12 个测试文件 / 95 用例 | JUnit 4.13+ / Robolectric 4.11+ |
+| JUnit + Robolectric | `android/app/src/test/java/com/aether/` | 12 个测试文件 / 105 用例 | JUnit 4.13+ / Robolectric 4.11+ |
 | **Rust 核心多形态分发** | | | |
 | aether_core_ffi.dll | `rust/aether-core-ffi/` 编译产物 | Windows x64 动态库（cdylib） | Rust 1.75+ / MSVC toolchain |
 | libaether_core_ffi.so | `rust/aether-core-ffi/` 编译产物 | Android arm64-v8a + x86_64 动态库（cdylib + jni 0.21） | Rust 1.75+ / NDK r25+ |
@@ -1807,7 +1807,7 @@ sequenceDiagram
 ### 7.1 单元测试（UT）
 
 - **Target**：`AetherTests`
-- **规模**：199 个测试文件，3502 用例（3502 pass / 0 skip / 0 failures）
+- **规模**：203 个测试文件，3541 用例（3541 pass / 0 skip / 0 failures）
 - **分层覆盖**：
 
 | 层级 | 测试文件 | 文件数 | 核心断言数（约） | skip 原因 |
@@ -2159,7 +2159,7 @@ CloudflareWorkers/               # BFF 代理网关
 ├── worker.js
 └── wrangler.toml
 
-AetherTests/                  # 199 个 UT 文件 / 3502 用例
+AetherTests/                  # 203 个 UT 文件 / 3541 用例
 ├── APIConfigTests.swift
 ├── AlarmToolTests.swift
 ├── BFFProxyClientTests.swift

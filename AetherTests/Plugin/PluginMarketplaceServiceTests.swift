@@ -71,12 +71,12 @@ final class PluginMarketplaceServiceTests: XCTestCase {
         XCTAssertFalse(result, "无效 base64 输入应返回 false")
     }
 
-    /// 实例方法 verifySignature：未配置公钥时应跳过验签返回 true
-    func testVerifySignatureNoPublicKeyReturnsTrue() {
+    /// 实例方法 verifySignature：未配置公钥时应 fail-closed 返回 false
+    func testVerifySignatureNoPublicKeyFailsClosed() {
         let service = PluginMarketplaceService(publicKeyBase64: nil)
         let data = Data([0x01, 0x02])
         let result = service.verifySignature(data: data, signature: "any")
-        XCTAssertTrue(result, "未配置公钥时应跳过验签返回 true")
+        XCTAssertFalse(result, "未配置公钥时不得跳过验签")
     }
 
     // MARK: - 搜索过滤
@@ -154,6 +154,8 @@ final class PluginMarketplaceServiceTests: XCTestCase {
         let pluginID = "download-test-\(UUID().uuidString.prefix(8))"
         let jsContent = "function execute(args) { return 'downloaded'; }"
         let jsData = jsContent.data(using: .utf8)!
+        let signingKey = Curve25519.Signing.PrivateKey()
+        let signature = try signingKey.signature(for: jsData).base64EncodedString()
 
         let downloadURL = URL(string: "https://mock.example.com/\(pluginID).js")!
         let session = makeMockSession(for: downloadURL, data: jsData)
@@ -162,10 +164,14 @@ final class PluginMarketplaceServiceTests: XCTestCase {
             id: pluginID, name: "下载测试", version: "1.0.0", author: "测试",
             description: "下载测试", tools: [], permissions: [],
             entryPoint: "main.js",
-            downloadURL: downloadURL
+            downloadURL: downloadURL,
+            signature: signature
         )
 
-        let service = PluginMarketplaceService(urlSession: session)
+        let service = PluginMarketplaceService(
+            publicKeyBase64: signingKey.publicKey.rawRepresentation.base64EncodedString(),
+            urlSession: session
+        )
         try await service.downloadPlugin(manifest: manifest)
 
         // 验证文件写入
@@ -305,14 +311,19 @@ final class PluginMarketplaceServiceTests: XCTestCase {
         config.protocolClasses = [PluginMockURLProtocol.self]
         let session = URLSession(configuration: config)
 
+        let signingKey = Curve25519.Signing.PrivateKey()
         let manifest = PluginManifest(
             id: "http-404-test", name: "404", version: "1.0.0", author: "测试",
             description: "404", tools: [], permissions: [],
             entryPoint: "main.js",
-            downloadURL: downloadURL
+            downloadURL: downloadURL,
+            signature: try? signingKey.signature(for: Data()).base64EncodedString()
         )
 
-        let service = PluginMarketplaceService(urlSession: session)
+        let service = PluginMarketplaceService(
+            publicKeyBase64: signingKey.publicKey.rawRepresentation.base64EncodedString(),
+            urlSession: session
+        )
         do {
             try await service.downloadPlugin(manifest: manifest)
             XCTFail("HTTP 404 应抛出错误")
@@ -334,14 +345,19 @@ final class PluginMarketplaceServiceTests: XCTestCase {
         config.protocolClasses = [PluginMockURLProtocol.self]
         let session = URLSession(configuration: config)
 
+        let signingKey = Curve25519.Signing.PrivateKey()
         let manifest = PluginManifest(
             id: "http-500-test", name: "500", version: "1.0.0", author: "测试",
             description: "500", tools: [], permissions: [],
             entryPoint: "main.js",
-            downloadURL: downloadURL
+            downloadURL: downloadURL,
+            signature: try? signingKey.signature(for: Data()).base64EncodedString()
         )
 
-        let service = PluginMarketplaceService(urlSession: session)
+        let service = PluginMarketplaceService(
+            publicKeyBase64: signingKey.publicKey.rawRepresentation.base64EncodedString(),
+            urlSession: session
+        )
         do {
             try await service.downloadPlugin(manifest: manifest)
             XCTFail("HTTP 500 应抛出错误")
@@ -360,6 +376,8 @@ final class PluginMarketplaceServiceTests: XCTestCase {
         let pluginID = "progress-test-\(UUID().uuidString.prefix(8))"
         let jsContent = "function execute(args) { return 'progress'; }"
         let jsData = jsContent.data(using: .utf8)!
+        let signingKey = Curve25519.Signing.PrivateKey()
+        let signature = try signingKey.signature(for: jsData).base64EncodedString()
         let downloadURL = URL(string: "https://mock.example.com/progress-\(pluginID).js")!
 
         // 配置延迟 mock 以便观察下载中状态
@@ -374,10 +392,14 @@ final class PluginMarketplaceServiceTests: XCTestCase {
             id: pluginID, name: "进度测试", version: "1.0.0", author: "测试",
             description: "进度", tools: [], permissions: [],
             entryPoint: "main.js",
-            downloadURL: downloadURL
+            downloadURL: downloadURL,
+            signature: signature
         )
 
-        let service = PluginMarketplaceService(urlSession: session)
+        let service = PluginMarketplaceService(
+            publicKeyBase64: signingKey.publicKey.rawRepresentation.base64EncodedString(),
+            urlSession: session
+        )
 
         // 在子任务中启动下载（@MainActor 继承）
         let downloadTask = Task { @MainActor in
@@ -460,7 +482,228 @@ final class PluginMarketplaceServiceTests: XCTestCase {
         XCTAssertEqual(results.first?.id, "dedup-1")
     }
 
+    // MARK: - P1 安全：验签 fail-closed
+
+    /// 未配置公钥时应拒绝安装，而不是跳过验签
+    func testDownloadPluginWithoutPublicKeyFailsClosed() async throws {
+        let jsData = "function execute(args) { return 'unsigned'; }".data(using: .utf8)!
+        let downloadURL = URL(string: "https://mock.example.com/no-key-\(UUID().uuidString.prefix(8)).js")!
+        let session = makeMockSession(for: downloadURL, data: jsData)
+        let key = Curve25519.Signing.PrivateKey()
+        let pluginID = "no-key-\(UUID().uuidString.prefix(8))"
+        let manifest = PluginManifest(
+            id: pluginID, name: "无公钥", version: "1.0.0", author: "测试",
+            description: "无公钥", tools: [], permissions: [],
+            entryPoint: "main.js", downloadURL: downloadURL,
+            signature: try key.signature(for: jsData).base64EncodedString()
+        )
+
+        let service = PluginMarketplaceService(publicKeyBase64: nil, urlSession: session)
+        do {
+            try await service.downloadPlugin(manifest: manifest)
+            XCTFail("未配置验签公钥时应拒绝安装")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("验签公钥"),
+                          "错误应说明缺少验签公钥，实际：\(error.localizedDescription)")
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: pluginDir(for: pluginID).path),
+                       "拒绝安装时不应创建插件目录")
+    }
+
+    /// manifest 缺少签名时应拒绝安装
+    func testDownloadPluginWithoutSignatureFailsClosed() async throws {
+        let jsData = "function execute(args) { return 'unsigned'; }".data(using: .utf8)!
+        let downloadURL = URL(string: "https://mock.example.com/no-sig-\(UUID().uuidString.prefix(8)).js")!
+        let session = makeMockSession(for: downloadURL, data: jsData)
+        let key = Curve25519.Signing.PrivateKey()
+        let manifest = PluginManifest(
+            id: "no-sig-\(UUID().uuidString.prefix(8))", name: "无签名", version: "1.0.0",
+            author: "测试", description: "无签名", tools: [], permissions: [],
+            entryPoint: "main.js", downloadURL: downloadURL, signature: nil
+        )
+
+        let service = PluginMarketplaceService(
+            publicKeyBase64: key.publicKey.rawRepresentation.base64EncodedString(),
+            urlSession: session
+        )
+        do {
+            try await service.downloadPlugin(manifest: manifest)
+            XCTFail("缺少签名时应拒绝安装")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("缺少签名"),
+                          "错误应说明缺少签名，实际：\(error.localizedDescription)")
+        }
+    }
+
+    // MARK: - P1 安全：入口点与插件 ID 路径校验
+
+    /// 使用有效签名时，穿越式入口点仍应被拒绝
+    func testDownloadPluginRejectsTraversalEntryPoint() async throws {
+        let jsData = "function execute(args) { return 'ok'; }".data(using: .utf8)!
+        let downloadURL = URL(string: "https://mock.example.com/traversal-\(UUID().uuidString.prefix(8)).js")!
+        let session = makeMockSession(for: downloadURL, data: jsData)
+        let key = Curve25519.Signing.PrivateKey()
+        let pluginID = "traversal-\(UUID().uuidString.prefix(8))"
+        let manifest = PluginManifest(
+            id: pluginID, name: "穿越", version: "1.0.0", author: "测试",
+            description: "穿越", tools: [], permissions: [],
+            entryPoint: "../escaped.js", downloadURL: downloadURL,
+            signature: try key.signature(for: jsData).base64EncodedString()
+        )
+
+        let service = PluginMarketplaceService(
+            publicKeyBase64: key.publicKey.rawRepresentation.base64EncodedString(),
+            urlSession: session
+        )
+        do {
+            try await service.downloadPlugin(manifest: manifest)
+            XCTFail("穿越式入口点应被拒绝")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("越界") || error.localizedDescription.contains("入口点"),
+                          "错误应说明入口点越界，实际：\(error.localizedDescription)")
+        }
+        let escaped = pluginDir(for: pluginID).deletingLastPathComponent().appendingPathComponent("escaped.js")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: escaped.path), "不得写入插件目录外的文件")
+    }
+
+    /// 绝对路径入口点应被拒绝
+    func testDownloadPluginRejectsAbsoluteEntryPoint() async throws {
+        let jsData = Data([0x01])
+        let downloadURL = URL(string: "https://mock.example.com/abs-\(UUID().uuidString.prefix(8)).js")!
+        let session = makeMockSession(for: downloadURL, data: jsData)
+        let key = Curve25519.Signing.PrivateKey()
+        let manifest = PluginManifest(
+            id: "abs-\(UUID().uuidString.prefix(8))", name: "绝对路径", version: "1.0.0",
+            author: "测试", description: "绝对路径", tools: [], permissions: [],
+            entryPoint: "/tmp/evil.js", downloadURL: downloadURL,
+            signature: try key.signature(for: jsData).base64EncodedString()
+        )
+
+        let service = PluginMarketplaceService(
+            publicKeyBase64: key.publicKey.rawRepresentation.base64EncodedString(),
+            urlSession: session
+        )
+        do {
+            try await service.downloadPlugin(manifest: manifest)
+            XCTFail("绝对路径入口点应被拒绝")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("入口点"),
+                          "错误应说明入口点不合法，实际：\(error.localizedDescription)")
+        }
+    }
+
+    /// 非 HTTPS 下载地址（如 file://）应被拒绝
+    func testDownloadPluginRejectsNonHTTPSURL() async {
+        let manifest = PluginManifest(
+            id: "file-url-\(UUID().uuidString.prefix(8))", name: "本地文件", version: "1.0.0",
+            author: "测试", description: "file URL", tools: [], permissions: [],
+            entryPoint: "main.js", downloadURL: URL(string: "file:///etc/passwd"), signature: "any"
+        )
+        let service = PluginMarketplaceService()
+        do {
+            try await service.downloadPlugin(manifest: manifest)
+            XCTFail("file:// 下载地址应被拒绝")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("HTTPS"),
+                          "错误应说明必须使用 HTTPS，实际：\(error.localizedDescription)")
+        }
+    }
+
+    /// 非法插件 ID（含路径分隔符）应被拒绝
+    func testDownloadPluginRejectsMaliciousPluginID() async {
+        let jsData = Data([0x01])
+        let downloadURL = URL(string: "https://mock.example.com/bad-id-\(UUID().uuidString.prefix(8)).js")!
+        let session = makeMockSession(for: downloadURL, data: jsData)
+        let manifest = PluginManifest(
+            id: "../evil", name: "恶意 ID", version: "1.0.0", author: "测试",
+            description: "恶意 ID", tools: [], permissions: [],
+            entryPoint: "main.js", downloadURL: downloadURL, signature: "any"
+        )
+
+        let service = PluginMarketplaceService(urlSession: session)
+        do {
+            try await service.downloadPlugin(manifest: manifest)
+            XCTFail("非法插件 ID 应被拒绝")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("插件 ID"),
+                          "错误应说明插件 ID 不合法，实际：\(error.localizedDescription)")
+        }
+    }
+
+    // MARK: - P1 安全：PluginPathPolicy
+
+    /// 合法插件 ID 通过校验，含分隔符或点段的 ID 被拒绝
+    func testPluginPathPolicyValidatesPluginID() {
+        XCTAssertTrue(PluginPathPolicy.isValidPluginID("plugin.one"))
+        XCTAssertTrue(PluginPathPolicy.isValidPluginID("a_b-c123"))
+        XCTAssertFalse(PluginPathPolicy.isValidPluginID(""))
+        XCTAssertFalse(PluginPathPolicy.isValidPluginID(".."))
+        XCTAssertFalse(PluginPathPolicy.isValidPluginID("../evil"))
+        XCTAssertFalse(PluginPathPolicy.isValidPluginID("a/b"))
+        XCTAssertFalse(PluginPathPolicy.isValidPluginID("a\\b"))
+        XCTAssertFalse(PluginPathPolicy.isValidPluginID("/abs"))
+        XCTAssertFalse(PluginPathPolicy.isValidPluginID(".hidden"))
+    }
+
+    /// 正常相对路径应解析到插件目录内
+    func testPluginPathPolicyAllowsNestedEntryPoint() throws {
+        let fm = FileManager.default
+        let base = fm.temporaryDirectory.appendingPathComponent("plugin-policy-\(UUID().uuidString)")
+        defer { try? fm.removeItem(at: base) }
+        let root = base.appendingPathComponent("plugin", isDirectory: true)
+        let nestedDir = root.appendingPathComponent("js", isDirectory: true)
+        try fm.createDirectory(at: nestedDir, withIntermediateDirectories: true)
+        let file = nestedDir.appendingPathComponent("main.js")
+        try Data("ok".utf8).write(to: file)
+
+        let url = try PluginPathPolicy.entryPointURL(root: root, entryPoint: "js/main.js")
+        XCTAssertEqual(url.lastPathComponent, "main.js")
+        XCTAssertTrue(url.path.hasSuffix("js/main.js"))
+    }
+
+    /// 穿越、绝对路径、URL 与反斜杠路径应被拒绝
+    func testPluginPathPolicyRejectsUnsafeEntryPoints() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("plugin-policy-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+
+        for entry in ["../evil.js", "js/../../evil.js", "/etc/passwd", "~/evil.js", "file:///etc/passwd", "js\\..\\evil.js"] {
+            XCTAssertThrowsError(try PluginPathPolicy.entryPointURL(root: root, entryPoint: entry),
+                                 "不安全入口点应被拒绝：\(entry)")
+        }
+    }
+
+    /// 指向插件目录外的符号链接应被拒绝
+    func testPluginPathPolicyRejectsSymlinkEscape() throws {
+        let fm = FileManager.default
+        let base = fm.temporaryDirectory.appendingPathComponent("plugin-symlink-\(UUID().uuidString)")
+        defer { try? fm.removeItem(at: base) }
+        let root = base.appendingPathComponent("plugin", isDirectory: true)
+        let outside = base.appendingPathComponent("outside", isDirectory: true)
+        try fm.createDirectory(at: root, withIntermediateDirectories: true)
+        try fm.createDirectory(at: outside, withIntermediateDirectories: true)
+        let outsideFile = outside.appendingPathComponent("evil.js")
+        try Data("function execute(){ return 'escaped'; }".utf8).write(to: outsideFile)
+
+        // 链接文件逃逸
+        try fm.createSymbolicLink(at: root.appendingPathComponent("main.js"), withDestinationURL: outsideFile)
+        // 链接目录逃逸
+        try fm.createSymbolicLink(at: root.appendingPathComponent("linked"), withDestinationURL: outside)
+
+        XCTAssertThrowsError(try PluginPathPolicy.entryPointURL(root: root, entryPoint: "main.js"))
+        XCTAssertThrowsError(try PluginPathPolicy.entryPointURL(root: root, entryPoint: "linked/evil.js"))
+    }
+
     // MARK: - 辅助
+
+    /// 指定插件 ID 的本地插件目录
+    private func pluginDir(for pluginID: String) -> URL {
+        let fm = FileManager.default
+        let appSupport = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? fm.temporaryDirectory
+        return appSupport.appendingPathComponent("Plugins", isDirectory: true)
+            .appendingPathComponent(pluginID, isDirectory: true)
+    }
 
     /// 清理指定插件 ID 的本地目录
     private func cleanupPluginDirectory(for pluginID: String) {

@@ -25,19 +25,25 @@ function makeKV() {
 /**
  * D1 mock：按 SQL 子字符串匹配注册返回值。
  * - prepare(sql).bind(...).first() / .all() / .run()
- * - batch(stmts)
+ * - batch(stmts) 逐个执行语句的 run()，模拟 D1 每语句返回 meta.changes
  */
 function makeDB() {
   const handlers = [];
+  const statements = [];
   const db = {
+    statements,
     prepare(sql) {
       const matched = handlers.find((h) =>
         h.match instanceof RegExp ? h.match.test(sql) : sql.includes(h.match)
       );
       let binds = [];
+      const entry = { sql, binds };
+      statements.push(entry);
       const stmt = {
+        sql,
         bind(...args) {
           binds = args;
+          entry.binds = args;
           return stmt;
         },
         async first() {
@@ -49,13 +55,13 @@ function makeDB() {
         async run() {
           return matched && matched.run
             ? await matched.run(binds)
-            : { success: true, changes: 1 };
+            : { success: true, meta: { changes: 1 } };
         },
       };
       return stmt;
     },
     async batch(stmts) {
-      return stmts.map(() => ({ success: true, changes: 1 }));
+      return Promise.all(stmts.map((stmt) => stmt.run()));
     },
     on(match, fns) {
       handlers.push({ match, ...fns });
@@ -118,7 +124,7 @@ describe("E2E /conversations CRUD", () => {
   it("POST /conversations 创建会话返回 201 + 完整对象", async () => {
     const env = makeEnv([
       // INSERT 成功
-      ["INSERT INTO conversations", { run: () => ({ success: true, changes: 1 }) }],
+      ["INSERT INTO conversations", { run: () => ({ success: true, meta: { changes: 1 } }) }],
     ]);
     const req = makeRequest("/conversations", {
       method: "POST",
@@ -128,10 +134,10 @@ describe("E2E /conversations CRUD", () => {
     const resp = await worker.fetch(req, env, {});
     expect(resp.status).toBe(201);
     const data = await resp.json();
-    expect(data.id).toBeTruthy();
-    expect(data.user_id).toBe(USER_ID);
-    expect(data.title).toBe("新会话");
-    expect(data.system_prompt).toBe("你是助手");
+    expect(data.conversation.id).toBeTruthy();
+    expect(data.conversation.user_id).toBe(USER_ID);
+    expect(data.conversation.title).toBe("新会话");
+    expect(data.conversation.system_prompt).toBe("你是助手");
   });
 
   it("POST /conversations 请求体非法返回 400", async () => {
@@ -188,7 +194,7 @@ describe("E2E /conversations CRUD", () => {
   it("PATCH /conversations/:id 更新标题并返回更新后对象", async () => {
     const updated = convRow({ id: "conv-1", title: "新标题", is_pinned: 1 });
     const env = makeEnv([
-      ["UPDATE conversations SET", { run: () => ({ success: true, changes: 1 }) }],
+      ["UPDATE conversations SET", { run: () => ({ success: true, meta: { changes: 1 } }) }],
       ["WHERE id = ?1 AND user_id", { first: () => updated }],
     ]);
     const req = makeRequest("/conversations/conv-1", {
@@ -216,7 +222,7 @@ describe("E2E /conversations CRUD", () => {
 
   it("PATCH /conversations/:id 目标不存在（changes=0）返回 404", async () => {
     const env = makeEnv([
-      ["UPDATE conversations SET", { run: () => ({ success: true, changes: 0 }) }],
+      ["UPDATE conversations SET", { run: () => ({ success: true, meta: { changes: 0 } }) }],
     ]);
     const req = makeRequest("/conversations/nope", {
       method: "PATCH",
@@ -229,8 +235,8 @@ describe("E2E /conversations CRUD", () => {
 
   it("DELETE /conversations/:id 成功返回 deleted:true", async () => {
     const env = makeEnv([
-      ["DELETE FROM messages WHERE conversation_id", { run: () => ({ success: true, changes: 0 }) }],
-      ["DELETE FROM conversations WHERE id = ?1 AND user_id", { run: () => ({ success: true, changes: 1 }) }],
+      ["DELETE FROM messages WHERE conversation_id", { run: () => ({ success: true, meta: { changes: 0 } }) }],
+      ["DELETE FROM conversations WHERE id = ?1 AND user_id", { run: () => ({ success: true, meta: { changes: 1 } }) }],
     ]);
     const req = makeRequest("/conversations/conv-1", {
       method: "DELETE",
@@ -243,10 +249,28 @@ describe("E2E /conversations CRUD", () => {
     expect(data.id).toBe("conv-1");
   });
 
-  it("DELETE /conversations/:id 不存在返回 404", async () => {
+  it("DELETE /conversations/:id 消息删除按 user_id 限定，避免跨租户删除", async () => {
     const env = makeEnv([
-      ["DELETE FROM messages WHERE conversation_id", { run: () => ({ success: true, changes: 0 }) }],
-      ["DELETE FROM conversations WHERE id = ?1 AND user_id", { run: () => ({ success: true, changes: 0 }) }],
+      ["DELETE FROM messages WHERE conversation_id", { run: () => ({ success: true, meta: { changes: 3 } }) }],
+      ["DELETE FROM conversations WHERE id = ?1 AND user_id", { run: () => ({ success: true, meta: { changes: 1 } }) }],
+    ]);
+    const req = makeRequest("/conversations/conv-1", {
+      method: "DELETE",
+      token: VALID_TOKEN,
+    });
+    const resp = await worker.fetch(req, env, {});
+    expect(resp.status).toBe(200);
+
+    const msgDelete = env.DB.statements.find((s) => s.sql.includes("DELETE FROM messages"));
+    expect(msgDelete).toBeDefined();
+    expect(msgDelete.sql).toContain("SELECT id FROM conversations WHERE id = ?1 AND user_id = ?2");
+    expect(msgDelete.binds).toEqual(["conv-1", USER_ID]);
+  });
+
+  it("DELETE /conversations/:id 会话 changes=0 时返回 404", async () => {
+    const env = makeEnv([
+      ["DELETE FROM messages WHERE conversation_id", { run: () => ({ success: true, meta: { changes: 0 } }) }],
+      ["DELETE FROM conversations WHERE id = ?1 AND user_id", { run: () => ({ success: true, meta: { changes: 0 } }) }],
     ]);
     const req = makeRequest("/conversations/nope", {
       method: "DELETE",

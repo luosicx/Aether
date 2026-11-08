@@ -41,7 +41,7 @@ protocol LLMProvider {
 | `QwenClient` | `https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions` | Qwen 走阿里云百炼 DashScope OpenAI 兼容端点 |
 | `BFFProxyClient` | `<BFF endpointURL>/v1/chat/completions` | 经 Cloudflare Workers 中转，header 带 `X-BFF-Token` 与 `X-Provider`，不带 Authorization |
 | `OfflineLLMProvider` | 本地 MLX 推理（不走 HTTP） | 端侧推理，断网可用；`baseURL` 为空字符串 |
-| `FallbackLLMProvider` | 包装 primary + fallback | `init(primary:fallback:primaryProvider:fallbackProvider:)`；primary 失败自动切 fallback |
+| `FallbackLLMProvider` | 包装 primary + fallback | `init(primary:fallback:primaryProvider:fallbackProvider:fallbackApiKey:)`；primary 失败自动切 fallback，fallback 使用自己的 API Key（未提供时回退到主 Key） |
 
 `BFFProxyClient` 的 chat 路径通过 `config.endpointURL.appending(path: "v1/chat/completions")` 构造，默认 `endpointURL` 为占位地址 `https://aether-bff.example.com`，部署后替换为真实域名。
 

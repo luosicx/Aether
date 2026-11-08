@@ -44,6 +44,40 @@ final class AetherClientTests: XCTestCase {
         }
     }
 
+    // MARK: - Provider 解析
+
+    func testBFFProviderResolvesToBFFProxyClient() throws {
+        let config = AetherConfig(
+            provider: .bff,
+            apiKey: "bff-token",
+            baseURL: URL(string: "https://bff.example.com")
+        )
+        let client = try AetherClient(config: config)
+        XCTAssertTrue(
+            client.providerInternal is BFFProxyClient,
+            "BFF 模式必须使用 BFFProxyClient，不能落到 DeepSeekClient"
+        )
+    }
+
+    func testBFFWithoutBaseURLThrows() {
+        let config = AetherConfig(provider: .bff, apiKey: "bff-token")
+        XCTAssertThrowsError(try AetherClient(config: config)) { error in
+            if case .invalidConfig(let reason) = error as? AetherError {
+                XCTAssertTrue(reason.contains("baseURL"))
+            } else {
+                XCTFail("期望 invalidConfig 错误，实际：\(error)")
+            }
+        }
+    }
+
+    func testDirectProvidersResolveToDirectClients() throws {
+        let deepSeek = try AetherClient(config: AetherConfig(provider: .deepSeek, apiKey: "sk-test"))
+        XCTAssertTrue(deepSeek.providerInternal is DeepSeekClient)
+
+        let qwen = try AetherClient(config: AetherConfig(provider: .qwen, apiKey: "sk-test"))
+        XCTAssertTrue(qwen.providerInternal is QwenClient)
+    }
+
     // MARK: - 工具注册 API
 
     func testRegisterTool() throws {

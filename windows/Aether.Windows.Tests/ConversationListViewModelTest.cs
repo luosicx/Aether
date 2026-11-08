@@ -2,8 +2,6 @@ using System.Net;
 using System.Net.Http;
 using System.Reflection;
 using System.Text;
-using System.Text.Json;
-using Aether.Windows.Models;
 using Aether.Windows.Services;
 using Aether.Windows.ViewModels;
 using Xunit;
@@ -29,13 +27,10 @@ public class ConversationListViewModelTest
     [Fact]
     public async Task LoadAsync_PopulatesConversations_SortedByPinnedThenUpdatedAt()
     {
-        var conversations = new List<Conversation>
-        {
-            new() { Id = "c1", Title = "对话1", IsPinned = false, UpdatedAt = 200 },
-            new() { Id = "c2", Title = "对话2", IsPinned = true, UpdatedAt = 100 },
-            new() { Id = "c3", Title = "对话3", IsPinned = false, UpdatedAt = 300 }
-        };
-        var json = JsonSerializer.Serialize(conversations);
+        var json = ConversationsJson(
+            ConversationJson("c1", "对话1", updatedAt: 200),
+            ConversationJson("c2", "对话2", isPinned: true, updatedAt: 100),
+            ConversationJson("c3", "对话3", updatedAt: 300));
         var handler = new StubHandler(_ => json);
         var api = CreateClientWithStubHttp(new HttpClient(handler));
 
@@ -72,8 +67,8 @@ public class ConversationListViewModelTest
     [Fact]
     public async Task CreateAsync_NavigatesToNewConversation()
     {
-        var newConv = new Conversation { Id = "new-123", Title = "新会话" };
-        var handler = new StubHandler(_ => JsonSerializer.Serialize(newConv));
+        var handler = new StubHandler(_ =>
+            $$"""{"conversation":{{ConversationJson("new-123", "新会话")}}}""");
         var api = CreateClientWithStubHttp(new HttpClient(handler));
 
         string? navigatedId = null;
@@ -88,12 +83,9 @@ public class ConversationListViewModelTest
     [Fact]
     public async Task DeleteAsync_RemovesConversationFromList()
     {
-        var conversations = new List<Conversation>
-        {
-            new() { Id = "c1", Title = "对话1" },
-            new() { Id = "c2", Title = "对话2" }
-        };
-        var json = JsonSerializer.Serialize(conversations);
+        var json = ConversationsJson(
+            ConversationJson("c1", "对话1"),
+            ConversationJson("c2", "对话2"));
         var handler = new StubHandler(_ => json);
         var api = CreateClientWithStubHttp(new HttpClient(handler));
 
@@ -110,12 +102,9 @@ public class ConversationListViewModelTest
     [Fact]
     public async Task TogglePinAsync_TogglesIsPinnedAndReorders()
     {
-        var conversations = new List<Conversation>
-        {
-            new() { Id = "c1", Title = "对话1", IsPinned = false, UpdatedAt = 200 },
-            new() { Id = "c2", Title = "对话2", IsPinned = false, UpdatedAt = 100 }
-        };
-        var json = JsonSerializer.Serialize(conversations);
+        var json = ConversationsJson(
+            ConversationJson("c1", "对话1", updatedAt: 200),
+            ConversationJson("c2", "对话2", updatedAt: 100));
         var handler = new StubHandler(_ => json);
         var api = CreateClientWithStubHttp(new HttpClient(handler));
 
@@ -164,6 +153,26 @@ public class ConversationListViewModelTest
 
         Assert.Equal("conv-456", navigatedId);
     }
+
+    /// <summary>按 BFF 契约（snake_case）序列化会话，供 stub 响应使用。</summary>
+    private static string ConversationJson(
+        string id, string title, bool isPinned = false, long updatedAt = 0) => $$"""
+        {
+          "id": "{{id}}",
+          "title": "{{title}}",
+          "system_prompt": null,
+          "parent_id": null,
+          "created_at": 0,
+          "updated_at": {{updatedAt}},
+          "last_message_preview": null,
+          "is_pinned": {{(isPinned ? 1 : 0)}},
+          "unread_count": 0,
+          "order_field": 0
+        }
+        """;
+
+    private static string ConversationsJson(params string[] items) =>
+        $$"""{"conversations":[{{string.Join(",", items)}}]}""";
 
     /// <summary>返回固定响应字符串的 HttpMessageHandler stub。</summary>
     private sealed class StubHandler : HttpMessageHandler

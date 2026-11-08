@@ -17,6 +17,25 @@ private final class ErrorObserver: @unchecked Sendable {
     }
 }
 
+/// 流生产 Task 的取消句柄。AsyncStream 的 onTermination 与消费端提前退出都可能在任意线程触发取消。
+private final class StreamTaskHandle: @unchecked Sendable {
+    private let lock = NSLock()
+    private var task: Task<Void, Never>?
+
+    func store(_ task: Task<Void, Never>) {
+        lock.lock()
+        self.task = task
+        lock.unlock()
+    }
+
+    func cancel() {
+        lock.lock()
+        let task = self.task
+        lock.unlock()
+        task?.cancel()
+    }
+}
+
 /// 核心 ViewModel，@Observable + @MainActor 隔离。P2-6 已抽取 10 个 Coordinator。
 @Observable
 @MainActor
@@ -222,16 +241,14 @@ final class ChatViewModel {
     /// 切回原 provider（联网后恢复）。仅当处于端侧推理且有保存的原 provider 时生效。
     func switchToOriginalProvider() { networkFallbackCoordinator.switchToOriginalProvider() }
 
-    /// Day 13+16: 按 selectedProvider / fallbackProvider 构造 LLMProvider。端侧推理不支持工具调用，需工具且网络可用时降级到云端。
-    private func makeLLMProvider() -> LLMProvider {
-        let effectiveProvider = networkFallbackCoordinator.effectiveProviderForRequest(
-            selectedProvider: selectedProvider, toolsEnabled: toolsEnabled
-        )
-        return networkFallbackCoordinator.makeLLMProvider(
-            selectedProvider: effectiveProvider,
+    /// Day 13+16: 按实际 provider / fallbackProvider 构造 LLMProvider。端侧推理不支持工具调用，需工具且网络可用时降级到云端。
+    private func makeLLMProvider(for provider: ModelProvider, fallbackApiKey: String?) -> LLMProvider {
+        networkFallbackCoordinator.makeLLMProvider(
+            selectedProvider: provider,
             fallbackProvider: fallbackProvider,
             bffConfig: bffConfig,
-            injectedClient: injectedClientUsed ? client : nil
+            injectedClient: injectedClientUsed ? client : nil,
+            fallbackApiKey: fallbackApiKey
         )
     }
 
@@ -261,6 +278,7 @@ final class ChatViewModel {
     func switchTo(conversation: Conversation) {
         streamingTask?.cancel()
         streamingTask = nil
+        endLiveActivity()  // 立即结束上一个会话的灵动岛（processMessage 的 defer 会再次调用，幂等）
         streamingText = ""
         isLoading = false
         currentToolSteps = []
@@ -348,6 +366,14 @@ final class ChatViewModel {
 
     /// Task 6: 消息处理主流程（状态机编排）：preparing → ragRetrieving → cacheChecking → (llmStreaming ↔ toolCalling)* → finishing。
     func processMessage(_ text: String, conversation: Conversation, modelContext: ModelContext) async {
+        // 取消 / 提前返回 / 正常完成等所有退出路径都结束灵动岛，避免残留 Live Activity
+        defer {
+            endLiveActivity()
+            if Task.isCancelled {
+                streamingText = ""
+                isLoading = false
+            }
+        }
         state = .preparing
         guard var ctx = await handlePreparing(text: text, conversation: conversation, modelContext: modelContext) else {
             state = .idle
@@ -417,14 +443,24 @@ final class ChatViewModel {
             return nil
         }
 
-        // Day 13: 用工厂构造 LLMProvider；通过 coordinator 同步 lastUsedProvider / didFallbackLastRequest
-        let llmClient = makeLLMProvider()
-        networkFallbackCoordinator.updateLastUsedProvider(effectiveProviderForRequest())
+        // Day 13+16: 请求实际使用的 provider（端侧 + 工具且在线时降级到云端）
+        let requestProvider = effectiveProviderForRequest()
+        networkFallbackCoordinator.updateLastUsedProvider(requestProvider)
         networkFallbackCoordinator.updateDidFallbackLastRequest(false)
 
-        // 后台线程读取 apiKey 避免主线程阻塞
-        let provider = self.selectedProvider
-        let apiKey = await Task.detached(priority: .userInitiated) { KeychainManager.shared.getAPIKey(for: provider) ?? "" }.value
+        // 后台线程按「实际 provider」读取 API Key；备用供应商单独读取，跨供应商 Key 不可互换
+        let fallback = fallbackProvider
+        let apiKeys = await Task.detached(priority: .userInitiated) {
+            var keys: [ModelProvider: String] = [:]
+            keys[requestProvider] = KeychainManager.shared.getAPIKey(for: requestProvider) ?? ""
+            if let fallback {
+                keys[fallback] = KeychainManager.shared.getAPIKey(for: fallback) ?? ""
+            }
+            return keys
+        }.value
+        let apiKey = apiKeys[requestProvider] ?? ""
+        let fallbackApiKey = fallback.flatMap { apiKeys[$0] }
+        let llmClient = makeLLMProvider(for: requestProvider, fallbackApiKey: fallbackApiKey)
 
         // 注入用户偏好到 systemPrompt 末尾
         let preference = ChatStorage(modelContext: modelContext).fetchPreference()
@@ -469,7 +505,7 @@ final class ChatViewModel {
         }
         apiMessages.append(contentsOf: conversationMessages.map { $0.toAPIMessage() })
 
-        return ProcessContext(text: text, conversation: conversation, modelContext: modelContext, llmClient: llmClient, apiKey: apiKey, provider: provider, apiMessages: apiMessages, queryEmbedding: [])
+        return ProcessContext(text: text, conversation: conversation, modelContext: modelContext, llmClient: llmClient, apiKey: apiKey, provider: selectedProvider, apiMessages: apiMessages, queryEmbedding: [])
     }
 
     /// SubTask 6.3 + P2-6 Task 7: RAG 检索阶段（转发至 RetrievalCoordinator）。开启则注入 systemPrompt；关闭则按需计算 query embedding（仅非工具模式，缓存用）。
@@ -563,20 +599,40 @@ final class ChatViewModel {
 
     /// SubTask 6.5: LLM 流式输出阶段——构造 chat 请求流（工具/纯文本两种模式）、累积 chunkContent（100ms throttle）、更新灵动岛、解析 finalToolCalls。返回 false 表示 Task 已取消。
     private func handleLLMStreaming(_ ctx: inout ProcessContext) async -> Bool {
+        guard !Task.isCancelled else { return false }  // 取消后不再发起新的 LLM 请求
         guard let chatConfig = ctx.chatConfig else { return true }
         let stream: AsyncStream<ParsedChunk>
+        let producerHandle = StreamTaskHandle()
         if toolsEnabled {
             let tools = ToolRegistry.shared.availableToolDefs
-            stream = ctx.llmClient.chat(messages: ctx.apiMessages, config: chatConfig, tools: tools, apiKey: ctx.apiKey)
-        } else {
-            let raw = ctx.llmClient.chat(messages: ctx.apiMessages, config: chatConfig, apiKey: ctx.apiKey)
+            let upstream = ctx.llmClient.chat(messages: ctx.apiMessages, config: chatConfig, tools: tools, apiKey: ctx.apiKey)
             stream = AsyncStream { cont in
-                Task {
-                    for await content in raw { cont.yield(ParsedChunk(content: content, toolCalls: nil)) }
+                let task = Task {
+                    for await chunk in upstream {
+                        if Task.isCancelled { break }
+                        cont.yield(chunk)
+                    }
                     cont.finish()
                 }
+                producerHandle.store(task)
+                cont.onTermination = { _ in task.cancel() }
+            }
+        } else {
+            let upstream = ctx.llmClient.chat(messages: ctx.apiMessages, config: chatConfig, apiKey: ctx.apiKey)
+            stream = AsyncStream { cont in
+                let task = Task {
+                    for await content in upstream {
+                        if Task.isCancelled { break }
+                        cont.yield(ParsedChunk(content: content, toolCalls: nil))
+                    }
+                    cont.finish()
+                }
+                producerHandle.store(task)
+                cont.onTermination = { _ in task.cancel() }
             }
         }
+        // 消费端提前退出（取消 / 错误返回）时取消上游生产 Task，避免网络流继续读取
+        defer { producerHandle.cancel() }
         var chunkContent = ""
         var finalToolCalls: [AccumulatedToolCall]?
         var hasUpdatedLiveActivity = false
@@ -597,6 +653,7 @@ final class ChatViewModel {
             }
             if let calls = chunk.toolCalls { finalToolCalls = calls }
         }
+        if Task.isCancelled { return false }  // 流结束后再次检查，避免取消后仍提交部分响应
         streamingText = ctx.fullResponse + chunkContent  // 流式结束后立即 flush 最终文本
         ctx.fullResponse += chunkContent
         ctx.lastChunkContent = chunkContent
@@ -610,6 +667,7 @@ final class ChatViewModel {
             toolCalls: toolCalls,
             lastChunkContent: ctx.lastChunkContent,
             loopCount: ctx.loopCount,
+            apiMessages: ctx.apiMessages,
             conversation: ctx.conversation,
             modelContext: ctx.modelContext
         )
@@ -633,16 +691,21 @@ final class ChatViewModel {
         }
         let latencyMs = ctx.llmStartTime.map { Int(Date().timeIntervalSince($0) * 1000) } ?? 0  // Day 14: LLM 响应埋点（latencyMs / success / 估算输出 token 数）
         let fullResponse = ctx.fullResponse
-        Task.detached { await TelemetryService.shared.track(.llmResponse(latencyMs: latencyMs, success: !fullResponse.isEmpty, outputTokens: fullResponse.count / 4)) }
-        let assistantMsg = ChatMessage(role: "assistant", content: ctx.fullResponse)
-        assistantMsg.conversation = ctx.conversation
-        ctx.conversation.messages.append(assistantMsg)
-        messages.append(assistantMsg)
+        let hasContent = !fullResponse.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        Task.detached { await TelemetryService.shared.track(.llmResponse(latencyMs: latencyMs, success: hasContent, outputTokens: fullResponse.count / 4)) }
         streamingText = ""
         isLoading = false
-        do { try ctx.modelContext.save() } catch { Logger.chat.error("最终助手回复保存失败: \(error.localizedDescription, privacy: .public)") }
+        if hasContent {
+            let assistantMsg = ChatMessage(role: "assistant", content: fullResponse)
+            assistantMsg.conversation = ctx.conversation
+            ctx.conversation.messages.append(assistantMsg)
+            messages.append(assistantMsg)
+            do { try ctx.modelContext.save() } catch { Logger.chat.error("最终助手回复保存失败: \(error.localizedDescription, privacy: .public)") }
 
-        retrievalCoordinator.writeCache(query: ctx.text, embedding: ctx.queryEmbedding, response: ctx.fullResponse)  // Day 6 + P2-6 Task 7: 语义缓存写入
+            retrievalCoordinator.writeCache(query: ctx.text, embedding: ctx.queryEmbedding, response: fullResponse)  // Day 6 + P2-6 Task 7: 语义缓存写入
+        } else {
+            Logger.chat.warning("LLM 返回空响应，跳过助手消息持久化与语义缓存写入")
+        }
 
         let promptJSON = (try? JSONSerialization.data(withJSONObject: ctx.apiMessages.map { ["role": $0.role, "content": $0.content] }, options: [.prettyPrinted])).flatMap { String(data: $0, encoding: .utf8) } ?? "无"  // 补充 C：调试信息（不持久化）
         lastDebugInfo = DebugInfo(
@@ -686,7 +749,7 @@ final class ChatViewModel {
         #endif
     }
 
-    // MARK: - PromptBuilder 转发（P2-6 Task 8，测试性调整为 internal 便于单测，行为零回归）
+    // MARK: - PromptBuilder 转发（P2-6 Task 8，测试性调整为 internal 便于单测）
     func limitTokens(_ messages: [APIMessage], max: Int) -> [APIMessage] { promptBuilder.limitTokens(messages, max: max) }
     func buildEffectiveSystemPrompt(base: String, preference: UserPreference) -> String { promptBuilder.buildEffectiveSystemPrompt(base: base, preference: preference) }
 }

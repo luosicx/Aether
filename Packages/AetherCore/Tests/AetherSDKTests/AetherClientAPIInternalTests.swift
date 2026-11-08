@@ -241,12 +241,12 @@ final class AetherClientAPIInternalTests: XCTestCase {
         let client = try AetherClient(config: config, provider: mock, ragProvider: ragProvider)
         do {
             _ = try await client.retrieve(query: "test")
-            XCTFail("应抛出 ragRetrievalFailed")
+            XCTFail("应抛出 ragRetrievalFailedWithCause")
         } catch let error as AetherError {
-            if case .ragRetrievalFailed = error {
-                // 预期：非 AetherError 被包装为 ragRetrievalFailed
+            if case .ragRetrievalFailedWithCause = error {
+                // 预期：P2-3 起非 AetherError 被包装为 ragRetrievalFailedWithCause
             } else {
-                XCTFail("期望 ragRetrievalFailed，实际：\(error)")
+                XCTFail("期望 ragRetrievalFailedWithCause，实际：\(error)")
             }
         }
     }

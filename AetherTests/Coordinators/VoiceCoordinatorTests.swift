@@ -23,9 +23,10 @@ final class VoiceCoordinatorTests: XCTestCase {
     /// 构造一个 VoiceCoordinator 并捕获闭包回调值，便于断言。
     /// isRecordingProvider 默认从 isRecordingBox 读取，模拟 ChatViewModel 的 @Observable var isRecording。
     private func makeCoordinator(
-        voiceService: VoiceService = VoiceService(),
+        voiceService: VoiceService? = nil,
         ttsConfig: TTSConfig = .defaultValue
     ) -> VoiceFixture {
+        let voiceService = voiceService ?? VoiceService()
         let isRecordingBox = NonIsolatedBox<Bool>(false)
         let speakingBox = NonIsolatedBox<UUID?>(nil)
         let inputTextBox = NonIsolatedBox<String>("")

@@ -172,6 +172,9 @@ final class MCPClientManager {
             // - MCPToolAdapter 内部记录审计日志
             let adapters = tools.map { MCPToolAdapter(tool: $0, client: client, serverID: config.id) }
             ToolRegistry.shared.registerBatch(tools: adapters)
+            // 动态注册发生在 ToolRegistry 初始化之后，必须重新应用启用策略，
+            // 否则新工具不在 enabledTools 中，execute 会以「未启用」拒绝，远程工具永远不可用。
+            ToolRegistry.shared.restoreEnabledStates()
             // 记录带前缀的工具名，断开时按名注销
             serverToolMap[config.id] = adapters.map { $0.registeredName }
         } catch {

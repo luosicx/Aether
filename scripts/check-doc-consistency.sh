@@ -27,10 +27,21 @@ MACOS_TOOLS=$(grep -cE '^\s*register\(tool:\s*[A-Z][A-Za-z0-9_]*\(\)\)' Aether/S
 MACOS_TOOLS=${MACOS_TOOLS:-0}
 TOOL_COUNT=$((CROSS_TOOLS + MACOS_TOOLS))
 
-# 测试数：精确匹配 XCTest 测试方法定义 `func testXxx(`，避免匹配注释或 helper
-# 注：grep -E | wc -l 模式下，grep 无匹配退出 1，pipefail 让管道退出 1，
-#     `|| true` 防止 set -e 退出脚本，wc -l 输出 "0" 被保留。
-TEST_COUNT=$(grep -rhE '^\s*func test\w+\s*\(' AetherTests/ 2>/dev/null | wc -l | tr -d ' ' || true)
+# 测试数：精确匹配 XCTest 测试方法定义 `func testXxx(`，避免匹配注释或 helper。
+# 注：改用 python3 的 Unicode `\w` 统计。macOS 的 BSD grep 在 C locale 下不把
+#     中文标识符算作 \w（如 `func testFoo并(`），GNU grep 在 UTF-8 locale 下会算，
+#     导致本地与 CI 统计结果相差若干条。
+TEST_COUNT=$(python3 - <<'PY' || true
+import pathlib
+import re
+
+pattern = re.compile(r'^\s*func test\w+\s*\(', re.M)
+print(sum(
+    len(pattern.findall(path.read_text(encoding='utf-8', errors='replace')))
+    for path in pathlib.Path('AetherTests').rglob('*.swift')
+))
+PY
+)
 TEST_COUNT=${TEST_COUNT:-0}
 
 echo "代码统计:"

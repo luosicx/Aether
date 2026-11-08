@@ -5,7 +5,7 @@ import AetherFoundation
 ///
 /// 从 ChatViewModel 抽取的 systemPrompt + 用户偏好 + AI 人设拼接职责 + token 截断职责。
 /// 纯值类型（struct），无依赖，不标注 @MainActor（纯函数式逻辑）。
-/// 行为等价于 ChatViewModel 原始 buildEffectiveSystemPrompt / limitTokens 实现。
+/// `limitTokens` 以完整对话轮次为截断单位，避免拆散 tool_calls 与 tool 结果。
 struct PromptBuilder {
     /// 构建 effective systemPrompt：base + 【用户偏好】 + 【AI人设】
     ///
@@ -55,24 +55,42 @@ struct PromptBuilder {
         return result
     }
 
-    /// token 截断：从尾部累加，超过 max 时丢弃最早的消息（保留最近的）
+    /// token 截断：从尾部按「完整对话轮次」累加，超过 max 时丢弃更早的轮次。
     ///
-    /// 行为等价于 ChatViewModel 原始 limitTokens 实现：
-    /// 反向遍历消息，累加 token 数，超过 max 时立即 break，保证保留最近的若干条消息。
+    /// 不能按单条消息截断：assistant(tool_calls) 与对应的 tool 结果必须成组保留，
+    /// 否则消息序列会出现孤立 tool 消息或缺失 tool 结果的 tool_calls，
+    /// 导致 API 400 或工具结果错配。用户消息与其后的助手回复同理。
     ///
     /// - Parameters:
     ///   - messages: 待截断的消息列表（按时间顺序：早 → 晚）
     ///   - max: token 上限；0 表示立即截断返回空数组
-    /// - Returns: 截断后的消息列表（保持原始顺序）
+    /// - Returns: 截断后的消息列表（保持原始顺序，且以完整轮次为边界）
     func limitTokens(_ messages: [APIMessage], max: Int) -> [APIMessage] {
+        guard max > 0 else { return [] }
         var total = 0
-        var result: [APIMessage] = []
-        for msg in messages.reversed() {
-            let tokens = msg.content.estimatedTokens
+        var keptGroups: [[APIMessage]] = []
+        for group in messageGroups(messages).reversed() {
+            let tokens = group.reduce(0) { $0 + $1.content.estimatedTokens }
             if total + tokens > max { break }
-            result.insert(msg, at: 0)
+            keptGroups.insert(group, at: 0)
             total += tokens
         }
-        return result
+        return keptGroups.flatMap { $0 }
+    }
+
+    /// 将消息划分为完整对话轮次：每条 user 消息开启新一轮，后续 assistant / tool 消息归入该轮。
+    /// 以轮次为最小截断单位，保证 assistant(tool_calls) 与 tool 结果、user 与 assistant 回复不被拆散。
+    private func messageGroups(_ messages: [APIMessage]) -> [[APIMessage]] {
+        var groups: [[APIMessage]] = []
+        var current: [APIMessage] = []
+        for message in messages {
+            if message.role == "user" && !current.isEmpty {
+                groups.append(current)
+                current = []
+            }
+            current.append(message)
+        }
+        if !current.isEmpty { groups.append(current) }
+        return groups
     }
 }

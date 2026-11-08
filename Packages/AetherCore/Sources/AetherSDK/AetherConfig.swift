@@ -10,7 +10,8 @@ public struct AetherConfig: Sendable, Equatable {
     public var provider: AetherProvider
     /// API Key（或 OAuth token，取决于 `auth` 方案）
     public var apiKey: String
-    /// 自定义 BFF / Provider 基础 URL（可选，nil 时使用 Provider 默认）
+    /// 自定义 BFF / Provider 基础 URL。
+    /// 直连 Provider 可省略（nil 时使用默认端点）；`.bff` 模式必须提供 BFF 网关地址。
     public var baseURL: URL?
     /// 语义缓存配置（nil 表示禁用缓存）
     public var cache: CacheConfig?
@@ -52,6 +53,10 @@ public struct AetherConfig: Sendable, Equatable {
         if provider != .onDevice && apiKey.isEmpty {
             return "apiKey 不能为空"
         }
+        // BFF 必须显式提供网关地址，避免误用占位域名直连
+        if provider == .bff && baseURL == nil {
+            return "BFF 模式必须提供 baseURL（BFF 网关地址）"
+        }
         if let cache = cache, cache.similarityThreshold < 0 || cache.similarityThreshold > 1 {
             return "cache.similarityThreshold 必须在 [0, 1] 区间"
         }
@@ -77,7 +82,9 @@ public enum AetherProvider: String, Sendable, CaseIterable, Equatable {
         switch self {
         case .deepSeek: return .deepseek
         case .qwen: return .qwen
-        case .bff: return .deepseek // BFF 走 DeepSeek 兼容路径，BFF 逻辑由 AuthConfig 体现
+        // BFF 模式固定转发至 DeepSeek 上游（X-Provider: deepseek），
+        // 真正的代理调用由 BFFProxyClient 完成，不复用 DeepSeekClient
+        case .bff: return .deepseek
         case .onDevice: return .onDevice
         }
     }

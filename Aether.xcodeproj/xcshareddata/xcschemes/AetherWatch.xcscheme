@@ -28,8 +28,6 @@
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       shouldUseLaunchSchemeArgsEnv = "YES"
       shouldAutocreateTestPlan = "YES">
-      <Testables>
-      </Testables>
    </TestAction>
    <LaunchAction
       buildConfiguration = "Debug"
@@ -47,7 +45,6 @@
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A86D99A3DB1C6A2FF6E735E2"
             BuildableName = "AetherWatch.app"
-            BlueprintName = "AetherWatch"
             ReferencedContainer = "container:Aether.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>

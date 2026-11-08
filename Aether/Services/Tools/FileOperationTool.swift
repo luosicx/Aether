@@ -51,22 +51,61 @@ final class FileOperationTool: ToolProtocol, @unchecked Sendable {
     }()
 
     /// 校验路径是否安全：不在敏感目录黑名单内。
-    /// 对路径做标准化（解析 `..`、符号链接、冗余分隔符）后检查前缀。
+    /// 对路径做标准化（解析 `..`、冗余分隔符）并解析符号链接后检查前缀，
+    /// 防止通过符号链接祖先目录绕过黑名单。
     /// 大小写不敏感比较，防止在大小写不敏感文件系统（APFS 默认）上绕过。
     /// - Parameter path: 用户提供的原始路径
     /// - Returns: 通过校验的标准化路径，或 nil 表示路径被拒绝
     private func validatePath(_ path: String) -> String? {
+        guard !path.isEmpty, !path.contains("\0") else { return nil }
         // 标准化路径：解析 .. 和 . 等
         let standardized = (path as NSString).standardizingPath
+        // 解析符号链接，防止 /tmp/link → ~/.ssh 之类的绕过
+        let resolved = URL(fileURLWithPath: standardized)
+            .resolvingSymlinksInPath()
+            .standardizedFileURL
+            .path
         // 大小写不敏感比较，防止 /Users/Alice/.ssh 绕过 /Users/alice/.ssh
-        let lowercased = standardized.lowercased()
-        for prefix in sensitivePathPrefixes {
-            let prefixLower = prefix.lowercased()
-            if lowercased == prefixLower || lowercased.hasPrefix(prefixLower + "/") {
-                return nil
+        for candidate in [standardized, resolved] {
+            let lowercased = candidate.lowercased()
+            for prefix in sensitivePathPrefixes {
+                let prefixLower = prefix.lowercased()
+                if lowercased == prefixLower || lowercased.hasPrefix(prefixLower + "/") {
+                    return nil
+                }
             }
         }
+        // 返回标准化路径而非解析后的路径，保留符号链接本身的操作语义
         return standardized
+    }
+
+    /// 校验新文件名并构造同目录下的目标 URL。
+    /// 文件名必须是单个路径组件：拒绝空名、路径分隔符、`.`/`..`、NUL 与超长名称。
+    /// - Parameters:
+    ///   - source: 源文件 URL
+    ///   - newName: 用户提供的新文件名
+    /// - Returns: 目标 URL，或 nil 表示文件名非法/越界
+    private func renameDestination(source: URL, newName: String) -> URL? {
+        guard !newName.isEmpty,
+              newName.utf8.count <= 255,
+              newName != ".",
+              newName != "..",
+              !newName.contains("/"),
+              !newName.contains("\\"),
+              !newName.contains("\0"),
+              !(newName as NSString).isAbsolutePath else {
+            return nil
+        }
+        let parent = source.deletingLastPathComponent()
+        let destination = parent.appendingPathComponent(newName, isDirectory: false).standardizedFileURL
+        // 拼接后必须仍位于源文件所在目录（防止 URL 规范化引入越界）
+        let resolvedParent = parent.resolvingSymlinksInPath().standardizedFileURL.path
+        let resolvedDestinationParent = destination.deletingLastPathComponent()
+            .resolvingSymlinksInPath()
+            .standardizedFileURL
+            .path
+        guard resolvedParent == resolvedDestinationParent else { return nil }
+        return destination
     }
 
     /// 执行文件操作
@@ -174,8 +213,13 @@ final class FileOperationTool: ToolProtocol, @unchecked Sendable {
             return "错误：拒绝访问敏感路径"
         }
         let srcURL = URL(fileURLWithPath: safePath)
-        // 在原路径所在目录下拼接新文件名
-        let dstURL = srcURL.deletingLastPathComponent().appendingPathComponent(newName)
+        // 新文件名必须是单个组件，且目标仍位于原目录内
+        guard let dstURL = renameDestination(source: srcURL, newName: newName) else {
+            return "错误：新文件名无效"
+        }
+        guard validatePath(dstURL.path) != nil else {
+            return "错误：拒绝访问敏感路径"
+        }
         do {
             try fm.moveItem(at: srcURL, to: dstURL)
             return "已重命名"

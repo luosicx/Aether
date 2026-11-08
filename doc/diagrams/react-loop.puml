@@ -67,8 +67,8 @@ loop loopCount < 5 轮
             VM -> DB: 保存 tool 消息
         end
 
-        VM -> VM: apiMessages = conversation.messages
-        note right of VM: 继续下一轮 ReAct 循环
+        VM -> VM: nextMessages = apiMessages + assistant(tool_calls) + tool 结果
+        note right of VM: 保留 system / RAG / 记忆上下文，继续下一轮 ReAct 循环
     else 无 tool_calls
         VM -> VM: break 跳出循环
     end

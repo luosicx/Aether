@@ -71,14 +71,30 @@ public final class AetherClient: @unchecked Sendable {
 
     // MARK: - 内部工具
 
-    /// 解析 LLMProvider：onDevice 必须注入，其余通过 ModelProviderFactory 构造
+    /// 解析 LLMProvider：onDevice 必须注入，BFF 走代理，其余通过 ModelProviderFactory 构造
     private static func resolveProvider(for config: AetherConfig) throws -> LLMProvider {
         switch config.provider {
-        case .deepSeek, .qwen, .bff:
+        case .deepSeek, .qwen:
             return ModelProviderFactory.make(config.provider.internalProvider)
+        case .bff:
+            return try makeBFFProvider(for: config)
         case .onDevice:
             throw AetherError.invalidConfig(reason: "onDevice provider 必须通过 init(config:provider:) 注入 OfflineLLMProvider")
         }
+    }
+
+    /// 构造 BFF 代理客户端。
+    /// BFF Token 通过 `X-BFF-Token` 发送，绝不作为上游 Bearer；上游 API Key 由服务端持有。
+    private static func makeBFFProvider(for config: AetherConfig) throws -> LLMProvider {
+        guard let endpointURL = config.baseURL else {
+            throw AetherError.invalidConfig(reason: "BFF 模式必须提供 baseURL（BFF 网关地址）")
+        }
+        let bffConfig = BFFConfig(
+            enabled: true,
+            endpointURL: endpointURL,
+            userToken: config.apiKey
+        )
+        return BFFProxyClient(provider: config.provider.internalProvider, config: bffConfig)
     }
 
     /// 获取或懒创建 SemanticCache（@MainActor 隔离）

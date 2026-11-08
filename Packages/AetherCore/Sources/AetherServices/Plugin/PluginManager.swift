@@ -38,11 +38,14 @@ public final class PluginManager {
 
     /// 安装插件。若插件 ID 已存在则覆盖（视为更新）。
     /// - Parameter manifest: 插件清单
-    /// - Throws: 插件 ID 为空时抛出错误
+    /// - Throws: 插件 ID 为空或不合法时抛出错误
     public func install(manifest: PluginManifest) throws {
         guard !manifest.id.isEmpty else {
             throw NSError(domain: "PluginManager", code: 1,
                           userInfo: [NSLocalizedDescriptionKey: "插件 ID 不能为空"])
+        }
+        guard PluginPathPolicy.isValidPluginID(manifest.id) else {
+            throw PluginPathError.invalidPluginID(manifest.id)
         }
         installedPlugins[manifest.id] = manifest
     }
@@ -144,9 +147,14 @@ public final class PluginManager {
                   let manifest = try? decoder.decode(PluginManifest.self, from: data) else {
                 continue
             }
-            // 校验入口 JS 文件存在
-            let entryURL = dir.appendingPathComponent(manifest.entryPoint)
-            guard fm.fileExists(atPath: entryURL.path) else {
+            // 插件 ID 必须合法且与所在目录名一致，避免清单冒充其他插件
+            guard PluginPathPolicy.isValidPluginID(manifest.id),
+                  manifest.id == dir.lastPathComponent else {
+                continue
+            }
+            // 校验入口 JS 文件存在，且解析后仍位于插件目录内
+            guard let entryURL = try? PluginPathPolicy.entryPointURL(root: dir, entryPoint: manifest.entryPoint),
+                  fm.fileExists(atPath: entryURL.path) else {
                 continue
             }
             installedPlugins[manifest.id] = manifest
@@ -159,10 +167,10 @@ public final class PluginManager {
     /// - Parameter pluginID: 插件 ID
     /// - Returns: 入口 JS 文件 URL，插件未安装或文件不存在返回 nil
     public func entryFileURL(for pluginID: String) -> URL? {
-        guard let manifest = installedPlugins[pluginID] else { return nil }
-        return pluginDirectory
-            .appendingPathComponent(pluginID, isDirectory: true)
-            .appendingPathComponent(manifest.entryPoint)
+        guard PluginPathPolicy.isValidPluginID(pluginID),
+              let manifest = installedPlugins[pluginID] else { return nil }
+        let root = pluginDirectory.appendingPathComponent(pluginID, isDirectory: true)
+        return try? PluginPathPolicy.entryPointURL(root: root, entryPoint: manifest.entryPoint)
     }
 }
 

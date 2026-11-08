@@ -53,7 +53,7 @@ export async function handleDeleteMessage(request, env, ctx, messageId) {
 
   try {
     // 通过 JOIN 校验消息所属会话属于当前用户
-    const { changes } = await env.DB.prepare(
+    const result = await env.DB.prepare(
       `DELETE FROM messages
        WHERE id = ?1 AND conversation_id IN (
          SELECT id FROM conversations WHERE user_id = ?2
@@ -61,7 +61,7 @@ export async function handleDeleteMessage(request, env, ctx, messageId) {
     )
       .bind(messageId, auth.userId)
       .run();
-    if (changes === 0) return jsonError(404, "消息不存在或无权删除");
+    if ((result.meta?.changes ?? 0) === 0) return jsonError(404, "消息不存在或无权删除");
     return jsonOk({ deleted: true, id: messageId });
   } catch (err) {
     return jsonError(500, "删除消息失败: " + (err && err.message));
@@ -96,7 +96,7 @@ export async function handleSubmitFeedback(request, env, ctx, messageId) {
   }
 
   try {
-    const { changes } = await env.DB.prepare(
+    const result = await env.DB.prepare(
       `UPDATE messages SET feedback = ?1
        WHERE id = ?2 AND conversation_id IN (
          SELECT id FROM conversations WHERE user_id = ?3
@@ -104,7 +104,7 @@ export async function handleSubmitFeedback(request, env, ctx, messageId) {
     )
       .bind(feedbackValue, messageId, auth.userId)
       .run();
-    if (changes === 0) return jsonError(404, "消息不存在或无权操作");
+    if ((result.meta?.changes ?? 0) === 0) return jsonError(404, "消息不存在或无权操作");
     return jsonOk({ id: messageId, feedback: feedbackValue });
   } catch (err) {
     console.error("反馈失败:", err && err.message);

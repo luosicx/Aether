@@ -371,6 +371,70 @@ final class PluginManagerTests: XCTestCase {
         XCTAssertFalse(manager.isInstalled(pluginID), "缺少入口文件不应安装")
     }
 
+    // MARK: - P1 安全：插件 ID 与入口点校验
+
+    /// install 应拒绝包含路径分隔符或点段的插件 ID
+    func testInstallRejectsMaliciousPluginID() {
+        let manager = PluginManager()
+        XCTAssertThrowsError(try manager.install(manifest: makeTestManifest(id: "../escape")),
+                             "含路径穿越的插件 ID 应被拒绝")
+        XCTAssertFalse(manager.isInstalled("../escape"))
+    }
+
+    /// scanLocalPlugins 应跳过清单 ID 与目录名不一致的插件
+    func testScanLocalPluginsSkipsMismatchedID() throws {
+        let manager = PluginManager()
+        let dirID = "scan-mismatch-\(UUID().uuidString.prefix(8))"
+        let fm = FileManager.default
+        let appSupport = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? fm.temporaryDirectory
+        let pluginDir = appSupport.appendingPathComponent("Plugins", isDirectory: true)
+            .appendingPathComponent(dirID, isDirectory: true)
+        try fm.createDirectory(at: pluginDir, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: pluginDir) }
+
+        let manifest = PluginManifest(
+            id: "different-id", name: "冒充插件", version: "1.0.0", author: "测试",
+            description: "冒充", tools: [], permissions: [], entryPoint: "main.js"
+        )
+        try JSONEncoder().encode(manifest).write(to: pluginDir.appendingPathComponent("manifest.json"))
+        try "function execute(args) { return 'x'; }".data(using: .utf8)!
+            .write(to: pluginDir.appendingPathComponent("main.js"))
+
+        let loaded = try manager.scanLocalPlugins()
+        XCTAssertFalse(loaded.contains(where: { $0.id == "different-id" }), "ID 与目录不一致的插件应被跳过")
+        XCTAssertFalse(manager.isInstalled("different-id"))
+    }
+
+    /// scanLocalPlugins 应跳过入口点越界的插件
+    func testScanLocalPluginsSkipsTraversalEntryPoint() throws {
+        let manager = PluginManager()
+        let pluginID = "scan-traversal-\(UUID().uuidString.prefix(8))"
+        let fm = FileManager.default
+        let appSupport = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? fm.temporaryDirectory
+        let pluginsRoot = appSupport.appendingPathComponent("Plugins", isDirectory: true)
+        let pluginDir = pluginsRoot.appendingPathComponent(pluginID, isDirectory: true)
+        try fm.createDirectory(at: pluginDir, withIntermediateDirectories: true)
+        let escapedFile = pluginsRoot.appendingPathComponent("escaped-\(pluginID).js")
+        try "function execute(args) { return 'x'; }".data(using: .utf8)!.write(to: escapedFile)
+        defer {
+            try? fm.removeItem(at: pluginDir)
+            try? fm.removeItem(at: escapedFile)
+        }
+
+        let manifest = PluginManifest(
+            id: pluginID, name: "越界插件", version: "1.0.0", author: "测试",
+            description: "越界", tools: [], permissions: [],
+            entryPoint: "../escaped-\(pluginID).js"
+        )
+        try JSONEncoder().encode(manifest).write(to: pluginDir.appendingPathComponent("manifest.json"))
+
+        let loaded = try manager.scanLocalPlugins()
+        XCTAssertFalse(loaded.contains(where: { $0.id == pluginID }), "入口点越界的插件应被跳过")
+        XCTAssertFalse(manager.isInstalled(pluginID))
+    }
+
     /// entryFileURL 应返回插件入口 JS 的完整路径
     func testEntryFileURLReturnsCorrectPath() throws {
         let manager = PluginManager()

@@ -19,7 +19,8 @@ final class PluginToolAdapterTests: XCTestCase {
     // MARK: - 辅助：构造适配器
 
     /// 使用内联 JS 代码构造一个 PluginToolAdapter
-    private func makeAdapter(jsCode: String, pluginID: String = "js-test") -> PluginToolAdapter {
+    private func makeAdapter(jsCode: String, pluginID: String = "js-test",
+                             executionTimeout: TimeInterval = 30) -> PluginToolAdapter {
         let toolDef = PluginManifest.PluginToolDef(
             name: "js_tool", description: "JS 测试工具",
             parameters: ["type": "object", "properties": [:]]
@@ -29,7 +30,16 @@ final class PluginToolAdapterTests: XCTestCase {
             description: "JS 执行测试", tools: [toolDef], permissions: [],
             entryPoint: jsCode
         )
-        return PluginToolAdapter(manifest: manifest, toolDef: toolDef)
+        return PluginToolAdapter(manifest: manifest, toolDef: toolDef, executionTimeout: executionTimeout)
+    }
+
+    /// 插件根目录（AppSupport/Plugins/{pluginID}）
+    private func pluginDirectory(for pluginID: String) -> URL {
+        let fm = FileManager.default
+        let appSupport = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? fm.temporaryDirectory
+        return appSupport.appendingPathComponent("Plugins", isDirectory: true)
+            .appendingPathComponent(pluginID, isDirectory: true)
     }
 
     // MARK: - 内联 JS 执行
@@ -316,5 +326,139 @@ final class PluginToolAdapterTests: XCTestCase {
             XCTAssertTrue(error.localizedDescription.contains("execute"),
                           "错误应提示缺少 execute 函数，实际：\(error.localizedDescription)")
         }
+    }
+
+    // MARK: - P1 安全：路径越界
+
+    /// 穿越式入口点不得读取插件目录外的文件
+    func testTraversalEntryPointIsRejected() async throws {
+        let pluginID = "traversal-\(UUID().uuidString.prefix(8))"
+        let fm = FileManager.default
+        let pluginsRoot = pluginDirectory(for: pluginID).deletingLastPathComponent()
+        try fm.createDirectory(at: pluginsRoot, withIntermediateDirectories: true)
+        let escapedFile = pluginsRoot.appendingPathComponent("escaped.js")
+        try "function execute(args) { return 'escaped'; }".data(using: .utf8)!.write(to: escapedFile)
+        defer { try? fm.removeItem(at: escapedFile) }
+
+        let toolDef = PluginManifest.PluginToolDef(
+            name: "escape_tool", description: "越界测试", parameters: ["type": "object"]
+        )
+        let manifest = PluginManifest(
+            id: pluginID, name: "越界插件", version: "1.0.0", author: "测试",
+            description: "越界", tools: [toolDef], permissions: [], entryPoint: "../escaped.js"
+        )
+        let adapter = PluginToolAdapter(manifest: manifest, toolDef: toolDef)
+
+        do {
+            let result = try await adapter.execute(arguments: [:])
+            XCTFail("穿越式入口点应被拒绝，实际执行结果：\(result)")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("越界") || error.localizedDescription.contains("入口点"),
+                          "错误应说明入口点越界，实际：\(error.localizedDescription)")
+        }
+    }
+
+    /// 入口文件为指向目录外的符号链接时应被拒绝
+    func testSymlinkedEntryFileIsRejected() async throws {
+        let pluginID = "symlink-\(UUID().uuidString.prefix(8))"
+        let fm = FileManager.default
+        let pluginDir = pluginDirectory(for: pluginID)
+        try fm.createDirectory(at: pluginDir, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: pluginDir) }
+
+        let outsideFile = fm.temporaryDirectory.appendingPathComponent("outside-\(UUID().uuidString).js")
+        try "function execute(args) { return 'outside'; }".data(using: .utf8)!.write(to: outsideFile)
+        defer { try? fm.removeItem(at: outsideFile) }
+        try fm.createSymbolicLink(at: pluginDir.appendingPathComponent("main.js"), withDestinationURL: outsideFile)
+
+        let toolDef = PluginManifest.PluginToolDef(
+            name: "symlink_tool", description: "符号链接测试", parameters: ["type": "object"]
+        )
+        let manifest = PluginManifest(
+            id: pluginID, name: "符号链接插件", version: "1.0.0", author: "测试",
+            description: "符号链接", tools: [toolDef], permissions: [], entryPoint: "main.js"
+        )
+        let adapter = PluginToolAdapter(manifest: manifest, toolDef: toolDef)
+
+        do {
+            let result = try await adapter.execute(arguments: [:])
+            XCTFail("符号链接逃逸应被拒绝，实际执行结果：\(result)")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("越界") || error.localizedDescription.contains("入口点"),
+                          "错误应说明入口点越界，实际：\(error.localizedDescription)")
+        }
+    }
+
+    // MARK: - P1 安全：执行配额
+
+    /// 长时间运行的脚本应按时超时返回错误
+    func testExecutionTimeoutThrows() async throws {
+        let adapter = makeAdapter(jsCode: """
+        function execute(args) {
+            var end = Date.now() + 1500;
+            while (Date.now() < end) {}
+            return "done";
+        }
+        """, executionTimeout: 0.1)
+
+        do {
+            _ = try await adapter.execute(arguments: [:])
+            XCTFail("超时脚本应抛错")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("超时"),
+                          "错误应说明执行超时，实际：\(error.localizedDescription)")
+        }
+    }
+
+    /// 超过 1 MB 的 JS 源码应被拒绝
+    func testOversizedSourceIsRejected() async throws {
+        let padding = String(repeating: "a", count: 1_048_577)
+        let adapter = makeAdapter(jsCode: "function execute(args) { return 'x'; }\n//" + padding)
+        do {
+            _ = try await adapter.execute(arguments: [:])
+            XCTFail("超长源码应被拒绝")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("源码"),
+                          "错误应说明源码超限，实际：\(error.localizedDescription)")
+        }
+    }
+
+    /// 超过 256 KB 的参数应被拒绝
+    func testOversizedArgumentsAreRejected() async throws {
+        let adapter = makeAdapter(jsCode: "function execute(args) { return 'ok'; }")
+        do {
+            _ = try await adapter.execute(arguments: ["blob": String(repeating: "a", count: 300 * 1024)])
+            XCTFail("超大参数应被拒绝")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("参数"),
+                          "错误应说明参数超限，实际：\(error.localizedDescription)")
+        }
+    }
+
+    /// 超过 1 MB 的返回值应被拒绝
+    func testOversizedResultIsRejected() async throws {
+        let adapter = makeAdapter(jsCode: """
+        function execute(args) {
+            return "x".repeat(1048577);
+        }
+        """)
+        do {
+            _ = try await adapter.execute(arguments: [:])
+            XCTFail("超大返回值应被拒绝")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("返回值"),
+                          "错误应说明返回值超限，实际：\(error.localizedDescription)")
+        }
+    }
+
+    /// 动态代码执行入口（eval / Function）应被移除
+    func testDynamicCodeEntryPointsAreRemoved() async throws {
+        let adapter = makeAdapter(jsCode: """
+        function execute(args) {
+            return typeof eval + "|" + typeof Function;
+        }
+        """)
+        let result = try await adapter.execute(arguments: [:])
+        XCTAssertEqual(result, "undefined|undefined", "eval 与 Function 应不可用")
     }
 }

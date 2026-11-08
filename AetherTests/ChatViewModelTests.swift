@@ -18,6 +18,7 @@ final class ChatViewModelTests: XCTestCase {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         container = try ModelContainer(
             for: Conversation.self, ChatMessage.self, UserPreference.self, DocumentChunk.self,
+            MessageFeedback.self,
             configurations: config
         )
         context = ModelContext(container)
@@ -638,10 +639,10 @@ final class ChatViewModelTests: XCTestCase {
         }
         // 第 21 次应触发限流
         await vm.processMessage("你好", conversation: conv, modelContext: context)
-        XCTAssertEqual(
-            vm.errorMessage,
-            String(format: NSLocalizedString("请求过于频繁，请 %d 秒后重试", comment: ""), 3),
-            "令牌耗尽后应设置限流 errorMessage"
+        // retryAfter 由令牌桶按墙上时钟计算，循环耗时会使秒数在 1~3 间浮动，只校验提示语义
+        XCTAssertTrue(
+            vm.errorMessage?.hasPrefix(NSLocalizedString("请求过于频繁，请", comment: "")) == true,
+            "令牌耗尽后应设置限流 errorMessage，实际：\(vm.errorMessage ?? "nil")"
         )
         XCTAssertFalse(vm.isLoading, "限流后 isLoading 应为 false")
     }
@@ -718,6 +719,29 @@ final class ChatViewModelTests: XCTestCase {
 
         XCTAssertEqual(vm.lastUsedProvider, .onDevice, "非降级时 lastUsedProvider 应为 selectedProvider")
         XCTAssertFalse(vm.didFallbackLastRequest)
+    }
+
+    /// P1-9 回归：端侧 + 工具请求实际走云端 fallback，应读取该云端 provider 的 Key 而不是端侧 Key
+    func testOnDeviceWithToolsReadsCloudProviderApiKey() async throws {
+        let mock = MockLLMProvider()
+        mock.chatChunks = ["回复"]
+        let vm = ChatViewModel(client: mock)
+        vm.selectedProvider = .onDevice
+        vm.toolsEnabled = true
+        try KeychainManager.shared.saveAPIKey("deepseek-key", for: .deepseek)
+
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+        let userMsg = ChatMessage(role: "user", content: "你好")
+        userMsg.conversation = conv
+        conv.messages.append(userMsg)
+
+        await vm.processMessage("你好", conversation: conv, modelContext: context)
+
+        XCTAssertEqual(vm.lastUsedProvider, .deepseek,
+                       "端侧 + 工具且在线时应使用云端 fallback provider")
+        XCTAssertEqual(mock.capturedApiKey, "deepseek-key",
+                       "应读取实际请求 provider 的 Key，而不是端侧占位 Key")
     }
 
     /// switchToOnDevice 保存原 provider 并切换到端侧；switchToOriginalProvider 恢复
@@ -1689,6 +1713,22 @@ final class ChatViewModelTests: XCTestCase {
         XCTAssertTrue(limited.isEmpty, "单条消息超过 limit 时应返回空数组")
     }
 
+    /// P1-8 回归：工具轮次整体超限时应整组丢弃，不能留下孤立 tool 消息
+    func testLimitTokensDropsWholeToolGroup() {
+        let vm = ChatViewModel()
+        let toolCall = ToolCallParam(id: "call-1", type: "function",
+                                     function: FunctionCall(name: "calculate", arguments: "{}"))
+        let messages = [
+            APIMessage(role: "user", content: "a b"),
+            APIMessage(role: "assistant", content: "x", toolCalls: [toolCall]),
+            APIMessage(role: "tool", content: "i j", toolCallId: "call-1", toolName: "calculate"),
+            APIMessage(role: "tool", content: "k l", toolCallId: "call-1", toolName: "calculate")
+        ]
+        let limited = vm.limitTokens(messages, max: 4)
+        XCTAssertTrue(limited.isEmpty,
+                      "工具轮次超限时应整组丢弃，不能只保留末尾 tool 结果")
+    }
+
     /// buildEffectiveSystemPrompt 所有偏好默认（tone="默认"）时应返回原 base
     func testBuildEffectiveSystemPromptDefaultToneReturnsBase() {
         let vm = ChatViewModel()
@@ -2216,7 +2256,7 @@ final class ChatViewModelTests: XCTestCase {
         XCTAssertEqual(vm.currentToolSteps.count, 0)
     }
 
-    /// processMessage 在空响应时仍应复位 loading 与 streamingText
+    /// processMessage 在空响应时复位 loading/streamingText，且不持久化空助手消息
     func testProcessMessageResetsLoadingOnEmptyResponse() async throws {
         let mock = MockLLMProvider()
         mock.chatChunks = []  // 空响应
@@ -2232,10 +2272,49 @@ final class ChatViewModelTests: XCTestCase {
 
         XCTAssertFalse(vm.isLoading, "空响应后 isLoading 应复位")
         XCTAssertEqual(vm.streamingText, "", "空响应后 streamingText 应清空")
-        // assistant 消息仍会被追加（即使内容为空）
-        let assistantMsgs = conv.messages.filter { $0.role == "assistant" }
-        XCTAssertEqual(assistantMsgs.count, 1)
-        XCTAssertEqual(assistantMsgs.first?.content, "")
+        XCTAssertTrue(conv.messages.filter { $0.role == "assistant" }.isEmpty,
+                      "空响应不应持久化空的助手消息")
+        XCTAssertTrue(vm.messages.filter { $0.role == "assistant" }.isEmpty,
+                      "空响应不应向 UI 追加助手消息")
+    }
+
+    // MARK: - 流式取消生命周期
+
+    /// 切换会话取消流式：取消传播到上游生产 Task，且不持久化部分助手回复
+    func testSwitchToDuringStreamingCancelsProducerAndSkipsPersistence() async throws {
+        let mock = MockLLMProvider()
+        mock.chatChunks = ["部分", "回复", "不应落库"]
+        mock.chunkDelayNanoseconds = 50_000_000  // 50ms / chunk，制造取消窗口
+        let vm = ChatViewModel(client: mock)
+        vm.selectedProvider = .onDevice
+
+        let conv1 = Conversation(title: "会话1", systemPrompt: "你是助手")
+        context.insert(conv1)
+        vm.inputText = "你好"
+        vm.sendMessage(in: conv1, modelContext: context)
+
+        // 等待首个 chunk 进入流式文本
+        for _ in 0..<50 {
+            if !vm.streamingText.isEmpty { break }
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        XCTAssertFalse(vm.streamingText.isEmpty, "前置：应已开始流式输出")
+
+        let conv2 = Conversation(title: "会话2", systemPrompt: "你是助手")
+        context.insert(conv2)
+        vm.switchTo(conversation: conv2)
+
+        // 等待取消传播到上游生产 Task
+        for _ in 0..<50 {
+            if mock.producerCancelled { break }
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        XCTAssertTrue(mock.producerCancelled, "切换会话应取消上游流生产 Task")
+        XCTAssertFalse(vm.isLoading, "取消后 isLoading 应为 false")
+
+        try await Task.sleep(nanoseconds: 200_000_000)  // 留出未取消场景下继续流式的时间
+        XCTAssertTrue(conv1.messages.filter { $0.role == "assistant" }.isEmpty,
+                      "取消后不应持久化部分助手回复")
     }
 
     // MARK: - 补充测试 Phase 9: 会话切换与加载边界
@@ -2608,6 +2687,37 @@ final class ChatViewModelTests: XCTestCase {
         XCTAssertEqual(assistantMsgs.first?.toolCalls?.count, 1,
                        "assistant 消息应携带 toolCalls")
         XCTAssertEqual(assistantMsgs.first?.toolCalls?.first?.function.name, "calculate")
+    }
+
+    /// P1-7 回归：ReAct 第二轮必须保留 system prompt 等初始上下文，不能从 conversation.messages 重建
+    func testToolCallSecondRoundPreservesSystemPrompt() async throws {
+        let mock = MockLLMProvider()
+        mock.toolCalls = [
+            AccumulatedToolCall(id: "call-1", type: "function", name: "calculate",
+                                arguments: "{\"expression\": \"1 + 1\"}")
+        ]
+        let vm = ChatViewModel(client: mock)
+        vm.selectedProvider = .onDevice
+        vm.toolsEnabled = true
+        let conv = Conversation(title: "测试", systemPrompt: "你是助手")
+        context.insert(conv)
+        let userMsg = ChatMessage(role: "user", content: "计算")
+        userMsg.conversation = conv
+        conv.messages.append(userMsg)
+
+        await vm.processMessage("计算", conversation: conv, modelContext: context)
+
+        XCTAssertGreaterThanOrEqual(mock.capturedMessagesHistory.count, 2, "ReAct 应至少调用 2 次 chat")
+        let firstCall = mock.capturedMessagesHistory[0]
+        let secondCall = mock.capturedMessagesHistory[1]
+        XCTAssertEqual(secondCall.first?.role, "system",
+                       "ReAct 第二轮第一条消息必须是 system")
+        XCTAssertTrue(secondCall.contains { $0.role == "system" && $0.content.contains("你是助手") },
+                      "ReAct 第二轮不应丢失 system prompt / RAG / 记忆上下文")
+        XCTAssertEqual(secondCall.count, firstCall.count + 2,
+                       "第二轮应仅追加 assistant(tool_calls) 与 tool 结果两条消息")
+        XCTAssertEqual(secondCall.last?.role, "tool",
+                       "追加的最后一条应为 tool 结果消息")
     }
 
     /// 空响应时 lastDebugInfo.apiResponse 应显示「无」
@@ -3096,6 +3206,20 @@ final class MockLLMProvider: LLMProvider, @unchecked Sendable {
     var repeatToolCalls: Bool = false
     /// chunk 之间延迟（纳秒），用于测试流式取消
     var chunkDelayNanoseconds: UInt64 = 0
+    /// 上游生产 Task 是否因消费端取消而终止（验证 onTermination 取消传播）
+    private let cancellationLock = NSLock()
+    private var _producerCancelled = false
+    var producerCancelled: Bool {
+        cancellationLock.lock()
+        defer { cancellationLock.unlock() }
+        return _producerCancelled
+    }
+
+    private func markProducerCancelled() {
+        cancellationLock.lock()
+        _producerCancelled = true
+        cancellationLock.unlock()
+    }
 
     func reset() {
         capturedConfig = nil
@@ -3104,6 +3228,9 @@ final class MockLLMProvider: LLMProvider, @unchecked Sendable {
         capturedMessagesHistory.removeAll()
         embedError = nil
         toolCallsYielded = false
+        cancellationLock.lock()
+        _producerCancelled = false
+        cancellationLock.unlock()
     }
 
     func chat(messages: [APIMessage], config: ChatConfig, apiKey: String) -> AsyncStream<String> {
@@ -3112,14 +3239,19 @@ final class MockLLMProvider: LLMProvider, @unchecked Sendable {
         capturedMessages = messages
         capturedMessagesHistory.append(messages)
         return AsyncStream<String> { cont in
-            Task {
+            let task = Task {
                 for chunk in self.chatChunks {
+                    if Task.isCancelled { break }
                     cont.yield(chunk)
                     if self.chunkDelayNanoseconds > 0 {
                         try? await Task.sleep(nanoseconds: self.chunkDelayNanoseconds)
                     }
                 }
                 cont.finish()
+            }
+            cont.onTermination = { [weak self] termination in
+                if case .cancelled = termination { self?.markProducerCancelled() }
+                task.cancel()
             }
         }
     }
@@ -3130,7 +3262,7 @@ final class MockLLMProvider: LLMProvider, @unchecked Sendable {
         capturedMessages = messages
         capturedMessagesHistory.append(messages)
         return AsyncStream<ParsedChunk> { cont in
-            Task {
+            let task = Task {
                 if let resp = self.toolChatResponse {
                     cont.yield(ParsedChunk(content: resp, toolCalls: nil))
                 }
@@ -3144,6 +3276,10 @@ final class MockLLMProvider: LLMProvider, @unchecked Sendable {
                     }
                 }
                 cont.finish()
+            }
+            cont.onTermination = { [weak self] termination in
+                if case .cancelled = termination { self?.markProducerCancelled() }
+                task.cancel()
             }
         }
     }
