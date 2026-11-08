@@ -7,11 +7,12 @@
     "deploy": "wrangler deploy",
     "dev": "wrangler dev",
     "test": "vitest run",
-    "test:e2e": "vitest run test/e2e-chat.test.js test/e2e-conversations.test.js test/e2e-memory.test.js test/e2e-messages.test.js test/e2e-rag.test.js test/e2e-proxy.test.js test/security-hotfix.test.js test/ratelimit-do.test.js test/stress-test.js",
+    "test:e2e": "vitest run test/e2e-chat.test.js test/e2e-conversations.test.js test/e2e-health.test.js test/e2e-memory.test.js test/e2e-messages.test.js test/e2e-rag.test.js test/e2e-proxy.test.js test/security-hotfix.test.js test/ratelimit-do.test.js test/contract.test.js test/stress-test.js",
     "build:wasm": "../rust/scripts/build-wasm.sh"
   },
   "devDependencies": {
+    "vitest": "^2.0.0",
     "wrangler": "^3.0.0",
-    "vitest": "^2.0.0"
+    "yaml": "^2.9.1"
   }
 }

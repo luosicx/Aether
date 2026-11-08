@@ -5,6 +5,10 @@ info:
   description: |
     Aether 跨平台业务网关 BFF API 契约。
 
+    本文件是 BFF 线协议的**唯一契约源**：Worker 路由与三端客户端 DTO 均需与之一致，
+    `test/contract.test.js` 会在 CI 中校验路由、响应 envelope 与客户端字段是否漂移。
+    每个 operation 的 `operationId` 必须与 `worker.js` 中 `dispatch` 的 handler id 完全相同。
+
     所有受保护端点需在请求头携带 `X-BFF-Token`，由 Cloudflare Worker 校验 KV `bff_tokens` 合法性。
 
     ## 鉴权
@@ -13,10 +17,18 @@ info:
 
     ## 限流
     - chat 端点每 userId 每分钟 60 次，超额返回 429 + `Retry-After` 头
+    - 其余业务端点每 userId 每分钟 600 次
+
+    ## 响应约定
+    - 单资源使用 envelope：`{ "conversation": {...} }`、`{ "memory": {...} }`、`{ "summary": {...} }`
+    - 列表使用 envelope：`{ "conversations": [...] }`、`{ "messages": [...] }`、`{ "memories": [...] }`、`{ "chunks": [...] }`
+    - 删除统一返回 `{ "deleted": true, "id": "<资源 id>" }`
+    - 错误统一返回 `{ "error": "<消息>" }`
 
     ## SSE 流式格式
     - `data: {"type":"delta","content":"xxx"}\n\n`
-    - `data: {"type":"done","conversationId":"...","messageId":"..."}\n\n`
+    - `data: {"type":"done","conversationId":"...","messageId":"...","userMessageId":"..."}\n\n`
+    - `data: {"type":"error","message":"..."}\n\n`
     - `data: [DONE]\n\n`
 
     ## 向后兼容
@@ -28,6 +40,9 @@ servers:
   - url: https://aether-bff.<your-subdomain>.workers.dev
     description: Cloudflare Workers 部署地址
 
+security:
+  - BFFToken: []
+
 components:
   securitySchemes:
     BFFToken:
@@ -35,9 +50,6 @@ components:
       in: header
       name: X-BFF-Token
       description: BFF Token，由 Cloudflare KV `bff_tokens` 校验
-
-  security:
-    - BFFToken: []
 
   schemas:
     Error:
@@ -153,6 +165,7 @@ components:
           default: 1.0
         created_at:
           type: integer
+          description: 毫秒时间戳；关键词检索路径未 SELECT 该列，客户端需容忍缺省
         document_title:
           type: string
           nullable: true
@@ -174,6 +187,15 @@ components:
         resting_heart_rate:
           type: integer
           nullable: true
+
+    DeletedResult:
+      type: object
+      required: [deleted, id]
+      properties:
+        deleted:
+          type: boolean
+        id:
+          type: string
 
     ChatRequest:
       type: object
@@ -224,9 +246,52 @@ components:
           type: string
           description: error 事件携带
 
+  responses:
+    BadRequest:
+      description: 请求体或参数不合法
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: 未鉴权（X-BFF-Token 缺失或无效）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: 资源不存在或无权访问
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    RateLimited:
+      description: 限流
+      headers:
+        Retry-After:
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ServiceUnavailable:
+      description: 服务未配置（如 D1 未绑定）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    InternalError:
+      description: 服务端内部错误
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
 paths:
   /chat/stream:
     post:
+      operationId: chat.stream
       summary: 流式聊天
       description: 加载会话上下文 + 历史 + 记忆 + RAG，调用 LLM 流式返回 SSE。
       requestBody:
@@ -243,30 +308,19 @@ paths:
               schema:
                 $ref: '#/components/schemas/ChatSSEEvent'
         '400':
-          description: 请求体不合法
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
+          $ref: '#/components/responses/BadRequest'
         '401':
-          description: 未鉴权
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '429':
-          description: 限流
-          headers:
-            Retry-After:
-              schema:
-                type: string
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /conversations:
     get:
+      operationId: conversations.list
       summary: 列出会话
       parameters:
         - name: limit
@@ -291,12 +345,20 @@ paths:
             application/json:
               schema:
                 type: object
+                required: [conversations]
                 properties:
                   conversations:
                     type: array
                     items:
                       $ref: '#/components/schemas/Conversation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
     post:
+      operationId: conversations.create
       summary: 创建会话
       requestBody:
         required: true
@@ -317,10 +379,23 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Conversation'
+                type: object
+                required: [conversation]
+                properties:
+                  conversation:
+                    $ref: '#/components/schemas/Conversation'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /conversations/{id}:
     get:
+      operationId: conversations.get
       summary: 获取单个会话
       parameters:
         - name: id
@@ -338,9 +413,18 @@ paths:
                 properties:
                   conversation:
                     $ref: '#/components/schemas/Conversation'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
-          description: 会话不存在
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
     patch:
+      operationId: conversations.update
       summary: 更新会话
       parameters:
         - name: id
@@ -373,7 +457,18 @@ paths:
                 properties:
                   conversation:
                     $ref: '#/components/schemas/Conversation'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
     delete:
+      operationId: conversations.delete
       summary: 删除会话（级联删除其下消息）
       parameters:
         - name: id
@@ -384,9 +479,24 @@ paths:
       responses:
         '200':
           description: 删除成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletedResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /conversations/{conversationId}/messages:
     get:
+      operationId: messages.list
       summary: 列出某会话下的消息
       parameters:
         - name: conversationId
@@ -417,14 +527,26 @@ paths:
             application/json:
               schema:
                 type: object
+                required: [messages]
                 properties:
                   messages:
                     type: array
                     items:
                       $ref: '#/components/schemas/Message'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /messages/{messageId}:
     delete:
+      operationId: messages.delete
       summary: 删除单条消息
       parameters:
         - name: messageId
@@ -435,9 +557,24 @@ paths:
       responses:
         '200':
           description: 删除成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletedResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /messages/{messageId}/feedback:
     post:
+      operationId: messages.feedback
       summary: 对消息反馈
       parameters:
         - name: messageId
@@ -464,15 +601,27 @@ paths:
             application/json:
               schema:
                 type: object
+                required: [id, feedback]
                 properties:
                   id:
                     type: string
                   feedback:
                     type: integer
                     nullable: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /memory:
     get:
+      operationId: memory.list
       summary: 列出记忆
       parameters:
         - name: limit
@@ -496,12 +645,20 @@ paths:
             application/json:
               schema:
                 type: object
+                required: [memories]
                 properties:
                   memories:
                     type: array
                     items:
                       $ref: '#/components/schemas/Memory'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
     post:
+      operationId: memory.create
       summary: 创建记忆
       requestBody:
         required: true
@@ -526,12 +683,22 @@ paths:
             application/json:
               schema:
                 type: object
+                required: [memory]
                 properties:
                   memory:
                     $ref: '#/components/schemas/Memory'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /memory/search:
     post:
+      operationId: memory.search
       summary: 搜索记忆（文本匹配）
       requestBody:
         required: true
@@ -553,6 +720,7 @@ paths:
             application/json:
               schema:
                 type: object
+                required: [memories, query]
                 properties:
                   memories:
                     type: array
@@ -560,9 +728,16 @@ paths:
                       $ref: '#/components/schemas/Memory'
                   query:
                     type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /memory/{id}:
     delete:
+      operationId: memory.delete
       summary: 删除记忆
       parameters:
         - name: id
@@ -573,9 +748,24 @@ paths:
       responses:
         '200':
           description: 删除成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletedResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /rag/search:
     post:
+      operationId: rag.search
       summary: 检索文档分块
       requestBody:
         required: true
@@ -597,6 +787,7 @@ paths:
             application/json:
               schema:
                 type: object
+                required: [chunks, query]
                 properties:
                   chunks:
                     type: array
@@ -604,9 +795,16 @@ paths:
                       $ref: '#/components/schemas/DocumentChunk'
                   query:
                     type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /rag/documents:
     post:
+      operationId: rag.upload
       summary: 上传文档（含分块）
       requestBody:
         required: true
@@ -629,14 +827,24 @@ paths:
             application/json:
               schema:
                 type: object
+                required: [documentId, chunkCount]
                 properties:
                   documentId:
                     type: string
                   chunkCount:
                     type: integer
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /health/summary:
     post:
+      operationId: health.upload
       summary: 上报健康摘要（按 user_id + date upsert）
       requestBody:
         required: true
@@ -657,14 +865,27 @@ paths:
                   type: integer
       responses:
         '200':
-          description: 上报成功
+          description: 上报成功，返回写入后的摘要
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HealthSummary'
+                type: object
+                required: [summary]
+                properties:
+                  summary:
+                    $ref: '#/components/schemas/HealthSummary'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /health/summary/{date}:
     get:
+      operationId: health.get
       summary: 获取某日健康摘要
       parameters:
         - name: date
@@ -680,8 +901,17 @@ paths:
             application/json:
               schema:
                 type: object
+                required: [summary]
                 properties:
                   summary:
                     $ref: '#/components/schemas/HealthSummary'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
-          description: 该日期无数据
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
