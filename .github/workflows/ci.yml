@@ -805,11 +805,12 @@ jobs:
             echo "Merged coverage.xml verified successfully"
           fi
 
-      - name: Setup Java 17 (SonarScanner)
+      - name: Setup Java 21 (SonarScanner)
+        # SonarScanner CLI 8.x 要求 Java 21+，Java 17 会在启动时直接报错退出
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
 
       - name: SonarQube Scan
         uses: SonarSource/sonarqube-scan-action@v8
@@ -824,6 +825,7 @@ jobs:
           # qualitygate.wait 不在 args 中覆盖，使用 sonar-project.properties 中的设置（false）。
           # 原因：iOS xccov 在 Xcode 26.3 上不稳定，导致 new_coverage 指标波动；
           # 待 xccov 稳定或迁移到 xcresulttool 后可在 properties 中恢复为 true。
+          # 用上一步装好的 JDK 21（skipJreProvisioning），避免扫描器再下载 JRE
           args: >
             -Dsonar.scanner.skipJreProvisioning=true
             ${{ github.event_name == 'pull_request' && format('-Dsonar.pullrequest.key={0} -Dsonar.pullrequest.branch={1} -Dsonar.pullrequest.base={2} -Dsonar.pullrequest.provider=github -Dsonar.pullrequest.github.repository={3}', github.event.pull_request.number, github.head_ref, github.base_ref, github.repository) || '' }}
