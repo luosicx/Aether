@@ -1,5 +1,6 @@
 package com.aether.data.model
 
+import com.aether.data.db.ConversationEntity
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -14,6 +15,19 @@ data class Conversation(
     val isPinned: Boolean = false,
     val unreadCount: Int = 0,
     val order: Int = 0
+)
+
+fun Conversation.toEntity(): ConversationEntity = ConversationEntity(
+    id = id,
+    title = title,
+    systemPrompt = systemPrompt,
+    parentId = parentId,
+    createdAt = createdAt,
+    updatedAt = updatedAt,
+    lastMessagePreview = lastMessagePreview,
+    isPinned = isPinned,
+    unreadCount = unreadCount,
+    order = order
 )
 
 @Serializable

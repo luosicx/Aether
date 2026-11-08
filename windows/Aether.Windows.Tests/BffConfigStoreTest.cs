@@ -76,29 +76,6 @@ public class BffConfigStoreTest
     }
 
     [Fact]
-    public async Task LoadAsync_RoundTrip_WorksSameAsSync()
-    {
-        var path = GetTempConfigPath();
-        try
-        {
-            var store = new BffConfigStore(path);
-            store.BaseUrl = "https://async.example.com";
-            store.UserToken = "async-token";
-            await store.SaveAsync();
-
-            var store2 = new BffConfigStore(path);
-            await store2.LoadAsync();
-
-            Assert.Equal("https://async.example.com", store2.BaseUrl);
-            Assert.Equal("async-token", store2.UserToken);
-        }
-        finally
-        {
-            if (File.Exists(path)) File.Delete(path);
-        }
-    }
-
-    [Fact]
     public async Task Save_EmptyToken_StoresEmptyEncryptedToken()
     {
         var path = GetTempConfigPath();

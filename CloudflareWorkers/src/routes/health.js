@@ -7,6 +7,7 @@
  */
 
 import { jsonError } from "../lib/llm.js";
+import { jsonOk } from "../lib/utils.js";
 
 /**
  * POST /health/summary - 上报某日健康摘要（按 user_id + date upsert）
@@ -65,12 +66,4 @@ export async function handleGetHealthSummary(request, env, ctx, date) {
     console.error("查询健康摘要失败:", err && err.message);
     return jsonError(500, "查询健康摘要失败");
   }
-}
-
-/// 构造 JSON 成功响应
-function jsonOk(data, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
 }

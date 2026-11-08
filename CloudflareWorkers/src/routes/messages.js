@@ -7,6 +7,7 @@
  */
 
 import { jsonError } from "../lib/llm.js";
+import { jsonOk } from "../lib/utils.js";
 
 /**
  * GET /conversations/:conversationId/messages - 列出某会话下的消息
@@ -86,12 +87,4 @@ export async function handleSubmitFeedback(request, env, ctx, messageId) {
     console.error("反馈失败:", err && err.message);
     return jsonError(500, "反馈失败");
   }
-}
-
-/// 构造 JSON 成功响应
-function jsonOk(data, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
 }

@@ -7,6 +7,7 @@
  */
 
 import { jsonError } from "../lib/llm.js";
+import { jsonOk } from "../lib/utils.js";
 
 /**
  * GET /memory - 列出当前用户的记忆
@@ -103,12 +104,4 @@ export async function handleDeleteMemory(request, env, ctx, id) {
     console.error("删除记忆失败:", err && err.message);
     return jsonError(500, "删除记忆失败");
   }
-}
-
-/// 构造 JSON 成功响应
-function jsonOk(data, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
 }

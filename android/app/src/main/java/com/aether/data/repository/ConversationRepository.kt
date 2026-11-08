@@ -4,6 +4,7 @@ import com.aether.data.api.AetherApi
 import com.aether.data.db.ConversationDao
 import com.aether.data.db.ConversationEntity
 import com.aether.data.model.Conversation
+import com.aether.data.model.toEntity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.first
@@ -136,19 +137,6 @@ class ConversationRepository(
     // ===== Entity <-> Model 映射 =====
 
     private fun ConversationEntity.toModel(): Conversation = Conversation(
-        id = id,
-        title = title,
-        systemPrompt = systemPrompt,
-        parentId = parentId,
-        createdAt = createdAt,
-        updatedAt = updatedAt,
-        lastMessagePreview = lastMessagePreview,
-        isPinned = isPinned,
-        unreadCount = unreadCount,
-        order = order
-    )
-
-    private fun Conversation.toEntity(): ConversationEntity = ConversationEntity(
         id = id,
         title = title,
         systemPrompt = systemPrompt,

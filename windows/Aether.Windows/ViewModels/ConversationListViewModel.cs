@@ -31,7 +31,6 @@ public class ConversationListViewModel : INotifyPropertyChanged
         set { _isLoading = value; OnPropertyChanged(); }
     }
 
-    public ICommand LoadCommand { get; }
     public ICommand CreateCommand { get; }
     public ICommand DeleteCommand { get; }
     public ICommand TogglePinCommand { get; }
@@ -47,7 +46,6 @@ public class ConversationListViewModel : INotifyPropertyChanged
         _navigateToChat = navigateToChat;
         _navigateToSettings = navigateToSettings;
 
-        LoadCommand = new RelayCommand(async _ => await LoadAsync());
         CreateCommand = new RelayCommand(async _ => await CreateAsync());
         DeleteCommand = new RelayCommand(async p => await DeleteAsync(p));
         TogglePinCommand = new RelayCommand(async p => await TogglePinAsync(p));

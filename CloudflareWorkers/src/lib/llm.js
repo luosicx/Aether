@@ -98,19 +98,6 @@ export function joinUpstreamUrl(baseUrl, path) {
 }
 
 /**
- * 透传上游响应 Header（保留 Content-Type 等用于 SSE 流式响应）
- * @param {Headers} headers
- * @returns {Headers}
- */
-export function forwardHeaders(headers) {
-  const out = new Headers();
-  for (const [key, value] of headers.entries()) {
-    out.set(key, value);
-  }
-  return out;
-}
-
-/**
  * 构建发送给 LLM 的 messages 上下文（OpenAI 兼容格式）
  *
  * 结构：

@@ -6,6 +6,7 @@
  */
 
 import { jsonError } from "../lib/llm.js";
+import { genId, jsonOk } from "../lib/utils.js";
 
 /**
  * GET /conversations - 列出当前用户的会话
@@ -118,12 +119,4 @@ export async function handleDeleteConversation(request, env, ctx, id) {
   } catch (err) {
     return jsonError(500, "删除会话失败: " + (err && err.message));
   }
-}
-
-/// 构造 JSON 成功响应
-function jsonOk(data, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
 }

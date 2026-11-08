@@ -91,12 +91,6 @@ public class BffConfigStore
         }
     }
 
-    /// <summary>异步加载配置文件。</summary>
-    public async Task LoadAsync()
-    {
-        await Task.Run(Load);
-    }
-
     /// <summary>异步保存配置文件。UserToken 会通过 DPAPI 加密后写入。</summary>
     public async Task SaveAsync()
     {
