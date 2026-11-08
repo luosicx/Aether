@@ -3,7 +3,7 @@
  *
  * 通过 worker.fetch 走完整 鉴权 → 路由分发 → rag handler 链路。
  * 聚焦 POST /rag/search：验证鉴权、入参校验、响应格式。
- * searchDocuments 关键词检索不依赖 WASM（无 DB 时降级返回空数组）。
+ * ctx.db.searchChunks 关键词检索不依赖 WASM（无 DB 时降级返回空数组）。
  * 不测试 /rag/documents 上传（其依赖 WASM Chunker 分块，由独立单测覆盖）。
  */
 
@@ -118,7 +118,7 @@ describe("E2E /rag/search", () => {
   });
 
   it("无 DB 时 chunks 降级为空数组（200）", async () => {
-    // 不配置 DB → searchDocuments 返回 []
+    // 不配置 DB → ctx.db 为空，检索降级为 []
     const env = { bff_tokens: makeKV() };
     const req = makeRequest("/rag/search", {
       method: "POST",
