@@ -9,7 +9,14 @@ import AetherUI
 /// 验证令牌桶限流器的 chat/embed 独立计数、耗尽抛 LLMError.rateLimited、以及自定义限额。
 final class RateLimiterTests: XCTestCase {
 
-    /// 辅助：断言 acquireChat 抛 LLMError.rateLimited(retryAfter: 60)
+    /// 辅助：断言 acquireChat 抛 LLMError.rateLimited
+    ///
+    /// retryAfter 取值取决于限流算法：
+    /// - Rust 连续 refill（useRust=true）：retryAfter = ceil(60 / chatPerMin)，范围 1-60
+    ///   （deficit=1, rate=chatPerMin/60 → retryAfter = 60/chatPerMin，向上取整）
+    /// - Swift 整桶重置（useRust=false）：retryAfter = 60（固定）
+    ///
+    /// 此处用范围断言 1...60 兼容两种实现，避免算法切换导致 flaky。
     private func assertChatRateLimited(_ limiter: RateLimiter, file: StaticString = #filePath, line: UInt = #line) async {
         do {
             try await limiter.acquireChat()
@@ -19,7 +26,7 @@ final class RateLimiterTests: XCTestCase {
                 XCTFail("期望 .rateLimited，实际：\(error)", file: file, line: line)
                 return
             }
-            XCTAssertEqual(retryAfter, 60, "retryAfter 应为 60 秒", file: file, line: line)
+            XCTAssertTrue((1...60).contains(retryAfter), "retryAfter 应在 1-60 秒范围内（实际：\(retryAfter)）", file: file, line: line)
         } catch {
             XCTFail("期望 LLMError，实际：\(type(of: error))", file: file, line: line)
         }

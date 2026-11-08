@@ -56,6 +56,7 @@
   - **端侧 MLX 模型下载**：进入 设置 → 端侧推理，选择模型（如 Qwen2.5-0.5B-Instruct）开始下载，验证下载进度条更新、中断后重启可断点续传、下载完成自动执行 SHA256 校验；关闭网络后发起对话，验证自动切换为端侧推理并在 UI 标识
   - **HealthKit 授权**：首次进入 设置 → 健康洞察，验证系统弹出 HealthKit 授权弹窗并请求心率 / 睡眠 / 步数读取权限；授权后下拉刷新健康洞察，验证数据读取成功；在对话中验证健康上下文已注入 system prompt（助手可引用近 7 天健康数据）
   - **端侧多模态 v1.4**（v1.4 新增）：在对话中让助手调用 `describe_image` 工具分析含文字 / 二维码的图片，验证 NativeVisionEngine 返回 OCR 文字与条码 payload；调用 `transcribe_audio` 工具转写中文录音，验证 NativeASREngine 返回识别文字；首次使用 `transcribe_audio` 时系统会弹出语音识别授权对话框；底层 3 个 Native 引擎基于 Apple Vision / Speech / AVSpeechSynthesizer 框架，无需下载外部模型
+  - **智能平台 v3.0**（v3.0 新增，服务层骨架无 UI 入口）：v3.0 交付 Apple Intelligence Provider / 混合 RAG（BM25 + RRF + Cross-Encoder）/ 多 Agent 仲裁（ArbiterAgent）/ AI Workflow 引擎四个服务层模块，均由 86 个单元测试覆盖（AppleIntelligenceProviderTests 14 + HybridRAGServiceTests 24 + ArbiterAgentTests 20 + WorkflowEngineTests 28）；Apple Intelligence 在 FoundationModels 不可用的环境自动返回占位提示并降级到 MLX / 云端 Provider，无新增权限请求与网络行为变化
 
 ### 4.1 构建验证
 - [ ] iOS 构建：`xcodebuild build -destination 'platform=iOS Simulator,name=iPhone 17'` 成功
@@ -68,7 +69,7 @@
 - [ ] ToolRegistry.swift 注册数验证：18 个跨平台工具无条件注册，11 个 macOS 独有工具用 `#if os(macOS)` 条件注册
 
 ### 4.3 测试规模
-- [ ] UT 用例数：3314
+- [ ] UT 用例数：3502
 - [ ] UIT 用例数：30
 - [ ] iOS UT 运行：`xcodebuild test -destination 'platform=iOS Simulator,name=iPhone 17'` 全部通过（0 skipped，0 failures）
 - [ ] UIT 运行全部通过（0 failures）
@@ -209,8 +210,8 @@
 ## 4.12 测试规模审计
 
 ### 单元测试（UT）
-- [ ] UT 用例数 = 3314（3314 pass / 0 skip / 0 failures）
-- [ ] UT 文件数 = 190
+- [ ] UT 用例数 = 3502（3502 pass / 0 skip / 0 failures）
+- [ ] UT 文件数 = 195
 - [ ] 验证命令：
   ```bash
   xcodebuild test \
@@ -220,7 +221,7 @@
     -only-testing:AetherTests \
     CODE_SIGNING_ALLOWED=NO 2>&1 | tail -5
   ```
-- [ ] 预期输出包含：`Executed 3314 tests, with 0 failures, 0 skipped`
+- [ ] 预期输出包含：`Executed 3502 tests, with 0 failures, 0 skipped`
 
 ### UI 测试（UIT）
 - [ ] UIT 用例数 = 30（30 pass / 0 skip / 0 failures）
@@ -260,7 +261,7 @@
 
 ### 跨平台测试汇总
 
-- [ ] iOS / macOS Swift UT = 3314（覆盖率 84.25%）
+- [ ] iOS / macOS Swift UT = 3502（覆盖率 84.25%）
 - [ ] Windows xUnit UT = 72
 - [ ] Android JUnit UT = 95
 - [ ] iOS UIT = 30
@@ -273,7 +274,7 @@
 - [ ] `doc/MANUAL_TEST_CHECKLIST.md` 存在且手测项完整
 - [ ] `doc/ReleaseChecklist.md` 存在且 4.1-4.21 审计项完整（含 4.7.1 端侧多模态功能验证）
 - [ ] `doc/BFF_DEPLOYMENT.md` 存在且部署步骤完整
-- [ ] `doc/CONTRIBUTING.md` 存在（贡献指南，UT 数 3314）
+- [ ] `doc/CONTRIBUTING.md` 存在（贡献指南，UT 数 3502）
 - [ ] `doc/CHANGELOG.md` 存在（变更日志，含 v1.4.0 条目）
 - [ ] `doc/API.md` 存在（API 契约文档，含第 9 章 MultimodalFacade API 契约）
 - [ ] `doc/ROADMAP.md` 存在（路线图，v1.0-v1.4 标注 ✅）
@@ -284,7 +285,7 @@
 - [ ] `doc/DMG_PACKAGING.md` 存在（macOS DMG 打包指南）
 - [ ] `README.md` 详细文档章节含 8 个文档链接
 - [ ] 文档间交叉引用链接全部有效（点击不报 404）
-- [ ] 运行 `bash scripts/check-doc-consistency.sh` 输出 PASS（i18n=888 / tools=29 / tests=3314）
+- [ ] 运行 `bash scripts/check-doc-consistency.sh` 输出 PASS（i18n=888 / tools=29 / tests=3502）
 
 ## 4.14 国际化与无障碍审计
 

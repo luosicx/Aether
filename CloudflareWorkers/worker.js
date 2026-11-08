@@ -2,21 +2,24 @@
  * Aether BFF 跨平台业务网关 - 路由入口
  *
  * 职责：
- * 1. 鉴权：所有受保护端点经 X-BFF-Token (KV `bff_tokens`) 校验
- * 2. 限流：chat 端点每 userId 每分钟 60 次（内存计数器）
+ * 1. 鉴权：所有受保护端点经 X-BFF-Token (KV `bff_tokens`) 校验（键为 token 的 SHA-256 哈希）
+ * 2. 限流：所有受保护端点按 userId 限流（chat 60/min，其余 600/min，内存令牌桶）；
+ *    鉴权失败按来源 IP 限流（120/min），缓解 token 暴力枚举
  * 3. 路由分发：基于 URL pathname 分发到 src/routes/* 模块
- * 4. 兜底：仅 /v1/chat/completions 与 /v1/embeddings 走 LLM 透传代理（路径/模型白名单 + 1 MiB 上限）
+ * 4. CORS：OPTIONS 预检 + Origin 白名单（env.ALLOWED_ORIGINS，逗号分隔；未配置则禁止跨域）
+ * 5. 兜底：仅白名单路径走 LLM 透传代理（模型白名单 + 1 MiB 上限），其余 404
  *
  * 错误约定（与 iOS BFFProxyClient 对齐）：
  * - 401：BFF Token 缺失/无效
  * - 429：服务端限流（携带 Retry-After Header）
- * - 5xx：BFF 服务异常
+ * - 5xx：BFF 服务异常（客户端仅收通用信息，细节进服务端日志）
  *
  * 绑定：
- * - KV `bff_tokens`：键为 BFF Token 字符串，值为用户标识/元数据
+ * - KV `bff_tokens`：键为 token 的 SHA-256 哈希（sha256:<hex>），值为用户标识/元数据；
+ *   旧明文键在首次命中时自动迁移（见 src/lib/auth.js）
  * - D1 `DB`：业务数据库（schema.sql）
  * - env.DEEPSEEK_API_KEY / env.QWEN_API_KEY：secrets
- * - env.DEEPSEEK_BASE_URL / env.QWEN_BASE_URL：vars
+ * - env.DEEPSEEK_BASE_URL / env.QWEN_BASE_URL / env.ALLOWED_ORIGINS：vars
  */
 
 import { authenticate } from "./src/lib/auth.js";
@@ -25,8 +28,10 @@ import {
   resolveUpstream,
   buildUpstreamHeaders,
   forwardHeaders,
+  joinUpstreamUrl,
   jsonError,
 } from "./src/lib/llm.js";
+import { redact } from "./src/lib/redact.js";
 
 import { handleChatStream } from "./src/routes/chat.js";
 import {
@@ -51,10 +56,58 @@ import {
   handleSearchDocuments,
   handleUploadDocument,
 } from "./src/routes/rag.js";
-import {
-  handleUploadHealthSummary,
+import { handleUploadHealthSummary,
   handleGetHealthSummary,
 } from "./src/routes/health.js";
+
+// Durable Object 导出（wrangler.toml durable_objects.bindings 引用）：
+// 全局限流器，每 limit key 一个实例，跨边缘节点精确扣减配额
+export { RateLimiterDO } from "./src/do/rate-limiter.js";
+
+// LLM 透传代理白名单：仅放行上游对话/嵌入/模型端点，
+// 防止任意路径透传 + 注入上游 API Key（等同把上游凭证借给客户端）
+const PROXY_ALLOWED_PATHS = new Set([
+  "/v1/chat/completions",
+  "/v1/embeddings",
+]);
+
+/**
+ * CORS：解析 Origin 白名单（env.ALLOWED_ORIGINS，逗号分隔）
+ * 未配置白名单或 Origin 不在白名单内时不下发任何 CORS 头（浏览器侧自然拦截）
+ */
+function corsHeaders(request, env) {
+  const origin = request.headers.get("Origin");
+  if (!origin) return null;
+  const allowed = String(env.ALLOWED_ORIGINS || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (!allowed.includes(origin)) return null;
+  return {
+    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, X-BFF-Token, X-Provider",
+    "Access-Control-Expose-Headers": "Retry-After",
+    "Access-Control-Max-Age": "86400",
+    Vary: "Origin",
+  };
+}
+
+/** OPTIONS 预检响应（204，无 body） */
+function preflightResponse() {
+  return new Response(null, { status: 204 });
+}
+
+/** 为响应附加 CORS 头（Origin 不在白名单或未携带时原样返回） */
+function withCors(request, env, resp) {
+  const headers = corsHeaders(request, env);
+  if (!headers) return resp;
+  const out = new Response(resp.body, resp);
+  for (const [key, value] of Object.entries(headers)) {
+    out.headers.set(key, value);
+  }
+  return out;
+}
 
 export default {
   async fetch(request, env, ctx) {
@@ -62,28 +115,30 @@ export default {
     const path = url.pathname;
     const method = request.method;
 
+    // CORS 预检：在路由匹配前统一拦截
+    if (method === "OPTIONS") {
+      return withCors(request, env, preflightResponse());
+    }
+
     try {
       // ============ 受保护的业务端点 ============
-      // 需鉴权；chat 端点额外限流
+      // 需鉴权；chat 端点 60/min，其余 600/min（见 dispatch）
       const routeResult = matchRoute(method, path);
+      let resp;
       if (routeResult) {
-        return await dispatch(routeResult, request, env, ctx);
+        resp = await dispatch(routeResult, request, env, ctx);
+      } else if (method === "POST" && PROXY_ALLOWED_PATHS.has(normalizeProxyPath(path))) {
+        // ============ LLM 透传代理（仅白名单路径可达）============
+        resp = await proxyLLM(request, env, ctx);
+      } else {
+        // 未匹配：返回 404（不回显 method/path 细节）
+        resp = jsonError(404, "Not Found");
       }
-
-      // ============ 兜底：保留原 LLM 透传代理行为 ============
-      // 仅允许 POST 到明确的上游路径，避免 BFF 沦为任意路径转发器
-      if (method === "POST") {
-        return await proxyLLM(request, env, ctx);
-      }
-
-      // 未匹配且非 POST：返回 404
-      return jsonError(404, "Not Found: " + method + " " + path);
+      return withCors(request, env, resp);
     } catch (err) {
-      // 兜底异常：返回 500，避免 Worker 崩溃暴露堆栈
-      return jsonError(
-        500,
-        "BFF 内部错误: " + (err && err.message ? err.message : "unknown")
-      );
+      // 兜底异常：客户端只返回通用信息，细节进服务端日志
+      console.error("BFF 内部错误:", err && err.message);
+      return withCors(request, env, jsonError(500, "BFF 内部错误"));
     }
   },
 };
@@ -180,15 +235,22 @@ async function dispatch(route, request, env, ctx) {
   // 1. 鉴权
   const auth = await authenticate(request, env);
   if (!auth) {
+    // 鉴权失败按来源 IP 限流，缓解 token 暴力枚举（CF-Connecting-IP 由 Cloudflare 注入）
+    const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+    const ipRl = await checkRateLimit("authfail:" + ip, env, 120);
+    if (!ipRl.allowed) {
+      return rateLimitResponse(ipRl.retryAfter);
+    }
     return jsonError(401, "BFF Token 缺失或无效");
   }
 
-  // 2. 限流（仅 chat 端点）
-  if (route.rateLimited) {
-    const rl = await checkRateLimit(auth.userId, env, 60);
-    if (!rl.allowed) {
-      return rateLimitResponse(rl.retryAfter);
-    }
+  // 2. 限流：所有受保护端点统一按 userId 限流
+  //    chat 端点维持 60/min（独立键空间）；其余端点 600/min
+  //    注：内存令牌桶仅对单个 Worker isolate 生效，跨边缘节点的全局限流待 Durable Objects（第三批）
+  const limitKey = route.rateLimited ? "chat:" + auth.userId : "api:" + auth.userId;
+  const rl = await checkRateLimit(limitKey, env, route.rateLimited ? 60 : 600);
+  if (!rl.allowed) {
+    return rateLimitResponse(rl.retryAfter);
   }
 
   // 3. 构造增强 ctx：注入 auth + 透传 waitUntil
@@ -245,16 +307,18 @@ async function dispatch(route, request, env, ctx) {
 }
 
 /**
- * 原 LLM 透传代理逻辑（向后兼容）
+ * LLM 透传代理（向后兼容，仅白名单路径可达，见 PROXY_ALLOWED_PATHS）
  *
- * 安全约束（P1-5）：
- *   1. 鉴权复用 authenticate()，强制执行 token TTL（expiresAt）
- *   2. 路径白名单：仅 /v1/chat/completions 与 /v1/embeddings，其余路径 404
- *   3. 模型白名单：按 provider 前缀校验，且路径与模型类型匹配
- *   4. 请求体上限 1 MiB，超限返回 413
- *   5. 只向上游转发必要 Header，避免透传客户端凭证/内部头
+ * 安全约束：
+ *   1. 复用 authenticate 校验 BFF Token（SHA-256 哈希 KV 键 + 旧 token 自动迁移 + expiresAt TTL）
+ *   2. 限流（按 userId，60/min，与 chat 端点同口径）
+ *   3. 路径白名单（PROXY_ALLOWED_PATHS），禁止把 BFF 当作任意路径的上游代理
+ *   4. 模型白名单：按 provider 前缀校验，且路径与模型类型匹配
+ *   5. 请求体上限 1 MiB，超限返回 413
+ *   6. Header 白名单构造并注入 Authorization（敏感头永不透传，见 llm.js）
+ *   7. URL 归一化（joinUpstreamUrl，避免 /v1/v1 双拼）
+ *   8. 流式透传响应；上游错误体经 redact 脱敏后回显
  */
-const PROXY_ALLOWED_PATHS = new Set(["/v1/chat/completions", "/v1/embeddings"]);
 const PROXY_MAX_BODY_BYTES = 1024 * 1024;
 const PROXY_MODEL_PREFIXES = {
   deepseek: ["deepseek-"],
@@ -336,14 +400,11 @@ async function proxyLLM(request, env, ctx) {
   const url = new URL(request.url);
   const path = normalizeProxyPath(url.pathname);
   if (!PROXY_ALLOWED_PATHS.has(path)) {
-    return jsonError(
-      404,
-      "不支持的代理路径，仅支持 /v1/chat/completions 与 /v1/embeddings"
-    );
+    return jsonError(404, "不支持的代理路径");
   }
 
-  // 3. 限流：按 userId 维度（与业务端点一致）
-  const rl = await checkRateLimit(auth.userId, env, 60);
+  // 3. 限流：按 userId 维度（与 chat 端点同口径）
+  const rl = await checkRateLimit("chat:" + auth.userId, env, 60);
   if (!rl.allowed) {
     return rateLimitResponse(rl.retryAfter);
   }
@@ -375,11 +436,12 @@ async function proxyLLM(request, env, ctx) {
     return jsonError(400, "不支持的 model: " + String(payload.model));
   }
 
-  // 6. 构造上游请求：仅转发必要 Header，注入上游 Authorization
-  const upstreamUrl = upstream.baseUrl.replace(/\/$/, "") + path;
+  // 6. 构造上游请求：URL 归一化（避免 /v1/v1 双拼）+ Header 白名单构造
+  //    附加白名单经 env.UPSTREAM_EXTRA_HEADERS 配置（敏感头永不放开，见 llm.js 拒绝清单）
+  const upstreamUrl = joinUpstreamUrl(upstream.baseUrl, path);
   const upstreamReq = new Request(upstreamUrl, {
     method: "POST",
-    headers: buildUpstreamHeaders(request.headers, upstream.apiKey),
+    headers: buildUpstreamHeaders(request.headers, upstream.apiKey, env.UPSTREAM_EXTRA_HEADERS),
     body: text,
   });
 
@@ -408,20 +470,23 @@ async function proxyLLM(request, env, ctx) {
       });
     }
 
-    // 上游非 2xx：透传状态码与错误体
+    // 上游非 2xx：错误体脱敏后透传（不回显内部 trace / 配额信息）
     const respHeaders = forwardHeaders(upstreamResp.headers);
     if (upstreamResp.status === 429 && !respHeaders.has("Retry-After")) {
       respHeaders.set("Retry-After", "60");
     }
-    const errBody = await upstreamResp.text();
+    let errBody;
+    try {
+      errBody = await redact(await upstreamResp.text());
+    } catch (_) {
+      errBody = JSON.stringify({ error: "upstream error", status: upstreamResp.status });
+    }
     return new Response(errBody, {
       status: upstreamResp.status,
       headers: respHeaders,
     });
   } catch (err) {
-    return jsonError(
-      502,
-      "BFF 服务异常: " + (err && err.message ? err.message : "upstream unreachable")
-    );
+    console.error("proxyLLM upstream error:", err && err.message);
+    return jsonError(502, "BFF 服务异常: 上游不可达");
   }
 }

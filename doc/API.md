@@ -41,7 +41,7 @@ protocol LLMProvider {
 | `QwenClient` | `https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions` | Qwen 走阿里云百炼 DashScope OpenAI 兼容端点 |
 | `BFFProxyClient` | `<BFF endpointURL>/v1/chat/completions` | 经 Cloudflare Workers 中转，header 带 `X-BFF-Token` 与 `X-Provider`，不带 Authorization |
 | `OfflineLLMProvider` | 本地 MLX 推理（不走 HTTP） | 端侧推理，断网可用；`baseURL` 为空字符串 |
-| `FallbackLLMProvider` | 包装 primary + fallback | `init(primary:fallback:primaryProvider:fallbackProvider:fallbackApiKey:)`；primary 失败自动切 fallback，fallback 使用自己的 API Key |
+| `FallbackLLMProvider` | 包装 primary + fallback | `init(primary:fallback:primaryProvider:fallbackProvider:fallbackApiKey:)`；primary 失败自动切 fallback，fallback 使用自己的 API Key（未提供时回退到主 Key） |
 
 `BFFProxyClient` 的 chat 路径通过 `config.endpointURL.appending(path: "v1/chat/completions")` 构造，默认 `endpointURL` 为占位地址 `https://aether-bff.example.com`，部署后替换为真实域名。
 
@@ -573,7 +573,7 @@ public protocol VisionInferenceEngine: Sendable {
 |------|------|------|
 | `PlaceholderVisionEngine` | v1.3 | 占位，未加载抛 `engineNotLoaded`，加载后返回提示字符串 |
 | `NativeVisionEngine` | v1.4 | 基于 Vision 框架 5 个请求并发（分类 / 人脸 / 矩形 / 文字 / 条码），`isLoaded` 始终为 `true`，`loadedModelName = "Apple Vision (Native)"`，`loadModel` / `unloadModel` 为 no-op |
-| `MLXVisionEngine` | v1.6 计划 | 基于 MLX-VLM（Qwen2-VL-2B Q4 等），`MLXInferenceEngine.generate(prompt:images:)` |
+| `MLXVisionEngine` | v1.6 已交付（骨架实现 + 降级兜底） | 基于 MLX-VLM（Qwen2-VL-2B Q4 等），`MLXInferenceEngine.generate(prompt:images:)`。条件编译 `#if canImport(MLXLLM) && canImport(MLXLMCommon)`，不可用时降级到 `NativeVisionEngine`。真实推理待 SPM 依赖集成 |
 
 #### 9.1.2 ASREngine（语音识别）
 
@@ -591,7 +591,7 @@ public protocol ASREngine: Sendable {
 |------|------|------|
 | `PlaceholderASREngine` | v1.3 | 占位，`name = "PlaceholderASR"`，`requiresNetwork = false`，返回提示字符串 |
 | `NativeASREngine` | v1.4 | `name = "NativeASR (SFSpeechRecognizer)"`，`requiresNetwork = true`，基于 `SFSpeechURLRecognitionRequest` 文件识别；支持 wav / caf / m4a / mp3 / aac；CI 环境识别器不可用抛 `asrRecognitionFailed` |
-| `WhisperASREngine` | v1.6 计划 | 基于 whisper.cpp Rust 绑定，离线识别 |
+| `WhisperASREngine` | v1.6 已交付（骨架实现 + 降级兜底） | 基于 whisper.cpp Rust 绑定，离线识别。`requiresNetwork = false`（完全离线），降级到 `NativeASREngine`（Apple Speech 框架兜底）。真实推理待 Rust FFI 集成 |
 
 #### 9.1.3 TTSEngine（语音合成）
 
@@ -608,7 +608,7 @@ public protocol TTSEngine: Sendable {
 |------|------|------|
 | `PlaceholderTTSEngine` | v1.3 | 占位，`name = "PlaceholderTTS"`，返回空 `Data()` |
 | `NativeTTSEngine` | v1.4 | `name = "NativeTTS (AVSpeechSynthesizer)"`，`isLoaded = true`，基于 `AVSpeechSynthesizer.write(_:toBufferCallback:)` 收集 PCM Buffer 编码为 WAV（44 字节 RIFF/WAVE 头）；CI 环境返回最小空 WAV 头；30s 超时保护 |
-| `MLXVoiceTTSEngine` | v1.6 计划 | 基于 MLX-Voice（Kokoro/Matcha-TTS） |
+| `MLXVoiceTTSEngine` | v1.6 已交付（骨架实现 + 降级兜底） | 基于 MLX-Voice（Kokoro/Matcha-TTS）。条件编译 `#if canImport(MLXVoice)`，降级到 `NativeTTSEngine`（AVSpeechSynthesizer 兜底）。真实推理待 SPM 依赖集成 |
 
 #### 9.1.4 VoiceCloner（语音克隆）
 
@@ -626,7 +626,7 @@ public protocol VoiceCloner: Sendable {
 | 实现 | 版本 | 说明 |
 |------|------|------|
 | `PlaceholderVoiceCloner` | v1.3 | 占位，未加载抛 `engineNotLoaded`；克隆返回 `embeddingBase64 = ""` 的占位音色 |
-| `OpenVoiceCloner` | v1.6 计划 | 基于 OpenVoice v2 蒸馏模型，提取音色嵌入存 Keychain |
+| `OpenVoiceCloner` | v1.6 已交付（骨架实现 + 降级兜底） | 基于 OpenVoice v2 蒸馏模型，提取音色嵌入存 Keychain。桩实现 + 256 维 embedding 向量，真实克隆待模型集成 |
 
 `ClonedVoice` 结构：
 
@@ -662,7 +662,7 @@ public protocol ImageGenerationEngine: Sendable {
 | 实现 | 版本 | 说明 |
 |------|------|------|
 | `PlaceholderImageGenerationEngine` | v1.3 | 占位，`name = "PlaceholderImageGen"`，`isLoaded = false`，`generate` 抛 `platformUnsupported` |
-| `SDMobileEngine` | v1.6 计划 | 基于 Stable Diffusion Mobile / CoreML 量化 |
+| `SDMobileEngine` | v1.6 已交付（骨架实现 + 降级兜底） | 基于 Stable Diffusion Mobile / CoreML 量化。条件编译 `#if canImport(CoreML)`，当前抛 `platformUnsupported`。真实推理待 CoreML 模型集成 |
 
 ### 9.2 MultimodalFacade 公共 API
 
@@ -671,6 +671,8 @@ public actor MultimodalFacade {
     public static let shared = MultimodalFacade()
     public init()  // v1.4: 默认 NativeVisionEngine / NativeASREngine / NativeTTSEngine + 占位 VoiceCloner / ImageGen
     public init(visionEngine:asrEngine:ttsEngine:voiceCloner:imageGenEngine:budget:)  // 测试可注入
+    // v1.6: 静态工厂方法，MLX → Native → Placeholder 自动降级链路
+    public static func createWithAutoFallback() -> MultimodalFacade
 
     // 引擎切换（依赖注入）
     public func setVisionEngine(_ engine: VisionInferenceEngine)

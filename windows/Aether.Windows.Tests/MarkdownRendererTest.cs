@@ -182,6 +182,36 @@ public class MarkdownRendererTest
         Assert.True(hyperlink.TextDecorations.Count > 0);
     }
 
+    [WpfTheory]
+    [InlineData("file:///C:/Windows/System32/calc.exe")]
+    [InlineData("javascript:alert(1)")]
+    [InlineData("ms-settings:privacy-location")]
+    [InlineData("ftp://example.com/file")]
+    [InlineData("/relative/path")]
+    public void Render_Link_NonHttpScheme_DoesNotSetNavigateUri(string url)
+    {
+        // 安全回归：非 http(s) scheme / 相对路径不得设置 NavigateUri，
+        // 否则 UseShellExecute 启动会唤起任意协议处理器（file:// 打开本地文件等）
+        var doc = MarkdownRenderer.RenderToFlowDocument($"[链接]({url})");
+
+        var paragraph = Assert.Single(doc.Blocks.OfType<Paragraph>());
+        var hyperlink = paragraph.Inlines.OfType<Hyperlink>().FirstOrDefault();
+        if (hyperlink is not null)
+        {
+            Assert.Null(hyperlink.NavigateUri);
+        }
+    }
+
+    [WpfFact]
+    public void Render_Link_HttpScheme_SetsNavigateUri()
+    {
+        var doc = MarkdownRenderer.RenderToFlowDocument("[链接](http://example.com)");
+
+        var paragraph = Assert.Single(doc.Blocks.OfType<Paragraph>());
+        var hyperlink = paragraph.Inlines.OfType<Hyperlink>().Single();
+        Assert.Equal(new Uri("http://example.com"), hyperlink.NavigateUri);
+    }
+
     [WpfFact]
     public void Render_BoldText_GeneratesBoldSpan()
     {

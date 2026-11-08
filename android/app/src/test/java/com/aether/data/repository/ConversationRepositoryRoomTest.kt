@@ -17,6 +17,7 @@ import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -61,25 +62,6 @@ class ConversationRepositoryRoomTest {
     }
 
     /**
-     * 服务端会话行（snake_case），与 Worker D1 输出保持一致。
-     */
-    private fun conversationRow(conv: Conversation): String = """
-        {
-          "id": "${conv.id}",
-          "user_id": "u1",
-          "title": "${conv.title}",
-          "parent_id": null,
-          "created_at": ${conv.createdAt},
-          "updated_at": ${conv.updatedAt},
-          "last_message_preview": "${conv.lastMessagePreview}",
-          "is_pinned": ${if (conv.isPinned) 1 else 0},
-          "system_prompt": "${conv.systemPrompt}",
-          "unread_count": ${conv.unreadCount},
-          "order_field": ${conv.order * 1000L}
-        }
-    """.trimIndent()
-
-    /**
      * 构造一个 MockEngine 驱动的 AetherApi，按 [behavior] 决定响应行为。
      *
      * @param behavior 网络行为：success 正常返回，createFails / deleteFails / updateFails / listFails 抛异常
@@ -97,9 +79,12 @@ class ConversationRepositoryRoomTest {
                     if (behavior == MockBehavior.LIST_FAILS) {
                         throw RuntimeException("network error")
                     }
-                    val rows = listPayload.joinToString(",") { conversationRow(it) }
+                    val json = Json.encodeToString(
+                        ListSerializer(Conversation.serializer()),
+                        listPayload
+                    )
                     respond(
-                        content = """{"conversations": [$rows]}""",
+                        content = json,
                         status = HttpStatusCode.OK,
                         headers = headersOf(HttpHeaders.ContentType, "application/json")
                     )
@@ -116,7 +101,7 @@ class ConversationRepositoryRoomTest {
                         updatedAt = 0L
                     )
                     respond(
-                        content = """{"conversation": ${conversationRow(response)}}""",
+                        content = Json.encodeToString(Conversation.serializer(), response),
                         status = HttpStatusCode.OK,
                         headers = headersOf(HttpHeaders.ContentType, "application/json")
                     )
@@ -140,7 +125,7 @@ class ConversationRepositoryRoomTest {
                         isPinned = true
                     )
                     respond(
-                        content = """{"conversation": ${conversationRow(response)}}""",
+                        content = Json.encodeToString(Conversation.serializer(), response),
                         status = HttpStatusCode.OK,
                         headers = headersOf(HttpHeaders.ContentType, "application/json")
                     )
@@ -148,7 +133,7 @@ class ConversationRepositoryRoomTest {
                 else -> respond("", HttpStatusCode.OK)
             }
         }) {
-            install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
+            install(ContentNegotiation) { json() }
         }
         return AetherApi(client, BffConfig(baseUrl = "http://test", userToken = "tok"))
     }

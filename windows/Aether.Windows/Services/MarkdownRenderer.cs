@@ -519,6 +519,13 @@ public static class MarkdownRenderer
         return new InlineUIContainer(border);
     }
 
+    /// <summary>超链接 scheme 白名单：仅允许 http/https，阻止 file://、自定义协议等经 shell 唤起任意处理器。</summary>
+    private static readonly HashSet<string> AllowedLinkSchemes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "http",
+        "https",
+    };
+
     /// <summary>渲染超链接：ElectricBlue + 下划线。RequestNavigate 由 RichTextBox 处理。</summary>
     private static WpfInline RenderLink(LinkInline link)
     {
@@ -531,11 +538,13 @@ public static class MarkdownRenderer
         }
 
         var hyperlink = new Hyperlink();
-        if (Uri.TryCreate(link.Url, UriKind.Absolute, out var uri))
+        if (Uri.TryCreate(link.Url, UriKind.Absolute, out var uri) && AllowedLinkSchemes.Contains(uri.Scheme))
         {
             hyperlink.NavigateUri = uri;
             hyperlink.RequestNavigate += (_, args) =>
             {
+                // 二次校验：NavigateUri 在渲染后理论上不可变，此处防御性复核 scheme 再交 shell 启动
+                if (!AllowedLinkSchemes.Contains(args.Uri.Scheme)) return;
                 try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(args.Uri.AbsoluteUri) { UseShellExecute = true }); }
                 catch { /* 忽略打开失败 */ }
             };

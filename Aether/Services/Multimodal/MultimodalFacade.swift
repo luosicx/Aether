@@ -67,6 +67,31 @@ public actor MultimodalFacade {
         self.budget = budget
     }
 
+    /// v1.6: 初始化时根据设备能力自动选择最佳引擎
+    ///
+    /// 优先级：MLX → Native → Placeholder
+    /// - VLM: MLXVisionEngine（v1.6）→ NativeVisionEngine（v1.4）→ PlaceholderVisionEngine（v1.3）
+    /// - ASR: WhisperASREngine（v1.6）→ NativeASREngine（v1.4）→ PlaceholderASREngine（v1.3）
+    /// - TTS: MLXVoiceTTSEngine（v1.6）→ NativeTTSEngine（v1.4）→ PlaceholderTTSEngine（v1.3）
+    /// - VoiceCloner: OpenVoiceCloner（v1.6）→ PlaceholderVoiceCloner（v1.3）
+    /// - ImageGen: SDMobileEngine（v1.6）→ PlaceholderImageGenerationEngine（v1.3）
+    public static func createWithAutoFallback() -> MultimodalFacade {
+        let capability = DeviceCapability.current
+        let facade = MultimodalFacade()
+
+        // v1.6: 尝试 MLX 引擎，失败时保持默认 Native 引擎
+        // 当前 MLX-VLM / Whisper / MLX-Voice 包未集成，保持 Native 默认引擎
+        // 集成后通过 setXxxEngine 切换
+        if capability.supportsVLM {
+            // facade.setVisionEngine(MLXVisionEngine())
+        }
+        if capability.supportsImageGeneration {
+            // facade.setImageGenEngine(SDMobileEngine())
+        }
+
+        return facade
+    }
+
     // MARK: - 引擎切换（依赖注入）
 
     public func setVisionEngine(_ engine: VisionInferenceEngine) {

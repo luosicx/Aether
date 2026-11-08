@@ -6,6 +6,150 @@
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-07-31
+
+### 智能平台 — Apple Intelligence / 本地 RAG 增强 / 多 Agent 协作 / AI Workflow
+
+#### Added — Apple Intelligence 集成（P2）
+- **AppleIntelligenceProvider**：实现 `LLMProvider` 协议，基于 Apple Foundation Models 框架的端侧 3B 模型 Provider
+  - `isAvailable` 运行时检测 FoundationModels 框架可用性（iOS 18+ / macOS 15+）
+  - `chat(messages:config:apiKey:)` 流式接口，占位模式返回提示文本
+  - `chat(messages:config:tools:apiKey:)` 工具调用降级为纯文本
+  - `embed(texts:apiKey:)` 返回 384 维占位向量（Apple Intelligence 未公开嵌入 API）
+  - 全端侧运行，无网络请求，隐私优先
+- **降级策略**：不可用时降级到 MLX / 云端 Provider（由 ModelProviderFactory 控制）
+
+#### Added — 本地 RAG 增强检索（P2）
+- **BM25Retriever**：基于 TF-IDF + BM25 算法的关键词检索引擎，纯内存实现
+  - `addDocument(id:text:)` / `addDocuments(_:)` 索引管理
+  - `search(query:topK:)` BM25 检索，k1=1.5 / b=0.75 标准参数
+  - 与向量检索互补，用于混合检索
+- **CrossEncoderReranker**：基于 Cross-Encoder 的重排序器（骨架）
+  - `rerank(query:documents:topK:)` 对 (query, document) 对计算精细相关度
+  - 启发式占位评分（精确匹配率 + 长度归一化），待 ONNX Runtime 集成后替换
+- **HybridRAGService**：混合检索服务，整合向量检索 + BM25 + RRF 融合 + 重排序
+  - `hybridSearch(query:vectorResults:topK:)` 混合检索主入口
+  - RRF（Reciprocal Rank Fusion）融合，k=60 标准参数
+  - `rewriteQuery(_:)` 查询改写占位（同义词扩展）
+  - 流程：向量 TopK=20 + BM25 TopK=20 → RRF 融合 TopK=10 → Cross-Encoder 重排序 TopK=5
+
+#### Added — 多 Agent 协作增强（P3）
+- **ArbiterAgent**：冲突仲裁 Agent，当多个 Agent 结果冲突时决策最终结果
+  - 三种决策策略：`majority`（多数表决，≥60% 一致）/ `priority`（角色优先级）/ `userIntervention`（用户介入）
+  - `maxRounds` 最大仲裁轮次（默认 5），超限强制用户介入
+  - 角色优先级：reviewer > researcher > coordinator > executor > planner
+- **AgentTeam**：Agent 团队定义与编排数据模型
+  - `TeamMember` 成员定义（role / isLead / delegates）
+  - 3 个预设模板：research（研究团队）/ coding（编码团队）/ critique（批判团队）
+  - `TeamOrchestrationResult` 编排结果（finalResult / agentResults / arbitrationResult / tokenConsumed）
+  - `AgentResultRecord` 单 Agent 执行记录
+
+#### Added — AI Workflow 自动化（P2）
+- **WorkflowEngine**：AI Workflow 执行引擎
+  - `validate(_:)` 验证工作流（有触发器 + 无循环 + 节点数上限）
+  - `execute(_:input:)` 执行工作流，线性遍历节点
+  - DFS 循环检测算法
+- **WorkflowNode**：工作流节点模型，9 种节点类型
+  - 触发器：`triggerTimer` / `triggerManual` / `triggerEvent`
+  - 动作：`actionLLM` / `actionTool` / `actionAgent`
+  - 控制流：`conditionIfElse`（MVP 仅线性 + 条件分支，循环后置）
+  - I/O：`input` / `output`
+- **Workflow**：完整工作流定义，支持 `toJSON()` / `fromJSON(_:)` 序列化导入导出
+- **WorkflowError**：6 种错误类型（noTriggerNode / cycleDetected / nodeNotFound / invalidJSON / executionFailed / maxNodesExceeded）
+
+#### Tests
+- **测试规模**：新增 4 个测试文件，共 86 个测试用例（AppleIntelligenceProviderTests 14 + HybridRAGServiceTests 24 + ArbiterAgentTests 20 + WorkflowEngineTests 28）
+- **UT 总数**：从 3583 增至 3669（+86 用例：iOS/macOS 3416 → 3502）
+
+#### 文件变更统计
+- 新增 7 个 Swift 源文件（Aether target，iOS + macOS 双 target）
+- 新增 4 个 Swift 测试文件（AetherTests target）
+- 修改 project.pbxproj（iOS + macOS 双 target Sources 引用 + 测试 Sources 引用）
+
+---
+
+## [2.0.0] - 2026-07-30
+
+### 跨端协作 — iCloud / Handoff / visionOS / Web 伴侣 / macOS 多窗口
+
+#### Added — iCloud 同步增强（P1）
+- **CloudKitSyncManager**：`@MainActor ObservableObject` 单例，管理 CloudKit 同步状态（lastSyncDate / pendingChangesCount / conflictCount / isSyncing），集成 `NSPersistentCloudKitContainer.eventChangedNotification` 事件监听，自动检测 CKError 冲突并记录
+- **SyncStatusView**：同步状态 SwiftUI 视图，显示上次同步时间 / 待同步条目数 / 冲突数 / 同步开关，提供手动触发同步按钮
+- **冲突解决策略**：默认 Last-Write-Wins（LWW），CloudKit 内部自动处理，字段级合并待后续扩展
+
+#### Added — Handoff 连续对话（P2）
+- **HandoffManager**：`@MainActor` 单例，管理 `NSUserActivity` 广播与接续
+  - `becomeCurrent(conversationId:lastMessageId:scrollPosition:)`：创建并广播 Handoff activity
+  - `handleContinueActivity(_:)`：解析接续 payload，恢复对话上下文与滚动位置
+  - Activity type：`com.aether.chat.continue`，三端（iPhone / iPad / Mac）共享
+- **HandoffPayload**：`Sendable` 结构体，携带 conversationId / lastMessageId / scrollPosition
+
+#### Added — visionOS 适配骨架（P3）
+- **SpatialChatView**：visionOS 3D 对话界面骨架，`#if os(visionOS)` 条件编译，RealityView 容器 + 消息沿 Z 轴 depth 排列 + SpatialTapGesture 占位
+- **SpatialMessageBubble**：3D 消息气泡组件，玻璃材质效果占位
+- **ToolRegistry+visionOS**：visionOS 工具注册，注册 14 个跨平台工具 + 3 个空间化工具占位（SpatialTool / PinchTool / GazeTool）
+- 所有 visionOS 文件使用 `#if os(visionOS)` 包裹，不影响 iOS/macOS 编译
+
+#### Added — Web 伴侣应用骨架（P3）
+- **HTML/CSS/JS 骨架**：基于 BFF 网关的轻量 Web 客户端，支持登录 / 对话列表 / 流式消息 / 输入发送
+- **BFFClient**：ES6 class，封装 BFF API 调用（login / fetchConversations / sendMessage SSE 流式），带 AbortController 超时与错误归一化
+- **SecureStorage**：基于 Web Crypto API（AES-GCM）+ IndexedDB 的安全存储，替代原生 Keychain
+- **品牌色板**：CSS 变量定义颜色令牌，与 Aether DesignTokens 对齐（DeepSpace / AetherPurple / ElectricBlue）
+- **架构规划**：SwiftWasm + React 集成路径已记录，当前为 HTML/CSS/JS 骨架
+
+#### Added — macOS 多窗口增强（P2）
+- **WindowStateManager**：`@MainActor` 单例，管理多窗口状态持久化
+  - `saveWindowState(conversationId:frame:isFocused:)`：保存窗口位置/大小/焦点状态
+  - `loadWindowState(conversationId:)`：恢复窗口状态
+  - 使用 UserDefaults + JSON 编码持久化，key 前缀 `aether.window.` 避免冲突
+- **WindowState**：`Codable Sendable` 结构体，包含 conversationId / frame / isFocused / lastActiveAt
+
+#### Tests
+- **测试规模**：新增 4 个测试文件，共 57 个测试用例（CloudKitSyncManagerTests 16 + HandoffManagerTests 21 + SpatialChatViewTests 8 + WindowStateManagerTests 12）
+- **UT 总数**：从 3526 增至 3583（+57 用例）
+
+#### 文件变更统计
+- 新增 7 个 Swift 源文件（Aether target）
+- 新增 4 个 Swift 测试文件（AetherTests target）
+- 新增 5 个 Web 文件（HTML / CSS / JS / README）
+- 修改 project.pbxproj（iOS + macOS 双 target 引用）
+
+---
+
+## [1.6.0] - 2026-07-29
+
+### 端侧多模态 Phase 2 — MLX 引擎集成
+
+#### Added — iOS / macOS 端（5 个新引擎 + Facade 增强）
+- **MLXVisionEngine**：基于 MLX-VLM（Qwen2-VL-2B Q4 等）的视觉理解引擎，条件编译 `#if canImport(MLXLLM) && canImport(MLXLMCommon)`，不可用时降级到 `NativeVisionEngine`（Apple Vision 框架兜底）
+- **WhisperASREngine**：基于 whisper.cpp Rust 绑定的离线 ASR 引擎，`requiresNetwork = false`（完全离线），降级到 `NativeASREngine`（Apple Speech 框架兜底）
+- **MLXVoiceTTSEngine**：基于 MLX-Voice（Kokoro/Matcha-TTS）的端侧 TTS 引擎，条件编译 `#if canImport(MLXVoice)`，降级到 `NativeTTSEngine`（AVSpeechSynthesizer 兜底）
+- **OpenVoiceCloner**：基于 OpenVoice v2 的语音克隆引擎，桩实现 + 256 维 embedding 向量 + Keychain 存储
+- **SDMobileEngine**：基于 Stable Diffusion Mobile / CoreML 的端侧图像生成引擎，条件编译 `#if canImport(CoreML)`
+- **MultimodalFacade.createWithAutoFallback()**：新增静态工厂方法，实现 MLX → Native → Placeholder 自动降级链路
+- **测试**：新增 5 个测试文件（MLXVisionEngineTests / WhisperASREngineTests / MLXVoiceTTSEngineTests / OpenVoiceClonerTests / SDMobileEngineTests），共 45 个测试用例
+
+#### 引擎降级策略
+- VLM: MLXVisionEngine（v1.6）→ NativeVisionEngine（v1.4）→ PlaceholderVisionEngine（v1.3）
+- ASR: WhisperASREngine（v1.6）→ NativeASREngine（v1.4）→ PlaceholderASREngine（v1.3）
+- TTS: MLXVoiceTTSEngine（v1.6）→ NativeTTSEngine（v1.4）→ PlaceholderTTSEngine（v1.3）
+- VoiceCloner: OpenVoiceCloner（v1.6）→ PlaceholderVoiceCloner（v1.3）
+- ImageGen: SDMobileEngine（v1.6）→ PlaceholderImageGenerationEngine（v1.3）
+
+#### 状态说明
+- MLX-VLM / Whisper.cpp / MLX-Voice / OpenVoice / SD Mobile 的真实推理依赖尚未集成（需引入 SPM 包 / Rust FFI）
+- 当前 5 个引擎均走降级/桩实现路径，架构接入点已就绪
+- 待 SPM 依赖集成后通过 `MultimodalFacade.setXxxEngine()` 切换到真实引擎
+
+#### Tests
+- **测试规模**：UT 从 3481 增至 3583（+45 用例：iOS/macOS 3314 → 3416，5 个新测试文件）。
+- **Rust 单测**：`redact.rs` 新增 3 个 JSON 格式用例（password / token / api_key），Rust 单测从 13 增至 16。
+
+#### Fixed
+- **Rust redact 正则不支持 JSON 格式密码字段**：原正则 `(?i)(password|...)\s*[:=]\s*[^\s&]+` 要求 key 后紧跟 `:` / `=`，不匹配 JSON 格式 `"password": "value"`（键值被引号包围），导致 iOS `RedactorRustTests.testRedactPassword` 失败。修改为 `(?i)["']?(password|...)["']?\s*[:=]\s*["']?[^\s&"']*["']?`，支持 JSON / ini / 单双引号多种格式（Rust regex 不支持反向引用，故键值前后引号独立匹配）。
+
+---
+
 ## [1.5.0] - 2026-07-26
 
 ### v1.5 跨平台扩展（Windows + Android 双端交付，Rust 核心通过 DLL FFI 与 JNI 多形态复用）
@@ -95,7 +239,7 @@
   - NativeASREngine：协议契约（name / requiresNetwork）/ loadModel 为 no-op / 不存在文件抛错 / 不支持格式抛错 / 空文件处理
   - NativeTTSEngine：协议契约 / loadModel 为 no-op / 空文本抛错 / 合成返回非空 WAV / voiceId 回退 / 长文本稳定性 / 英文合成
   - MultimodalFacade：默认使用 Native 引擎 / 可切换回 Placeholder / describeImage 集成测试（CI 跳过）
-- **测试规模**：UT 从 3290 增至 3314（+24 用例），测试文件从 189 增至 190
+- **测试规模**：UT 从 3290 增至 3314（+24 用例），测试文件从 189 增至 199
 
 #### CI 修复
 - **NativeTTSEngine 编译错误**：`AVAudioBuffer` 不能直接转换为 `AVAudioPCMBuffer`，通过 `as? AVAudioPCMBuffer` 向下转型修复

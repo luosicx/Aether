@@ -76,22 +76,13 @@ class HealthViewModelTest {
         // handler 在 Dispatchers.IO 上执行（ktor 框架默认）。
         val engine = MockEngine(handler)
         val client = HttpClient(engine) {
-            install(ContentNegotiation) { json(Json { ignoreUnknownKeys = true }) }
+            install(ContentNegotiation) { json() }
         }
         return AetherApi(client, BffConfig(baseUrl = "http://test", userToken = "tok"))
     }
 
-    private fun jsonSummary(s: HealthSummary): String = """
-        {
-          "summary": {
-            "user_id": "u1",
-            "date": "${s.date}",
-            "steps": ${s.steps ?: "null"},
-            "sleep_hours": ${s.sleepHours ?: "null"},
-            "resting_heart_rate": ${s.restingHeartRate ?: "null"}
-          }
-        }
-    """.trimIndent()
+    private fun jsonSummary(s: HealthSummary): String =
+        Json.encodeToString(HealthSummary.serializer(), s)
 
     /**
      * 等待 viewModelScope 中的异步操作完成。
