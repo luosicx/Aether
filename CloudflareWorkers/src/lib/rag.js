@@ -13,7 +13,7 @@
  * @param {number} overlap - 重叠字符数，默认 256
  * @returns {Array<string>}
  */
-export function chunkText(text, chunkSize = 2048, overlap = 256) {
+function chunkText(text, chunkSize = 2048, overlap = 256) {
   if (!text || typeof text !== "string") return [];
   const chunks = [];
   const step = Math.max(1, chunkSize - overlap);

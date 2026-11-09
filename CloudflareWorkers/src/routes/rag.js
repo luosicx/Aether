@@ -7,6 +7,7 @@
  */
 
 import { jsonError } from "../lib/llm.js";
+import { jsonOk } from "../lib/utils.js";
 
 /**
  * POST /rag/search - 检索与查询相关的文档分块
@@ -58,12 +59,4 @@ export async function handleUploadDocument(request, env, ctx) {
 
   if (!result) return jsonError(500, "上传文档失败");
   return jsonOk({ documentId: result.documentId, chunkCount: result.chunkCount }, 201);
-}
-
-/// 构造 JSON 成功响应
-function jsonOk(data, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
 }

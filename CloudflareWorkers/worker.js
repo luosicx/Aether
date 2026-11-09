@@ -28,7 +28,6 @@ import { createTenantDB } from "./src/lib/tenant-db.js";
 import {
   resolveUpstream,
   buildUpstreamHeaders,
-  forwardHeaders,
   joinUpstreamUrl,
   jsonError,
 } from "./src/lib/llm.js";
@@ -454,7 +453,7 @@ async function proxyLLM(request, env, ctx) {
 
     // 上游 2xx：流式透传 SSE
     if (upstreamResp.ok) {
-      const respHeaders = forwardHeaders(upstreamResp.headers);
+      const respHeaders = new Headers(upstreamResp.headers);
       if (!upstreamResp.body) {
         return new Response(null, {
           status: upstreamResp.status,
@@ -474,7 +473,7 @@ async function proxyLLM(request, env, ctx) {
     }
 
     // 上游非 2xx：错误体脱敏后透传（不回显内部 trace / 配额信息）
-    const respHeaders = forwardHeaders(upstreamResp.headers);
+    const respHeaders = new Headers(upstreamResp.headers);
     if (upstreamResp.status === 429 && !respHeaders.has("Retry-After")) {
       respHeaders.set("Retry-After", "60");
     }

@@ -89,22 +89,6 @@ class HealthViewModel(private val api: AetherApi) : ViewModel() {
     }
 
     /**
-     * 用作上传目标的当前摘要 setter（供 UI 编辑后上传）。
-     */
-    fun updateCurrentSummary(
-        steps: Int? = null,
-        sleepHours: Double? = null,
-        restingHeartRate: Int? = null
-    ) {
-        val current = _healthSummary.value ?: HealthSummary(date = _selectedDate.value)
-        _healthSummary.value = current.copy(
-            steps = steps ?: current.steps,
-            sleepHours = sleepHours ?: current.sleepHours,
-            restingHeartRate = restingHeartRate ?: current.restingHeartRate
-        )
-    }
-
-    /**
      * 清空错误状态。
      */
     fun clearError() {

@@ -261,18 +261,4 @@ class HealthViewModelTest {
         vm.clearError()
         assertNull(vm.errorMessage.value)
     }
-
-    @Test
-    fun updateCurrentSummaryMergesFields() = runBlocking {
-        val api = makeApi { _ ->
-            respond("null", HttpStatusCode.NotFound)
-        }
-        val vm = HealthViewModel(api)
-        // updateCurrentSummary 是同步操作，无需 awaitLoading
-        vm.updateCurrentSummary(steps = 1000)
-        assertEquals(1000, vm.healthSummary.value?.steps)
-        vm.updateCurrentSummary(sleepHours = 8.0)
-        assertEquals(1000, vm.healthSummary.value?.steps)
-        assertEquals(8.0, vm.healthSummary.value?.sleepHours!!, 0.0001)
-    }
 }

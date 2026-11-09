@@ -9,6 +9,7 @@ import com.aether.data.db.MessageEntity
 import com.aether.data.model.ChatMessage
 import com.aether.data.model.Conversation
 import com.aether.data.model.ToolCall
+import com.aether.data.model.toEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.builtins.ListSerializer
@@ -71,22 +72,6 @@ class RepositorySyncManager(
             Log.w(TAG, "syncMessages($conversationId): 网络同步失败，保留本地数据", e)
         }
     }
-
-    /**
-     * Conversation -> ConversationEntity 映射（与 Repository 中保持一致）。
-     */
-    private fun Conversation.toEntity(): ConversationEntity = ConversationEntity(
-        id = id,
-        title = title,
-        systemPrompt = systemPrompt,
-        parentId = parentId,
-        createdAt = createdAt,
-        updatedAt = updatedAt,
-        lastMessagePreview = lastMessagePreview,
-        isPinned = isPinned,
-        unreadCount = unreadCount,
-        order = order
-    )
 
     /**
      * ChatMessage -> MessageEntity 映射：toolCalls 序列化为 JSON 字符串存储。
