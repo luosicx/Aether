@@ -236,6 +236,29 @@ describe("E2E / POST 兜底代理", () => {
     expect(JSON.parse(await upstreamReq.text())).toEqual(chatBody);
   });
 
+  it("客户端断开时上游请求 signal 随之 abort", async () => {
+    const controller = new AbortController();
+    const h = new Headers({ "Content-Type": "application/json" });
+    h.set("X-BFF-Token", VALID_TOKEN);
+    const req = new Request("https://bff.test/v1/chat/completions", {
+      method: "POST",
+      headers: h,
+      body: JSON.stringify(chatBody),
+      signal: controller.signal,
+    });
+    const ctx = makeCtx();
+    const resp = await worker.fetch(req, makeEnv(), ctx);
+    expect(resp.status).toBe(200);
+    expect(await resp.text()).toContain('"ok":true');
+    await Promise.all(ctx._pending);
+
+    // Request 构造会派生跟随信号（非同引用），验证 abort 行为传播
+    const upstreamReq = fetchMock.mock.calls[0][0];
+    expect(upstreamReq.signal.aborted).toBe(false);
+    controller.abort();
+    expect(upstreamReq.signal.aborted).toBe(true);
+  });
+
   it("embedding 请求按 provider 路由到对应上游", async () => {
     const ctx = makeCtx();
     const resp = await worker.fetch(

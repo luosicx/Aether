@@ -239,6 +239,27 @@ describe("E2E /chat/stream", () => {
     expect(errPayload.message).toBeTruthy();
   });
 
+  it("客户端 request.signal 透传给上游 LLM 调用（断开即中止上游）", async () => {
+    let capturedOpts;
+    mocks.llmStream = async function* (_env, _model, _messages, opts) {
+      capturedOpts = opts;
+      yield "ok";
+    };
+    const env = makeEnv();
+    const ctx = makeCtx();
+    const req = makeRequest("/chat/stream", {
+      method: "POST",
+      token: VALID_TOKEN,
+      body: { message: "hi" },
+    });
+    const resp = await worker.fetch(req, env, ctx);
+    expect(resp.status).toBe(200);
+    await resp.text();
+    await Promise.all(ctx._pending);
+    expect(capturedOpts).toBeTruthy();
+    expect(capturedOpts.signal).toBe(req.signal);
+  });
+
   it("限流触发返回 429 + Retry-After 头", async () => {
     // 让模拟限流器返回拒绝
     mocks.rateLimit = { allowed: false, retryAfter: 60 };

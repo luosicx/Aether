@@ -185,6 +185,8 @@ export async function* callLLMStream(env, model, messages, opts = {}) {
       Authorization: "Bearer " + upstream.apiKey,
     },
     body: JSON.stringify(payload),
+    // 客户端断开时 request.signal 触发 abort，中止上游请求（避免空转计费）
+    signal: opts.signal,
   });
 
   if (!resp.ok) {
@@ -222,6 +224,12 @@ export async function* callLLMStream(env, model, messages, opts = {}) {
       if (delta) yield delta;
     }
   } finally {
+    // 消费端提前退出（客户端断开/写 SSE 失败）时取消上游流，关闭连接；正常读完时为 no-op
+    try {
+      await reader.cancel();
+    } catch (_) {
+      /* noop */
+    }
     try {
       reader.releaseLock();
     } catch (_) {
