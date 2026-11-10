@@ -17,8 +17,6 @@ android {
         versionName = "1.0.0"
         // BFF 端点配置（可在 build.gradle 中覆盖）
         buildConfigField("String", "BFF_BASE_URL", "\"https://aether-bff.example.com\"")
-        // 启用 Rust SSE 解析路径（JNI 不可用时自动回退到 Kotlin 实现）
-        buildConfigField("boolean", "USE_RUST_SSE", "true")
     }
 
     buildFeatures {
