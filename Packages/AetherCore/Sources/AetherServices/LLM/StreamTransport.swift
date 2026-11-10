@@ -173,7 +173,11 @@ extension ChatRequestBody {
             "stream": stream,
         ]
         if let maxTokens = max_tokens { payload["max_tokens"] = maxTokens }
-        if let temperature = temperature { payload["temperature"] = temperature }
+        if let temperature = temperature {
+            // JSONSerialization 遇 NaN/Infinity 会抛 ObjC 异常（try? 无法捕获），提前拒绝
+            guard temperature.isFinite else { return nil }
+            payload["temperature"] = temperature
+        }
         if let tools = tools {
             payload["tools"] = tools.map { tool in
                 [

@@ -153,7 +153,8 @@ pub fn parse_with_tool_accumulation(
 ) -> Option<ParsedChunk> {
     let (content_opt, usage) = match parse_line(line)? {
         ParsedLine::Delta { content, usage } => (content, usage),
-        ParsedLine::Done => (None, None),
+        // [DONE] / BFF done|error 不产出 chunk（与旧 Swift 在调解析器前跳过 [DONE] 的行为一致）
+        ParsedLine::Done => return None,
     };
     let data = strip_data_prefix(line)?;
     let deltas = serde_json::from_str::<ChatChunk>(&data)
@@ -363,6 +364,18 @@ mod tests {
         let parsed = parse_with_tool_accumulation(line, &mut acc).unwrap();
         assert_eq!(parsed.content.as_deref(), Some("BFF"));
         assert!(parsed.tool_calls.is_none());
+    }
+
+    #[test]
+    fn tool_accumulation_path_returns_none_for_done() {
+        let mut acc: BTreeMap<i64, AccumulatedToolCall> = BTreeMap::new();
+        // [DONE] 与 BFF done/error 都不产出 chunk（即使已有累积的工具调用）
+        assert!(parse_with_tool_accumulation("data: [DONE]", &mut acc).is_none());
+        assert!(parse_with_tool_accumulation(r#"data: {"type":"done"}"#, &mut acc).is_none());
+        assert!(
+            parse_with_tool_accumulation(r#"data: {"type":"error","message":"x"}"#, &mut acc)
+                .is_none()
+        );
     }
 
     #[test]

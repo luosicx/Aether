@@ -24,7 +24,10 @@ public final class AetherRustSSEParser: @unchecked Sendable {
     /// 等价于 Workers `parseSSEEvent`：返回 content 字符串或 nil。
     public func extractContent(_ line: String) -> String? {
         guard let raw = line.withCString({ aether_sse_extract_content($0) }) else { return nil }
-        return takeString(raw)
+        guard let json = takeString(raw),
+              let data = json.data(using: .utf8) else { return nil }
+        // C ABI 返回 JSON 编码后的字符串（形如 "\"Hello\""），需解码还原
+        return try? JSONDecoder().decode(String.self, from: data)
     }
 
     /// 等价于 Swift `parseChunk`：
