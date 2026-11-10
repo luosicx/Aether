@@ -498,7 +498,7 @@ enum LLMError: Error, Sendable {
 
 ### 6.2 BFF 错误
 
-`BFFProxyClient.bffError(from:)` 按状态码映射：
+`BFFProxyClient.mapHTTPError(_:body:)` 按状态码映射（由 `StreamTransport` 的 httpErrorMapper 注入）：
 
 | HTTP 状态码 | LLMError case | 用户可见消息 | 说明 |
 |------------|---------------|-------------|------|
@@ -547,7 +547,7 @@ struct APIMessage: Sendable {
 }
 ```
 
-> 注意：`APIMessage.content` 为非可选 `String`；但请求体 `ChatRequestBody.ChatMessageBody.content` 为 `String?`（编码时若为空字符串则按 `encodeIfPresent` 处理）。多模态场景下，`images` 非空时 content 在请求体中改为内容块数组（`[{type:"text",...},{type:"image_url",...}]`），该逻辑由 `DeepSeekClient` / `QwenClient` / `BFFProxyClient` 手动构造 payload 实现（Codable 无法表达"字符串或数组"联合类型）。
+> 注意：`APIMessage.content` 为非可选 `String`；但请求体 `ChatRequestBody.ChatMessageBody.content` 为 `String?`（编码时若为空字符串则按 `encodeIfPresent` 处理）。多模态场景下，`images` 非空时 content 在请求体中改为内容块数组（`[{type:"text",...},{type:"image_url",...}]`），该逻辑统一由 `ChatRequestBody.makeStreamPayload(includeUsage:)` 实现（`DeepSeekClient` / `QwenClient` / `BFFProxyClient` 经 `StreamTransport` 共用；Codable 无法表达"字符串或数组"联合类型）。
 
 ---
 
@@ -828,9 +828,9 @@ v1.5.0 起 Windows 端（`windows/Aether.Windows/Services/AetherApiClient.cs`）
 
 | 端 | 客户端文件 | HTTP 库 | SSE 解析路径 |
 |----|-----------|---------|-------------|
-| Apple（iOS / iPad / macOS） | `Services/LLM/BFFProxyClient.swift` | `URLSession` | `SSEParser` / `AetherRust/SSE.swift` |
+| Apple（iOS / iPad / macOS） | `Services/LLM/BFFProxyClient.swift` | `URLSession`（`StreamTransport` 统一传输） | `SSEParser` / `AetherRust/SSE.swift` |
 | Windows | `windows/Aether.Windows/Services/AetherApiClient.cs` | `HttpClient` | `JsonDocument`（默认）/ `AetherNativeBridge.ParseSseChunk`（`UseRustSse` 开关） |
-| Android | `android/app/src/main/java/com/aether/data/api/{AetherApi,ChatStreamClient}.kt` | Ktor `HttpClient` | `parseLineKotlin`（默认 / 回退）/ `SseBridge.parseWithTools`（`BuildConfig.USE_RUST_SSE` 开关） |
+| Android | `android/app/src/main/java/com/aether/data/api/{AetherApi,ChatStreamClient}.kt` | Ktor `HttpClient` | `SseBridge.parseWithTools`（Rust JNI，统一 OpenAI/BFF envelope；JNI 不可用返回 null） |
 
 ### 10.2 共享 BFF HTTP 端点清单
 
@@ -1045,18 +1045,20 @@ object Redact {
       "name": "calculate",
       "arguments": "{\"expression\":\"1+2\"}"
     }
-  ]
+  ],
+  "usage": { "prompt_tokens": 3, "completion_tokens": 5, "total_tokens": 8 }
 }
 ```
 
 - `content`：当前 chunk 的文本增量；无 content 时为 `null`。
 - `toolCalls`：累积后的全部工具调用列表（跨 chunk 拼接 `arguments`）；无工具调用时为 `null` 或空数组。
-- 解析失败 / 非 data 行返回空串 `""`，调用方据此回退到纯 Kotlin 解析。
+- `usage`：上游 token 用量（仅 `stream_options.include_usage` 末块下发）；无用量时为 `null`。
+- 解析失败 / 非 data 行 / `[DONE]` / BFF `done|error` 返回空串 `""`，调用方据此跳过该行。
 
 #### 11.2.4 回退约定
 
 - `SseBridge`：`init` 块抛 `UnsatisfiedLinkError` 会导致 object 永久初始化失败（后续访问抛 `NoClassDefFoundError`），因此 `VectorMath` / `Redact` 改用 `nativeLoaded` 标记 + `*Safe` 包装方法。
-- `ChatStreamClient.parseLine` 捕获 `Throwable` 后回退到 `parseLineKotlin`。
+- `ChatStreamClient.parseLine` 捕获 `Throwable` 后返回 null（SSE 解析统一在 Rust，支持 OpenAI 与 BFF 两种 envelope，无 Kotlin 重复解析器）。
 - `VectorMath.cosineF64Safe` / `Redact.redactSafe` 在 `nativeLoaded = false` 时直接返回 0.0 / 原值，不抛异常。
 
 ---

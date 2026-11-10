@@ -226,12 +226,11 @@ Android 客户端通过 BFF（Backend For Frontend）代理访问 LLM 服务，�
 
 ```kotlin
 buildConfigField("String", "BFF_BASE_URL", "\"https://aether-bff.example.com\"")
-buildConfigField("boolean", "USE_RUST_SSE", "true")
 ```
 
 > **当前 `BFF_BASE_URL` 为占位符**（`aether-bff.example.com`），正式构建前需替换为真实部署的 BFF 地址。可在 `build.gradle.kts` 中直接修改，或通过 product flavor / 命令行 `-PBFF_BASE_URL=...` 覆盖。
 
-代码中通过 `BuildConfig.BFF_BASE_URL` 与 `BuildConfig.USE_RUST_SSE` 读取。
+代码中通过 `BuildConfig.BFF_BASE_URL` 读取。
 
 ---
 
@@ -252,9 +251,9 @@ Android 端通过 JNI 调用 Rust core，桥接代码位于 `com.aether.rust` �
 - 支持两个 ABI：`arm64-v8a`（真机）+ `x86_64`（模拟器）
 - `.so` 放置于 `android/app/src/main/jniLibs/{arm64-v8a,x86_64}/`，通过 Gradle jniLibs 打包进 APK
 
-**回退机制**：
+**解析与降级**：
 
-`ChatStreamClient` SSE 解析优先走 Rust JNI（`BuildConfig.USE_RUST_SSE = true`），JNI 不可用时自动回退到纯 Kotlin 实现。`VectorMath.cosineF64Safe` / `Redact.redactSafe` 同样提供 `*Safe` 回退路径。
+`ChatStreamClient` SSE 解析统一走 Rust JNI（`SseBridge.parseWithTools`，同时支持 OpenAI `choices` 与 BFF `type/content` 两种 envelope），不再保留 Kotlin 重复解析器；JNI 不可用（打包损坏）时 `parseLine` 返回 null 不崩溃。`VectorMath.cosineF64Safe` / `Redact.redactSafe` 仍提供 `*Safe` 回退路径。
 
 ---
 
@@ -268,12 +267,12 @@ Android 端通过 JNI 调用 Rust core，桥接代码位于 `com.aether.rust` �
   - Kotlin 桥接代码位于 `com.aether.rust` 包：`SseBridge`（SSE 解析）、`VectorMath`（余弦相似度）、`Redact`（脱敏）。
   - `.so` 产物由 CI `rust` job 通过 `cargo-ndk` 构建（`aarch64-linux-android` + `x86_64-linux-android`），上传为 artifact `aether-core-android-so`。
   - `android-build` CI job 下载 `.so` 并放入 `android/app/src/main/jniLibs/{arm64-v8a,x86_64}/`，通过 Gradle jniLibs 打包进 APK。
-  - `ChatStreamClient` SSE 解析优先走 Rust JNI（`BuildConfig.USE_RUST_SSE = true`），JNI 不可用时自动回退到纯 Kotlin 实现。
+  - `ChatStreamClient` SSE 解析统一走 Rust JNI（支持 OpenAI 与 BFF 两种 envelope），JNI 不可用时返回 null 不崩溃。
 - **基础单元测试已覆盖**：Android 端已新增 12 个测试文件、105 个测试用例，CI 执行 `testDebugUnitTest`：
   - `ModelsTest`：Conversation / ChatMessage / Memory JSON 序列化与默认值。
   - `BffConfigTest`：BffConfig 默认值 + BffConfigStore 读写（Robolectric + DataStore）。
   - `ConversationRepositoryTest` / `ConversationRepositoryRoomTest`：Room DAO CRUD + 排序 + 级联删除（Room in-memory database）。
-  - `SseBridgeTest`：JNI 不可用时的 Kotlin 回退路径。
+  - `SseBridgeTest`：JNI 不可用时的降级行为（返回 null 不崩溃）。
   - `VectorMathTest`：JNI 不可用时的 `cosineF64Safe` 回退（返回 0.0）。
   - `RedactTest`：JNI 不可用时的 `redactSafe` 回退。
   - `ChatViewModelDeleteTest` / `MarkdownTextTest` / `HealthViewModelTest` / `KnowledgeBaseViewModelTest` / `LanguageManagerTest`：各模块 ViewModel 与 UI 逻辑测试。
