@@ -76,8 +76,7 @@ struct ChatView: View {
                 Button {
                     createNewConversation()
                 } label: {
-                    // v1.2: 使用 AetherIcon.newConversation 替换 SF Symbol plus
-                    AetherIcon.newConversation.systemImage
+                    toolbarLabel("新建对话", icon: .newConversation)
                         .fontWeight(.medium)
                 }
                 .accessibilityLabel("新建对话")
@@ -123,8 +122,7 @@ struct ChatView: View {
                 ToolbarItem(placement: .topBarLeadingCompat) {
                     if horizontalSizeClass != .regular {
                         Button { showConversationList = true } label: {
-                            // v1.2: 使用 AetherIcon.bubble 替换 SF Symbol list.bullet
-                            AetherIcon.bubble.systemImage
+                            toolbarLabel("会话列表", icon: .bubble)
                                 .font(.titleAI)
                                 .foregroundStyle(.secondary)
                         }
@@ -137,8 +135,7 @@ struct ChatView: View {
                     Button {
                         showKnowledgeBase = true
                     } label: {
-                        // v1.2: 使用 AetherIcon.knowledge 替换 SF Symbol folder.badge.plus
-                        AetherIcon.knowledge.systemImage
+                        toolbarLabel("知识库", icon: .knowledge)
                             .font(.titleAI)
                             .foregroundStyle(.secondary)
                     }
@@ -146,8 +143,7 @@ struct ChatView: View {
                     .accessibilityHint("打开知识库管理")
                     .accessibilityIdentifier("knowledgeBaseToolbarButton")
                     Button { showSettings = true } label: {
-                        // v1.2: 使用 AetherIcon.settings 替换 SF Symbol gearshape
-                        AetherIcon.settings.systemImage
+                        toolbarLabel("设置", icon: .settings)
                             .font(.titleAI)
                             .foregroundStyle(.secondary)
                     }
@@ -347,6 +343,17 @@ struct ChatView: View {
         .responsiveLayout()
         // v1.1 Phase D: 动态星空背景叠加
         .background(StarfieldBackgroundView().opacity(0.4).allowsHitTesting(false))
+    }
+
+    /// iPhone Duo 的竖排工具栏与溢出菜单需要标题+图标才能完整自适应（系统按姿态选用）；
+    /// macOS 工具栏保持纯图标外观
+    @ViewBuilder
+    private func toolbarLabel(_ title: String, icon: AetherIcon) -> some View {
+        #if os(iOS)
+        Label(title, systemImage: icon.fallbackSystemName)
+        #else
+        icon.systemImage
+        #endif
     }
 
     /// Day 19: 创建新对话的公共逻辑（侧栏与 sheet 复用）

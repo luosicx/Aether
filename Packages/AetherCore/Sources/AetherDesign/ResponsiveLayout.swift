@@ -1,12 +1,14 @@
 import SwiftUI
 
 /// 设备类型：按宽度划分五档，用于响应式布局适配
+/// 按可用宽度而非设备型号判定，折叠屏（iPhone Duo 外屏 466pt / 内屏 669pt）
+/// 与分屏窗口自然落入对应宽度档位
 public enum DeviceType: Equatable {
     /// iPhone SE 及更小（width <= 375）
     case iPhoneSE
     /// iPhone 标准宽（width <= 430）
     case iPhone
-    /// iPad Mini / iPad（width <= 768）
+    /// iPad Mini / iPad / iPhone Duo 双屏（width <= 768）
     case iPadMini
     /// iPad Pro（width <= 1024）
     case iPadPro
@@ -53,6 +55,7 @@ public enum LayoutSize: Equatable {
     case xl
 
     /// 按宽度与 horizontal size class 联合判定
+    /// iPhone Duo：外屏为 compact 宽度，内屏为 regular 宽度，分屏时按实际可用宽度判定
     /// - Parameters:
     ///   - width: 可用宽度
     ///   - sizeClass: horizontal size class（.compact / .regular / .other）
@@ -60,7 +63,7 @@ public enum LayoutSize: Equatable {
         if horizontalSizeClass == .compact {
             return width <= 375 ? .compact : .medium
         }
-        // regular size class：iPad / macOS
+        // regular size class：iPad / macOS / iPhone Duo 内屏
         if width < 768 {
             return .medium
         } else if width < 1024 {

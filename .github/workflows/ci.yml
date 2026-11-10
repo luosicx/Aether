@@ -1237,3 +1237,89 @@ jobs:
         env:
           DESTINATION: 'generic/platform=iOS Simulator'
         run: make build-widget
+
+  # Xcode 27 / iPhone Duo 兼容性验证：
+  # 用 iOS 27 SDK 构建全部 iOS 相关 target，并在 iPhone Duo 折叠屏模拟器上
+  # 运行布局相关单元测试，验证双屏（外屏 466×678pt / 内屏 669×951pt）适配。
+  # xcode-27 为 GitHub 公开预览镜像（macOS 27 + Xcode 27.1/27.2），
+  # 与主 CI 的 Xcode 26 基线互补；iPhone Duo 需要专用模拟器 runtime，
+  # ci-setup-simulator.sh 会按 supportedDeviceTypes 自动选择。
+  xcode27-iphone-duo:
+    name: Xcode 27 / iPhone Duo
+    needs: rust-apple
+    runs-on: xcode-27
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Select Xcode 27.2
+        id: setup-xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '27.2'
+
+      - name: 缓存 DerivedData 和 SPM
+        uses: actions/cache@v5
+        with:
+          path: |
+            build/DerivedData
+            ~/Library/Developer/Xcode/DerivedData
+            ~/Library/Caches/org.swift.swiftpm
+            .build
+          key: ${{ runner.os }}-xcode-${{ steps.setup-xcode.outputs.xcode-version }}-duo-${{ hashFiles('Packages/AetherCore/Package.resolved', 'Aether.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-xcode-duo-
+
+      - name: Download xcframework
+        uses: actions/download-artifact@v7
+        with:
+          name: aether-core-xcframework
+          path: Packages/AetherCore
+
+      - name: Setup iPhone Duo Simulator
+        env:
+          IOS_SIMULATOR_NAME: 'iPhone Duo'
+        run: bash scripts/ci-setup-simulator.sh
+
+      - name: Build for Testing (iPhone Duo)
+        run: |
+          xcodebuild build-for-testing \
+            -project Aether.xcodeproj \
+            -scheme Aether-iOS \
+            -destination 'platform=iOS Simulator,name=iPhone Duo,arch=arm64' \
+            -configuration Debug \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO ARCHS=arm64 SWIFT_STRICT_CONCURRENCY=complete 2>&1 | tee /tmp/duo-build.log
+          status=${PIPESTATUS[0]}
+          if [ $status -ne 0 ]; then
+            echo "## iPhone Duo Build Failed (exit $status)" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            grep -E "error:|Undefined symbol|linker command failed|cannot find|Could not build|no such file" /tmp/duo-build.log | head -40 >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+          exit $status
+
+      - name: Run Layout Tests (iPhone Duo)
+        run: |
+          xcodebuild test-without-building \
+            -project Aether.xcodeproj \
+            -scheme Aether-iOS \
+            -destination 'platform=iOS Simulator,name=iPhone Duo,arch=arm64' \
+            -configuration Debug \
+            -derivedDataPath build \
+            -only-testing:AetherTests/ResponsiveLayoutTests \
+            -only-testing:AetherTests/DesignSystemTests \
+            -only-testing:AetherTests/MessageBubbleTests \
+            -skip-testing:AetherUITests \
+            -resultBundlePath DuoTestResults.xcresult \
+            CODE_SIGNING_ALLOWED=NO ARCHS=arm64 SWIFT_STRICT_CONCURRENCY=complete
+
+      - name: Build Watch App (Xcode 27)
+        env:
+          DESTINATION: 'generic/platform=watchOS Simulator'
+        run: make build-watch
+
+      - name: Build Widget Extension (Xcode 27)
+        env:
+          DESTINATION: 'generic/platform=iOS Simulator'
+        run: make build-widget

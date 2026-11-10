@@ -329,8 +329,14 @@ struct ConversationList: View {
                         Button {
                             onCreate()
                         } label: {
+                            // iPhone Duo 竖排工具栏/溢出菜单需要标题+图标；macOS 保持纯图标
+                            #if os(iOS)
+                            Label("新建对话", systemImage: "plus")
+                                .fontWeight(.medium)
+                            #else
                             Image(systemName: "plus")
                                 .fontWeight(.medium)
+                            #endif
                         }
                         .accessibilityLabel("新建对话")
                         .accessibilityHint("创建新对话")

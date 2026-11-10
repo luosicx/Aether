@@ -7,7 +7,7 @@ set -e
 PROJECT_DIR="/Users/xuchen/Documents/AIBuiler"
 PROJECT="$PROJECT_DIR/Aether.xcodeproj"
 SCHEME="Aether-iOS"
-SIM_NAME="iPhone 17"
+SIM_NAME="${SIM_NAME:-iPhone 17}"
 
 cd "$PROJECT_DIR"
 
@@ -27,18 +27,12 @@ if [ ! -d "Packages/AetherCore/aether_core.xcframework" ]; then
 fi
 echo "[OK] xcframework 存在"
 
-# 2. 检查/创建模拟器
-SIM_ID=$(xcrun simctl list devices available 2>/dev/null | grep "$SIM_NAME" | head -1 | grep -oE '[0-9A-F-]{36}')
+# 2. 检查/创建模拟器（委托 ci-setup-simulator.sh，自动选择支持该设备类型的 runtime，含 iPhone Duo 专用 runtime）
+SIM_ID=$(xcrun simctl list devices available 2>/dev/null | grep "${SIM_NAME} (" | head -1 | grep -oE '[0-9A-F-]{36}')
 if [ -z "$SIM_ID" ]; then
-  echo "iPhone 17 模拟器不存在，尝试创建..."
-  RUNTIME_ID=$(xcrun simctl list runtimes 2>/dev/null | grep "com.apple.CoreSimulator.SimRuntime.iOS" | head -1 | grep -oE '[0-9A-F-]{36}')
-  if [ -z "$RUNTIME_ID" ]; then
-    echo "ERROR: 没有可用的 iOS runtime"
-    echo "请先运行: xcodebuild -downloadPlatform iOS"
-    exit 1
-  fi
-  xcrun simctl create "$SIM_NAME" "com.apple.CoreSimulator.SimDeviceType.iPhone-17" "$RUNTIME_ID"
-  SIM_ID=$(xcrun simctl list devices available 2>/dev/null | grep "$SIM_NAME" | head -1 | grep -oE '[0-9A-F-]{36}')
+  echo "$SIM_NAME 模拟器不存在，尝试创建..."
+  IOS_SIMULATOR_NAME="$SIM_NAME" bash "$PROJECT_DIR/scripts/ci-setup-simulator.sh"
+  SIM_ID=$(xcrun simctl list devices available 2>/dev/null | grep "${SIM_NAME} (" | head -1 | grep -oE '[0-9A-F-]{36}')
 fi
 echo "[OK] 模拟器 ID: $SIM_ID"
 

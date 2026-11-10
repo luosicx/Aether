@@ -85,7 +85,7 @@ Watch App、Widget Extension 与主 App 通过 App Group 共享 SwiftData 存储
 在某些 Xcode beta 版本中，SwiftData `@Model` 宏的 macro plugin server 存在 bug，可能导致 Watch / Widget 作为独立 target 单独构建时失败（表现为主 App 构建正常，但 Watch/Widget standalone build 报 macro 相关错误）。
 
 **规避方式**：
-- 优先使用正式版 Xcode 16+
+- 优先使用正式版 Xcode 26+（推荐 Xcode 27.1+）
 - 或先构建主 App（`make build-ios`），再构建 Watch/Widget
 - 或在 Xcode 中以主 App scheme 运行（Watch/Widget 作为依赖被一起编译）
 

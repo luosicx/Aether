@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 46;
+	objectVersion = 56;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -357,6 +357,7 @@
 		A1B2C3D4E5F6071809AB3037 /* ToolExecutionCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6071809AB3038 /* ToolExecutionCoordinatorTests.swift */; };
 		A1B2C3D4E5F6A7B8C9D0E1F5 /* OnDeviceModelDownloaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3E4D5C6B7A89012FEDCBA98 /* OnDeviceModelDownloaderTests.swift */; };
 		A1E2F3A4B5C6D7E8F9A0B1CB /* DesignSystemTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1E2F3A4B5C6D7E8F9A0B1CA /* DesignSystemTests.swift */; };
+		A1E2F3A4B5C6D7E8F9A0B1CD /* ResponsiveLayoutTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1E2F3A4B5C6D7E8F9A0B1CC /* ResponsiveLayoutTests.swift */; };
 		A2E32ED4E295C38A968596EC /* DAGExecutionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A1B2C3D4E5F607100B00109 /* DAGExecutionEngine.swift */; };
 		A31BB2BCBA40DC4CA046B587 /* NetworkMonitorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 981ECB76C29A8669E33E5E43 /* NetworkMonitorTests.swift */; };
 		A36CFEF5A35FD8E6BD2794A8 /* KnowledgeBaseView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000000000000000000C001 /* KnowledgeBaseView.swift */; };
@@ -953,6 +954,7 @@
 		A1E2F3A4B5C6D7E8F9A0B1C4 /* AetherIcons.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AetherIcons.swift; sourceTree = "<group>"; };
 		A1E2F3A4B5C6D7E8F9A0B1C6 /* AetherIconRenderer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AetherIconRenderer.swift; sourceTree = "<group>"; };
 		A1E2F3A4B5C6D7E8F9A0B1CA /* DesignSystemTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DesignSystemTests.swift; sourceTree = "<group>"; };
+		A1E2F3A4B5C6D7E8F9A0B1CC /* ResponsiveLayoutTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ResponsiveLayoutTests.swift; sourceTree = "<group>"; };
 		A25DCD40D09E1716B5899628 /* SystemControlTool.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SystemControlTool.swift; sourceTree = "<group>"; };
 		A2B3C4D5E6F7A8B9C0D1E2F3 /* OnDeviceModelCatalog.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OnDeviceModelCatalog.swift; sourceTree = "<group>"; };
 		A2F7349A21CF97B72D3EC019 /* WatchQuickChatView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WatchQuickChatView.swift; sourceTree = "<group>"; };
@@ -2173,6 +2175,7 @@
 			children = (
 				D477EAE9EE0C38583B08BCF8 /* AetherIconsTests.swift */,
 				A1E2F3A4B5C6D7E8F9A0B1CA /* DesignSystemTests.swift */,
+				A1E2F3A4B5C6D7E8F9A0B1CC /* ResponsiveLayoutTests.swift */,
 				25A1B2C3D4E5F6000100A007 /* ThemeManagerTests.swift */,
 				5F1D00000000000000000004 /* AnimationTokensTests.swift */,
 			);
@@ -2635,8 +2638,8 @@
 		7C5EF9114C3CBE2937F8D8FA /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
-				LastSwiftUpdateCheck = 1600;
-				LastUpgradeCheck = 1600;
+				LastSwiftUpdateCheck = 2700;
+				LastUpgradeCheck = 2700;
 				TargetAttributes = {
 					B06AF15605D68E7EA565058C = {
 						ProvisioningStyle = Automatic;
@@ -2644,7 +2647,7 @@
 				};
 			};
 			buildConfigurationList = 71FBA09C0546F01C73A17485 /* Build configuration list for PBXProject "AetherTests" */;
-			compatibilityVersion = "Xcode 3.2";
+			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = "zh-Hans";
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -3103,6 +3106,7 @@
 				AD95A90701D0791B6C307089 /* InterventionPanelTests.swift in Sources */,
 				C377A94D6147939F189D1355 /* AgentPerformanceBaselineTests.swift in Sources */,
 				A1E2F3A4B5C6D7E8F9A0B1CB /* DesignSystemTests.swift in Sources */,
+				A1E2F3A4B5C6D7E8F9A0B1CD /* ResponsiveLayoutTests.swift in Sources */,
 				ABCDEF00000000000000000B /* MCPClientTests.swift in Sources */,
 				ABCDEF00000000000000000D /* ToolRegistryDynamicTests.swift in Sources */,
 				753C3984A3F2D58051000D36 /* MCPSecurityTests.swift in Sources */,

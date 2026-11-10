@@ -1,6 +1,5 @@
 import XCTest
-import SwiftUI
-@testable import AetherDesign
+import AetherDesign
 
 /// v1.2 响应式布局单元测试
 /// 覆盖 LayoutSize 判定 / 属性映射 / DefaultLayoutStrategy 决策
@@ -150,6 +149,43 @@ final class ResponsiveLayoutTests: XCTestCase {
     func testStrategyLayoutSizeStored() {
         let strategy = DefaultLayoutStrategy(layoutSize: .medium)
         XCTAssertEqual(strategy.layoutSize, .medium)
+    }
+
+    // MARK: - iPhone Duo 折叠屏适配测试
+
+    /// Duo 外屏 466pt 宽（1398×2034px @3x），compact size class → medium 档
+    func testDuoOuterDisplayResolvesMedium() {
+        XCTAssertEqual(LayoutSize.resolve(width: 466, horizontalSizeClass: .compact), .medium)
+    }
+
+    /// Duo 内屏 669pt 宽（2007×2853px @3x），regular size class → medium 档，支持双栏分屏
+    func testDuoInnerDisplayResolvesMediumAndSupportsSplitView() {
+        let layout = LayoutSize.resolve(width: 669, horizontalSizeClass: .regular)
+        XCTAssertEqual(layout, .medium)
+        XCTAssertTrue(DefaultLayoutStrategy(layoutSize: layout).supportsSplitView)
+    }
+
+    /// Duo 内屏 Split View 分屏后宽度约减半（~334pt），compact → compact 档
+    func testDuoSplitViewHalfWidthResolvesCompact() {
+        XCTAssertEqual(LayoutSize.resolve(width: 334, horizontalSizeClass: .compact), .compact)
+    }
+
+    /// Duo 两块屏幕宽度均落入 iPadMini 宽度档，内容最大宽度 600pt
+    func testDuoDisplayWidthsContentWidth() {
+        XCTAssertEqual(DeviceType.current(width: 466), .iPadMini)
+        XCTAssertEqual(DeviceType.current(width: 669), .iPadMini)
+        XCTAssertEqual(DeviceType.current(width: 466).maxContentWidth, 600)
+        XCTAssertEqual(DeviceType.current(width: 669).maxContentWidth, 600)
+    }
+
+    /// Duo 姿态切换（外屏→内屏）时布局档位随宽度连续变化，不依赖设备型号
+    func testDuoPoseTransitionLayoutContinuity() {
+        let outer = LayoutSize.resolve(width: 466, horizontalSizeClass: .compact)
+        let inner = LayoutSize.resolve(width: 669, horizontalSizeClass: .regular)
+        XCTAssertEqual(outer.bubbleMaxWidth, 500)
+        XCTAssertEqual(inner.bubbleMaxWidth, 500)
+        XCTAssertFalse(outer.toolbarCollapseToMenu)
+        XCTAssertFalse(inner.toolbarCollapseToMenu)
     }
 
     // MARK: - SplitViewStyle 等价性测试
