@@ -121,21 +121,7 @@ jobs:
 
       - name: Verify Test Results
         if: steps.test.outcome != 'success'
-        run: |
-          echo "xcodebuild test exited non-zero, verifying test results..."
-          if [ ! -d "TestResults.xcresult" ]; then
-            echo "ERROR: No test results generated (TestResults.xcresult missing)"
-            exit 1
-          fi
-          # 检查实际测试失败数（grep -c 无匹配时退出码为 1，不依赖 || echo "0" 回退）
-          FAILED_TESTS=$(xcrun xcresulttool get test-results summary --path TestResults.xcresult 2>/dev/null | grep -c '"failed"' | tr -d '\n')
-          FAILED_TESTS=${FAILED_TESTS:-0}
-          if [ "$FAILED_TESTS" -gt 0 ]; then
-            echo "ERROR: $FAILED_TESTS test(s) failed"
-            xcrun xcresulttool get test-results summary --path TestResults.xcresult
-            exit 1
-          fi
-          echo "xcodebuild exited non-zero but all tests passed (simulator instability)"
+        run: bash scripts/check-xcresult-failures.sh TestResults.xcresult iOS
 
       - name: Check Coverage Threshold (≥ 80%, iOS Swift + Rust core, excluding Views/DesignSystem/App/Protocols)
         id: coverage
@@ -448,21 +434,7 @@ jobs:
 
       - name: Verify UIT Results
         if: steps.test.outcome != 'success'
-        run: |
-          echo "xcodebuild test exited non-zero, verifying test results..."
-          if [ ! -d "UITestResults.xcresult" ]; then
-            echo "ERROR: No test results generated (UITestResults.xcresult missing)"
-            exit 1
-          fi
-          # 检查实际测试失败数（grep -c 无匹配时退出码为 1，不依赖 || echo "0" 回退）
-          FAILED_TESTS=$(xcrun xcresulttool get test-results summary --path UITestResults.xcresult 2>/dev/null | grep -c '"failed"' | tr -d '\n')
-          FAILED_TESTS=${FAILED_TESTS:-0}
-          if [ "$FAILED_TESTS" -gt 0 ]; then
-            echo "ERROR: $FAILED_TESTS UIT test(s) failed"
-            xcrun xcresulttool get test-results summary --path UITestResults.xcresult
-            exit 1
-          fi
-          echo "xcodebuild exited non-zero but all UIT tests passed (simulator instability)"
+        run: bash scripts/check-xcresult-failures.sh UITestResults.xcresult UI
 
   # 安全相关测试（ToolRegistry/ToolAuthorization/Keychain/Telemetry 等）已包含在
   # unit-tests 与 unit-tests-macos 的完整测试集中，不再单独起 job 重复构建与执行。
@@ -615,20 +587,7 @@ jobs:
 
       - name: Verify macOS Test Results
         if: steps.test.outcome != 'success'
-        run: |
-          echo "xcodebuild test exited non-zero, verifying macOS test results..."
-          if [ ! -d "TestResultsMacOS.xcresult" ]; then
-            echo "ERROR: No test results generated (TestResultsMacOS.xcresult missing)"
-            exit 1
-          fi
-          FAILED_TESTS=$(xcrun xcresulttool get test-results summary --path TestResultsMacOS.xcresult 2>/dev/null | grep -c '"failed"' | tr -d '\n')
-          FAILED_TESTS=${FAILED_TESTS:-0}
-          if [ "$FAILED_TESTS" -gt 0 ]; then
-            echo "ERROR: $FAILED_TESTS macOS test(s) failed"
-            xcrun xcresulttool get test-results summary --path TestResultsMacOS.xcresult
-            exit 1
-          fi
-          echo "xcodebuild exited non-zero but all macOS tests passed (host app instability)"
+        run: bash scripts/check-xcresult-failures.sh TestResultsMacOS.xcresult macOS
 
       - name: Generate macOS cobertura.xml
         if: always()
