@@ -1148,7 +1148,7 @@ Android 端位于 `android/app/src/main/java/com/aether/` 目录，包名 `com.a
 | `android/app/src/main/java/com/aether/ui/navigation/AetherApp.kt` | Compose 导航图：定义 Chat / ConversationList / Settings / KnowledgeBase / Health 五个目的地的 `NavHost` 路由。 |
 | `android/app/src/main/java/com/aether/data/model/Models.kt` | 数据模型：`Conversation` / `ChatMessage` / `ToolCall` / `ChatRequest` / `Memory` / `MemorySearchRequest` / `DocumentChunk` / `RagSearchRequest` / `HealthSummary`，使用 `@Serializable` 与 BFF DTO 一一对应。 |
 | `android/app/src/main/java/com/aether/data/api/AetherApi.kt` | BFF HTTP 客户端：基于 Ktor `HttpClient`，提供 `listConversations` / `createConversation` / `getConversation` / `updateConversation` / `deleteConversation` / `listMessages` / `deleteMessage` / `submitFeedback` / `listMemory` / `createMemory` / `searchMemory` / `deleteMemory` / `searchDocuments` / `uploadHealthSummary` / `getHealthSummary` 等方法；`withAuth()` 统一注入 `X-BFF-Token` header。 |
-| `android/app/src/main/java/com/aether/data/api/ChatStreamClient.kt` | SSE 流式聊天：Ktor `HttpStatement` + `response.bodyAsChannel()` 读取 SSE 行，`parseLine` 优先调用 `SseBridge.parseWithTools`（Rust JNI），失败回退到 `parseLineKotlin`（纯 Kotlin 解析 BFF 自定义 `{"type":"delta","content":"..."}` 格式），返回 `Flow<String>`。 |
+| `android/app/src/main/java/com/aether/data/api/ChatStreamClient.kt` | SSE 流式聊天：Ktor `HttpStatement` + `response.bodyAsChannel()` 读取 SSE 行，`parseLine` 统一调用 `SseBridge.parseWithTools`（Rust JNI，同时支持 OpenAI `choices` 与 BFF `{"type":"delta","content":"..."}` 两种 envelope），JNI 不可用时返回 null 不崩溃，返回 `Flow<String>`。 |
 | `android/app/src/main/java/com/aether/data/api/HttpClientFactory.kt` | Ktor `HttpClient` 工厂：配置 `ContentNegotiation`（kotlinx.serialization）/ `HttpTimeout` / `UserAgent` / `Logging` 等插件。 |
 | `android/app/src/main/java/com/aether/data/api/BffConfig.kt` | BFF 配置数据类：`baseUrl`（默认 `BuildConfig.BFF_BASE_URL`）+ `userToken`（默认空串，运行时从 `BffConfigStore` 读取）。 |
 | `android/app/src/main/java/com/aether/data/api/BffConfigStore.kt` | BFF 配置持久化：非敏感数据（baseUrl / defaultModel / accentColor / language）用 `DataStore Preferences`，敏感数据（userToken）用 `EncryptedSharedPreferences`（AES256-GCM）；暴露 `Flow<BffConfig>` / `setBaseUrl` / `setUserToken` / `setLanguage` 等。 |
@@ -1559,15 +1559,12 @@ sequenceDiagram
     BFF-->>CSC: SSE 流
     loop 逐行读取 SSE
         CSC->>CSC: channel.readUTF8Line()
-        alt BuildConfig.USE_RUST_SSE == true
-            CSC->>JNI: parseWithTools(line)
-            JNI-->>CSC: {"content":"...","toolCalls":[...]}
-            alt JNI 不可用
-                JNI-->>CSC: 异常 / 空串
-                CSC->>CSC: parseLineKotlin(line) 回退
-            end
-        else 纯 Kotlin（默认 / 回退）
-            CSC->>CSC: parseLineKotlin(line)
+        CSC->>JNI: parseWithTools(line)
+        alt JNI 正常
+            JNI-->>CSC: {"content":"...","toolCalls":[...],"usage":{...}}
+        else JNI 不可用 / 解析失败
+            JNI-->>CSC: 异常 / 空串
+            CSC->>CSC: parseLine 返回 null（跳过该行）
         end
         CSC-->>VM: Flow yield content
         VM->>MR: appendAssistantChunk(content)
@@ -1581,7 +1578,7 @@ sequenceDiagram
 
 **关键说明**：
 - **离线优先**：`ConversationRepository` / `MessageRepository` 采用「先 Room 后网络」策略，离线时读取 Room 缓存，联网时拉取 BFF 并写入 Room 同步。
-- **Rust JNI 回退**：`ChatStreamClient.parseLine` 优先调 `SseBridge.parseWithTools`，捕获 `Throwable` 后回退到 `parseLineKotlin`；`Redact.redactSafe` / `VectorMath.cosineF64Safe` 同样在 JNI 不可用时返回原值 / 0.0。
+- **Rust JNI 解析**：`ChatStreamClient.parseLine` 统一调用 `SseBridge.parseWithTools`（同时支持 OpenAI choices 与 BFF delta/done/error 两种 envelope），JNI 不可用或解析失败时返回 null 跳过该行，不崩溃；`Redact.redactSafe` / `VectorMath.cosineF64Safe` 同样在 JNI 不可用时返回原值 / 0.0。
 - **状态驱动 UI**：ViewModel 暴露 `StateFlow<ChatUiState>`，Compose 通过 `collectAsStateWithLifecycle()` 订阅，避免不必要的重组。
 
 ---
@@ -1762,7 +1759,7 @@ sequenceDiagram
 | PerformanceMonitor | `Services/Performance/PerformanceMonitor.swift` | iOS 17.0+ / macOS 14.0+ |
 | PrivacyInfo.xcprivacy | `Resources/PrivacyInfo.xcprivacy` | iOS 17.0+ / macOS 14.0+ / Xcode 16+（App Store 审核要求） |
 | AttributedString（Markdown） | `Views/Chat/Markdown*.swift` / `CodeSyntaxHighlighter.swift` | iOS 17.0+ / macOS 14.0+ / Foundation |
-| XCTest | `AetherTests/` 203 文件（3541 用例） | Xcode 16+ / Swift 5.9+ |
+| XCTest | `AetherTests/` 203 文件（3546 用例） | Xcode 16+ / Swift 5.9+ |
 | XCUITest | `AetherUITests/` 7 文件（30 用例） | Xcode 16+ / Swift 5.9+ |
 | GitHub Actions | `.github/workflows/ci.yml` | macos-14 runner / Xcode 16+ |
 | CoreLocation | CLLocationManager + CLGeocoder | LocationTool 定位与反地理编码 | iOS 17.0+ / macOS 14.0+ / CoreLocation.framework |
@@ -1807,7 +1804,7 @@ sequenceDiagram
 ### 7.1 单元测试（UT）
 
 - **Target**：`AetherTests`
-- **规模**：203 个测试文件，3541 用例（3541 pass / 0 skip / 0 failures）
+- **规模**：203 个测试文件，3546 用例（3546 pass / 0 skip / 0 failures）
 - **分层覆盖**：
 
 | 层级 | 测试文件 | 文件数 | 核心断言数（约） | skip 原因 |
@@ -2159,7 +2156,7 @@ CloudflareWorkers/               # BFF 代理网关
 ├── worker.js
 └── wrangler.toml
 
-AetherTests/                  # 203 个 UT 文件 / 3541 用例
+AetherTests/                  # 203 个 UT 文件 / 3546 用例
 ├── APIConfigTests.swift
 ├── AlarmToolTests.swift
 ├── BFFProxyClientTests.swift

@@ -445,6 +445,8 @@ async function proxyLLM(request, env, ctx) {
     method: "POST",
     headers: buildUpstreamHeaders(request.headers, upstream.apiKey, env.UPSTREAM_EXTRA_HEADERS),
     body: text,
+    // 客户端断开时中止上游请求（含等待响应头阶段）
+    signal: request.signal,
   });
 
   // 7. 转发并流式返回

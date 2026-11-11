@@ -25,6 +25,7 @@ struct View<'a> {
     content: &'a Option<String>,
     #[serde(rename = "toolCalls")]
     tool_calls: Vec<ViewTool<'a>>,
+    usage: &'a Option<aether_core::Usage>,
 }
 
 impl<'a> From<&'a ParsedChunk> for View<'a> {
@@ -46,6 +47,7 @@ impl<'a> From<&'a ParsedChunk> for View<'a> {
         View {
             content: &p.content,
             tool_calls,
+            usage: &p.usage,
         }
     }
 }

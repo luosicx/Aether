@@ -42,6 +42,7 @@ pub extern "system" fn Java_com_aether_rust_SseBridge_parseWithTools(
             serde_json::to_string(&serde_json::json!({
                 "content": p.content,
                 "toolCalls": p.tool_calls,
+                "usage": p.usage,
             }))
             .ok()
         })

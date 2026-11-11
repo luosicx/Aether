@@ -402,7 +402,7 @@
     2. 发送消息
     3. 查看 DebugPanel 的 request header
   - **预期结果**：请求 Header 含 X-BFF-Token，不含 Authorization: Bearer
-  - **失败排查**：检查 BFFProxyClient.modifyRequest；查看 header 注入
+  - **失败排查**：检查 BFFProxyClient.makeRequest；查看 header 注入
 
 - [ ] 禁用 BFF 回退直连
   - **前置条件**：BFF 代理已启用
@@ -3456,17 +3456,17 @@
   - **预期结果**：捕获 `UnsatisfiedLinkError`，返回 0.0，不崩溃
   - **失败排查**：检查 `VectorMath.kt` 中 try/catch 块；查看回退日志
 
-- [ ] BuildConfig.USE_RUST_SSE=true 默认启用
-  - **前置条件**：构建配置已加载
-  - **操作步骤**：1. 查看 `android/app/build.gradle` 中 buildConfigField 2. 检查运行时 `BuildConfig.USE_RUST_SSE`
-  - **预期结果**：USE_RUST_SSE = true
-  - **失败排查**：检查 `build.gradle` 中 buildConfigField 配置；查看 BuildConfig 生成
+- [ ] SSE 解析统一走 Rust JNI（无 Kotlin 重复解析器）
+  - **前置条件**：.so 已加载
+  - **操作步骤**：1. 发送消息触发 SSE 流 2. 确认 `ChatStreamClient.parseLine` 调用 `SseBridge.parseWithTools`
+  - **预期结果**：OpenAI choices 与 BFF delta/done/error 两种 envelope 均能解析出 content；代码中无 parseLineKotlin / USE_RUST_SSE 残留
+  - **失败排查**：检查 `ChatStreamClient.kt` parseLine 实现；确认 jniLibs 下 .so 与 Rust 源码版本一致
 
 - [ ] .so 不存在时安全降级（UnsatisfiedLinkError 捕获）
   - **前置条件**：移除 jniLibs 下 .so 文件
   - **操作步骤**：1. 启动应用 2. 发送消息触发 SSE 解析
-  - **预期结果**：UnsatisfiedLinkError 被 catch，回退到 Kotlin SSE 解析路径，应用不崩溃
-  - **失败排查**：检查 `SseBridge.kt` 中 try/catch；查看 Kotlin 回退解析实现
+  - **预期结果**：UnsatisfiedLinkError 被 catch，parseLine 返回 null 跳过该行，应用不崩溃（无 Kotlin 回退解析器）
+  - **失败排查**：检查 `ChatStreamClient.kt` parseLine 的 try/catch；查看 logcat 异常日志
 
 ### 39.8 Room 数据库
 

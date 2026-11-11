@@ -906,6 +906,7 @@ fn to_parsed_chunk_json(p: &ParsedChunk) -> *mut c_char {
         content: &'a Option<String>,
         #[serde(rename = "toolCalls")]
         tool_calls: Vec<ViewTool<'a>>,
+        usage: &'a Option<aether_core::Usage>,
     }
     let tools: Vec<ViewTool> = p
         .tool_calls
@@ -924,6 +925,7 @@ fn to_parsed_chunk_json(p: &ParsedChunk) -> *mut c_char {
     let view = View {
         content: &p.content,
         tool_calls: tools,
+        usage: &p.usage,
     };
     serde_json::to_string(&view)
         .map(|j| to_cstring(&j))

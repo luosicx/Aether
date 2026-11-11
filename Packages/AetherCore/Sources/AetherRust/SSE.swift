@@ -24,7 +24,10 @@ public final class AetherRustSSEParser: @unchecked Sendable {
     /// 等价于 Workers `parseSSEEvent`：返回 content 字符串或 nil。
     public func extractContent(_ line: String) -> String? {
         guard let raw = line.withCString({ aether_sse_extract_content($0) }) else { return nil }
-        return takeString(raw)
+        guard let json = takeString(raw),
+              let data = json.data(using: .utf8) else { return nil }
+        // C ABI 返回 JSON 编码后的字符串（形如 "\"Hello\""），需解码还原
+        return try? JSONDecoder().decode(String.self, from: data)
     }
 
     /// 等价于 Swift `parseChunk`：
@@ -42,13 +45,15 @@ public final class AetherRustSSEParser: @unchecked Sendable {
     }
 
     /// 等价于 Swift `parseWithToolAccumulation`。
-    /// 返回 (content, toolCalls)；非 data 行返回 nil。
-    public func parseWithTools(_ line: String) -> (content: String?, toolCalls: [AetherRustAccumulatedToolCall]?)? {
+    /// 返回 (content, toolCalls, usage)；非 data 行返回 nil。
+    public func parseWithTools(
+        _ line: String
+    ) -> (content: String?, toolCalls: [AetherRustAccumulatedToolCall]?, usage: AetherRustUsage?)? {
         guard let raw = line.withCString({ aether_sse_parse_with_tools($0, state) }) else { return nil }
         guard let json = takeString(raw) else { return nil }
         guard let data = json.data(using: .utf8),
               let view = try? JSONDecoder().decode(ParsedChunkView.self, from: data) else { return nil }
-        return (view.content, view.toolCalls)
+        return (view.content, view.toolCalls, view.usage)
     }
 
     private func takeString(_ raw: UnsafeMutablePointer<CChar>) -> String? {
@@ -61,6 +66,20 @@ public final class AetherRustSSEParser: @unchecked Sendable {
 private struct ParsedChunkView: Decodable {
     let content: String?
     let toolCalls: [AetherRustAccumulatedToolCall]?
+    let usage: AetherRustUsage?
+}
+
+/// 上游 token 用量（OpenAI 兼容字段名）。
+public struct AetherRustUsage: Decodable, Sendable, Equatable {
+    public let prompt_tokens: Int?
+    public let completion_tokens: Int?
+    public let total_tokens: Int?
+
+    public init(prompt_tokens: Int? = nil, completion_tokens: Int? = nil, total_tokens: Int? = nil) {
+        self.prompt_tokens = prompt_tokens
+        self.completion_tokens = completion_tokens
+        self.total_tokens = total_tokens
+    }
 }
 
 /// `AetherRust` 暴露的累积工具调用（字段 `type` 对应 Rust `kind`，已通过 serde rename 对齐）。
