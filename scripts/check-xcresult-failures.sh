@@ -58,7 +58,8 @@ failed_count = data.get('failedTests')
 if failed_count is None:
     failed_count = len(entries)
 
-known = set()
+known_exact = set()
+known_class = set()
 if os.path.exists(baseline_path):
     with open(baseline_path, encoding='utf-8') as fh:
         for line in fh:
@@ -66,17 +67,34 @@ if os.path.exists(baseline_path):
             if not line or line.startswith('#') or ':' not in line:
                 continue
             scope, _, tid = line.partition(':')
-            if scope.strip() == label:
-                known.add(tid.strip())
+            if scope.strip() != label:
+                continue
+            tid = tid.strip()
+            # xcresult 的 id 不含括号，手写基线常带 Swift 的 method() 风格，统一掉
+            if tid.endswith('()'):
+                tid = tid[:-2]
+            if tid.endswith('/*'):
+                known_class.add(tid[:-2])
+            elif tid:
+                known_exact.add(tid)
 else:
     print('NOTE: baseline %s not found; treating every failure as new' % baseline_path)
 
-new = [(t, r) for (t, r) in entries if t not in known]
-known_hits = [(t, r) for (t, r) in entries if t in known]
 
-print('result=%s passed=%s failed=%s skipped=%s | baseline(%s)=%d'
+def is_known(tid):
+    """条目支持两种粒度：`Class/method` 精确匹配，`Class/*` 整类豁免。
+    超时类失败的受害用例每次不同（同一批里换个方法触发），只能按类锚定。"""
+    if tid in known_exact:
+        return True
+    return tid.split('/', 1)[0] in known_class
+
+
+new = [(t, r) for (t, r) in entries if not is_known(t)]
+known_hits = [(t, r) for (t, r) in entries if is_known(t)]
+
+print('result=%s passed=%s failed=%s skipped=%s | baseline(%s)=%d exact + %d class'
       % (data.get('result'), data.get('passedTests'), failed_count,
-         data.get('skippedTests'), label, len(known)))
+         data.get('skippedTests'), label, len(known_exact), len(known_class)))
 
 # 计数多于可枚举明细时，差额无法核对基线，按新增处理
 if failed_count > len(entries):
