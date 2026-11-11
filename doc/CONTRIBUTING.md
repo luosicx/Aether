@@ -498,6 +498,7 @@ Closes #789
 - 必须 **Build 成功** + **Test 0 failures**
 - CI 通过 SonarCloud 进行代码质量检查（`code-quality` job），存在 error 会阻断合并
 - 跨平台 PR：CI 必须全部 **job 通过**（含 iOS-build / macOS-build / windows-build / android-build / Rust 各 target / coverage-summary 等），Coverage 当前阈值 84.25%
+- 用例失败闸门：`scripts/check-xcresult-failures.sh` 解析 xcresult 的真实失败明细，与 `scripts/known-test-failures.txt` 基线比对——命中基线的历史失败只告警放行，**基线外的新增失败直接判红**。修好一条请从基线删掉；不要为了让自己 PR 变绿往基线加条目，需要长期跳过就用 `-skip-testing:` 并在 `ci.yml` 注明原因
 - Reviewer 审核通过后合并
 
 ### 4.4 Windows 端 PR 测试要求
