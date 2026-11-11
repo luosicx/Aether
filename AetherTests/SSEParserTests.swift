@@ -52,15 +52,6 @@ final class SSEParserTests: XCTestCase {
         XCTAssertEqual(final?.toolCalls?.first?.arguments, #"{"expression":"1+2"}"#)
     }
 
-    // MARK: - parse(data:) 方法测试
-
-    /// parse(data:) 应正确将 Data 转为 String
-    func testParseDataReturnsString() {
-        let data = "Hello World".data(using: .utf8)!
-        let result = parser.parse(data: data)
-        XCTAssertEqual(result, "Hello World", "应将 Data 正确转为 String")
-    }
-
     // MARK: - parseWithToolAccumulation 边界测试
 
     /// tool_call 缺少 id 或 name 时应 continue（跳过）
@@ -132,5 +123,59 @@ final class SSEParserTests: XCTestCase {
         XCTAssertNotNil(result, "应返回 ParsedChunk")
         XCTAssertEqual(result?.toolCalls?.count, 2, "应累积 2 个 toolCalls")
         XCTAssertEqual(accum.count, 2, "accumulated 应有 2 个条目")
+    }
+
+    // MARK: - BFF 自有 envelope（POST /chat/stream）
+
+    /// BFF delta 事件应解析出 content
+    func testParseChunkBFFDelta() {
+        let chunk = parser.parseChunk(from: #"data: {"type":"delta","content":"你好"}"#)
+        XCTAssertEqual(chunk?.choices?.first?.delta?.content, "你好")
+    }
+
+    /// BFF done 事件应返回 nil（流结束信号，无 content）
+    func testParseChunkBFFDone() {
+        let chunk = parser.parseChunk(from: #"data: {"type":"done","conversationId":"c1","messageId":"m1"}"#)
+        XCTAssertNil(chunk)
+    }
+
+    /// BFF error 事件不产出 content（与旧客户端行为一致，流自然结束）
+    func testParseChunkBFFError() {
+        let chunk = parser.parseChunk(from: #"data: {"type":"error","message":"上游超时"}"#)
+        XCTAssertNil(chunk)
+    }
+
+    /// 工具累积路径同样支持 BFF delta envelope
+    @MainActor
+    func testParseWithToolAccumulationBFFDelta() {
+        var accum: [Int: AccumulatedToolCall] = [:]
+        let result = parser.parseWithToolAccumulation(from: #"data: {"type":"delta","content":"BFF"}"#, accumulated: &accum)
+        XCTAssertEqual(result?.content, "BFF")
+        XCTAssertNil(result?.toolCalls)
+    }
+
+    // MARK: - usage 用量提取
+
+    /// 末块携带 usage 时应透出到 ParsedChunk.usage
+    @MainActor
+    func testParseWithToolAccumulationExtractsUsage() {
+        var accum: [Int: AccumulatedToolCall] = [:]
+        let line = #"data: {"choices":[{"delta":{"content":"X"}}],"usage":{"prompt_tokens":3,"completion_tokens":5,"total_tokens":8}}"#
+        let result = parser.parseWithToolAccumulation(from: line, accumulated: &accum)
+        XCTAssertEqual(result?.content, "X")
+        XCTAssertEqual(result?.usage?.prompt_tokens, 3)
+        XCTAssertEqual(result?.usage?.completion_tokens, 5)
+        XCTAssertEqual(result?.usage?.total_tokens, 8)
+    }
+
+    /// usage-only 末块（choices 为空数组）无 content 但仍上报用量
+    @MainActor
+    func testParseWithToolAccumulationUsageOnlyChunk() {
+        var accum: [Int: AccumulatedToolCall] = [:]
+        let line = #"data: {"choices":[],"usage":{"total_tokens":12}}"#
+        let result = parser.parseWithToolAccumulation(from: line, accumulated: &accum)
+        XCTAssertNotNil(result)
+        XCTAssertNil(result?.content)
+        XCTAssertEqual(result?.usage?.total_tokens, 12)
     }
 }

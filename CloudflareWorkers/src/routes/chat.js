@@ -137,6 +137,8 @@ export async function handleChatStream(request, env, ctx) {
       if (typeof body.temperature === "number") opts.temperature = body.temperature;
       if (typeof body.maxTokens === "number") opts.max_tokens = body.maxTokens;
       opts.provider = provider;
+      // 客户端断开时中止上游 LLM 请求
+      opts.signal = request.signal;
 
       for await (const delta of callLLMStream(env, model, messages, opts)) {
         fullResponse += delta;

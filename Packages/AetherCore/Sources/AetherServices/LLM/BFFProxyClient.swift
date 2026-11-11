@@ -1,9 +1,10 @@
 import Foundation
 import AetherFoundation
 
-/// Day 15: BFF 代理客户端，实现 LLMProvider 协议。
+/// BFF 代理客户端，实现 LLMProvider 协议。
 /// 将设备端请求转发到 BFF 网关（Cloudflare Workers），由服务端持有上游 API Key，
-/// 设备仅携带 X-BFF-Token 鉴权。请求体结构与 DeepSeekClient 一致，SSE 解析复用 SSEParser。
+/// 设备仅携带 X-BFF-Token 鉴权。请求体结构与 DeepSeekClient 一致，
+/// 网络层行为（超时/取消/错误通知）统一由 StreamTransport 承担。
 /// nonisolated 设计允许跨 actor 调用。
 ///
 /// P1-12 (H-S1): 当 `config.pinnedSPKIHashes` 非空时，自动创建带 `CertificatePinningDelegate`
@@ -15,8 +16,8 @@ nonisolated public final class BFFProxyClient: LLMProvider, @unchecked Sendable 
     private let config: BFFConfig
     /// URLSession（启用 Pinning 时为带 delegate 的实例；否则使用注入的 session）
     private let session: URLSession
-    /// SSE 流解析器
-    private let parser = SSEParser()
+    /// 统一 SSE 传输层（HTTP 错误映射走 BFF 语义）
+    private let transport: StreamTransport
     /// Pinning delegate 强引用，防止 URLSession 释放后被回收（仅 Pinning 启用时持有）
     private let pinningDelegate: CertificatePinningDelegate?
 
@@ -30,38 +31,42 @@ nonisolated public final class BFFProxyClient: LLMProvider, @unchecked Sendable 
         self.provider = provider
         self.config = config
         // P1-12: 配置了 SPKI pin 时创建带 delegate 的 URLSession
+        let resolvedSession: URLSession
         if config.isSSLPinningEnabled {
             let delegate = CertificatePinningDelegate(pinnedHashes: config.pinnedSPKIHashes)
             self.pinningDelegate = delegate
-            self.session = URLSession(
+            resolvedSession = URLSession(
                 configuration: .default,
                 delegate: delegate,
                 delegateQueue: nil
             )
         } else {
             self.pinningDelegate = nil
-            self.session = session
+            resolvedSession = session
         }
+        self.session = resolvedSession
+        self.transport = StreamTransport(session: resolvedSession, httpErrorMapper: { http, body in
+            Self.mapHTTPError(http, body: body)
+        })
     }
 
     /// 纯文本 chat 流，返回 AsyncStream<String>，逐 chunk yield 文本内容
     public func chat(messages: [APIMessage], config: ChatConfig, apiKey: String) -> AsyncStream<String> {
-        AsyncStream { continuation in
-            let task = Task {
-                await self.streamChat(messages: messages, config: config, apiKey: apiKey, continuation: continuation)
-            }
-            continuation.onTermination = { _ in task.cancel() }
+        // P1-11 (H-S5): 客户端 TTL 检查——Token 过期则不发请求，发通知并 finish
+        if self.config.isTokenExpired { return expiredTokenStream() }
+        guard let request = makeRequest(messages: messages, config: config, tools: nil) else {
+            return AsyncStream { $0.finish() }
         }
+        return transport.textStream(for: request)
     }
 
     /// 带工具调用 chat 流，返回 AsyncStream<ParsedChunk>，yield 含 content 和累积后的 toolCalls
     public func chat(messages: [APIMessage], config: ChatConfig, tools: [ToolDef], apiKey: String) -> AsyncStream<ParsedChunk> {
-        AsyncStream { continuation in
-            let task = Task {
-                await self.streamChatWithTools(messages: messages, config: config, tools: tools, apiKey: apiKey, continuation: continuation)
-            }
-            continuation.onTermination = { _ in task.cancel() }
+        if self.config.isTokenExpired { return expiredTokenStream() }
+        guard let request = makeRequest(messages: messages, config: config, tools: tools) else {
+            return AsyncStream { $0.finish() }
         }
+        return transport.chunkStream(for: request)
     }
 
     /// 批量文本嵌入。空入参短路返回空数组。HTTP 非 2xx 抛 LLMError 并发 .llmErrorOccurred 通知。
@@ -96,7 +101,8 @@ nonisolated public final class BFFProxyClient: LLMProvider, @unchecked Sendable 
         do {
             let (data, response) = try await session.data(for: request)
             if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
-                let err = await bffError(from: http)
+                let err = Self.mapHTTPError(http, body: String(data: data, encoding: .utf8) ?? "")
+                await StreamTransport.report(err)
                 throw err
             }
             let decoded = try JSONDecoder().decode(EmbeddingResponse.self, from: data)
@@ -116,39 +122,13 @@ nonisolated public final class BFFProxyClient: LLMProvider, @unchecked Sendable 
         }
     }
 
-    /// 构造纯文本请求体，转交 sendRequest
-    private func streamChat(messages: [APIMessage], config: ChatConfig, apiKey: String, continuation: AsyncStream<String>.Continuation) async {
-        let body = ChatRequestBody(
-            model: config.model,
-            messages: messages.map {
-                ChatRequestBody.ChatMessageBody(
-                    role: $0.role,
-                    content: $0.content,
-                    images: $0.images,
-                    tool_call_id: $0.toolCallId,
-                    tool_calls: $0.toolCalls?.map {
-                        ChatRequestBody.ToolCallBody(
-                            id: $0.id,
-                            type: $0.type,
-                            function: ChatRequestBody.FunctionBody(
-                                name: $0.function.name,
-                                arguments: $0.function.arguments
-                            )
-                        )
-                    }
-                )
-            },
-            stream: true,
-            max_tokens: config.maxTokens,
-            temperature: config.temperature,
-            tools: nil,
-            tool_choice: nil
-        )
-        await sendRequest(body: body, apiKey: apiKey, continuation: continuation)
-    }
-
-    /// 构造带工具的请求体，转交 sendRequestWithTools
-    private func streamChatWithTools(messages: [APIMessage], config: ChatConfig, tools: [ToolDef], apiKey: String, continuation: AsyncStream<ParsedChunk>.Continuation) async {
+    /// 构造 chat 请求（含工具），转交 StreamTransport。BFF 模式下 apiKey 不使用（服务端持有上游 key）。
+    /// 走透明代理路由（OpenAI envelope），不附带 stream_options（由上游/BFF 决定 usage 行为）。
+    private func makeRequest(messages: [APIMessage], config: ChatConfig, tools: [ToolDef]?) -> URLRequest? {
+        guard let endpointURL = self.config.endpointURL,
+              let url = URL(string: endpointURL.appending(path: "v1/chat/completions").absoluteString) else {
+            return nil
+        }
         let body = ChatRequestBody(
             model: config.model,
             messages: messages.map {
@@ -173,202 +153,47 @@ nonisolated public final class BFFProxyClient: LLMProvider, @unchecked Sendable 
             max_tokens: config.maxTokens,
             temperature: config.temperature,
             tools: tools,
-            tool_choice: "auto"
+            tool_choice: tools == nil ? nil : "auto"
         )
-        await sendRequestWithTools(body: body, apiKey: apiKey, continuation: continuation)
+        return body.makeRequest(
+            url: url,
+            headers: [
+                "X-BFF-Token": self.config.userToken,
+                "X-Provider": provider.rawValue
+            ],
+            includeUsage: false
+        )
     }
 
-    /// 发送纯文本 chat 请求并流式解析 SSE。HTTP 错误发通知并 finish。
-    /// 逐行解析 `data: ` 前缀，跳过 [DONE]，yield content。
-    private func sendRequest(body: ChatRequestBody, apiKey: String, continuation: AsyncStream<String>.Continuation) async {
-        // P1-11 (H-S5): 客户端 TTL 检查——Token 过期则不发请求，发通知并 finish
-        if config.isTokenExpired {
-            let err = LLMError.llmErrorOccurred(NSLocalizedString("BFF Token 已过期，请在设置中重新设置", comment: ""))
-            await MainActor.run {
-                NotificationCenter.default.post(name: .llmErrorOccurred, object: nil, userInfo: ["error": err])
-            }
-            continuation.finish()
-            return
-        }
-        // BFF 模式下 apiKey 不使用（服务端持有上游 key）
-        guard let endpointURL = config.endpointURL,
-              let url = URL(string: endpointURL.appending(path: "v1/chat/completions").absoluteString) else {
-            continuation.finish()
-            return
-        }
-        // 手动构建请求体，支持多模态 content（图片以 image_url 形式嵌入 content 数组）
-        var messagesPayload: [[String: Any]] = []
-        for msg in body.messages {
-            var msgDict: [String: Any] = ["role": msg.role]
-            if let images = msg.images, !images.isEmpty {
-                // 多模态：content 改为内容块数组（text + image_url）
-                var contentParts: [[String: Any]] = []
-                if let text = msg.content, !text.isEmpty {
-                    contentParts.append(["type": "text", "text": text])
-                }
-                for base64String in images {
-                    contentParts.append([
-                        "type": "image_url",
-                        "image_url": ["url": "data:image/jpeg;base64,\(base64String)"]
-                    ])
-                }
-                msgDict["content"] = contentParts
-            } else {
-                // 无图片：保持原有字符串 content 路径
-                msgDict["content"] = msg.content ?? ""
-            }
-            if let toolCallId = msg.tool_call_id {
-                msgDict["tool_call_id"] = toolCallId
-            }
-            if let toolCalls = msg.tool_calls {
-                msgDict["tool_calls"] = toolCalls.map { tc in
-                    [
-                        "id": tc.id,
-                        "type": tc.type,
-                        "function": [
-                            "name": tc.function.name,
-                            "arguments": tc.function.arguments
-                        ]
-                    ] as [String: Any]
-                }
-            }
-            messagesPayload.append(msgDict)
-        }
-        var payload: [String: Any] = [
-            "model": body.model,
-            "messages": messagesPayload,
-            "stream": body.stream
-        ]
-        if let maxTokens = body.max_tokens { payload["max_tokens"] = maxTokens }
-        if let temperature = body.temperature { payload["temperature"] = temperature }
-        guard let jsonData = try? JSONSerialization.data(withJSONObject: payload, options: []) else {
-            continuation.finish()
-            return
-        }
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(self.config.userToken, forHTTPHeaderField: "X-BFF-Token")
-        request.setValue(self.provider.rawValue, forHTTPHeaderField: "X-Provider")
-        request.httpBody = jsonData
-        do {
-            let (bytes, response) = try await session.bytes(for: request)
-            if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
-                // 消费错误响应体（避免连接泄漏）
-                for try await _ in bytes.lines { }
-                _ = await bffError(from: http)
+    /// Token 过期时的空流：发通知后立即结束。
+    private func expiredTokenStream<T>() -> AsyncStream<T> {
+        AsyncStream { continuation in
+            let task = Task {
+                let err = LLMError.llmErrorOccurred(NSLocalizedString("BFF Token 已过期，请在设置中重新设置", comment: ""))
+                await StreamTransport.report(err)
                 continuation.finish()
-                return
             }
-            for try await line in bytes.lines {
-                guard line.hasPrefix("data: ") else { continue }
-                let jsonStr = String(line.dropFirst(6)).trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !jsonStr.isEmpty, jsonStr != "[DONE]" else { continue }
-                guard let data = jsonStr.data(using: .utf8),
-                      let chunk = try? JSONDecoder().decode(ChatChunk.self, from: data),
-                      let content = chunk.choices?.first?.delta?.content else { continue }
-                continuation.yield(content)
-            }
-        } catch {
-            if !Task.isCancelled, !isRequestCancellation(error) {
-                let err = LLMError.networkError(error.localizedDescription)
-                await MainActor.run {
-                    NotificationCenter.default.post(
-                        name: .llmErrorOccurred,
-                        object: nil,
-                        userInfo: ["error": err]
-                    )
-                }
-            }
+            continuation.onTermination = { _ in task.cancel() }
         }
-        continuation.finish()
     }
 
-    /// 发送带工具的 chat 请求并流式解析 SSE。用 SSEParser.parseWithToolAccumulation 累积 tool_calls。
-    private func sendRequestWithTools(body: ChatRequestBody, apiKey: String, continuation: AsyncStream<ParsedChunk>.Continuation) async {
-        // P1-11 (H-S5): 客户端 TTL 检查——Token 过期则不发请求，发通知并 finish
-        if config.isTokenExpired {
-            let err = LLMError.llmErrorOccurred(NSLocalizedString("BFF Token 已过期，请在设置中重新设置", comment: ""))
-            await MainActor.run {
-                NotificationCenter.default.post(name: .llmErrorOccurred, object: nil, userInfo: ["error": err])
-            }
-            continuation.finish()
-            return
-        }
-        // BFF 模式下 apiKey 不使用（服务端持有上游 key）
-        guard let endpointURL = config.endpointURL,
-              let url = URL(string: endpointURL.appending(path: "v1/chat/completions").absoluteString),
-              let jsonData = try? JSONEncoder().encode(body) else {
-            continuation.finish()
-            return
-        }
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(self.config.userToken, forHTTPHeaderField: "X-BFF-Token")
-        request.setValue(self.provider.rawValue, forHTTPHeaderField: "X-Provider")
-        request.httpBody = jsonData
-        do {
-            let (bytes, response) = try await session.bytes(for: request)
-            if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
-                // 消费错误响应体（避免连接泄漏）
-                for try await _ in bytes.lines { }
-                _ = await bffError(from: http)
-                continuation.finish()
-                return
-            }
-            var toolAccum: [Int: AccumulatedToolCall] = [:]
-            for try await line in bytes.lines {
-                guard line.hasPrefix("data: ") else { continue }
-                let jsonStr = String(line.dropFirst(6)).trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !jsonStr.isEmpty, jsonStr != "[DONE]" else { continue }
-                if let parsed = parser.parseWithToolAccumulation(from: line, accumulated: &toolAccum) {
-                    continuation.yield(parsed)
-                }
-            }
-        } catch {
-            if !Task.isCancelled, !isRequestCancellation(error) {
-                let err = LLMError.networkError(error.localizedDescription)
-                await MainActor.run {
-                    NotificationCenter.default.post(
-                        name: .llmErrorOccurred,
-                        object: nil,
-                        userInfo: ["error": err]
-                    )
-                }
-            }
-        }
-        continuation.finish()
-    }
-
-    /// 根据 HTTP 状态码构造 BFF 错误并发 .llmErrorOccurred 通知。
+    /// 把 BFF HTTP 错误映射为 LLMError（纯函数，通知由 StreamTransport / embed 发出）。
     /// - 401 → BFF Token 无效
     /// - 429 → 解析 Retry-After Header → rateLimited
     /// - 5xx → BFF 服务异常
     /// - 其他 → apiError
-    /// - Parameter http: HTTP 响应
-    /// - Returns: 构造的 LLMError
-    private func bffError(from http: HTTPURLResponse) async -> LLMError {
-        let err: LLMError
+    static func mapHTTPError(_ http: HTTPURLResponse, body: String) -> LLMError {
         switch http.statusCode {
         case 401:
-            err = .llmErrorOccurred(NSLocalizedString("BFF Token 无效", comment: ""))
+            return .llmErrorOccurred(NSLocalizedString("BFF Token 无效", comment: ""))
         case 429:
             // 解析 Retry-After Header（秒），缺省 60
             let retryAfter = Double(http.value(forHTTPHeaderField: "Retry-After") ?? "") ?? 60
-            err = .rateLimited(retryAfter: max(retryAfter, 1))
+            return .rateLimited(retryAfter: max(retryAfter, 1))
         case 500...599:
-            err = .llmErrorOccurred(NSLocalizedString("BFF 服务异常", comment: ""))
+            return .llmErrorOccurred(NSLocalizedString("BFF 服务异常", comment: ""))
         default:
-            err = .apiError(code: http.statusCode, message: "BFF HTTP \(http.statusCode)")
+            return .apiError(code: http.statusCode, message: "BFF HTTP \(http.statusCode)")
         }
-        await MainActor.run {
-            NotificationCenter.default.post(
-                name: .llmErrorOccurred,
-                object: nil,
-                userInfo: ["error": err]
-            )
-        }
-        return err
     }
 }

@@ -16,8 +16,10 @@ final class SSEParserRustTests: XCTestCase {
 
     func testDoneReturnsNilContent() {
         let p = AetherRustSSEParser()
-        // [DONE] 在 parseChunk 语义里是 Some(None)，Swift wrapper 转为 nil content
-        XCTAssertNil(p.parseChunk("data: [DONE]"))
+        // [DONE] 在 parseChunk 语义里是 Some(None)：外层命中 data 行，内层 content 为 nil
+        let result = p.parseChunk("data: [DONE]")
+        XCTAssertNotNil(result)
+        XCTAssertNil(result ?? nil)
     }
 
     func testNonDataLineReturnsNil() {

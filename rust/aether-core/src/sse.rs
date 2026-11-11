@@ -1,6 +1,10 @@
-//! SSE 流解析器：统一 Swift / Workers / Android 的解析行为。
+//! SSE 流解析器：统一 Swift / Workers / Android / Windows 的解析行为。
 //!
-//! 与 Swift `SSEParser` 对齐：
+//! 同时支持两种上游事件格式：
+//! - OpenAI 兼容（DeepSeek / Qwen / BFF 透传代理）：`data: {"choices":[{"delta":{...}}]}`
+//! - BFF 自有协议（`POST /chat/stream`）：`data: {"type":"delta"|"done"|"error", ...}`
+//!
+//! 统一语义：
 //! - 跳过非 `data:` 前缀行（返回 None 表示"非 data 行"）
 //! - `[DONE]` 在 `parse_chunk` 中返回 `Some(None)`（命中 data 行但无 payload）
 //! - JSON 解析失败返回 None（保持与 `try? JSONDecoder().decode` 一致）
@@ -12,6 +16,7 @@ use std::collections::BTreeMap;
 #[derive(Debug, Deserialize)]
 struct ChatChunk {
     choices: Option<Vec<Choice>>,
+    usage: Option<Usage>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -40,6 +45,32 @@ struct FunctionBlock {
     arguments: Option<String>,
 }
 
+/// BFF `POST /chat/stream` 自有事件（routes/chat.js）。
+#[derive(Debug, Deserialize)]
+struct BffEvent {
+    #[serde(rename = "type")]
+    kind: String,
+    #[serde(default)]
+    content: Option<String>,
+}
+
+/// token 用量（OpenAI 兼容上游仅在 `stream_options.include_usage` 时下发）。
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct Usage {
+    pub prompt_tokens: Option<u32>,
+    pub completion_tokens: Option<u32>,
+    pub total_tokens: Option<u32>,
+}
+
+/// 单行解析结果（内部使用）。
+enum ParsedLine {
+    Delta {
+        content: Option<String>,
+        usage: Option<Usage>,
+    },
+    Done,
+}
+
 /// 跨 chunk 累积后的工具调用（公开，FFI 需要导出）。
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct AccumulatedToolCall {
@@ -54,41 +85,64 @@ pub struct AccumulatedToolCall {
 pub struct ParsedChunk {
     pub content: Option<String>,
     pub tool_calls: Option<Vec<AccumulatedToolCall>>,
+    pub usage: Option<Usage>,
+}
+
+/// 解析单行 SSE（OpenAI chunk 或 BFF 事件）。非 data 行 / 无法识别返回 None。
+fn parse_line(line: &str) -> Option<ParsedLine> {
+    let data = strip_data_prefix(line)?;
+    if data == "[DONE]" {
+        return Some(ParsedLine::Done);
+    }
+    if let Ok(chunk) = serde_json::from_str::<ChatChunk>(&data) {
+        if let Some(mut choices) = chunk.choices {
+            let delta = choices.pop().and_then(|c| c.delta);
+            return Some(ParsedLine::Delta {
+                content: delta.and_then(|d| d.content),
+                usage: chunk.usage,
+            });
+        }
+        // usage-only 末块（choices 缺省/为空）仍需上报用量
+        if chunk.usage.is_some() {
+            return Some(ParsedLine::Delta {
+                content: None,
+                usage: chunk.usage,
+            });
+        }
+    }
+    let event: BffEvent = serde_json::from_str(&data).ok()?;
+    match event.kind.as_str() {
+        "delta" => Some(ParsedLine::Delta {
+            content: event.content,
+            usage: None,
+        }),
+        // BFF done 与 [DONE] 语义一致；error 不产出内容（与旧行为一致，流自然结束）
+        "done" | "error" => Some(ParsedLine::Done),
+        _ => None,
+    }
 }
 
 /// Workers `parseSSEEvent` 语义：返回 content 字符串。
 /// 非 data 行 / [DONE] / 无 content / 空 content 返回 None。
 pub fn extract_content(line: &str) -> Option<String> {
-    let data = strip_data_prefix(line)?;
-    if data == "[DONE]" {
-        return None;
+    match parse_line(line)? {
+        ParsedLine::Delta {
+            content: Some(s), ..
+        } if !s.is_empty() => Some(s),
+        _ => None,
     }
-    let chunk: ChatChunk = serde_json::from_str(&data).ok()?;
-    chunk
-        .choices
-        .and_then(|mut c| c.pop())
-        .and_then(|c| c.delta)
-        .and_then(|d| d.content)
-        .filter(|s| !s.is_empty())
 }
 
 /// Swift `parseChunk` 等价物。
 /// 返回值语义：
 /// - `None`：非 data 行 / JSON 解析失败
-/// - `Some(None)`：`data: [DONE]`
+/// - `Some(None)`：`data: [DONE]` / BFF done / 无 content 的 delta
 /// - `Some(Some(s))`：有 content（可能为空串）
 pub fn parse_chunk(line: &str) -> Option<Option<String>> {
-    let data = strip_data_prefix(line)?;
-    if data == "[DONE]" {
-        return Some(None);
+    match parse_line(line)? {
+        ParsedLine::Delta { content, .. } => Some(content),
+        ParsedLine::Done => Some(None),
     }
-    let chunk: ChatChunk = serde_json::from_str(&data).ok()?;
-    let content = chunk
-        .choices
-        .and_then(|mut c| c.pop())
-        .and_then(|c| c.delta)
-        .and_then(|d| d.content);
-    Some(content)
 }
 
 /// Swift `parseWithToolAccumulation` 等价物。
@@ -97,11 +151,15 @@ pub fn parse_with_tool_accumulation(
     line: &str,
     accumulated: &mut BTreeMap<i64, AccumulatedToolCall>,
 ) -> Option<ParsedChunk> {
-    let content_opt = parse_chunk(line)?;
+    let (content_opt, usage) = match parse_line(line)? {
+        ParsedLine::Delta { content, usage } => (content, usage),
+        // [DONE] / BFF done|error 不产出 chunk（与旧 Swift 在调解析器前跳过 [DONE] 的行为一致）
+        ParsedLine::Done => return None,
+    };
     let data = strip_data_prefix(line)?;
-    let chunk: ChatChunk = serde_json::from_str(&data).ok()?;
-    let deltas = chunk
-        .choices
+    let deltas = serde_json::from_str::<ChatChunk>(&data)
+        .ok()
+        .and_then(|chunk| chunk.choices)
         .and_then(|mut c| c.pop())
         .and_then(|c| c.delta)
         .and_then(|d| d.tool_calls);
@@ -120,6 +178,7 @@ pub fn parse_with_tool_accumulation(
     Some(ParsedChunk {
         content: content_opt,
         tool_calls,
+        usage,
     })
 }
 
@@ -272,5 +331,76 @@ mod tests {
         let result = parse_with_tool_accumulation(line, &mut acc).unwrap();
         assert_eq!(result.content.as_deref(), Some("keep me"));
         assert!(acc.is_empty());
+    }
+
+    // ===== BFF 自有 envelope（POST /chat/stream）=====
+
+    #[test]
+    fn parses_bff_delta_envelope() {
+        let line = r#"data: {"type":"delta","content":"你好"}"#;
+        assert_eq!(extract_content(line), Some("你好".to_string()));
+        assert_eq!(parse_chunk(line), Some(Some("你好".to_string())));
+    }
+
+    #[test]
+    fn parses_bff_done_envelope() {
+        let line = r#"data: {"type":"done","conversationId":"c1","messageId":"m1"}"#;
+        assert_eq!(parse_chunk(line), Some(None));
+        assert_eq!(extract_content(line), None);
+    }
+
+    #[test]
+    fn parses_bff_error_envelope_without_content() {
+        let line = r#"data: {"type":"error","message":"上游超时"}"#;
+        // error 事件不产出 content（流自然结束，与旧客户端行为一致）
+        assert_eq!(parse_chunk(line), Some(None));
+        assert_eq!(extract_content(line), None);
+    }
+
+    #[test]
+    fn bff_tool_accumulation_path_yields_content() {
+        let mut acc: BTreeMap<i64, AccumulatedToolCall> = BTreeMap::new();
+        let line = r#"data: {"type":"delta","content":"BFF"}"#;
+        let parsed = parse_with_tool_accumulation(line, &mut acc).unwrap();
+        assert_eq!(parsed.content.as_deref(), Some("BFF"));
+        assert!(parsed.tool_calls.is_none());
+    }
+
+    #[test]
+    fn tool_accumulation_path_returns_none_for_done() {
+        let mut acc: BTreeMap<i64, AccumulatedToolCall> = BTreeMap::new();
+        // [DONE] 与 BFF done/error 都不产出 chunk（即使已有累积的工具调用）
+        assert!(parse_with_tool_accumulation("data: [DONE]", &mut acc).is_none());
+        assert!(parse_with_tool_accumulation(r#"data: {"type":"done"}"#, &mut acc).is_none());
+        assert!(
+            parse_with_tool_accumulation(r#"data: {"type":"error","message":"x"}"#, &mut acc)
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn extracts_usage_from_final_chunk() {
+        let line = r#"data: {"choices":[{"delta":{"content":"X"}}],"usage":{"prompt_tokens":3,"completion_tokens":5,"total_tokens":8}}"#;
+        let mut acc: BTreeMap<i64, AccumulatedToolCall> = BTreeMap::new();
+        let parsed = parse_with_tool_accumulation(line, &mut acc).unwrap();
+        assert_eq!(parsed.content.as_deref(), Some("X"));
+        assert_eq!(
+            parsed.usage,
+            Some(Usage {
+                prompt_tokens: Some(3),
+                completion_tokens: Some(5),
+                total_tokens: Some(8),
+            })
+        );
+    }
+
+    #[test]
+    fn usage_only_chunk_yields_usage_without_content() {
+        let line = r#"data: {"choices":[],"usage":{"total_tokens":12}}"#;
+        assert_eq!(extract_content(line), None);
+        let mut acc: BTreeMap<i64, AccumulatedToolCall> = BTreeMap::new();
+        let parsed = parse_with_tool_accumulation(line, &mut acc).unwrap();
+        assert!(parsed.content.is_none());
+        assert_eq!(parsed.usage.and_then(|u| u.total_tokens), Some(12));
     }
 }

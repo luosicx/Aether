@@ -1,6 +1,5 @@
 package com.aether.data.api
 
-import com.aether.app.BuildConfig
 import com.aether.data.model.ChatRequest
 import com.aether.rust.SseBridge
 import io.ktor.client.*
@@ -18,7 +17,7 @@ class ChatStreamClient(private val client: HttpClient, private val config: BffCo
      * 解析 SSE 事件格式：data: {"type":"delta","content":"..."}\n\n
      * 终止信号：data: [DONE]\n\n
      *
-     * SSE 解析优先走 Rust JNI（OpenAI choices 格式），失败回退到纯 Kotlin（自定义 type/content 格式）。
+     * SSE 解析统一走 Rust JNI（同时支持 OpenAI choices 与 BFF type/content 两种 envelope）。
      */
     fun streamChat(request: ChatRequest): Flow<String> = channelFlow {
         val response = client.post("${config.baseUrl}/chat/stream") {
@@ -50,50 +49,25 @@ class ChatStreamClient(private val client: HttpClient, private val config: BffCo
     }
 
     /**
-     * 解析单行 SSE：优先 Rust JNI，失败回退纯 Kotlin。
+     * 解析单行 SSE（Rust JNI，统一支持 OpenAI 与 BFF 两种 envelope）。
      * 入参为完整 SSE 行（含 `data: ` 前缀）。
      * 返回 delta content；非 delta 行或无 content 返回 null。
+     * JNI 不可用（打包损坏）时返回 null，不崩溃。
      */
     fun parseLine(line: String): String? {
-        if (BuildConfig.USE_RUST_SSE) {
-            try {
-                val rust = SseBridge.parseWithTools(line)
-                if (rust.isNotEmpty()) {
-                    // Rust 返回 {"content":"...","toolCalls":[...]}
-                    val parsed = Json { ignoreUnknownKeys = true }
-                        .parseToJsonElement(rust).jsonObject
-                    val contentElem = parsed["content"]
-                    return if (contentElem != null && contentElem is kotlinx.serialization.json.JsonPrimitive && contentElem !is kotlinx.serialization.json.JsonNull) {
-                        contentElem.jsonPrimitive.content
-                    } else {
-                        null
-                    }
-                }
-                // 空串：Rust 未识别此行，回退到 Kotlin
-            } catch (e: Throwable) {
-                // JNI 不可用或解析异常，回退到 Kotlin
-            }
+        val rust = try {
+            SseBridge.parseWithTools(line)
+        } catch (e: Throwable) {
+            return null
         }
-        return parseLineKotlin(line)
-    }
-
-    /**
-     * 纯 Kotlin SSE 解析（fallback）。
-     * 处理 BFF 自定义格式：data: {"type":"delta","content":"..."}
-     */
-    private fun parseLineKotlin(line: String): String? {
+        if (rust.isEmpty()) return null
         return try {
-            val data = line.removePrefix("data: ").trim()
-            val json = Json { ignoreUnknownKeys = true }
-            val obj = json.parseToJsonElement(data).jsonObject
-            val type = obj["type"]?.jsonPrimitive?.content
-            if (type == "delta") {
-                val contentElem = obj["content"]
-                if (contentElem != null && contentElem is kotlinx.serialization.json.JsonPrimitive && contentElem !is kotlinx.serialization.json.JsonNull) {
-                    contentElem.jsonPrimitive.content
-                } else {
-                    null
-                }
+            // Rust 返回 {"content":"...","toolCalls":[...],"usage":{...}}
+            val parsed = Json { ignoreUnknownKeys = true }
+                .parseToJsonElement(rust).jsonObject
+            val contentElem = parsed["content"]
+            if (contentElem != null && contentElem is JsonPrimitive && contentElem !is JsonNull) {
+                contentElem.jsonPrimitive.content
             } else {
                 null
             }

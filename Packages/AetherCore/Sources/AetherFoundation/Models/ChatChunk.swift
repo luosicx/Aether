@@ -103,10 +103,13 @@ extension AccumulatedToolCall {
 public struct ParsedChunk: Sendable {
     public let content: String?
     public let toolCalls: [AccumulatedToolCall]?
+    /// 上游下发的 token 用量（请求带 `stream_options.include_usage` 时才有）
+    public let usage: ChatChunk.Usage?
 
-    public init(content: String? = nil, toolCalls: [AccumulatedToolCall]? = nil) {
+    public init(content: String? = nil, toolCalls: [AccumulatedToolCall]? = nil, usage: ChatChunk.Usage? = nil) {
         self.content = content
         self.toolCalls = toolCalls
+        self.usage = usage
     }
 }
 
