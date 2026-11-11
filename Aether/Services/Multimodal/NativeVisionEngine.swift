@@ -102,9 +102,10 @@ public final class NativeVisionEngine: VisionInferenceEngine, @unchecked Sendabl
     /// 图像分类（VNClassifyImageRequest）
     private func classifyImage(_ image: CGImage) async -> String {
         await withCheckedContinuation { (continuation: CheckedContinuation<String, Never>) in
+            let once = ResumeOnceContinuation(continuation)
             let request = VNClassifyImageRequest { request, error in
                 if error != nil {
-                    continuation.resume(returning: "")
+                    once.resume(returning: "")
                     return
                 }
                 let observations = request.results as? [VNClassificationObservation] ?? []
@@ -112,13 +113,13 @@ public final class NativeVisionEngine: VisionInferenceEngine, @unchecked Sendabl
                 let top = observations.prefix(3).map { obs in
                     "\(obs.identifier)（\(Int(obs.confidence * 100))%）"
                 }
-                continuation.resume(returning: top.joined(separator: " / "))
+                once.resume(returning: top.joined(separator: " / "))
             }
             let handler = VNImageRequestHandler(cgImage: image)
             do {
                 try handler.perform([request])
             } catch {
-                continuation.resume(returning: "")
+                once.resume(returning: "")
             }
         }
     }
@@ -126,15 +127,16 @@ public final class NativeVisionEngine: VisionInferenceEngine, @unchecked Sendabl
     /// 人脸检测（VNDetectFaceRectanglesRequest）
     private func detectFaces(_ image: CGImage) async -> Int {
         await withCheckedContinuation { (continuation: CheckedContinuation<Int, Never>) in
+            let once = ResumeOnceContinuation(continuation)
             let request = VNDetectFaceRectanglesRequest { request, _ in
                 let count = request.results?.count ?? 0
-                continuation.resume(returning: count)
+                once.resume(returning: count)
             }
             let handler = VNImageRequestHandler(cgImage: image)
             do {
                 try handler.perform([request])
             } catch {
-                continuation.resume(returning: 0)
+                once.resume(returning: 0)
             }
         }
     }
@@ -142,15 +144,16 @@ public final class NativeVisionEngine: VisionInferenceEngine, @unchecked Sendabl
     /// 矩形检测（VNDetectRectanglesRequest）
     private func detectRectangles(_ image: CGImage) async -> Int {
         await withCheckedContinuation { (continuation: CheckedContinuation<Int, Never>) in
+            let once = ResumeOnceContinuation(continuation)
             let request = VNDetectRectanglesRequest { request, _ in
                 let count = request.results?.count ?? 0
-                continuation.resume(returning: count)
+                once.resume(returning: count)
             }
             let handler = VNImageRequestHandler(cgImage: image)
             do {
                 try handler.perform([request])
             } catch {
-                continuation.resume(returning: 0)
+                once.resume(returning: 0)
             }
         }
     }
@@ -158,14 +161,15 @@ public final class NativeVisionEngine: VisionInferenceEngine, @unchecked Sendabl
     /// 文字识别（VNRecognizeTextRequest）
     private func recognizeTexts(_ image: CGImage) async -> [String] {
         await withCheckedContinuation { (continuation: CheckedContinuation<[String], Never>) in
+            let once = ResumeOnceContinuation(continuation)
             let request = VNRecognizeTextRequest { request, error in
                 if error != nil {
-                    continuation.resume(returning: [])
+                    once.resume(returning: [])
                     return
                 }
                 let observations = request.results as? [VNRecognizedTextObservation] ?? []
                 let texts = observations.compactMap { $0.topCandidates(1).first?.string }
-                continuation.resume(returning: texts)
+                once.resume(returning: texts)
             }
             request.recognitionLevel = .accurate
             request.recognitionLanguages = ["zh-Hans", "en"]
@@ -173,7 +177,7 @@ public final class NativeVisionEngine: VisionInferenceEngine, @unchecked Sendabl
             do {
                 try handler.perform([request])
             } catch {
-                continuation.resume(returning: [])
+                once.resume(returning: [])
             }
         }
     }
@@ -181,17 +185,47 @@ public final class NativeVisionEngine: VisionInferenceEngine, @unchecked Sendabl
     /// 条码检测（VNDetectBarcodesRequest）
     private func detectBarcodes(_ image: CGImage) async -> [String] {
         await withCheckedContinuation { (continuation: CheckedContinuation<[String], Never>) in
+            let once = ResumeOnceContinuation(continuation)
             let request = VNDetectBarcodesRequest { request, _ in
                 let observations = request.results as? [VNBarcodeObservation] ?? []
                 let payloads = observations.compactMap { $0.payloadStringValue }
-                continuation.resume(returning: payloads)
+                once.resume(returning: payloads)
             }
             let handler = VNImageRequestHandler(cgImage: image)
             do {
                 try handler.perform([request])
             } catch {
-                continuation.resume(returning: [])
+                once.resume(returning: [])
             }
         }
+    }
+}
+
+/// Vision 请求的 completion handler 与 `perform()` 抛错后的 catch 路径可能先后
+/// 触发 resume，CheckedContinuation 重复 resume 会直接 fatalError 使整个进程崩溃
+/// （CI 上表现为测试进程反复崩溃重启、后续用例全部未执行）。用锁保证只 resume 一次。
+final class ResumeOnceContinuation<Value, Failure: Error>: @unchecked Sendable {
+    private let continuation: CheckedContinuation<Value, Failure>
+    private let lock = NSLock()
+    private var resumed = false
+
+    init(_ continuation: CheckedContinuation<Value, Failure>) {
+        self.continuation = continuation
+    }
+
+    func resume(returning value: Value) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !resumed else { return }
+        resumed = true
+        continuation.resume(returning: value)
+    }
+
+    func resume(throwing error: Failure) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !resumed else { return }
+        resumed = true
+        continuation.resume(throwing: error)
     }
 }
