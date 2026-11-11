@@ -9,7 +9,7 @@ set -uo pipefail
 #   3. 出现基线外的新增失败    → 阻断（退出 1）
 # 基线（默认 scripts/known-test-failures.txt）用于锚定既有的历史失败债务：
 # 修好一条就从基线删一条，新写的坏用例则当场拦住。条目粒度从紧到松：
-#   `Class/method` 精确 · `Class/testFoo*` 同族豁免 · `Class/*~crash` 只豁免崩溃归因 · `Class/*` 整类豁免
+#   `Class/method` 精确 · `Class/testFoo*` 同族豁免 · `Class/*~crash|*~timeout` 形态豁免 · `Class/*` 整类豁免
 #
 # 注意 xcresulttool 的 JSON summary 里没有 "failed" 这个键（实际字段是 failedTests /
 # result / testFailures[]，失败项含 testName / testIdentifierString / failureText），
@@ -61,16 +61,23 @@ if failed_count is None:
 
 known_exact = set()
 known_patterns = []
-known_crash_patterns = []
-# 进程级崩溃的受害用例由 xcresult 归因：segv 落在崩溃瞬间"在跑"的那条方法上，
-# 每次可以完全不同，按方法锚定永远追不上。`~crash` 后缀的条目只豁免崩溃形态的失败，
-# 同一个类里新增的断言失败照旧拦。
+known_shape_patterns = []
+# 崩溃与超时的责任用例是 xcresult "归因"出来的：segv 或被杀落在当时正在跑的那条方法上，
+# 每轮可以完全不同（UI 四轮里超时受害者换了 5 个方法），按方法锚定永远追不完。
+# `*~<shape>` 条目只豁免该形态，同一个类里新增的断言失败和其它形态照旧拦。
 CRASH_MARKS = ('crashed with signal', 'segv', 'crash:', 'fatal error')
+SHAPES = {
+    'crash': CRASH_MARKS,
+    'timeout': ('exceeded execution time allowance',),
+}
 
 
-def is_crash_shape(text):
+def shape_of(text):
     low = (text or '').lower()
-    return any(m in low for m in CRASH_MARKS)
+    for name, marks in SHAPES.items():
+        if any(m in low for m in marks):
+            return name
+    return None
 
 
 if os.path.exists(baseline_path):
@@ -86,42 +93,55 @@ if os.path.exists(baseline_path):
             # xcresult 的 id 不含括号，手写基线常带 Swift 的 method() 风格，统一掉
             if tid.endswith('()'):
                 tid = tid[:-2]
-            scoped = tid.endswith('~crash')
-            if scoped:
-                tid = tid[:-len('~crash')]
+            shape = None
+            for name in SHAPES:
+                suffix = '~' + name
+                if tid.endswith(suffix):
+                    tid = tid[:-len(suffix)]
+                    shape = name
+                    break
             if '*' in tid:
-                (known_crash_patterns if scoped else known_patterns).append(tid)
+                if shape:
+                    known_shape_patterns.append((tid, shape))
+                else:
+                    known_patterns.append(tid)
             elif tid:
                 known_exact.add(tid)
-    if known_crash_patterns:
-        print('crash-only exemptions for %s: %d pattern(s)' % (label, len(known_crash_patterns)))
+    if known_shape_patterns:
+        shape_counts = {}
+        for _, shape_name in known_shape_patterns:
+            shape_counts[shape_name] = shape_counts.get(shape_name, 0) + 1
+        print('shape-only exemptions for %s: %s' % (
+            label, ', '.join('%s=%d' % (k, v) for k, v in sorted(shape_counts.items()))))
 else:
     print('NOTE: baseline %s not found; treating every failure as new' % baseline_path)
 
 
 def classify(tid, text):
-    """返回 (是否在基线内, 是否仅靠 ~crash 豁免)。逐条 occurrence 判定：同一条用例
+    """返回 (是否在基线内, 靠哪种形态豁免或 None)。逐条 occurrence 判定：同一条用例
     在一轮里既崩溃又断言失败时，断言那次仍算基线外。"""
     if tid in known_exact:
-        return True, False
+        return True, None
     if any(fnmatch.fnmatchcase(tid, pat) for pat in known_patterns):
-        return True, False
-    if is_crash_shape(text) and any(fnmatch.fnmatchcase(tid, pat) for pat in known_crash_patterns):
-        return True, True
-    return False, False
+        return True, None
+    shape = shape_of(text)
+    if shape and any(fnmatch.fnmatchcase(tid, pat) and name == shape
+                     for pat, name in known_shape_patterns):
+        return True, shape
+    return False, None
 
 
-new, known_hits, crash_exempt = [], [], []
+new, known_hits, shape_exempt = [], [], []
 for tid, text in entries:
-    known, via_crash = classify(tid, text)
+    known, via_shape = classify(tid, text)
     (known_hits if known else new).append((tid, text))
-    if via_crash:
-        crash_exempt.append((tid, text))
+    if via_shape:
+        shape_exempt.append((tid, text, via_shape))
 
-print('result=%s passed=%s failed=%s skipped=%s | baseline(%s)=%d exact + %d pattern + %d crash-only'
+print('result=%s passed=%s failed=%s skipped=%s | baseline(%s)=%d exact + %d pattern + %d shape-only'
       % (data.get('result'), data.get('passedTests'), failed_count,
          data.get('skippedTests'), label, len(known_exact), len(known_patterns),
-         len(known_crash_patterns)))
+         len(known_shape_patterns)))
 
 # 计数多于可枚举明细时，差额无法核对基线，按新增处理
 if failed_count > len(entries):
@@ -151,20 +171,21 @@ if new:
     sys.exit(1)
 
 print('WARNING: %d %s failure(s) are all baseline-known; no new failures' % (len(known_hits), label))
-if crash_exempt:
-    print('  其中 %d 条属崩溃形态，靠 ~crash 归因豁免放行（受害者每轮随机，务必看崩溃栈）：'
-          % len(crash_exempt))
-    for tid, reason in crash_exempt[:20]:
-        print('    crash-exempt: %s :: %s' % (tid, reason))
+if shape_exempt:
+    print('  其中 %d 条属形态豁免（崩溃/超时的责任用例每轮轮换，务必回看原始日志）：'
+          % len(shape_exempt))
+    for tid, reason, shape_name in shape_exempt[:20]:
+        print('    %s-exempt: %s :: %s' % (shape_name, tid, reason))
 for tid, reason in known_hits[:10]:
     print('  known: %s :: %s' % (tid, reason))
 if len(known_hits) > 10:
     print('  ... 其余 %d 条见 %s' % (len(known_hits) - 10, baseline_path))
 summary_lines = ['## %s 测试：%d 个失败均在基线内（历史债）' % (label, len(known_hits)), '']
-if crash_exempt:
-    summary_lines.append('本轮崩溃形态豁免 %d 条（`~crash` 条目，只豁免崩溃归因，不豁免断言失败）：'
-                         % len(crash_exempt))
-    summary_lines += ['- `%s` — %s' % (t, r.replace('|', '\\|')) for t, r in crash_exempt[:20]]
+if shape_exempt:
+    summary_lines.append('本轮形态豁免 %d 条（`*~crash` / `*~timeout` 条目只豁免该形态的归因，断言失败照旧拦）：'
+                         % len(shape_exempt))
+    summary_lines += ['- `%s`（%s 形态）— %s' % (t, s, r.replace('|', '\\|'))
+                      for t, r, s in shape_exempt[:20]]
     summary_lines.append('')
 summary_lines += ['- `%s`' % t for t, _ in known_hits[:200]]
 emit_section(summary_lines)
