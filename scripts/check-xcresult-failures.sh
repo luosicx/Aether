@@ -65,6 +65,7 @@ known_shape_patterns = []
 # 崩溃与超时的责任用例是 xcresult "归因"出来的：segv 或被杀落在当时正在跑的那条方法上，
 # 每轮可以完全不同（UI 四轮里超时受害者换了 5 个方法），按方法锚定永远追不完。
 # `*~<shape>` 条目只豁免该形态，同一个类里新增的断言失败和其它形态照旧拦。
+# 形态后缀对精确条目同样有效（`Class/method~timeout`），两者都只放行声明的那一种形态。
 CRASH_MARKS = ('crashed with signal', 'segv', 'crash:', 'fatal error')
 SHAPES = {
     'crash': CRASH_MARKS,
@@ -100,11 +101,10 @@ if os.path.exists(baseline_path):
                     tid = tid[:-len(suffix)]
                     shape = name
                     break
-            if '*' in tid:
-                if shape:
-                    known_shape_patterns.append((tid, shape))
-                else:
-                    known_patterns.append(tid)
+            if shape:
+                known_shape_patterns.append((tid, shape))
+            elif '*' in tid:
+                known_patterns.append(tid)
             elif tid:
                 known_exact.add(tid)
     if known_shape_patterns:
