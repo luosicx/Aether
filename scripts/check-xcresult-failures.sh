@@ -8,7 +8,8 @@ set -uo pipefail
 #   2. 失败用例全部在基线内    → 警告放行（退出 0），并把清单写进 step summary
 #   3. 出现基线外的新增失败    → 阻断（退出 1）
 # 基线（默认 scripts/known-test-failures.txt）用于锚定既有的历史失败债务：
-# 修好一条就从基线删一条，新写的坏用例则当场拦住。
+# 修好一条就从基线删一条，新写的坏用例则当场拦住。条目粒度从紧到松：
+#   `Class/method` 精确 · `Class/testFoo*` 同族豁免 · `Class/*~crash` 只豁免崩溃归因 · `Class/*` 整类豁免
 #
 # 注意 xcresulttool 的 JSON summary 里没有 "failed" 这个键（实际字段是 failedTests /
 # result / testFailures[]，失败项含 testName / testIdentifierString / failureText），
@@ -60,6 +61,18 @@ if failed_count is None:
 
 known_exact = set()
 known_patterns = []
+known_crash_patterns = []
+# 进程级崩溃的受害用例由 xcresult 归因：segv 落在崩溃瞬间"在跑"的那条方法上，
+# 每次可以完全不同，按方法锚定永远追不上。`~crash` 后缀的条目只豁免崩溃形态的失败，
+# 同一个类里新增的断言失败照旧拦。
+CRASH_MARKS = ('crashed with signal', 'segv', 'crash:', 'fatal error')
+
+
+def is_crash_shape(text):
+    low = (text or '').lower()
+    return any(m in low for m in CRASH_MARKS)
+
+
 if os.path.exists(baseline_path):
     with open(baseline_path, encoding='utf-8') as fh:
         for line in fh:
@@ -73,29 +86,42 @@ if os.path.exists(baseline_path):
             # xcresult 的 id 不含括号，手写基线常带 Swift 的 method() 风格，统一掉
             if tid.endswith('()'):
                 tid = tid[:-2]
+            scoped = tid.endswith('~crash')
+            if scoped:
+                tid = tid[:-len('~crash')]
             if '*' in tid:
-                known_patterns.append(tid)
+                (known_crash_patterns if scoped else known_patterns).append(tid)
             elif tid:
                 known_exact.add(tid)
+    if known_crash_patterns:
+        print('crash-only exemptions for %s: %d pattern(s)' % (label, len(known_crash_patterns)))
 else:
     print('NOTE: baseline %s not found; treating every failure as new' % baseline_path)
 
 
-def is_known(tid):
-    """三种粒度：`Class/method` 精确；`Class/testFoo*` 按方法前缀成组豁免；
-    `Class/*` 整类豁免。后两种只为超时/崩溃这类每轮换受害者的失败存在，
-    通配范围越大掩盖越多，能精确就不要放宽。"""
+def classify(tid, text):
+    """返回 (是否在基线内, 是否仅靠 ~crash 豁免)。逐条 occurrence 判定：同一条用例
+    在一轮里既崩溃又断言失败时，断言那次仍算基线外。"""
     if tid in known_exact:
-        return True
-    return any(fnmatch.fnmatchcase(tid, pat) for pat in known_patterns)
+        return True, False
+    if any(fnmatch.fnmatchcase(tid, pat) for pat in known_patterns):
+        return True, False
+    if is_crash_shape(text) and any(fnmatch.fnmatchcase(tid, pat) for pat in known_crash_patterns):
+        return True, True
+    return False, False
 
 
-new = [(t, r) for (t, r) in entries if not is_known(t)]
-known_hits = [(t, r) for (t, r) in entries if is_known(t)]
+new, known_hits, crash_exempt = [], [], []
+for tid, text in entries:
+    known, via_crash = classify(tid, text)
+    (known_hits if known else new).append((tid, text))
+    if via_crash:
+        crash_exempt.append((tid, text))
 
-print('result=%s passed=%s failed=%s skipped=%s | baseline(%s)=%d exact + %d pattern'
+print('result=%s passed=%s failed=%s skipped=%s | baseline(%s)=%d exact + %d pattern + %d crash-only'
       % (data.get('result'), data.get('passedTests'), failed_count,
-         data.get('skippedTests'), label, len(known_exact), len(known_patterns)))
+         data.get('skippedTests'), label, len(known_exact), len(known_patterns),
+         len(known_crash_patterns)))
 
 # 计数多于可枚举明细时，差额无法核对基线，按新增处理
 if failed_count > len(entries):
@@ -125,11 +151,22 @@ if new:
     sys.exit(1)
 
 print('WARNING: %d %s failure(s) are all baseline-known; no new failures' % (len(known_hits), label))
+if crash_exempt:
+    print('  其中 %d 条属崩溃形态，靠 ~crash 归因豁免放行（受害者每轮随机，务必看崩溃栈）：'
+          % len(crash_exempt))
+    for tid, reason in crash_exempt[:20]:
+        print('    crash-exempt: %s :: %s' % (tid, reason))
 for tid, reason in known_hits[:10]:
     print('  known: %s :: %s' % (tid, reason))
 if len(known_hits) > 10:
     print('  ... 其余 %d 条见 %s' % (len(known_hits) - 10, baseline_path))
-emit_section(['## %s 测试：%d 个失败均在基线内（历史债）' % (label, len(known_hits)), '']
-             + ['- `%s`' % t for t, _ in known_hits[:200]])
+summary_lines = ['## %s 测试：%d 个失败均在基线内（历史债）' % (label, len(known_hits)), '']
+if crash_exempt:
+    summary_lines.append('本轮崩溃形态豁免 %d 条（`~crash` 条目，只豁免崩溃归因，不豁免断言失败）：'
+                         % len(crash_exempt))
+    summary_lines += ['- `%s` — %s' % (t, r.replace('|', '\\|')) for t, r in crash_exempt[:20]]
+    summary_lines.append('')
+summary_lines += ['- `%s`' % t for t, _ in known_hits[:200]]
+emit_section(summary_lines)
 sys.exit(0)
 PY

@@ -6,20 +6,27 @@
 #
 # 格式：`<label>:<TestClass>/<testMethod>`，label 与 ci.yml 传入的一致（iOS / macOS / UI）。
 # macOS 两个分片共用 macOS label；用例换分片不影响本文件；方法名写不写 () 都识别。
-# 三种粒度，从紧到松——通配范围越大掩盖越多，能收紧就收紧：
+# 四种粒度，从紧到松——通配范围越大掩盖越多，能收紧就收紧：
 #   `macOS:Foo/testBar`        精确一条，用于确定性失败（断言写错、标识符缺失）
 #   `macOS:Foo/testBarBaz*`    同组飘移豁免：CamelCase 前两词相同的一族里只要飘过一次，整组按飘移处理
-#   `macOS:Foo/*`              整类豁免，只在该类过半方法都在飘时使用
+#   `macOS:Foo/*~crash`        只豁免崩溃形态的失败（failureText 含 segv/crashed with signal/Crash:）。
+#                              进程崩溃的受害用例由 xcresult 归因到崩溃瞬间"在跑"的方法上，每轮随机，
+#                              逐条追不完；同类新增的断言失败与超时照旧判红。崩溃仍会打印在门输出里。
+#   `macOS:Foo/*`              整类豁免，只在该类过半方法都在飘（断言/超时也算）时使用；
+#                              它连该类新增的真实失败一起放过，代价最大，能用上面三种就不要用它。
 #
 # 维护约定：
 # - 修好一条就删一条。加条目只允许发生在"严格门首次暴露闸门修好前就存在的失败"这一次性
 #   锚定里；此后想让 PR 变绿必须改用例或改产品代码，或用 -skip-testing: 显式跳过并注明原因。
-# - 证据：main@7ccc5ac（当前 main）+ PR #56 的 f71be62 / ea16a7e / 4183bd6 四轮同码 run 的
-#   全部 test job 日志与后三轮闸门自身的 NEW FAILURE 明细；收录门槛是跨轮复现 ≥2 次，或确定性
-#   断言失败（1 次也收），或已出现在闸门明细/上一版基线里。XCUITest 的
-#   `Failed to terminate/launch com.aether.app.ios` 属 XCUITest runner 噪声、xcresult 不计
-#   失败，不收。
-# - main@c2005ea（PR #55 之前）里出现过、之后三轮都不复现的失败不收录——那是已经还掉的债，
+#   `*~crash` 例外：它锚的是"崩溃归因随机"这件事，不是某条用例，所以只在该类第一次出现
+#   segv/crash 形态失败时加，加了就要去查那个崩溃；类里真正要修的用例仍按精确条目记，别指望
+#   `*~crash` 替你记账。
+# - 证据：main@7ccc5ac + PR #56 的 f71be62 / ea16a7e / 4183bd6 / 153b8a8 共五轮 run（产品代码
+#   完全相同，只有本基线文件在变）的全部 test job 日志与后四轮闸门自身的 NEW FAILURE 明细；
+#   收录门槛是跨轮复现 >=2 次，或确定性断言失败（1 次也收），或已出现在闸门明细/上一版基线里。
+#   XCUITest 的 `Failed to terminate/launch com.aether.app.ios` 属 XCUITest runner 噪声、
+#   xcresult 不计失败，不收。
+# - main@c2005ea（PR #55 之前）里出现过、之后四轮都不复现的失败不收录——那是已经还掉的债，
 #   例如 DesignSystemTests/testAetherIconAllCasesCount。
 # - 下面每一条都早于本 PR：本 PR 只动 ci.yml 与 scripts/，没碰产品与用例代码。它们此前被
 #   `grep -c '"failed"'` 这个恒为 0 的旧门静默放行。
@@ -34,6 +41,7 @@ UI:MCPSettingsUITests/testDeleteMCPServer
 
 # ---- macOS（unit-tests-macos 两个分片共用同一 label）----
 macOS:AgentMessageBusTests/testSubscriberCount
+macOS:AgentOrchestratorTests/*~crash
 macOS:AgentOrchestratorTests/testExecuteAllParallelSubTasks
 macOS:AgentOrchestratorTests/testExecuteNextSubTaskFailureThrows
 macOS:AgentOrchestratorTests/testMultiAgent*
@@ -66,6 +74,7 @@ macOS:DAGExecutionEngineTests/testRunFailedNodeCascadesSkip
 macOS:DAGExecutionEngineTests/testRunReExecutesInProgressNodes
 macOS:ExportImporterTests/testExportToFileAndImportFromFile
 macOS:ExportImporterTests/testImportPartialDuplicates
+macOS:KeychainManagerTests/*~crash
 macOS:KeychainManagerTests/testConcurrentWrite*
 macOS:MCPClientTests/testSSEEndpointHijackIsRejected
 macOS:MCPDiscoveryServiceTests/testBackgroundScanPaused
@@ -98,6 +107,7 @@ macOS:ToolRegistryTests/testAllToolDefsCount
 macOS:VoiceCoordinatorTests/testToggleVoice*
 macOS:VoiceServiceTests/testDeinitAsyncCleanupAfterRecordingAttempt
 macOS:VoiceServiceTests/testDeinitWhileRecordingReleasesResources
+macOS:VoiceServiceTests/testDidCancelDuringPreviewCleansPreviewState
 macOS:VoiceServiceTests/testRequestPermission*
 macOS:WhisperASREngineTests/testTranscribeCIEnvironmentThrowsOrReturns
 macOS:WhisperASREngineTests/testTranscribeValidAudioFileReturnsWhisperPrefix
@@ -107,6 +117,7 @@ macOS:WorkflowEngineTests/testWorkflowFromInvalidJSON
 iOS:AgentMessageBusTests/testPublishAfterResetStillWorks
 iOS:AgentMessageBusTests/testResetClearsAllSubscribers
 iOS:AgentMessageBusTests/testSubscriberCount
+iOS:AgentOrchestratorTests/*~crash
 iOS:AgentOrchestratorTests/testExecuteAllParallelSubTasks
 iOS:AgentOrchestratorTests/testExecuteNextSubTaskFailureThrows
 iOS:AgentOrchestratorTests/testMultiAgentCollaborationReviewPass
@@ -125,6 +136,7 @@ iOS:DAGExecutionEngineTests/testRunFailedNodeCascadesSkip
 iOS:DAGExecutionEngineTests/testRunReExecutesInProgressNodes
 iOS:ExportImporterTests/testExportToFileAndImportFromFile
 iOS:ExportImporterTests/testImportPartialDuplicates
+iOS:KeychainManagerTests/*~crash
 iOS:KeychainManagerTests/testConcurrentWrite*
 iOS:MCPClientTests/testSSEEndpointHijackIsRejected
 iOS:MCPDiscoveryServiceTests/testBackgroundScanPaused
@@ -150,7 +162,7 @@ iOS:SemanticMemoryStoreTests/testRetrieveRelevantMemoriesRespectsLimit
 iOS:SettingsViewTests/testSettingsSectionAllCasesCount
 iOS:ShortcutsToolTests/testCreateCopyToClipboardSuccess
 iOS:ToolRegistryTests/testAllToolDefsCount
-iOS:VoiceServiceTests/testRequestPermissionReturnsBoolOnSimulator
+iOS:VoiceServiceTests/*~crash
 iOS:WhisperASREngineTests/testTranscribeCIEnvironmentThrowsOrReturns
 iOS:WhisperASREngineTests/testTranscribeValidAudioFileReturnsWhisperPrefix
 iOS:WorkflowEngineTests/testWorkflowFromInvalidJSON
