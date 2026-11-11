@@ -53,9 +53,9 @@
 
 | 项 | 要求 | 说明 |
 |---|---|---|
-| Xcode | 16+ | 编译 SwiftData / Observation 等新 API |
+| Xcode | 26+（推荐 27.1+） | 编译 SwiftData / Observation 等新 API；Xcode 27.1+ 完整支持 iPhone Duo 折叠屏 |
 | iOS Deployment Target | 17.0+ | 真机与模拟器均需 ≥ iOS 17 |
-| macOS | 14+ | 运行 Xcode 16 与 iOS 模拟器 |
+| macOS | 15+ | 运行 Xcode 26 与 iOS 模拟器（Xcode 27 需 macOS 26+，仅 Apple 芯片） |
 | DeepSeek API Key | 必备（云端模式） | 用户自行在 https://platform.deepseek.com 申请 |
 | mlx-swift SPM 依赖 | 端侧推理可选 | 真机集成后启用 MLX，模拟器走占位实现 |
 
@@ -101,7 +101,7 @@ open Aether.xcodeproj
 在 Xcode 中：
 
 1. 顶部 Scheme 选择 `Aether`
-2. 目标设备选择 **iPhone 17 模拟器**
+2. 目标设备选择 **iPhone 17 或 iPhone Duo 模拟器**
 3. 按 `Cmd + R` 运行
 
 > **首次启动行为说明**：App 启动后**不会主动创建会话**（避免阻塞主线程与 body 重算打断 TextField）。仅当用户在底部输入框发送**第一条消息**时，才会创建首个 Conversation。

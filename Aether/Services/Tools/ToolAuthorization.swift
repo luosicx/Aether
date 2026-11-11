@@ -47,8 +47,23 @@ final class ToolAuthorization: @unchecked Sendable {
 
     private let alwaysAuthorizedKeyPrefix = "aether.tool.auth.always."
 
+    #if os(iOS)
+    /// 最近激活的 scene。iPhone Duo 分屏/多窗口下可能同时存在多个 foregroundActive scene，
+    /// 弹窗优先落在用户最近交互的 scene，避免授权弹窗出现在错误窗口。仅主线程读写。
+    private weak var lastActiveScene: UIWindowScene?
+    #endif
+
     private init() {
         restoreAlwaysAuthorized()
+        #if os(iOS)
+        NotificationCenter.default.addObserver(
+            forName: UIScene.didActivateNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            self?.lastActiveScene = notification.object as? UIWindowScene
+        }
+        #endif
     }
 
     /// 查询某工具的当前授权状态
@@ -254,11 +269,11 @@ private extension ToolAuthorization {
 
     #if os(iOS)
     func topViewController() -> UIViewController? {
-        let window = UIApplication.shared.connectedScenes
+        let scenes = UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }
-            .first(where: { $0.activationState == .foregroundActive })?
-            .windows
-            .first(where: { $0.isKeyWindow })
+        let scene = scenes.first(where: { $0 === lastActiveScene && $0.activationState == .foregroundActive })
+            ?? scenes.first(where: { $0.activationState == .foregroundActive })
+        let window = scene?.windows.first(where: { $0.isKeyWindow })
         return window?.rootViewController
     }
     #endif

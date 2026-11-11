@@ -52,7 +52,7 @@
 ### 1.1 通用要求
 
 - macOS 14.0+ 开发机
-- Xcode 16+（含 Xcode Command Line Tools）
+- Xcode 26+（含 Xcode Command Line Tools；推荐 Xcode 27.1+）
 - 命令行验证：
   ```bash
   xcodebuild -version

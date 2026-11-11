@@ -1,7 +1,7 @@
 # Aether（以太）
 
-<!-- doc-stats: i18n=888 tools=29 tests=3546 -->
-<!-- doc-stats-total: iOS/macOS 3546 + Windows 102 + Android 105 = 3753 -->
+<!-- doc-stats: i18n=888 tools=29 tests=3551 -->
+<!-- doc-stats-total: iOS/macOS 3551 + Windows 102 + Android 105 = 3758 -->
 
 > 一个跨平台 AI 对话助手，覆盖 iOS / iPad / macOS / Windows / Android 五端，采用**液态玻璃 + 深空主题**视觉语言。基于多 LLM Provider（DeepSeek / Qwen / BFF 代理 / 端侧 MLX），覆盖流式对话、RAG 知识库、ReAct 工具调用、语义缓存、端侧离线推理、语音合成与识别、健康洞察、灵动岛 Live Activity、Watch App、桌面 Widget、DeepLink 等能力。底层引入 Rust 核心引擎（aether-core-ffi，xcframework / DLL / JNI 多形态分发），为 Apple / Windows / Android 平台提供统一的跨平台高性能算法（SHA-256 哈希、Token 计数、文档分块、向量相似度、SSE 解析、WASM 沙箱、Candle 推理、令牌桶限流、敏感信息脱敏）。支持 8 种语言（简中 / 繁中 / 英 / 日 / 韩 / 法 / 德 / 西）。
 
@@ -78,13 +78,13 @@
 ### Apple 端（iOS / iPad / macOS）
 
 1. clone 仓库
-2. 用 Xcode 16+ 打开 `Aether.xcodeproj`
+2. 用 Xcode 26+ 打开 `Aether.xcodeproj`（推荐 Xcode 27.1+，完整支持 iPhone Duo 折叠屏内外屏）
 3. **Rust 依赖**（可选，xcframework 已预编译）：
    ```bash
    rustup target add aarch64-apple-ios aarch64-apple-ios-simulator aarch64-apple-darwin
    cd rust/aether-core-ffi && cargo build --release
    ```
-4. iOS 运行：选 iPhone 17 模拟器 → `Cmd + R`
+4. iOS 运行：选 iPhone 17 或 iPhone Duo 模拟器 → `Cmd + R`
 5. macOS 运行：选 My Mac 目标 → `Cmd + R`
 6. 运行后进入设置填入 DeepSeek API Key（https://platform.deepseek.com 申请）
 
@@ -156,7 +156,7 @@ android/                    # Android 端（Kotlin + Jetpack Compose，22 个 .k
 │   └── app/                # MainActivity.kt 入口
 └── app/src/test/           # 单元测试（JUnit / MockK，105 用例）
 CloudflareWorkers/          # BFF 代理层（worker.js + wrangler.toml）
-AetherTests/                # 单元测试（iOS / macOS，203 文件 / 3546 用例，覆盖 Multimodal / Tools / Services 全模块）
+AetherTests/                # 单元测试（iOS / macOS，203 文件 / 3551 用例，覆盖 Multimodal / Tools / Services 全模块）
 AetherUITests/              # UI 测试（7 文件 / 30 用例）
 ```
 
@@ -201,7 +201,7 @@ AetherUITests/              # UI 测试（7 文件 / 30 用例）
 
 **Apple 端**：
 
-- Xcode 16+
+- Xcode 26+（推荐 Xcode 27.1+；iOS 27 SDK 构建可完整适配 iPhone Duo 折叠屏与分屏多任务）
 - iOS Deployment Target 17.0+
 - macOS Deployment Target 14+
 - watchOS Deployment Target 10+（Watch App 可选）

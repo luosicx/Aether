@@ -120,9 +120,10 @@ struct MessageListView: View {
 
         return Group {
             if entries.isEmpty && viewModel.streamingText.isEmpty {
+                // iPhone Duo 分屏/外屏横屏时容器高度可能不足 420pt，
+                // 空态只撑满可用空间，不设固定最小高度，避免溢出
                 emptyState
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .frame(minHeight: 420)
             } else {
                 // Task 12: iOS 使用 UICollectionView 虚拟化，macOS 回退到 LazyVStack
                 VirtualizedMessageList(

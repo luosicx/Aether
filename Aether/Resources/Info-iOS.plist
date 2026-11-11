@@ -41,8 +41,6 @@
 	<string>100</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<key>NSApplicationSupportsMultipleWindows</key>
-	<true/>
 	<key>NSCalendarsUsageDescription</key>
 	<string>用于创建闹钟和日历事件提醒</string>
 	<key>NSContactsUsageDescription</key>

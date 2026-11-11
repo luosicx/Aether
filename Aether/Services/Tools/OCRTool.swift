@@ -75,18 +75,19 @@ final class OCRTool: ToolProtocol, @unchecked Sendable {
         // Vision API 三端共享，无需平台条件编译
         return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
             // NOSONAR: VNRecognizeTextRequest 回调由 Vision API 设计要求，嵌套不可避免
+            let once = ResumeOnceContinuation(continuation)
             let request = VNRecognizeTextRequest { request, error in
                 if let error = error {
-                    continuation.resume(throwing: error)
+                    once.resume(throwing: error)
                     return
                 }
                 // 取每个观测结果中置信度最高的候选文本
                 let observations = request.results as? [VNRecognizedTextObservation] ?? []
                 let texts = observations.compactMap { $0.topCandidates(1).first?.string }
                 if texts.isEmpty {
-                    continuation.resume(returning: "未识别到文字")
+                    once.resume(returning: "未识别到文字")
                 } else {
-                    continuation.resume(returning: texts.joined(separator: "\n"))
+                    once.resume(returning: texts.joined(separator: "\n"))
                 }
             }
             request.recognitionLevel = .accurate
@@ -95,7 +96,7 @@ final class OCRTool: ToolProtocol, @unchecked Sendable {
             do {
                 try handler.perform([request])
             } catch {
-                continuation.resume(throwing: error)
+                once.resume(throwing: error)
             }
         }
     }

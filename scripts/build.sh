@@ -89,10 +89,10 @@ detect_developer_dir() {
 # 模拟器检测
 # ====================================================================
 
-# 检测可用的 iPhone 模拟器（回退链：iPhone 17 → iPhone 16 Pro → iPhone 16 → iPhone 15）
+# 检测可用的 iPhone 模拟器（回退链：iPhone 17 → iPhone Duo → iPhone 16 Pro → iPhone 16 → iPhone 15）
 # 使用 "${name} (" 精确匹配，避免 "iPhone 16" 误匹配 "iPhone 16 Pro"
 detect_ios_simulator() {
-    local candidates=("iPhone 17" "iPhone 16 Pro" "iPhone 16" "iPhone 15")
+    local candidates=("iPhone 17" "iPhone Duo" "iPhone 16 Pro" "iPhone 16" "iPhone 15")
     local available
     available=$(xcrun simctl list devices available 2>/dev/null || true)
     for name in "${candidates[@]}"; do

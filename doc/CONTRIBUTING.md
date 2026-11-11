@@ -9,7 +9,7 @@
 | 项 | 要求 | 说明 |
 |---|---|---|
 | macOS | 14+ | 编译 iOS / macOS 双端 |
-| Xcode | 16+ | 编译 SwiftData / Observation 等新 API |
+| Xcode | 26+（推荐 27.1+） | 编译 SwiftData / Observation 等新 API；Xcode 27.1+ 完整支持 iPhone Duo 折叠屏 |
 | iOS Deployment Target | 17.0+ | 真机与模拟器均需 ≥ iOS 17 |
 | macOS Deployment Target | 14+ | macOS 目标平台 |
 | Git | 2.30+ | 提交与 PR |
@@ -34,7 +34,7 @@ open Aether.xcodeproj
 ### 1.4 首次运行
 
 1. Xcode 顶部 Scheme 选择 `Aether-iOS / Aether-macOS / AetherWatch / AetherWidgets`
-2. 目标设备选择 **iPhone 17 模拟器**（iOS 测试）或 **My Mac**（macOS 测试）
+2. 目标设备选择 **iPhone 17 或 iPhone Duo 模拟器**（iOS 测试）或 **My Mac**（macOS 测试）
 3. 按 `Cmd + R` 运行
 4. App 启动后进入设置填入 DeepSeek API Key（https://platform.deepseek.com 申请）
 

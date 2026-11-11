@@ -28,7 +28,7 @@ final class DesignSystemTests: XCTestCase {
     // MARK: - AetherIcon 枚举验证
 
     func testAetherIconAllCasesCount() {
-        XCTAssertEqual(AetherIcon.allCases.count, 8)
+        XCTAssertEqual(AetherIcon.allCases.count, 29)
     }
 
     func testAetherIconRawValues() {
