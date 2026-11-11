@@ -1,60 +1,62 @@
 # 已知失败用例基线（历史债锚定）
 #
-# 用法：scripts/check-xcresult-failures.sh 把本次 xcresult 里的失败用例与本文件比对，
+# 用法：scripts/check-xcresult-failures.sh 把本次 xcresult 的失败用例与本文件比对，
 # 命中基线 → 只告警放行；基线外的新增失败 → 直接判红。于是不再出现"CI 绿但用例在失败"，
 # 也不必一次性修完所有历史债。
 #
 # 格式：`<label>:<TestClass>/<testMethod>`，label 与 ci.yml 传入的一致（iOS / macOS / UI）。
 # macOS 两个分片共用 macOS label；用例换分片不影响本文件；方法名写不写 () 都识别。
-# 两种粒度：
-#   `macOS:FooTests/testBar`  精确到方法，用于确定性失败（断言写错、标识符缺失）
-#   `macOS:FooTests/*`        整类豁免，仅用于超时类失败——同一批里每次触发的方法不同，
-#                             按方法锚定会在换个受害者时误报红。整类豁免会掩盖该类新增
-#                             的真实失败，所以能精确就不要用通配。
+# 三种粒度，从紧到松——通配范围越大掩盖越多，能收紧就收紧：
+#   `macOS:Foo/testBar`        精确一条，用于确定性失败（断言写错、标识符缺失）
+#   `macOS:Foo/testBarBaz*`    同组飘移豁免：CamelCase 前两词相同的超时/崩溃用例成组锚定
+#   `macOS:Foo/*`              整类豁免，只在该类过半方法都在飘时使用
 #
 # 维护约定：
 # - 修好一条就删一条。加条目只允许发生在"严格门首次暴露闸门修好前就存在的失败"这一次性
-#   锚定里；此后想让 PR 变绿必须改用例或改产品代码，或按上面的约定用 -skip-testing: 显式跳过。
-# - 来源：run 42978823892（PR #56，head f71be62）三个 test job 的完整失败明细
-#   （iOS 50 / macOS 分片 1 有 42 / 分片 2 有 51），以及 run 42970786821 中本轮未复现的历史条目。
-#   本 PR 只动 ci.yml 与 scripts/，没碰产品与用例代码，所以下面每一条都早于本 PR——
-#   它们此前被 `grep -c '"failed"'` 这个恒为 0 的旧门静默放行。
+#   锚定里；此后想让 PR 变绿必须改用例或改产品代码，或用 -skip-testing: 显式跳过并注明原因。
+# - 证据：main@7ccc5ac（当前 main）+ PR #56@f71be62 + PR #56@ea16a7e 三轮同码 run 的全部
+#   test job 日志与后两轮闸门自身的 NEW FAILURE 明细；收录门槛是跨轮复现 ≥2 次，或确定性
+#   断言失败（1 次也收），或已出现在闸门明细/上一版基线里。XCUITest 的
+#   `Failed to terminate com.aether.app.ios` 属 app teardown 噪声、xcresult 不计失败，不收。
+# - main@c2005ea（PR #55 之前）里出现过、之后三轮都不复现的失败不收录——那是已经还掉的债，
+#   例如 DesignSystemTests/testAetherIconAllCasesCount。
+# - 下面每一条都早于本 PR：本 PR 只动 ci.yml 与 scripts/，没碰产品与用例代码。它们此前被
+#   `grep -c '"failed"'` 这个恒为 0 的旧门静默放行。
 
-# ---- UI（AetherUITests）----
+# ---- UI（ui-tests job：AetherUITests / GestureUITests / MCPSettingsUITests）----
 UI:AetherUITests/testConversationContextMenuActions
 UI:AetherUITests/testEditSystemPrompt
 UI:AetherUITests/testOpenConversationListShowsEmptyState
 UI:AetherUITests/testUserPreferencePersistence
 UI:GestureUITests/testDragReorderEditMode
+UI:MCPSettingsUITests/testDeleteMCPServer
 
-# ---- macOS ----
-# 超时类：每轮受害方法不同，整类豁免
-macOS:ChatViewModelTests/*
-macOS:ContactsToolTests/*
-macOS:MLXVisionEngineTests/*
-macOS:NativeEnginesTests/*
-macOS:SystemControlToolTests/*
-macOS:WhisperASREngineTests/*
-# 确定性失败：逐条锚定
+# ---- macOS（两个分片共用同一 label）----
+macOS:AgentMessageBusTests/testSubscriberCount
 macOS:AgentOrchestratorTests/testExecuteAllParallelSubTasks
 macOS:AgentOrchestratorTests/testExecuteNextSubTaskFailureThrows
+macOS:AgentOrchestratorTests/testMultiAgentCollaborationReviewPass
 macOS:AgentOrchestratorTests/testMultiAgentCollaborationReviewRetry
 macOS:AgentPerformanceBaselineTests/testComplexDAGExecutionTime
 macOS:AgentPerformanceBaselineTests/testMediumDAGExecutionTime
 macOS:AgentPerformanceBaselineTests/testSimpleDAGExecutionTime
-macOS:AlarmToolTests/testExecuteLatestTime
-macOS:AlarmToolTests/testExecuteLatestTimeReachesPermissionRequestNoSkip
-macOS:AlarmToolTests/testExecuteMidnightReachesPermissionRequestNoSkip
-macOS:AlarmToolTests/testExecuteMidnightTime
+macOS:AlarmToolTests/testExecuteLatest*
+macOS:AlarmToolTests/testExecuteMidnight*
 macOS:AlarmToolTests/testExecuteSingleDigitHourTimeFormat
-macOS:AlarmToolTests/testExecuteValidTimePermissionDeniedReturnsExactError
-macOS:AlarmToolTests/testExecuteValidTimeReachesPermissionRequestNoSkip
-macOS:AlarmToolTests/testExecuteValidTimeWithCustomLabel
-macOS:AlarmToolTests/testExecuteValidTimeWithDefaultLabel
-macOS:AlarmToolTests/testExecuteValidTimeWithEmptyLabelReachesPermissionNoSkip
-macOS:AlarmToolTests/testExecuteValidTimeWithLabelReachesPermissionNoSkip
+macOS:AlarmToolTests/testExecuteValid*
+macOS:ChatViewModelTests/testToggleVoice*
 macOS:ChatViewModelToolSecurityTests/testReadClipboardUnauthorizedDoesNotExecute
 macOS:CheckpointManagerTests/testCheckpointSupportsIdempotentResume
+macOS:ContactsToolTests/testExecuteChinese*
+macOS:ContactsToolTests/testExecuteCoversEnumerateContactsPath
+macOS:ContactsToolTests/testExecuteEnglish*
+macOS:ContactsToolTests/testExecuteLongQueryPassesGuard
+macOS:ContactsToolTests/testExecuteMultipleCallsCoverEnumerateContacts
+macOS:ContactsToolTests/testExecutePhone*
+macOS:ContactsToolTests/testExecuteReal*
+macOS:ContactsToolTests/testExecuteReturnsString
+macOS:ContactsToolTests/testExecuteSpecial*
+macOS:ContactsToolTests/testExecuteWhitespaceQueryPassesGuard
 macOS:DAGExecutionEngineMultiAgentTests/testAssignedRoleRoutingUsesCorrectSystemPrompt
 macOS:DAGExecutionEngineMultiAgentTests/testCrossAgentDelegationViaMessageBus
 macOS:DAGExecutionEngineMultiAgentTests/testDAGEngineWithNilMessageBusFallsBackToSingleAgent
@@ -64,10 +66,16 @@ macOS:DAGExecutionEngineTests/testRunFailedNodeCascadesSkip
 macOS:DAGExecutionEngineTests/testRunReExecutesInProgressNodes
 macOS:ExportImporterTests/testExportToFileAndImportFromFile
 macOS:ExportImporterTests/testImportPartialDuplicates
+macOS:KeychainManagerTests/testConcurrentWriteSameProvider
 macOS:MCPClientTests/testSSEEndpointHijackIsRejected
 macOS:MCPDiscoveryServiceTests/testBackgroundScanPaused
 macOS:MCPServerTests/testToolsCallExecutionErrorReturnsIsError
+macOS:MLXVisionEngineTests/testDescribeIncludesFallbackContent
+macOS:MLXVisionEngineTests/testDescribeWithDifferentPrompt
 macOS:MemoryServiceTests/testRecallReturnsBySimilarityOrder
+macOS:NativeEnginesTests/testASREngineTranscribeEmptyFileThrows
+macOS:NativeEnginesTests/testFacadeDescribeImageWithNativeEngine
+macOS:NativeEnginesTests/testVisionEngine*
 macOS:OnDeviceModelDownloaderTests/testDeleteModelWhenRemoveItemFails
 macOS:PlaceholderEnginesTests/testClonedVoiceEquality
 macOS:PluginManagerTests/testManifestCodablePreservesParametersSchema
@@ -82,6 +90,8 @@ macOS:SSETransportTests/testSendWithHTTPErrorStatusCodeThrowsTransportError
 macOS:SemanticMemoryStoreTests/testRetrieveRelevantMemoriesDefaultLimit
 macOS:SemanticMemoryStoreTests/testRetrieveRelevantMemoriesRespectsLimit
 macOS:SettingsViewTests/testSettingsSectionAllCasesCount
+macOS:SystemControlToolTests/testExecuteGet*
+macOS:SystemControlToolTests/testExecuteSet*
 macOS:TTSVoiceCatalogTests/testVoiceReturnsNilForInvalidIdentifier
 macOS:ToolExecutionCoordinatorTests/testReadClipboardUnauthorizedDoesNotExecute
 macOS:ToolRegistryTests/testAllToolDefsCount
@@ -90,24 +100,22 @@ macOS:VoiceCoordinatorTests/testToggleVoiceInputStopsRecording
 macOS:VoiceCoordinatorTests/testToggleVoiceInputWhenUnavailableSetsError
 macOS:VoiceServiceTests/testDeinitAsyncCleanupAfterRecordingAttempt
 macOS:VoiceServiceTests/testDeinitWhileRecordingReleasesResources
-macOS:VoiceServiceTests/testRequestPermissionReturnsBool
-macOS:VoiceServiceTests/testRequestPermissionReturnsBoolOnSimulator
+macOS:VoiceServiceTests/testRequestPermission*
+macOS:WhisperASREngineTests/testTranscribeCIEnvironmentThrowsOrReturns
+macOS:WhisperASREngineTests/testTranscribeValidAudioFileReturnsWhisperPrefix
 macOS:WorkflowEngineTests/testWorkflowFromInvalidJSON
 
-# ---- iOS ----
-# 超时类：每轮受害方法不同，整类豁免
-iOS:AgentPerformanceBaselineTests/*
-iOS:MLXVisionEngineTests/*
-iOS:NativeEnginesTests/*
-iOS:RateLimiterTests/*
-iOS:WhisperASREngineTests/*
-# 确定性失败：逐条锚定
+# ---- iOS（unit-tests）----
+iOS:AgentMessageBusTests/testPublishAfterResetStillWorks
 iOS:AgentMessageBusTests/testResetClearsAllSubscribers
 iOS:AgentMessageBusTests/testSubscriberCount
 iOS:AgentOrchestratorTests/testExecuteAllParallelSubTasks
 iOS:AgentOrchestratorTests/testExecuteNextSubTaskFailureThrows
 iOS:AgentOrchestratorTests/testMultiAgentCollaborationReviewPass
 iOS:AgentOrchestratorTests/testMultiAgentCollaborationReviewRetry
+iOS:AgentPerformanceBaselineTests/testComplexDAGExecutionTime
+iOS:AgentPerformanceBaselineTests/testMediumDAGExecutionTime
+iOS:AgentPerformanceBaselineTests/testSimpleDAGExecutionTime
 iOS:ChatViewModelToolSecurityTests/testReadClipboardUnauthorizedDoesNotExecute
 iOS:CheckpointManagerTests/testCheckpointSupportsIdempotentResume
 iOS:DAGExecutionEngineMultiAgentTests/testAssignedRoleRoutingUsesCorrectSystemPrompt
@@ -119,15 +127,23 @@ iOS:DAGExecutionEngineTests/testRunFailedNodeCascadesSkip
 iOS:DAGExecutionEngineTests/testRunReExecutesInProgressNodes
 iOS:ExportImporterTests/testExportToFileAndImportFromFile
 iOS:ExportImporterTests/testImportPartialDuplicates
+iOS:KeychainManagerTests/testConcurrentWriteMultipleProviders
 iOS:MCPClientTests/testSSEEndpointHijackIsRejected
 iOS:MCPDiscoveryServiceTests/testBackgroundScanPaused
 iOS:MCPServerTests/testToolsCallExecutionErrorReturnsIsError
+iOS:MLXVisionEngineTests/testDescribeIncludesFallbackContent
+iOS:MLXVisionEngineTests/testDescribeWithDifferentPrompt
 iOS:MemoryServiceTests/testRecallReturnsBySimilarityOrder
+iOS:NativeEnginesTests/testASREngineTranscribeEmptyFileThrows
+iOS:NativeEnginesTests/testFacadeDescribeImageWithNativeEngine
+iOS:NativeEnginesTests/testVisionEngine*
 iOS:OnDeviceModelDownloaderTests/testDeleteModelWhenRemoveItemFails
 iOS:PlaceholderEnginesTests/testClonedVoiceEquality
 iOS:PluginManagerTests/testManifestCodablePreservesParametersSchema
 iOS:PreferenceExtractorTests/testParsePreferencesMissingRequiredFields
 iOS:PreferenceExtractorTests/testParsePreferencesTypeMismatch
+iOS:RateLimiterTests/testRefillAfter60SecondsResetsTokens
+iOS:RateLimiterTests/testRefillResetsBothChatAndEmbedTokens
 iOS:ReminderToolTests/testExecuteInvalidDateFormatSlashSeparator
 iOS:SSETransportTests/testHandleSSEEventSameOriginEndpointAccepted
 iOS:SSETransportTests/testSendWithHTTPErrorStatusCodeThrowsTransportError
@@ -137,4 +153,6 @@ iOS:SettingsViewTests/testSettingsSectionAllCasesCount
 iOS:ShortcutsToolTests/testCreateCopyToClipboardSuccess
 iOS:ToolRegistryTests/testAllToolDefsCount
 iOS:VoiceServiceTests/testRequestPermissionReturnsBoolOnSimulator
+iOS:WhisperASREngineTests/testTranscribeCIEnvironmentThrowsOrReturns
+iOS:WhisperASREngineTests/testTranscribeValidAudioFileReturnsWhisperPrefix
 iOS:WorkflowEngineTests/testWorkflowFromInvalidJSON

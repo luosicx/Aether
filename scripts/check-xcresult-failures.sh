@@ -39,7 +39,7 @@ if [ ! -s "$SUMMARY_FILE" ]; then
 fi
 
 python3 - "$LABEL" "$BASELINE" "$SUMMARY_FILE" <<'PY'
-import json, os, sys
+import fnmatch, json, os, sys
 
 label, baseline_path, summary_path = sys.argv[1:4]
 
@@ -59,7 +59,7 @@ if failed_count is None:
     failed_count = len(entries)
 
 known_exact = set()
-known_class = set()
+known_patterns = []
 if os.path.exists(baseline_path):
     with open(baseline_path, encoding='utf-8') as fh:
         for line in fh:
@@ -73,8 +73,8 @@ if os.path.exists(baseline_path):
             # xcresult 的 id 不含括号，手写基线常带 Swift 的 method() 风格，统一掉
             if tid.endswith('()'):
                 tid = tid[:-2]
-            if tid.endswith('/*'):
-                known_class.add(tid[:-2])
+            if '*' in tid:
+                known_patterns.append(tid)
             elif tid:
                 known_exact.add(tid)
 else:
@@ -82,19 +82,20 @@ else:
 
 
 def is_known(tid):
-    """条目支持两种粒度：`Class/method` 精确匹配，`Class/*` 整类豁免。
-    超时类失败的受害用例每次不同（同一批里换个方法触发），只能按类锚定。"""
+    """三种粒度：`Class/method` 精确；`Class/testFoo*` 按方法前缀成组豁免；
+    `Class/*` 整类豁免。后两种只为超时/崩溃这类每轮换受害者的失败存在，
+    通配范围越大掩盖越多，能精确就不要放宽。"""
     if tid in known_exact:
         return True
-    return tid.split('/', 1)[0] in known_class
+    return any(fnmatch.fnmatchcase(tid, pat) for pat in known_patterns)
 
 
 new = [(t, r) for (t, r) in entries if not is_known(t)]
 known_hits = [(t, r) for (t, r) in entries if is_known(t)]
 
-print('result=%s passed=%s failed=%s skipped=%s | baseline(%s)=%d exact + %d class'
+print('result=%s passed=%s failed=%s skipped=%s | baseline(%s)=%d exact + %d pattern'
       % (data.get('result'), data.get('passedTests'), failed_count,
-         data.get('skippedTests'), label, len(known_exact), len(known_class)))
+         data.get('skippedTests'), label, len(known_exact), len(known_patterns)))
 
 # 计数多于可枚举明细时，差额无法核对基线，按新增处理
 if failed_count > len(entries):
