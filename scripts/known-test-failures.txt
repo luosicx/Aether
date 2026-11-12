@@ -68,7 +68,49 @@
 #   execution time 行），删条目的依据是 main@5090a91 两个 macOS 分片 job 日志里同形的挂死记录
 #   ——MLXVision 2 条、NativeEngines 的 ASR/facade/vision* 共 8 条、WhisperASR 2 条全部
 #   exceeded，而 4 条 testTTSEngineSynthesize* 正好卡在 30.02–30.108s，与上面那条机制吻合。
-#   MCP/SSE 族 10 条（同一批 5 个方法在 macOS / iOS 各记一条）修的是四处不同的东西：
+# - #60 删 20 条（iOS 10 + macOS 10），五种机制，全部改用例或改产品，没有新增豁免：
+#   - AnyCodable.encode 缺 [Any] / [String: Any] 分支，嵌套结构一律落成 null。`PluginToolDef.parameters`
+#     是 JSON Schema、必然是字典，所以插件工具的参数定义编码即丢，到不了 LLM。补上递归包装后，
+#     ChatChunkTests 里那条按"记录当前实现返回 null"写的用例同步改成断言真实 JSON（净增 1 条用例，
+#     文档计数门的 3551→3552 就是它）。
+#   - ExportImporter 三处 coder 不同源：写用 ISO8601，`exportToFile` 回读用默认策略（Double），
+#     自己导出的文件自己读不回来；用例侧的 fixture 是第四处。收敛成 jsonEncoder()/jsonDecoder()。
+#   - `Workflow.fromJSON` 只在 `json.data(using: .utf8)` 失败时抛 invalidJSON，而任何字符串都能转
+#     UTF-8，格式非法其实发生在 decode，抛出去的是裸 DecodingError——按声明的契约收敛。
+#   - P2-3 给 invalidJSON / subTaskFailed 加 `*WithCause` 变体时保留了"向后兼容"的旧 case，同一个
+#     语义裂成两个 case，所有 `if case .invalidJSON` 的匹配方静默失效（这次是 3 条用例）。合成一个
+#     带默认关联值的 case（`invalidJSON(String, underlying: Error? = nil)`）——Swift 枚举 case
+#     允许默认值，所以旧的抛出点与旧的匹配点都不用改。PreferenceExtractor / GoalDecomposer /
+#     AgentOrchestrator 三处同病同治。
+#   - 三条过期或自相矛盾的断言：SettingsSection 漏了 `.icloud`（7 写成 6）；ClonedVoice 的 id 是
+#     per-instance UUID，同类另一条用例正是这么断言的，"两条新建记录相等"不可能成立；
+#     ToolRegistry 是进程级单例，别的用例会往里注册测试工具且不注销，绝对数量随执行顺序变
+#     （全量跑实测 27），改成断言 18 个跨平台默认工具都在册——既不被污染撑大，也真能抓住漏注册。
+# - #60 追加：记忆检索族删 6 条（iOS 3 + macOS 3），两种机制，只改用例；两批合计 106→80。
+#   触发点是 #60 那轮 iOS job 报出的 NEW FAILURE
+#   `SemanticMemoryStoreTests/testRetrieveRelevantMemoriesReturnsBySimilarity`（此前只在 main@5090a91
+#   本地飘过一次，当时按"复现不足两次"没收）。它不是前半批引入的：在干净的 9bb6c73 上只跑 Memory/
+#   目录就能稳定复现同一条 `("1") is not equal to ("2")`，前半批也没碰这条路径（ExportImporterTests
+#   自带注入的 factory，从不写单例）。收在这里是因为它已经把 #60 判红了，而机制下面两条说清了。
+#   - 进程级向量存储没隔离（MemoryServiceTests/testRecallReturnsBySimilarityOrder ×2）：
+#     `MemoryService.recall` 走的是"从 VectorStore 取全局 top-limit，再回 SwiftData 按 id 捞实例"，
+#     而这个类用的是 `VectorStoreFactory.shared`——它的 cached store 会攒下整个测试进程写过的每一条
+#     向量。别人的向量占满 limit 窗口后，本用例自己的记忆直接被挤出去，条数就成了"谁先跑、前面跑了
+#     多少条"的函数。Memory/ 目录里 AgingCompactor / ExportImporter / RecallEngine 三个类早就各自
+#     `VectorStoreFactory()` + `setOverride(BruteForceVectorStore())` 注入，只有这两个类漏了。
+#   - 断言与 RecallEngine 的同类去重对着干（SemanticMemoryStoreTests 两条 limit 用例 ×2）：
+#     `retrieveRelevantMemories` 委托 RecallEngine，后者按 category 去重、每类只留最高分，而这两条
+#     用例把 3 条 / 5 条记忆全塞进默认 category "context"——无论存几条都只剩 1 条，limit 根本没有
+#     东西可限。RecallEngineTests 里同类断言一直用 `context_i` 逐个换 category 绕开这一点。
+#   那条 `testRetrieveRelevantMemoriesReturnsBySimilarity` 两条记忆分属 preference/context，不受去重
+#   影响，飘的是上面第一个机制——同进程里 MemoryServiceTests 先写过一批同向向量，与查询正交的那条
+#   进不了 top-20 候选窗口。所以本族实际受益 4 个方法（3 个锚点方法 + 这条没锚过的偶发）。
+#   本地验证：干净 main 上只跑 Memory/ 目录 186 条就能稳定复现这 4 个方法（同批失败的另外 4 个是
+#   exportedAt 与 invalidJSONWithCause，归本 PR 前半批）；两批合到同一分支后 iOS 与 macOS 各
+#   186 tests 0 failures。反向校验拿修复前那份 xcresult 配删完 26 条的新基线跑门，NEW FAILURE
+#   恰好 8 条 = 本族 4 个方法 + 前半批 4 个方法，一条不多一条不少。
+# - MCP/SSE 族删 10 条（macOS 5 + iOS 5，同一批 5 个方法在两个平台各记一条），80→70，
+#   四处机制各不相同：
 #   - SSETransport 的分帧：`URLSession.bytes(for:).lines` 不会为结尾的空行再产出一个 ""，于是
 #     "服务器发完最后一条事件就关流"这种形态在解析循环里永远等不到事件边界，那条挂起的事件整条
 #     丢掉。改成流正常结束时把未派发的缓冲补发一次（异常路径不补发，那里的事件可能只收了一半）。
@@ -105,6 +147,10 @@
 #   `AetherTests/MCP/` 整个目录 20 个类一起跑，259 tests 0 failures。两边日志里都出现
 #   `[MCPSecurity] 检测到 MCP endpoint 劫持尝试：SSE=http://localhost/sse, endpoint=http://localhost:9999/messages`
 #   ——两个平台都是"事件真的进到同源校验里、然后被端口口径拒掉"，不是靠丢事件蒙过断言。
+#   合并 main@b40cc22 之后在合并树上重跑（含构建，同一套超时参数，`AetherTests/MCP/` 全 20 个类）：
+#   macOS 267 tests 0 failures、iOS 259 tests 0 failures，5 条锚点方法加 2 条同源用例两边全绿
+#   （macOS 0.001–0.209s / iOS 0.001–0.105s，新增端口用例 0.009s / 0.004s），两边都重新打印出
+#   上面那两条 MCPSecurity 告警，没有 exceeded execution time 行。
 # - 证据：main@7ccc5ac + PR #56 的 f71be62 / ea16a7e / 4183bd6 / 153b8a8 / bb3b793 / f74e07a 共七轮 run
 #   （产品代码完全相同，只有本基线文件在变）的全部 test job 日志与后六轮闸门自身的 NEW FAILURE
 #   明细；再加 #56 落地后的 main@632e087、#57 的 9147076、main@5090a91 三轮 iOS job 日志——
@@ -133,7 +179,6 @@ UI:MCPSettingsUITests/testDeleteMCPServer
 # ---- macOS（unit-tests-macos 两个分片共用同一 label）----
 macOS:AgentOrchestratorTests/*~crash
 macOS:AgentOrchestratorTests/testExecuteAllParallelSubTasks
-macOS:AgentOrchestratorTests/testExecuteNextSubTaskFailureThrows
 macOS:AgentOrchestratorTests/testMultiAgent*
 macOS:AgentPerformanceBaselineTests/testComplexDAGExecutionTime
 macOS:AgentPerformanceBaselineTests/testMediumDAGExecutionTime
@@ -162,37 +207,24 @@ macOS:DAGExecutionEngineMultiAgentTests/testDelegationFailureCascadesSkipDepende
 macOS:DAGExecutionEngineMultiAgentTests/testMixedExecution
 macOS:DAGExecutionEngineTests/testRunFailedNodeCascadesSkip
 macOS:DAGExecutionEngineTests/testRunReExecutesInProgressNodes
-macOS:ExportImporterTests/testExportToFileAndImportFromFile
-macOS:ExportImporterTests/testImportPartialDuplicates
 macOS:KeychainManagerTests/*~crash
 macOS:KeychainManagerTests/testConcurrentWrite*
-macOS:MemoryServiceTests/testRecallReturnsBySimilarityOrder
 macOS:OnDeviceModelDownloaderTests/testDeleteModelWhenRemoveItemFails
-macOS:PlaceholderEnginesTests/testClonedVoiceEquality
-macOS:PluginManagerTests/testManifestCodablePreservesParametersSchema
-macOS:PreferenceExtractorTests/testParsePreferencesMissingRequiredFields
-macOS:PreferenceExtractorTests/testParsePreferencesTypeMismatch
 macOS:ReminderToolTests/testExecuteDateNotStringIsIgnored
 macOS:ReminderToolTests/testExecuteInvalidDateFormatSlashSeparator
-macOS:SemanticMemoryStoreTests/testRetrieveRelevantMemoriesDefaultLimit
-macOS:SemanticMemoryStoreTests/testRetrieveRelevantMemoriesRespectsLimit
-macOS:SettingsViewTests/testSettingsSectionAllCasesCount
 macOS:SystemControlToolTests/testExecuteGet*
 macOS:SystemControlToolTests/testExecuteSet*
 macOS:TTSVoiceCatalogTests/testVoiceReturnsNilForInvalidIdentifier
 macOS:ToolExecutionCoordinatorTests/testReadClipboardUnauthorizedDoesNotExecute
-macOS:ToolRegistryTests/testAllToolDefsCount
 macOS:VoiceCoordinatorTests/testToggleVoice*
 macOS:VoiceServiceTests/testDeinitAsyncCleanupAfterRecordingAttempt
 macOS:VoiceServiceTests/testDeinitWhileRecordingReleasesResources
 macOS:VoiceServiceTests/testDidCancelDuringPreviewCleansPreviewState
 macOS:VoiceServiceTests/testRequestPermission*
-macOS:WorkflowEngineTests/testWorkflowFromInvalidJSON
 
 # ---- iOS（unit-tests job）----
 iOS:AgentOrchestratorTests/*~crash
 iOS:AgentOrchestratorTests/testExecuteAllParallelSubTasks
-iOS:AgentOrchestratorTests/testExecuteNextSubTaskFailureThrows
 iOS:AgentOrchestratorTests/testMultiAgentCollaborationReviewPass
 iOS:AgentOrchestratorTests/testMultiAgentCollaborationReviewRetry
 iOS:AgentPerformanceBaselineTests/testComplexDAGExecutionTime
@@ -207,20 +239,8 @@ iOS:DAGExecutionEngineMultiAgentTests/testDelegationFailureCascadesSkipDependent
 iOS:DAGExecutionEngineMultiAgentTests/testMixedExecution
 iOS:DAGExecutionEngineTests/testRunFailedNodeCascadesSkip
 iOS:DAGExecutionEngineTests/testRunReExecutesInProgressNodes
-iOS:ExportImporterTests/testExportToFileAndImportFromFile
-iOS:ExportImporterTests/testImportPartialDuplicates
 iOS:KeychainManagerTests/*~crash
 iOS:KeychainManagerTests/testConcurrentWrite*
-iOS:MemoryServiceTests/testRecallReturnsBySimilarityOrder
 iOS:OnDeviceModelDownloaderTests/testDeleteModelWhenRemoveItemFails
-iOS:PlaceholderEnginesTests/testClonedVoiceEquality
-iOS:PluginManagerTests/testManifestCodablePreservesParametersSchema
-iOS:PreferenceExtractorTests/testParsePreferencesMissingRequiredFields
-iOS:PreferenceExtractorTests/testParsePreferencesTypeMismatch
 iOS:ReminderToolTests/testExecuteInvalidDateFormatSlashSeparator
-iOS:SemanticMemoryStoreTests/testRetrieveRelevantMemoriesDefaultLimit
-iOS:SemanticMemoryStoreTests/testRetrieveRelevantMemoriesRespectsLimit
-iOS:SettingsViewTests/testSettingsSectionAllCasesCount
-iOS:ToolRegistryTests/testAllToolDefsCount
 iOS:VoiceServiceTests/*~crash
-iOS:WorkflowEngineTests/testWorkflowFromInvalidJSON

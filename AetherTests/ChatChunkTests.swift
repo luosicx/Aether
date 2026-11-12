@@ -237,16 +237,51 @@ final class ChatChunkTests: XCTestCase {
         XCTAssertEqual(try encodeString(AnyCodable("hello")), #""hello""#)
     }
 
-    /// 当前实现对嵌套 array / dict 的 encode 落到 encodeNil 分支（记录实现行为）
-    func testAnyCodableEncodeArrayAndDictCurrentBehavior() throws {
+    /// 嵌套 array / dict 必须编成真实 JSON，不能退化成 null
+    func testAnyCodableEncodeArrayAndDictNested() throws {
         func encodeString(_ val: AnyCodable) throws -> String {
             let data = try JSONEncoder().encode(val)
             return String(data: data, encoding: .utf8) ?? ""
         }
 
-        // encode 未处理 [Any] / [String: Any]，落到 encodeNil()
-        XCTAssertEqual(try encodeString(AnyCodable([1, 2, 3])), "null")
-        XCTAssertEqual(try encodeString(AnyCodable(["a": 1])), "null")
+        XCTAssertEqual(try encodeString(AnyCodable([1, 2, 3])), "[1,2,3]")
+        XCTAssertEqual(try encodeString(AnyCodable(["a": 1])), #"{"a":1}"#)
+        // 元素已经是 AnyCodable 时要拆包，不能二次包装成 null
+        XCTAssertEqual(
+            try encodeString(AnyCodable(["nested": AnyCodable(["x": true])])),
+            #"{"nested":{"x":true}}"#
+        )
+    }
+
+    /// round-trip：嵌套 JSON Schema encode→decode→encode 一致
+    func testAnyCodableRoundTripNestedSchema() throws {
+        let schema: [String: Any] = [
+            "type": "object",
+            "properties": ["expression": ["type": "string"]],
+            "required": ["expression"]
+        ]
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        let decoder = JSONDecoder()
+
+        let originalData = try encoder.encode(AnyCodable(schema))
+        let decoded = try decoder.decode(AnyCodable.self, from: originalData)
+        let reencodedData = try encoder.encode(decoded)
+
+        XCTAssertEqual(
+            String(data: originalData, encoding: .utf8),
+            String(data: reencodedData, encoding: .utf8),
+            "嵌套 schema encode→decode→encode 应一致"
+        )
+        let params = decoded.value as? [String: Any]
+        XCTAssertEqual(params?["type"] as? String, "object")
+        let properties = params?["properties"] as? [String: Any]
+        let expression = properties?["expression"] as? [String: Any]
+        XCTAssertEqual(expression?["type"] as? String, "string")
+        let required = params?["required"] as? [Any]
+        XCTAssertEqual(required?.count, 1)
+        XCTAssertEqual(required?[0] as? String, "expression")
     }
 
     /// round-trip：扁平 JSON Schema encode→decode→encode 一致
