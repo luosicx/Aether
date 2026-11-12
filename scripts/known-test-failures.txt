@@ -68,6 +68,42 @@
 #   execution time 行），删条目的依据是 main@5090a91 两个 macOS 分片 job 日志里同形的挂死记录
 #   ——MLXVision 2 条、NativeEngines 的 ASR/facade/vision* 共 8 条、WhisperASR 2 条全部
 #   exceeded，而 4 条 testTTSEngineSynthesize* 正好卡在 30.02–30.108s，与上面那条机制吻合。
+#   MCP/SSE 族 10 条（同一批 5 个方法在 macOS / iOS 各记一条）修的是四处不同的东西：
+#   - SSETransport 的分帧：`URLSession.bytes(for:).lines` 不会为结尾的空行再产出一个 ""，于是
+#     "服务器发完最后一条事件就关流"这种形态在解析循环里永远等不到事件边界，那条挂起的事件整条
+#     丢掉。改成流正常结束时把未派发的缓冲补发一次（异常路径不补发，那里的事件可能只收了一半）。
+#     三条失败同源：MCPClientTests.swift:679 `("0") is not equal to ("1") - 应仅收到 1 条 message
+#     事件`，以及 SSETransportTests.swift:248 / :181 两条都停在 `connectionFailed("SSE POST 端点未就绪")`
+#     ——endpoint 事件同样被丢了，postEndpoint 从未被设置。main@632e087 的 iOS unit-tests 日志里
+#     这 5 条都在，macOS 侧分布在两个分片（分片 1 四条，分片 2 是 hijack 那条的两个断言），
+#     file:line 与断言文案跟本地跑出来的一致；本地按方法挑出来跑也是 5 条全红。
+#     同源的 testHandleSSEEventCrossOriginEndpointRejected 改前一直是绿的，那是假绿：它只断言
+#     postEndpoint 为 nil，事件丢失恰好满足。补发之后事件才真的进到同源校验里被拒（本地日志有
+#     `[MCPSecurity] 检测到 MCP endpoint 劫持尝试：SSE=http://localhost:9999/sse, endpoint=http://evil.com/api`）。
+#   - 同源校验的端口口径：旧写法 `(url.port ?? base.port) == (base.port ?? url.port)` 在"只有一侧
+#     写了端口"时两侧退化成同一个值——SSE 连 `http://localhost/sse`（隐式 80）、endpoint 指
+#     `http://localhost:9999/messages` 会被放行，带 Authorization 头的后续请求就交给了 9999 端口。
+#     换成按 scheme 补默认端口后拼出 `scheme://host:port` 再比，新增
+#     `testHandleSSEEventEndpointPortMustMatch` 把拒绝和接受两个方向都钉住。诚实记一句：这次 10 条
+#     锚点没有一条是它修好的。我最初按"相对 URL 取不到 scheme，所以合法 endpoint 被误判成劫持"
+#     改的它，实测那 3 条照旧红——`URL(string:relativeTo:)` 经 base 就能拿到 scheme/host/port，
+#     误判的前提不成立；真正的丢事件原因是上面那条 EOF 补发。这处留着是因为它补的是一个真漏洞。
+#   - MCPDiscoveryService 的前后台状态机：`setForegroundActive(false)` 停掉 browser 与 Timer 却留着
+#     `isScanning == true`，回前台时 `startScanning()` 的 `guard !isScanning` 把恢复挡死，于是
+#     MCPDiscoveryServiceTests.swift:253 `回前台应恢复搜索` 恒红。改成"扫描意图 wantsScanning 与
+#     执行状态 isScanning 分离"，挂起时一并归位。该类在 production 里目前还没有构造点（只有测试
+#     new 它），所以这修的是潜在缺陷，不改变现有 App 行为。
+#   - MCPServerTests.swift:466 那条是用例 bug，不是产品 bug：它拿 `calculate` + `###invalid###`
+#     想触发执行错误，而 CalculateTool 把这类失败写成 `return "错误：表达式无效"`
+#     （ToolRegistry.swift:302）根本不抛，走的仍是成功分支，`isError` 恒为 false——那条断言
+#     从来没可能碰到 MCPServer 的 catch 分支。改成白名单放行一个未注册的工具，让
+#     `ToolRegistry.execute` 真抛 NSError，并把透传文案一起钉住。
+#   本地验证（-only-testing 那 4 个类，CI 同款 -test-timeouts-enabled + 30/60 allowance）。macOS：
+#   EOF 补发落地前那轮还剩 SSETransportTests 8 tests 2 failures + MCPClientTests 28 tests 2 条断言
+#   失败；补发之后 132 tests 0 failures，5 条锚点方法 0.001–0.241s 全过，新增端口用例 0.021s。
+#   iOS：同样 4 个类 80 tests 0 failures，5 条 0.001–0.155s、新端口用例 0.002s，日志里同样出现
+#   `[MCPSecurity] 检测到 MCP endpoint 劫持尝试：SSE=http://localhost/sse, endpoint=http://localhost:9999/messages`
+#   ——两个平台都是"事件真的进到同源校验里、然后被端口口径拒掉"，不是靠丢事件蒙过断言。
 # - 证据：main@7ccc5ac + PR #56 的 f71be62 / ea16a7e / 4183bd6 / 153b8a8 / bb3b793 / f74e07a 共七轮 run
 #   （产品代码完全相同，只有本基线文件在变）的全部 test job 日志与后六轮闸门自身的 NEW FAILURE
 #   明细；再加 #56 落地后的 main@632e087、#57 的 9147076、main@5090a91 三轮 iOS job 日志——
@@ -129,9 +165,6 @@ macOS:ExportImporterTests/testExportToFileAndImportFromFile
 macOS:ExportImporterTests/testImportPartialDuplicates
 macOS:KeychainManagerTests/*~crash
 macOS:KeychainManagerTests/testConcurrentWrite*
-macOS:MCPClientTests/testSSEEndpointHijackIsRejected
-macOS:MCPDiscoveryServiceTests/testBackgroundScanPaused
-macOS:MCPServerTests/testToolsCallExecutionErrorReturnsIsError
 macOS:MemoryServiceTests/testRecallReturnsBySimilarityOrder
 macOS:OnDeviceModelDownloaderTests/testDeleteModelWhenRemoveItemFails
 macOS:PlaceholderEnginesTests/testClonedVoiceEquality
@@ -140,8 +173,6 @@ macOS:PreferenceExtractorTests/testParsePreferencesMissingRequiredFields
 macOS:PreferenceExtractorTests/testParsePreferencesTypeMismatch
 macOS:ReminderToolTests/testExecuteDateNotStringIsIgnored
 macOS:ReminderToolTests/testExecuteInvalidDateFormatSlashSeparator
-macOS:SSETransportTests/testHandleSSEEventSameOriginEndpointAccepted
-macOS:SSETransportTests/testSendWithHTTPErrorStatusCodeThrowsTransportError
 macOS:SemanticMemoryStoreTests/testRetrieveRelevantMemoriesDefaultLimit
 macOS:SemanticMemoryStoreTests/testRetrieveRelevantMemoriesRespectsLimit
 macOS:SettingsViewTests/testSettingsSectionAllCasesCount
@@ -179,9 +210,6 @@ iOS:ExportImporterTests/testExportToFileAndImportFromFile
 iOS:ExportImporterTests/testImportPartialDuplicates
 iOS:KeychainManagerTests/*~crash
 iOS:KeychainManagerTests/testConcurrentWrite*
-iOS:MCPClientTests/testSSEEndpointHijackIsRejected
-iOS:MCPDiscoveryServiceTests/testBackgroundScanPaused
-iOS:MCPServerTests/testToolsCallExecutionErrorReturnsIsError
 iOS:MemoryServiceTests/testRecallReturnsBySimilarityOrder
 iOS:OnDeviceModelDownloaderTests/testDeleteModelWhenRemoveItemFails
 iOS:PlaceholderEnginesTests/testClonedVoiceEquality
@@ -189,8 +217,6 @@ iOS:PluginManagerTests/testManifestCodablePreservesParametersSchema
 iOS:PreferenceExtractorTests/testParsePreferencesMissingRequiredFields
 iOS:PreferenceExtractorTests/testParsePreferencesTypeMismatch
 iOS:ReminderToolTests/testExecuteInvalidDateFormatSlashSeparator
-iOS:SSETransportTests/testHandleSSEEventSameOriginEndpointAccepted
-iOS:SSETransportTests/testSendWithHTTPErrorStatusCodeThrowsTransportError
 iOS:SemanticMemoryStoreTests/testRetrieveRelevantMemoriesDefaultLimit
 iOS:SemanticMemoryStoreTests/testRetrieveRelevantMemoriesRespectsLimit
 iOS:SettingsViewTests/testSettingsSectionAllCasesCount

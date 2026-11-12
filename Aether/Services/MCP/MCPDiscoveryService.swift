@@ -54,6 +54,8 @@ final class MCPDiscoveryService {
     private var scanTimer: Timer?
     /// 是否在前台活跃（iOS 后台时暂停扫描）
     private var isForegroundActive: Bool = true
+    /// 调用方是否要求扫描：后台只挂起执行，不抹掉这个意图
+    private var wantsScanning: Bool = false
     /// 是否正在扫描
     private(set) var isScanning: Bool = false
 
@@ -79,23 +81,14 @@ final class MCPDiscoveryService {
 
     /// 启动扫描：立即执行一次搜索 + 周期 Timer
     func startScanning() {
-        guard !isScanning else { return }
-        guard isForegroundActive else {
-            // iOS 后台不启动扫描，等待前台激活后再启动
-            return
-        }
-        isScanning = true
-        startBrowserSearch()
-        startPeriodicTimer()
+        wantsScanning = true
+        resumeScanningIfNeeded()
     }
 
     /// 停止扫描：取消 Timer + 停止 browser
     func stopScanning() {
-        isScanning = false
-        scanTimer?.invalidate()
-        scanTimer = nil
-        browser?.stopDiscovery()
-        browser = nil
+        wantsScanning = false
+        suspendScanning()
     }
 
     /// 设置前台活跃状态（iOS 后台切换时调用）
@@ -103,20 +96,33 @@ final class MCPDiscoveryService {
     func setForegroundActive(_ active: Bool) {
         isForegroundActive = active
         if active {
-            // 回到前台：恢复扫描
-            if !isScanning {
-                startScanning()
-            }
+            resumeScanningIfNeeded()
         } else {
-            // 进入后台：暂停扫描（保留 isScanning 状态以便恢复）
-            scanTimer?.invalidate()
-            scanTimer = nil
-            browser?.stopDiscovery()
-            browser = nil
+            // 进入后台：只挂起执行，扫描意图留给回前台恢复
+            suspendScanning()
         }
     }
 
     // MARK: - 内部方法
+
+    /// 前台 + 有扫描意图 + 当前没在扫，才真正把 browser 与周期 Timer 拉起来。
+    private func resumeScanningIfNeeded() {
+        guard wantsScanning, isForegroundActive, !isScanning else { return }
+        isScanning = true
+        startBrowserSearch()
+        startPeriodicTimer()
+    }
+
+    /// 停掉 browser 与周期 Timer，并把 `isScanning` 归位。
+    /// 后台挂起必须连 `isScanning` 一起清掉，否则 `resumeScanningIfNeeded()` 的
+    /// `!isScanning` 会把回前台的恢复挡死——局域网发现从此不再工作。
+    private func suspendScanning() {
+        isScanning = false
+        scanTimer?.invalidate()
+        scanTimer = nil
+        browser?.stopDiscovery()
+        browser = nil
+    }
 
     /// 启动一次 browser 搜索
     private func startBrowserSearch() {

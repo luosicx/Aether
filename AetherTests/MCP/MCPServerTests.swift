@@ -451,21 +451,25 @@ final class MCPServerTests: XCTestCase {
         XCTAssertEqual(code, -32602, "缺少 params 应返回 -32602 Invalid params")
     }
 
-    /// 白名单工具执行抛错时应返回 isError=true
+    /// 白名单放行、但 ToolRegistry 里没注册的工具：execute 抛错，应落到 isError=true 的执行错误分支。
+    /// 原来这条用 `calculate` + 非法表达式，而工具层把这类失败写成 "错误：表达式无效" 返回字符串
+    /// 而不是抛错，走的仍是成功分支（isError=false），断言从未触及 catch 分支。
     func testToolsCallExecutionErrorReturnsIsError() async throws {
+        await server.registerTools(["not_registered_tool"])
         try await server.start()
 
-        // 调用 calculate 工具，传入无效表达式触发执行错误
         let response = await sendRequestAndWait(
             method: "tools/call",
-            params: ["name": "calculate", "arguments": ["expression": "###invalid###"]],
+            params: ["name": "not_registered_tool", "arguments": [:]],
             id: 23
         )
-        XCTAssertNotNil(response?["result"], "执行错误应返回 result（非 error）")
+        XCTAssertNotNil(response?["result"], "工具执行失败应返回 result（而非 JSON-RPC error）")
         let result = response?["result"] as? [String: Any]
-        XCTAssertEqual(result?["isError"] as? Bool, true, "执行错误时 isError 应为 true")
+        XCTAssertEqual(result?["isError"] as? Bool, true, "工具抛错时 isError 应为 true")
         let content = result?["content"] as? [[String: Any]]
-        XCTAssertNotNil(content?.first?["text"], "应返回错误描述文本")
+        let text = content?.first?["text"] as? String
+        XCTAssertEqual(text, "工具执行失败: 工具 not_registered_tool 未注册",
+                       "应把 execute 抛出的错误描述透传给调用方")
     }
 
     // MARK: - 12. 错误码与 String id 测试

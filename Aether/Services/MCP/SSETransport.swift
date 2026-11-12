@@ -85,7 +85,13 @@ final class SSETransport: @unchecked Sendable, MCPTransport {
                     self?.finishContinuation()
                     return
                 }
-                // SSE 流正常结束
+                // SSE 流正常结束。
+                // `bytes.lines` 不会为结尾的空行再产出一个 ""，所以"服务器发完最后一条事件就关流"
+                // 这种形态在循环里永远等不到事件边界，那条 JSON-RPC 响应会整条丢掉；
+                // 这里在流结束时把挂起的事件补发一次。异常路径不补发，那里的事件可能只收了一半。
+                if !data.isEmpty {
+                    self?.handleSSEEvent(event: event, data: data)
+                }
                 self?.finishContinuation()
             }
             setReadTask(task)
@@ -169,29 +175,34 @@ final class SSETransport: @unchecked Sendable, MCPTransport {
         lock.unlock()
     }
 
+    /// URL 的源（scheme + host + port），端口缺失时按 scheme 补默认端口。
+    ///
+    /// 同源校验用它比较，是为了堵住两边各缺一侧端口时的漏判：`https://host`（隐式 443）
+    /// 对 `https://host:9999` 若写成 `url.port ?? base.port == base.port ?? url.port`，
+    /// 两侧都会退化成 9999 而相等，等于把带 Authorization 头的后续请求交给攻击者。
+    private static func origin(of url: URL) -> String? {
+        guard let scheme = url.scheme?.lowercased(), let host = url.host?.lowercased() else { return nil }
+        let port = url.port ?? (scheme == "https" || scheme == "wss" ? 443 : 80)
+        return "\(scheme)://\(host):\(port)"
+    }
+
     /// 处理 SSE 事件
     /// - endpoint 事件：设置 POST 端点 URL（校验与 SSE 连接同源，防劫持）
     /// - message 事件：yield JSON-RPC 响应到消息流
     private func handleSSEEvent(event: String, data: String) {
         switch event {
         case "endpoint":
-            // endpoint URL 可能是相对路径，基于 SSE URL 解析
-            guard let url = URL(string: data, relativeTo: self.url) else { return }
-            // 安全校验：endpoint 必须与 SSE 连接同源（scheme + host + port），
-            // 防止恶意 MCP Server 将后续请求（含 Authorization 头）劫持到攻击者服务器
-            guard let sseScheme = self.url.scheme,
-                  let sseHost = self.url.host,
-                  let endpointScheme = url.scheme,
-                  let endpointHost = url.host,
-                  endpointScheme.lowercased() == sseScheme.lowercased(),
-                  endpointHost.lowercased() == sseHost.lowercased(),
-                  (url.port ?? self.url.port) == (self.url.port ?? url.port) else {
+            // endpoint 常见写法是相对路径（如 "/messages"），必须先 absoluteURL 化才带 scheme/host；
+            // 直接拿相对 URL 比同源会把合法 endpoint 全部误判成劫持。
+            guard let endpoint = URL(string: data, relativeTo: self.url)?.absoluteURL,
+                  let origin = Self.origin(of: endpoint),
+                  origin == Self.origin(of: self.url) else {
                 // 拒绝跨域 endpoint，记录安全告警日志
                 Self.logger.warning("检测到 MCP endpoint 劫持尝试：SSE=\(self.url.absoluteString, privacy: .public), endpoint=\(data, privacy: .public)")
                 return
             }
             lock.lock()
-            postEndpoint = url
+            postEndpoint = endpoint
             lock.unlock()
         case "message":
             // JSON-RPC 响应（持锁 yield，避免与 disconnect() 后 finish 重复访问）
