@@ -53,48 +53,50 @@ public actor RateLimiter {
     }
 
     /// 申请一个 chat 令牌。令牌耗尽时抛 rateLimited。
-    public func acquireChat() throws {
+    /// - Parameter now: 取号时刻，默认当前时间。单测传入回拨后的时间即可覆盖 60 秒补充分支，
+    ///   不必真实等待 61 秒（真实等待会被 CI 的 60s execution allowance 杀掉）。
+    public func acquireChat(now: Date = Date()) throws {
         if Self.useRust, let bucket = chatBucket {
-            let nowMs = UInt64(Date().timeIntervalSince1970 * 1000)
+            let nowMs = UInt64(now.timeIntervalSince1970 * 1000)
             if let retryAfter = bucket.acquire(1.0, nowMs: nowMs) {
                 throw LLMError.rateLimited(retryAfter: retryAfter.rounded(.up))
             }
             return
         }
-        try acquireChatSwift()
+        try acquireChatSwift(now: now)
     }
 
     /// 申请一个 embed 令牌。令牌耗尽时抛 rateLimited。
-    public func acquireEmbed() throws {
+    /// - Parameter now: 同 `acquireChat(now:)`。
+    public func acquireEmbed(now: Date = Date()) throws {
         if Self.useRust, let bucket = embedBucket {
-            let nowMs = UInt64(Date().timeIntervalSince1970 * 1000)
+            let nowMs = UInt64(now.timeIntervalSince1970 * 1000)
             if let retryAfter = bucket.acquire(1.0, nowMs: nowMs) {
                 throw LLMError.rateLimited(retryAfter: retryAfter.rounded(.up))
             }
             return
         }
-        try acquireEmbedSwift()
+        try acquireEmbedSwift(now: now)
     }
 
     // MARK: - 纯 Swift 兜底实现（保留以便回退）
 
     /// Swift 兜底：申请 chat 令牌。
-    private func acquireChatSwift() throws {
-        refillIfNeeded()
+    private func acquireChatSwift(now: Date) throws {
+        refillIfNeeded(now: now)
         guard chatTokens > 0 else { throw LLMError.rateLimited(retryAfter: 60) }
         chatTokens -= 1
     }
 
     /// Swift 兜底：申请 embed 令牌。
-    private func acquireEmbedSwift() throws {
-        refillIfNeeded()
+    private func acquireEmbedSwift(now: Date) throws {
+        refillIfNeeded(now: now)
         guard embedTokens > 0 else { throw LLMError.rateLimited(retryAfter: 60) }
         embedTokens -= 1
     }
 
     /// 距上次补充满 60 秒则重置两类令牌至上限（滑动窗口式补充）。
-    private func refillIfNeeded() {
-        let now = Date()
+    private func refillIfNeeded(now: Date) {
         let elapsed = now.timeIntervalSince(lastRefillAt)
         if elapsed >= 60 {
             chatTokens = chatPerMin

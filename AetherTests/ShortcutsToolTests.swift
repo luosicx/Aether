@@ -244,8 +244,9 @@ final class ShortcutsToolTests: XCTestCase {
 
     /// open_url 动作成功路径：应返回创建成功消息
     func testCreateOpenUrlSuccess() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["CI"] != nil,
-                      "跳过：CI 环境下 UIApplication.shared.open 可能不可用")
+        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil
+                          || ProcessInfo.processInfo.environment["CI"] != nil,
+                      "跳过：模拟器/CI 环境下 UIApplication.shared.open 可能不可用")
         let result = try await createTool.execute(arguments: [
             "name": "TestOpenURL",
             "action": "open_url",
@@ -267,8 +268,9 @@ final class ShortcutsToolTests: XCTestCase {
 
     /// show_text 动作成功路径：应返回创建成功消息
     func testCreateShowTextSuccess() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["CI"] != nil,
-                      "跳过：CI 环境下 UIApplication.shared.open 可能不可用")
+        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil
+                          || ProcessInfo.processInfo.environment["CI"] != nil,
+                      "跳过：模拟器/CI 环境下 UIApplication.shared.open 可能不可用")
         let result = try await createTool.execute(arguments: [
             "name": "TestShowText",
             "action": "show_text",
@@ -279,8 +281,9 @@ final class ShortcutsToolTests: XCTestCase {
 
     /// copy_to_clipboard 动作成功路径：应返回创建成功消息
     func testCreateCopyToClipboardSuccess() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["CI"] != nil,
-                      "跳过：CI 环境下 UIApplication.shared.open 可能不可用")
+        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil
+                          || ProcessInfo.processInfo.environment["CI"] != nil,
+                      "跳过：模拟器/CI 环境下 UIApplication.shared.open 可能不可用")
         let result = try await createTool.execute(arguments: [
             "name": "TestCopy",
             "action": "copy_to_clipboard",

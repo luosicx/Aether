@@ -26,13 +26,27 @@
 #   `*~crash` / `*~timeout` 例外：它们锚的是"归因随机"这件事，不是某条用例，所以只在该类第一次
 #   出现该形态失败时加，加了就要去查那个崩溃/那次超时；类里真正要修的用例仍按精确条目记，别
 #   指望形态豁免替你记账。超时豁免目前只给 UI job：XCUITest 冷启动 app 要 60-80s，120s
-#   allowance 正好压在临界值上，哪条越线每轮随机（四轮换了 5 个受害者）；单测 job 的超时受害者
-#   是稳定的（ContactsTool/NativeEngines/AlarmTool 那几族每轮同一批），仍逐条记，不用豁免。
-#   第七轮验证了这个判断：iOS 冒出该类的第 9 个超时方法（前 8 个七轮全复现），闸门如实判红 1 条，
-#   按精确条目补锚即可——单测 job 的超时是"具体某条用例越线"，不是"归因随机"，不该用形态豁免盖掉。
+#   allowance 正好压在临界值上，哪条越线每轮随机（四轮换了 5 个受害者）；单测 job 的超时逐条记，
+#   不用豁免。第九轮（main@5090a91）把这条判断换成了更根本的解释——单测超时不是"归因随机"，
+#   是"耗时压在 60s allowance 临界值上"，而这些耗时本该在 CI 里根本不发生：
+#   - ShortcutsToolTests 换受害者：testCreateCopyToClipboardSuccess 十轮里飘 5 次，
+#     testCreateOpenUrlSuccess 首次越线；该类三处 testCreate*Success 真实耗时在 4.5–58.7s
+#     之间波动（同一轮 testCreateShowTextSuccess 16.1s），越不过去纯属运气。
+#   - RateLimiterTests 两条 61 秒真实等待，在 iOS 和 macOS 两边都必然越线。
+#   共同根因是 `environment["CI"]` 守卫读不到东西：GitHub Actions 的 CI 变量不传进测试进程
+#   （macOS 侧的证据是 .github/macos-test-durations.json 里 RateLimiterTests 仍记着 132.5s，
+#   两条 61 秒等待确实在跑），模拟器里唯一有效的信号是同 target 用了 60 多处的
+#   `SIMULATOR_DEVICE_NAME != nil`（该轮 Location/Contacts/Alarm 分别 skipped 22/15/18 条）。
+#   所以本轮删掉 5 条锚点而不是再加豁免：设备相关的 ShortcutsToolTests 3 处按既有写法补上
+#   模拟器条件；wall-clock 依赖的 RateLimiterTests 2 条改用 `RateLimiter.acquireChat(now:)`
+#   时间接缝，回拨 61 秒代替真实等待，iOS/macOS 两边都能跑而且不再超时。
+#   剩下 NativeEngines/WhisperASR/MLXVision 那一批超时锚点同源于产品侧——NativeASREngine 的
+#   SFSpeechRecognizer.requestAuthorization 在模拟器上不回调，NativeTTSEngine 的 CI stub
+#   同样失效。改这些要动产品行为，另开 PR 单独评估。
 # - 证据：main@7ccc5ac + PR #56 的 f71be62 / ea16a7e / 4183bd6 / 153b8a8 / bb3b793 / f74e07a 共七轮 run
 #   （产品代码完全相同，只有本基线文件在变）的全部 test job 日志与后六轮闸门自身的 NEW FAILURE
-#   明细；
+#   明细；再加 #56 落地后的 main@632e087、#57 的 9147076、main@5090a91 三轮 iOS job 日志——
+#   上面那条"耗时压在 allowance 临界值"的判断就来自这十轮的逐方法耗时矩阵；
 #   收录门槛是跨轮复现 >=2 次，或确定性断言失败（1 次也收），或已出现在闸门明细/上一版基线里。
 #   XCUITest 的 `Failed to terminate/launch com.aether.app.ios` 属 XCUITest runner 噪声、
 #   xcresult 不计失败，不收。
@@ -104,8 +118,6 @@ macOS:PlaceholderEnginesTests/testClonedVoiceEquality
 macOS:PluginManagerTests/testManifestCodablePreservesParametersSchema
 macOS:PreferenceExtractorTests/testParsePreferencesMissingRequiredFields
 macOS:PreferenceExtractorTests/testParsePreferencesTypeMismatch
-macOS:RateLimiterTests/testRefillAfter60SecondsResetsTokens
-macOS:RateLimiterTests/testRefillResetsBothChatAndEmbedTokens
 macOS:ReminderToolTests/testExecuteDateNotStringIsIgnored
 macOS:ReminderToolTests/testExecuteInvalidDateFormatSlashSeparator
 macOS:SSETransportTests/testHandleSSEEventSameOriginEndpointAccepted
@@ -164,15 +176,12 @@ iOS:PlaceholderEnginesTests/testClonedVoiceEquality
 iOS:PluginManagerTests/testManifestCodablePreservesParametersSchema
 iOS:PreferenceExtractorTests/testParsePreferencesMissingRequiredFields
 iOS:PreferenceExtractorTests/testParsePreferencesTypeMismatch
-iOS:RateLimiterTests/testRefillAfter60SecondsResetsTokens
-iOS:RateLimiterTests/testRefillResetsBothChatAndEmbedTokens
 iOS:ReminderToolTests/testExecuteInvalidDateFormatSlashSeparator
 iOS:SSETransportTests/testHandleSSEEventSameOriginEndpointAccepted
 iOS:SSETransportTests/testSendWithHTTPErrorStatusCodeThrowsTransportError
 iOS:SemanticMemoryStoreTests/testRetrieveRelevantMemoriesDefaultLimit
 iOS:SemanticMemoryStoreTests/testRetrieveRelevantMemoriesRespectsLimit
 iOS:SettingsViewTests/testSettingsSectionAllCasesCount
-iOS:ShortcutsToolTests/testCreateCopyToClipboardSuccess
 iOS:ToolRegistryTests/testAllToolDefsCount
 iOS:VoiceServiceTests/*~crash
 iOS:WhisperASREngineTests/testTranscribeCIEnvironmentThrowsOrReturns
