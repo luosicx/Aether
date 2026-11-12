@@ -98,10 +98,11 @@
 #     （ToolRegistry.swift:302）根本不抛，走的仍是成功分支，`isError` 恒为 false——那条断言
 #     从来没可能碰到 MCPServer 的 catch 分支。改成白名单放行一个未注册的工具，让
 #     `ToolRegistry.execute` 真抛 NSError，并把透传文案一起钉住。
-#   本地验证（-only-testing 那 4 个类，CI 同款 -test-timeouts-enabled + 30/60 allowance）。macOS：
+#   本地验证（CI 同款 -test-timeouts-enabled + 30/60 allowance，用 -only-testing 挑类跑）。macOS：
 #   EOF 补发落地前那轮还剩 SSETransportTests 8 tests 2 failures + MCPClientTests 28 tests 2 条断言
 #   失败；补发之后 132 tests 0 failures，5 条锚点方法 0.001–0.241s 全过，新增端口用例 0.021s。
-#   iOS：同样 4 个类 80 tests 0 failures，5 条 0.001–0.155s、新端口用例 0.002s，日志里同样出现
+#   iOS：同样 4 个类 80 tests 0 failures，5 条 0.001–0.155s、新端口用例 0.002s；再把
+#   `AetherTests/MCP/` 整个目录 20 个类一起跑，259 tests 0 failures。两边日志里都出现
 #   `[MCPSecurity] 检测到 MCP endpoint 劫持尝试：SSE=http://localhost/sse, endpoint=http://localhost:9999/messages`
 #   ——两个平台都是"事件真的进到同源校验里、然后被端口口径拒掉"，不是靠丢事件蒙过断言。
 # - 证据：main@7ccc5ac + PR #56 的 f71be62 / ea16a7e / 4183bd6 / 153b8a8 / bb3b793 / f74e07a 共七轮 run
