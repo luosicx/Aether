@@ -36,7 +36,7 @@ final class AlarmTool: ToolProtocol, @unchecked Sendable {
         guard let date = formatter.date(from: time) else {
             return "错误：时间格式无效"
         }
-        let granted = try await eventStore.requestFullAccessToEvents()
+        let granted = await requestEventAccess(within: Self.authorizationDeadline)
         guard granted else { return "错误：无法访问日历" }
         let alarm = EKAlarm()
         let calendar = Calendar.current
@@ -50,5 +50,23 @@ final class AlarmTool: ToolProtocol, @unchecked Sendable {
         event.calendar = eventStore.defaultCalendarForNewEvents
         try eventStore.save(event, span: .thisEvent)
         return "已创建闹钟：\(label) 于 \(time)"
+    }
+
+    /// 日历授权回调窗口，与 ContactsTool、NativeASREngine 的授权窗口同量级。
+    private static let authorizationDeadline: TimeInterval = 5
+
+    /// 申请日历完整访问权限，回调在 `seconds` 内未触发时按未授权（false）收尾。
+    /// `EKEventStore.requestFullAccessToEvents` 的回调在无法应答系统弹窗的运行环境
+    /// （模拟器、无头 CI）里可能永不触发，无界 await 会把工具调用整条链挂死。
+    private func requestEventAccess(within seconds: TimeInterval) async -> Bool {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+            let once = ResumeOnceContinuation(continuation)
+            eventStore.requestFullAccessToEvents { granted, _ in
+                once.resume(returning: granted)
+            }
+            DispatchQueue.global().asyncAfter(deadline: .now() + seconds) {
+                once.resume(returning: false)
+            }
+        }
     }
 }

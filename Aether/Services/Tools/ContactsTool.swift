@@ -9,6 +9,8 @@ import AetherFoundation
 
 /// 通讯录搜索工具，通过 Contacts 框架按姓名或电话号码搜索联系人
 final class ContactsTool: ToolProtocol, @unchecked Sendable {
+    private let store = CNContactStore()
+
     /// 工具定义（name/description/parameters）
     var definition: ToolDefinition {
         ToolDefinition(
@@ -31,8 +33,7 @@ final class ContactsTool: ToolProtocol, @unchecked Sendable {
         guard let query = arguments["query"] as? String, !query.isEmpty else {
             return "错误：请提供搜索关键词"
         }
-        let store = CNContactStore()
-        let granted = try await store.requestAccess(for: .contacts)
+        let granted = try await requestContactAccess(within: Self.authorizationDeadline)
         guard granted else {
             return "通讯录权限未授权，请在设置中开启通讯录权限"
         }
@@ -76,5 +77,28 @@ final class ContactsTool: ToolProtocol, @unchecked Sendable {
             return "姓名：\(name)，电话：\(phones.isEmpty ? "无" : phones)"
         }
         return lines.joined(separator: "\n")
+    }
+
+    /// 通讯录授权回调窗口。真机上用户点掉系统弹窗是亚秒到数十秒，
+    /// 取 5 秒与端侧引擎的授权窗口同量级，越界即按未授权返回，不再挂住调用方。
+    private static let authorizationDeadline: TimeInterval = 5
+
+    /// 申请通讯录权限，回调在 `seconds` 内未触发时按未授权（false）收尾。
+    /// `CNContactStore.requestAccess` 的回调在无法呈现/应答系统弹窗的运行环境
+    /// （模拟器、无头 CI）里可能永不触发，无界 await 会把工具调用整条链挂死。
+    private func requestContactAccess(within seconds: TimeInterval) async throws -> Bool {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Bool, Error>) in
+            let once = ResumeOnceContinuation(continuation)
+            store.requestAccess(for: .contacts) { granted, error in
+                if let error {
+                    once.resume(throwing: error)
+                } else {
+                    once.resume(returning: granted)
+                }
+            }
+            DispatchQueue.global().asyncAfter(deadline: .now() + seconds) {
+                once.resume(returning: false)
+            }
+        }
     }
 }
