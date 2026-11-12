@@ -109,6 +109,47 @@
 #   exportedAt 与 invalidJSONWithCause，归本 PR 前半批）；两批合到同一分支后 iOS 与 macOS 各
 #   186 tests 0 failures。反向校验拿修复前那份 xcresult 配删完 26 条的新基线跑门，NEW FAILURE
 #   恰好 8 条 = 本族 4 个方法 + 前半批 4 个方法，一条不多一条不少。
+
+# - 系统权限族删 17 条（macOS 16 + iOS 1）：ContactsTool / AlarmTool / ReminderTool 三处 TCC 授权
+#   调用是无界 await（`store.requestAccess(for:)`、`requestFullAccessToEvents()`、
+#   `requestFullAccessToReminders()`），而授权弹窗在无人应答的运行环境里根本不会被点掉，回调
+#   永不触发。用例于是挂在 allowance 上，xcodebuild 只会打 "Restarting after unexpected exit,
+#   crash, or test timeout" 重启测试进程从头再来。证据是 run 43211714888（main@9bb6c73，
+#   即 #59 合入之后）的 `unit-tests-macos (1)` job：该 job 的 26 次重启里有 15 次停在
+#   ContactsToolTests 上，`Test Suite 'ContactsToolTests' started` 因此出现 16 次，最后一次
+#   直接 Executed 0 tests。日志里露过面的 35 个方法中，20 个不触碰授权的 passed，另外 15 个
+#   只有 started、没有任何结果行，且这 15 个全是 testExecute* 走进 requestAccess 的那些。
+#   该类在 .github/macos-test-durations.json 里记着 1053.2s（Alarm 792.9s、Reminder 146.3s 同源）。
+#   本地 macOS 也复现：改前跑到 `AlarmToolTests/testExecuteLatestTime` 就再无一行 passed 输出，
+#   所以这不是"CI 才有"的问题。
+#   三处都改成有界等待：沿用 #59 的 `ResumeOnceContinuation` + `DispatchQueue.global().asyncAfter`，
+#   窗口 5 秒，与 NativeASREngine 的授权窗口同量级，到点按未授权收尾，正好落进这三个工具本来就有的
+#   "通讯录权限未授权… / 错误：无法访问日历 / 错误：无法访问提醒事项" 分支——返回文案一字未改，
+#   改的只是"永不返回"变成"5 秒后返回未授权"。机制与 #59 那批不同：那批是端侧推理服务不交付结果，
+#   这批是系统授权弹窗无人应答；两者共同的口子是 production 里授权窗口该给多长，仍待产品定。
+#   用例侧配套：这三个类里原有 34 处 `XCTSkipIf(...)` 守卫，其中 27 处带
+#   `environment["CI"] != nil`——macOS 上读不到该变量，守卫从来不生效，正是它们把 macOS 挂死
+#   攒成了一整族锚点。按"这条断言到底需要什么"分流：
+#   - 只要求"返回权限提示 / 非空字符串 / 不崩"的守卫删掉（含 Alarm 里 7 处纯模拟器守卫——时间格式
+#     校验早已移到权限请求之前，"25:99""0830""08:30:00" 这些输入根本碰不到 EventKit），
+#     授权超时后走未授权分支，iOS 与 macOS 都有确定结果；
+#   - 确实需要真授权的 3 处（闹钟创建成功 2 条、通讯录结果格式 1 条）换成前置条件跳过：
+#     工具自述未授权、或 requestAccess 直接抛错时 XCTSkip，理由写明"本机未授予权限"，
+#     而不是用一个读不到的环境变量把整类吞掉。
+#   ReminderToolTests 那条锚点还另有一个用例 bug：`testExecuteInvalidDateFormatSlashSeparator`
+#   的输入其实是连字符日期 "2026-01-15 10:30"（合法），名字和注释却声称"斜杠分隔应返回格式错误"。
+#   两头都不成立——连字符能解析，斜杠同样能解析（DateFormatter 对数字字段之间的分隔符是宽松匹配，
+#   实测确认），实现从来没拒绝过斜杠。改名 `testExecuteValidDatePassesFormatGuard`，断言
+#   "合法日期不会被格式守卫拒绝"，不再宣称一个不存在的约束。
+#   本地验证（与 CI 同款 -test-timeouts-enabled YES + 30/60 allowance）：macOS 与 iOS 三个类
+#   都是 102 条 = 99 passed + 3 skipped + 0 failed，分别是 133.4s / 156.6s。按耗时拆开看，
+#   两平台完全同形：77 条亚秒通过（只碰 definition 和参数校验，根本不进 TCC）、21 条各跑满
+#   一个 5 秒窗口后按未授权通过、1 条调了两次工具跑满两个（10.0s）、3 条 skip 前也各跑满
+#   一个窗口（5.025/5.038/5.026s）——窗口按授权调用计、不按用例计，真正付出去是 26 次 × 5 秒。
+#   走到授权阶段的 25 条在 iOS 侧改前全部被 `SIMULATOR_DEVICE_NAME` 守卫吞掉（上面第 9 轮记的
+#   Alarm/Contacts skipped 18/15 条就是它们），到这里才第一次真的执行；代价是那一轮多出约
+#   2 分钟的窗口等待。
+
 # - 证据：main@7ccc5ac + PR #56 的 f71be62 / ea16a7e / 4183bd6 / 153b8a8 / bb3b793 / f74e07a 共七轮 run
 #   （产品代码完全相同，只有本基线文件在变）的全部 test job 日志与后六轮闸门自身的 NEW FAILURE
 #   明细；再加 #56 落地后的 main@632e087、#57 的 9147076、main@5090a91 三轮 iOS job 日志——
@@ -141,23 +182,9 @@ macOS:AgentOrchestratorTests/testMultiAgent*
 macOS:AgentPerformanceBaselineTests/testComplexDAGExecutionTime
 macOS:AgentPerformanceBaselineTests/testMediumDAGExecutionTime
 macOS:AgentPerformanceBaselineTests/testSimpleDAGExecutionTime
-macOS:AlarmToolTests/testExecuteLatest*
-macOS:AlarmToolTests/testExecuteMidnight*
-macOS:AlarmToolTests/testExecuteSingleDigitHourTimeFormat
-macOS:AlarmToolTests/testExecuteValid*
 macOS:ChatViewModelTests/testToggleVoice*
 macOS:ChatViewModelToolSecurityTests/testReadClipboardUnauthorizedDoesNotExecute
 macOS:CheckpointManagerTests/testCheckpointSupportsIdempotentResume
-macOS:ContactsToolTests/testExecuteChinese*
-macOS:ContactsToolTests/testExecuteCoversEnumerateContactsPath
-macOS:ContactsToolTests/testExecuteEnglish*
-macOS:ContactsToolTests/testExecuteLongQueryPassesGuard
-macOS:ContactsToolTests/testExecuteMultipleCallsCoverEnumerateContacts
-macOS:ContactsToolTests/testExecutePhone*
-macOS:ContactsToolTests/testExecuteReal*
-macOS:ContactsToolTests/testExecuteReturnsString
-macOS:ContactsToolTests/testExecuteSpecial*
-macOS:ContactsToolTests/testExecuteWhitespaceQueryPassesGuard
 macOS:DAGExecutionEngineMultiAgentTests/testAssignedRoleRoutingUsesCorrectSystemPrompt
 macOS:DAGExecutionEngineMultiAgentTests/testCrossAgentDelegationViaMessageBus
 macOS:DAGExecutionEngineMultiAgentTests/testDAGEngineWithNilMessageBusFallsBackToSingleAgent
@@ -171,8 +198,6 @@ macOS:MCPClientTests/testSSEEndpointHijackIsRejected
 macOS:MCPDiscoveryServiceTests/testBackgroundScanPaused
 macOS:MCPServerTests/testToolsCallExecutionErrorReturnsIsError
 macOS:OnDeviceModelDownloaderTests/testDeleteModelWhenRemoveItemFails
-macOS:ReminderToolTests/testExecuteDateNotStringIsIgnored
-macOS:ReminderToolTests/testExecuteInvalidDateFormatSlashSeparator
 macOS:SSETransportTests/testHandleSSEEventSameOriginEndpointAccepted
 macOS:SSETransportTests/testSendWithHTTPErrorStatusCodeThrowsTransportError
 macOS:SystemControlToolTests/testExecuteGet*
@@ -208,7 +233,6 @@ iOS:MCPClientTests/testSSEEndpointHijackIsRejected
 iOS:MCPDiscoveryServiceTests/testBackgroundScanPaused
 iOS:MCPServerTests/testToolsCallExecutionErrorReturnsIsError
 iOS:OnDeviceModelDownloaderTests/testDeleteModelWhenRemoveItemFails
-iOS:ReminderToolTests/testExecuteInvalidDateFormatSlashSeparator
 iOS:SSETransportTests/testHandleSSEEventSameOriginEndpointAccepted
 iOS:SSETransportTests/testSendWithHTTPErrorStatusCodeThrowsTransportError
 iOS:VoiceServiceTests/*~crash

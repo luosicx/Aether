@@ -40,7 +40,7 @@ final class ReminderTool: ToolProtocol, @unchecked Sendable {
             }
             parsedDate = date
         }
-        let granted = try await eventStore.requestFullAccessToReminders()
+        let granted = await requestReminderAccess(within: Self.authorizationDeadline)
         guard granted else { return "错误：无法访问提醒事项" }
         let reminder = EKReminder(eventStore: eventStore)
         reminder.title = title
@@ -52,5 +52,23 @@ final class ReminderTool: ToolProtocol, @unchecked Sendable {
         reminder.calendar = eventStore.defaultCalendarForNewReminders()
         try eventStore.save(reminder, commit: true)
         return "已创建提醒：\(title)"
+    }
+
+    /// 提醒事项授权回调窗口，与 AlarmTool、ContactsTool 的授权窗口同量级。
+    private static let authorizationDeadline: TimeInterval = 5
+
+    /// 申请提醒事项完整访问权限，回调在 `seconds` 内未触发时按未授权（false）收尾。
+    /// `EKEventStore.requestFullAccessToReminders` 的回调在无法应答系统弹窗的运行环境
+    /// （模拟器、无头 CI）里可能永不触发，无界 await 会把工具调用整条链挂死。
+    private func requestReminderAccess(within seconds: TimeInterval) async -> Bool {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+            let once = ResumeOnceContinuation(continuation)
+            eventStore.requestFullAccessToReminders { granted, _ in
+                once.resume(returning: granted)
+            }
+            DispatchQueue.global().asyncAfter(deadline: .now() + seconds) {
+                once.resume(returning: false)
+            }
+        }
     }
 }

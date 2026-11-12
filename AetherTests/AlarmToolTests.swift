@@ -2,7 +2,7 @@ import XCTest
 @testable import Aether
 
 /// AlarmTool 单元测试
-/// 注：不测真实 EventKit 保存（避免权限依赖）
+/// 注：格式校验分支不触及 EventKit；只有需要真实日历授权的用例按授权结果决定是否跳过
 final class AlarmToolTests: XCTestCase {
     private let tool = AlarmTool()
 
@@ -25,12 +25,8 @@ final class AlarmToolTests: XCTestCase {
     }
 
     /// time = "25:99" 应返回错误字符串
-    /// 注：execute 在时间格式校验之前会先请求 EventKit 权限：
-    ///   - 权限拒绝 → 返回 "错误：无法访问日历"
-    ///   - 权限授予 → "25:99" 格式无效 → 返回 "错误：时间格式无效"
-    /// 两种情况均为错误字符串，故断言结果以 "错误" 开头
+    /// 实现在权限请求之前先做格式校验，无效时间不触及 EventKit，两端都能直接跑
     func testExecuteInvalidTimeFormat() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil, "跳过：模拟器环境下 EventKit 权限请求挂起")
         var result = ""
         do {
             result = try await tool.execute(arguments: ["time": "25:99"])
@@ -78,12 +74,10 @@ final class AlarmToolTests: XCTestCase {
         XCTAssertTrue(desc?.contains("HH:mm") == true, "time description 应含格式提示 HH:mm")
     }
 
-    // MARK: - 时间格式验证（EventKit 权限在 time guard 之前，模拟器可能挂起，跳过）
+    // MARK: - 时间格式验证（校验在权限请求之前，不触及 EventKit）
 
     /// time 缺少冒号分隔符 "0830" 应返回错误
     func testExecuteInvalidTimeNoColon() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil,
-                      "跳过：模拟器环境下 EventKit 权限请求挂起")
         var result = ""
         do {
             result = try await tool.execute(arguments: ["time": "0830"])
@@ -95,8 +89,6 @@ final class AlarmToolTests: XCTestCase {
 
     /// time 小时越界 "25:30" 应返回错误
     func testExecuteInvalidTimeHourOutOfRange() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil,
-                      "跳过：模拟器环境下 EventKit 权限请求挂起")
         var result = ""
         do {
             result = try await tool.execute(arguments: ["time": "25:30"])
@@ -108,8 +100,6 @@ final class AlarmToolTests: XCTestCase {
 
     /// time 分钟越界 "08:60" 应返回错误
     func testExecuteInvalidTimeMinuteOutOfRange() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil,
-                      "跳过：模拟器环境下 EventKit 权限请求挂起")
         var result = ""
         do {
             result = try await tool.execute(arguments: ["time": "08:60"])
@@ -121,8 +111,6 @@ final class AlarmToolTests: XCTestCase {
 
     /// time 非数字 "abc" 应返回错误
     func testExecuteInvalidTimeNonNumeric() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil,
-                      "跳过：模拟器环境下 EventKit 权限请求挂起")
         var result = ""
         do {
             result = try await tool.execute(arguments: ["time": "abc"])
@@ -134,8 +122,6 @@ final class AlarmToolTests: XCTestCase {
 
     /// time 为空字符串 "" 应返回错误
     func testExecuteEmptyTimeString() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil,
-                      "跳过：模拟器环境下 EventKit 权限请求挂起")
         var result = ""
         do {
             result = try await tool.execute(arguments: ["time": ""])
@@ -253,31 +239,29 @@ final class AlarmToolTests: XCTestCase {
                        "Dictionary 类型 time 应返回参数错误")
     }
 
-    // MARK: - EventKit 权限依赖路径（模拟器跳过）
+    // MARK: - EventKit 权限依赖路径
 
-    /// 有效时间格式 "08:30" + 默认 label：应返回成功（需 EventKit 权限）
+    /// 有效时间格式 "08:30" + 默认 label：已授予日历权限时应返回成功
     func testExecuteValidTimeWithDefaultLabel() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
-                      "跳过：模拟器/CI 环境下 EventKit 权限请求挂起")
         let result = try await tool.execute(arguments: ["time": "08:30"])
+        // 授权对话框在无头环境（模拟器/CI）里无法应答，工具会走未授权分支；
+        // 这条用例验证的是创建成功分支，所以按工具自述的授权结果决定是否跳过。
+        try XCTSkipIf(result == "错误：无法访问日历", "跳过：本机未授予日历权限")
         XCTAssertTrue(result.contains("已创建闹钟"), "有效时间应创建成功，实际：\(result)")
         XCTAssertTrue(result.contains("08:30"), "结果应含时间")
         XCTAssertTrue(result.contains("闹钟"), "默认 label 应为 '闹钟'")
     }
 
-    /// 有效时间格式 + 自定义 label：应返回成功且含自定义 label
+    /// 有效时间格式 + 自定义 label：已授予日历权限时应返回成功且含自定义 label
     func testExecuteValidTimeWithCustomLabel() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
-                      "跳过：模拟器/CI 环境下 EventKit 权限请求挂起")
         let result = try await tool.execute(arguments: ["time": "09:00", "label": "起床"])
+        try XCTSkipIf(result == "错误：无法访问日历", "跳过：本机未授予日历权限")
         XCTAssertTrue(result.contains("已创建闹钟"), "有效时间应创建成功")
         XCTAssertTrue(result.contains("起床"), "结果应含自定义 label '起床'")
     }
 
     /// 有效时间格式 "00:00"（午夜）：应返回成功
     func testExecuteMidnightTime() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
-                      "跳过：模拟器/CI 环境下 EventKit 权限请求挂起")
         let result = try await tool.execute(arguments: ["time": "00:00"])
         XCTAssertTrue(result.contains("已创建闹钟") || result.hasPrefix("错误"),
                       "午夜时间应返回成功或错误，实际：\(result)")
@@ -285,8 +269,6 @@ final class AlarmToolTests: XCTestCase {
 
     /// 有效时间格式 "23:59"（最晚时间）：应返回成功
     func testExecuteLatestTime() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
-                      "跳过：模拟器/CI 环境下 EventKit 权限请求挂起")
         let result = try await tool.execute(arguments: ["time": "23:59"])
         XCTAssertTrue(result.contains("已创建闹钟") || result.hasPrefix("错误"),
                       "最晚时间应返回成功或错误，实际：\(result)")
@@ -325,8 +307,6 @@ final class AlarmToolTests: XCTestCase {
 
     /// time 为单数字小时 "8:30"：通过 as? String，但 DateFormatter 可能解析失败，需权限后校验
     func testExecuteSingleDigitHourTimeFormat() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
-                      "跳过：模拟器/CI 环境下 EventKit 权限请求挂起")
         let result = try await tool.execute(arguments: ["time": "8:30"])
         XCTAssertTrue(result.contains("已创建闹钟") || result.hasPrefix("错误"),
                       "单数字小时时间应返回成功或错误，实际：\(result)")
@@ -334,8 +314,6 @@ final class AlarmToolTests: XCTestCase {
 
     /// time 含秒 "08:30:00"：DateFormatter 按 HH:mm 解析应失败
     func testExecuteTimeWithSecondsReturnsError() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil,
-                      "跳过：模拟器环境下 EventKit 权限请求挂起")
         let result = try await tool.execute(arguments: ["time": "08:30:00"])
         XCTAssertTrue(result.hasPrefix("错误"), "含秒时间应返回错误，实际：\(result)")
     }
@@ -403,12 +381,9 @@ final class AlarmToolTests: XCTestCase {
     // MARK: - 新代码覆盖率：权限请求路径（有效时间到达 requestFullAccessToEvents）
 
     /// 有效时间 "08:30" 应通过格式校验并到达权限请求阶段。
-    /// 新代码将时间校验移至权限请求之前，有效时间会触发 requestFullAccessToEvents。
-    /// 权限授予 → "已创建闹钟：..."；权限拒绝 → "错误：无法访问日历"。
-    /// 模拟器/CI 跳过：EventKit 权限请求弹窗无法在自动化环境关闭。
+    /// 时间校验在权限请求之前，有效时间会触发 requestFullAccessToEvents；
+    /// 权限授予 → "已创建闹钟：..."；权限拒绝或授权回调超时 → "错误：无法访问日历"。
     func testExecuteValidTimeReachesPermissionRequestNoSkip() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
-                      "跳过：模拟器/CI 环境下 EventKit 权限请求挂起")
         let result = try await tool.execute(arguments: ["time": "08:30"])
         XCTAssertTrue(result.contains("已创建闹钟") || result == "错误：无法访问日历",
                       "有效时间应返回成功或权限拒绝，实际：\(result)")
@@ -417,8 +392,6 @@ final class AlarmToolTests: XCTestCase {
     /// 有效时间 + 自定义 label 应到达权限请求阶段。
     /// 覆盖 requestFullAccessToEvents 和 guard granted 分支。
     func testExecuteValidTimeWithLabelReachesPermissionNoSkip() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
-                      "跳过：模拟器/CI 环境下 EventKit 权限请求挂起")
         let result = try await tool.execute(arguments: ["time": "10:30", "label": "测试闹钟"])
         XCTAssertTrue(result.contains("已创建闹钟") || result == "错误：无法访问日历",
                       "有效时间+label 应返回成功或权限拒绝，实际：\(result)")
@@ -426,8 +399,6 @@ final class AlarmToolTests: XCTestCase {
 
     /// 有效时间 "00:00"（午夜）应到达权限请求阶段。
     func testExecuteMidnightReachesPermissionRequestNoSkip() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
-                      "跳过：模拟器/CI 环境下 EventKit 权限请求挂起")
         let result = try await tool.execute(arguments: ["time": "00:00"])
         XCTAssertTrue(result.contains("已创建闹钟") || result == "错误：无法访问日历",
                       "午夜时间应返回成功或权限拒绝，实际：\(result)")
@@ -435,8 +406,6 @@ final class AlarmToolTests: XCTestCase {
 
     /// 有效时间 "23:59"（最晚时间）应到达权限请求阶段。
     func testExecuteLatestTimeReachesPermissionRequestNoSkip() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
-                      "跳过：模拟器/CI 环境下 EventKit 权限请求挂起")
         let result = try await tool.execute(arguments: ["time": "23:59"])
         XCTAssertTrue(result.contains("已创建闹钟") || result == "错误：无法访问日历",
                       "最晚时间应返回成功或权限拒绝，实际：\(result)")
@@ -444,8 +413,6 @@ final class AlarmToolTests: XCTestCase {
 
     /// 有效时间 + 空 label 应使用默认值 "闹钟" 并到达权限请求阶段。
     func testExecuteValidTimeWithEmptyLabelReachesPermissionNoSkip() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
-                      "跳过：模拟器/CI 环境下 EventKit 权限请求挂起")
         let result = try await tool.execute(arguments: ["time": "14:00", "label": ""])
         XCTAssertTrue(result.contains("已创建闹钟") || result == "错误：无法访问日历",
                       "有效时间+空label 应返回成功或权限拒绝，实际：\(result)")
@@ -454,8 +421,6 @@ final class AlarmToolTests: XCTestCase {
     /// 权限拒绝路径验证：有效时间应返回 "错误：无法访问日历" 或成功消息。
     /// 若权限被拒绝，结果精确匹配 "错误：无法访问日历"，覆盖 guard granted else 分支。
     func testExecuteValidTimePermissionDeniedReturnsExactError() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
-                      "跳过：模拟器/CI 环境下 EventKit 权限请求挂起")
         let result = try await tool.execute(arguments: ["time": "15:45"])
         if result == "错误：无法访问日历" {
             // 权限拒绝路径：覆盖 guard granted else { return "错误：无法访问日历" }
