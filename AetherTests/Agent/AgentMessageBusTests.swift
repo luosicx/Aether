@@ -143,13 +143,15 @@ final class AgentMessageBusTests: XCTestCase {
         let count0 = await bus.subscriberCount(topic: topic)
         XCTAssertEqual(count0, 0)
 
-        _ = await bus.subscribe(topic: topic)
+        let stream1 = await bus.subscribe(topic: topic)
         let count1 = await bus.subscriberCount(topic: topic)
         XCTAssertEqual(count1, 1)
 
-        _ = await bus.subscribe(topic: topic)
+        let stream2 = await bus.subscribe(topic: topic)
         let count2 = await bus.subscriberCount(topic: topic)
         XCTAssertEqual(count2, 2)
+        // AsyncStream 一释放就会经 onTermination 异步移除订阅者，订阅必须活到断言之后
+        withExtendedLifetime((stream1, stream2)) {}
     }
 
     /// 未使用的 topic 计数应为 0
@@ -165,8 +167,8 @@ final class AgentMessageBusTests: XCTestCase {
     func testResetClearsAllSubscribers() async throws {
         let bus = AgentMessageBus()
 
-        _ = await bus.subscribe(topic: "topic.A")
-        _ = await bus.subscribe(topic: "topic.B")
+        let streamA = await bus.subscribe(topic: "topic.A")
+        let streamB = await bus.subscribe(topic: "topic.B")
 
         let countA1 = await bus.subscriberCount(topic: "topic.A")
         XCTAssertEqual(countA1, 1)
@@ -179,6 +181,7 @@ final class AgentMessageBusTests: XCTestCase {
         XCTAssertEqual(countA0, 0)
         let countB0 = await bus.subscriberCount(topic: "topic.B")
         XCTAssertEqual(countB0, 0)
+        withExtendedLifetime((streamA, streamB)) {}
     }
 
     // MARK: - AgentMessage 类型
@@ -309,9 +312,11 @@ final class AgentMessageBusTests: XCTestCase {
         let bus = AgentMessageBus()
         let topic = "test.afterReset"
 
-        _ = await bus.subscribe(topic: topic)
+        let streamBeforeReset = await bus.subscribe(topic: topic)
         let countBeforeReset = await bus.subscriberCount(topic: topic)
         XCTAssertEqual(countBeforeReset, 1)
+        // 同理：订阅要活过第一个计数断言，否则释放触发的异步移除会把它变成 0
+        withExtendedLifetime(streamBeforeReset) {}
 
         await bus.reset()
         let countAfterReset = await bus.subscriberCount(topic: topic)
