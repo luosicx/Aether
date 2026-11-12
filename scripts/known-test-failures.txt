@@ -55,7 +55,6 @@ UI:GestureUITests/testDragReorderEditMode
 UI:MCPSettingsUITests/testDeleteMCPServer
 
 # ---- macOS（unit-tests-macos 两个分片共用同一 label）----
-macOS:AgentMessageBusTests/testSubscriberCount
 macOS:AgentOrchestratorTests/*~crash
 macOS:AgentOrchestratorTests/testExecuteAllParallelSubTasks
 macOS:AgentOrchestratorTests/testExecuteNextSubTaskFailureThrows
@@ -129,9 +128,6 @@ macOS:WhisperASREngineTests/testTranscribeValidAudioFileReturnsWhisperPrefix
 macOS:WorkflowEngineTests/testWorkflowFromInvalidJSON
 
 # ---- iOS（unit-tests job）----
-iOS:AgentMessageBusTests/testPublishAfterResetStillWorks
-iOS:AgentMessageBusTests/testResetClearsAllSubscribers
-iOS:AgentMessageBusTests/testSubscriberCount
 iOS:AgentOrchestratorTests/*~crash
 iOS:AgentOrchestratorTests/testExecuteAllParallelSubTasks
 iOS:AgentOrchestratorTests/testExecuteNextSubTaskFailureThrows
