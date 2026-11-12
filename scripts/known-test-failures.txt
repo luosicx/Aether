@@ -97,7 +97,8 @@
 #   "合法日期不会被格式守卫拒绝"，不再宣称一个不存在的约束。
 #   本地验证（与 CI 同款 -test-timeouts-enabled YES + 30/60 allowance）：macOS 与 iOS 三个类
 #   都是 102 条 = 99 passed + 3 skipped + 0 failed，分别是 133.4s / 156.6s；三条 skip 各占
-#   5.0s 即授权窗口跑满，另有 21 条同样跑满窗口后按未授权通过。走到授权阶段的 24 条在 iOS 侧
+#   5.0s 即授权窗口跑满；另有 22 条按未授权通过，21 条各跑满一个窗口，调用两次工具的那条
+#   跑满两个（10.0s）——窗口按调用计，不按用例计。走到授权阶段的这 24 条在 iOS 侧
 #   改前全部被 `SIMULATOR_DEVICE_NAME` 守卫跳过（main@5090a91 那轮 iOS job 记着 Alarm/Contacts
 #   分别 skipped 18/15 条），到这里才真的执行；代价是 iOS 那一轮多出约 2 分钟的窗口等待。
 
