@@ -99,25 +99,62 @@ public final class NativeVisionEngine: VisionInferenceEngine, @unchecked Sendabl
 
     // MARK: - 子任务
 
-    /// 单个 Vision 请求的兜底窗口。`VNImageRequestHandler.perform` 的 completion
-    /// 在没有视觉服务的运行环境（如模拟器）里可能永不触发，无界 continuation 会把整条
-    /// `describe` 挂死；到点用同一个 `ResumeOnceContinuation` 以空结果收尾。
-    /// 五个子请求并发执行，故总耗时约等于该窗口而非五倍。
+    /// 单个 Vision 请求的兜底窗口。
     private static let requestDeadline: TimeInterval = 10
 
-    private func scheduleDeadline<Value: Sendable>(_ once: ResumeOnceContinuation<Value, Never>,
-                                                   _ fallback: Value) {
-        let seconds = Self.requestDeadline
-        DispatchQueue.global().asyncAfter(deadline: .now() + seconds) {
-            once.resume(returning: fallback)
+    /// Vision 请求的执行队列。
+    ///
+    /// `VNImageRequestHandler.perform` 是同步阻塞调用，不能留在 Swift 协作线程池上：
+    /// `describe` 用五个 `async let` 并发发起请求，runner 的协作池只有与核数等量的线程，
+    /// 请求一挂死整个池就被抽干，连兜底分支的 `resume` 都排不上线程，10 秒窗口形同不存在
+    /// （CI 上正是如此：加了兜底之后 `testDescribe*` 仍照样越满 60 秒）。
+    /// 挪到独立执行队列后，挂死只消耗该队列的工作线程，等待方仍能被兜底放行。
+    /// 这里用 `maxConcurrentOperationCount = 5` 而不是并发 DispatchQueue：挂死的 perform
+    /// 永远不会交还线程，设上限才能保证最坏只占住 5 条，而不是每调一次 `describe` 再泄漏 5 条。
+    private static let workQueue: OperationQueue = {
+        let queue = OperationQueue()
+        queue.name = "com.aether.NativeVisionEngine.perform"
+        queue.maxConcurrentOperationCount = 5
+        queue.qualityOfService = .userInitiated
+        return queue
+    }()
+
+    /// CGImage 未标注 Sendable，但不可变，且每个 box 只被一个队列读取一次。
+    private struct ImageBox: @unchecked Sendable {
+        let image: CGImage
+    }
+
+    /// 在执行队列上跑一个 Vision 请求，超时则以 `fallback` 收尾。
+    /// completion handler、超时兜底与 `perform` 抛错三条路径共用同一个
+    /// `ResumeOnceContinuation`，谁先到谁生效。
+    private func performWithDeadline<Value: Sendable>(
+        _ image: CGImage,
+        fallback: Value,
+        makeRequest: @escaping @Sendable (ResumeOnceContinuation<Value, Never>) -> VNRequest
+    ) async -> Value {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Value, Never>) in
+            let once = ResumeOnceContinuation(continuation)
+            let seconds = Self.requestDeadline
+            DispatchQueue.global().asyncAfter(deadline: .now() + seconds) {
+                once.resume(returning: fallback)
+            }
+            let box = ImageBox(image: image)
+            Self.workQueue.addOperation {
+                let request = makeRequest(once)
+                let handler = VNImageRequestHandler(cgImage: box.image)
+                do {
+                    try handler.perform([request])
+                } catch {
+                    once.resume(returning: fallback)
+                }
+            }
         }
     }
 
     /// 图像分类（VNClassifyImageRequest）
     private func classifyImage(_ image: CGImage) async -> String {
-        await withCheckedContinuation { (continuation: CheckedContinuation<String, Never>) in
-            let once = ResumeOnceContinuation(continuation)
-            let request = VNClassifyImageRequest { request, error in
+        await performWithDeadline(image, fallback: "") { once in
+            VNClassifyImageRequest { request, error in
                 if error != nil {
                     once.resume(returning: "")
                     return
@@ -129,56 +166,32 @@ public final class NativeVisionEngine: VisionInferenceEngine, @unchecked Sendabl
                 }
                 once.resume(returning: top.joined(separator: " / "))
             }
-            scheduleDeadline(once, "")
-            let handler = VNImageRequestHandler(cgImage: image)
-            do {
-                try handler.perform([request])
-            } catch {
-                once.resume(returning: "")
-            }
         }
     }
 
     /// 人脸检测（VNDetectFaceRectanglesRequest）
     private func detectFaces(_ image: CGImage) async -> Int {
-        await withCheckedContinuation { (continuation: CheckedContinuation<Int, Never>) in
-            let once = ResumeOnceContinuation(continuation)
-            let request = VNDetectFaceRectanglesRequest { request, _ in
+        await performWithDeadline(image, fallback: 0) { once in
+            VNDetectFaceRectanglesRequest { request, _ in
                 let count = request.results?.count ?? 0
                 once.resume(returning: count)
-            }
-            scheduleDeadline(once, 0)
-            let handler = VNImageRequestHandler(cgImage: image)
-            do {
-                try handler.perform([request])
-            } catch {
-                once.resume(returning: 0)
             }
         }
     }
 
     /// 矩形检测（VNDetectRectanglesRequest）
     private func detectRectangles(_ image: CGImage) async -> Int {
-        await withCheckedContinuation { (continuation: CheckedContinuation<Int, Never>) in
-            let once = ResumeOnceContinuation(continuation)
-            let request = VNDetectRectanglesRequest { request, _ in
+        await performWithDeadline(image, fallback: 0) { once in
+            VNDetectRectanglesRequest { request, _ in
                 let count = request.results?.count ?? 0
                 once.resume(returning: count)
-            }
-            scheduleDeadline(once, 0)
-            let handler = VNImageRequestHandler(cgImage: image)
-            do {
-                try handler.perform([request])
-            } catch {
-                once.resume(returning: 0)
             }
         }
     }
 
     /// 文字识别（VNRecognizeTextRequest）
     private func recognizeTexts(_ image: CGImage) async -> [String] {
-        await withCheckedContinuation { (continuation: CheckedContinuation<[String], Never>) in
-            let once = ResumeOnceContinuation(continuation)
+        await performWithDeadline(image, fallback: []) { once in
             let request = VNRecognizeTextRequest { request, error in
                 if error != nil {
                     once.resume(returning: [])
@@ -190,31 +203,17 @@ public final class NativeVisionEngine: VisionInferenceEngine, @unchecked Sendabl
             }
             request.recognitionLevel = .accurate
             request.recognitionLanguages = ["zh-Hans", "en"]
-            scheduleDeadline(once, [])
-            let handler = VNImageRequestHandler(cgImage: image)
-            do {
-                try handler.perform([request])
-            } catch {
-                once.resume(returning: [])
-            }
+            return request
         }
     }
 
     /// 条码检测（VNDetectBarcodesRequest）
     private func detectBarcodes(_ image: CGImage) async -> [String] {
-        await withCheckedContinuation { (continuation: CheckedContinuation<[String], Never>) in
-            let once = ResumeOnceContinuation(continuation)
-            let request = VNDetectBarcodesRequest { request, _ in
+        await performWithDeadline(image, fallback: []) { once in
+            VNDetectBarcodesRequest { request, _ in
                 let observations = request.results as? [VNBarcodeObservation] ?? []
                 let payloads = observations.compactMap { $0.payloadStringValue }
                 once.resume(returning: payloads)
-            }
-            scheduleDeadline(once, [])
-            let handler = VNImageRequestHandler(cgImage: image)
-            do {
-                try handler.perform([request])
-            } catch {
-                once.resume(returning: [])
             }
         }
     }

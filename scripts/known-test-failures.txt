@@ -54,8 +54,14 @@
 #     `testTTSEngineSynthesizeWithVoiceId` 那条精确锚点就是这里来的：30 秒定长正好压在 allowance
 #     临界值上，偶尔越线、偶尔压线通过。
 #   - NativeVisionEngine：本地 1.3s 就正常返回，只有 CI runner 上挂死，故 5 个子请求各加 10 秒
-#     空结果兜底。这处的收益本地测不出来，只能由 CI 轮次验证——它同时也是生产侧的上界，
-#     原来没有任何东西兜住 perform 不返回的情况。
+#     空结果兜底。第一次只加窗口没用——`VNImageRequestHandler.perform` 是同步阻塞调用，
+#     `describe` 的五个 `async let` 把它留在 Swift 协作线程池上跑，runner 的池只有核数量级的
+#     线程，一挂死整个池被抽干，兜底的 resume 自己都排不上线程（PR #59 第一轮 CI 正是这样：
+#     iOS 9 条 + macOS 2 条 `exceeded 1 分钟`，窗口形同不存在）。真正的修法是 perform 挪到
+#     独立队列，且队列 `maxConcurrentOperationCount = 5`：挂死的 perform 永不交还线程，不设上限
+#     就变成了每调一次 `describe` 泄漏 5 条线程。这处的收益本地仍测不出来（本机 Vision 不挂），
+#     只能由 CI 轮次验证；但它同时也是生产侧的上界——一次 Vision 服务卡死原本会冻结整个 App 的
+#     async 工作，而不只是这一个请求。
 #   据此删 iOS 8 条 + macOS 7 条锚点。iOS 一侧由本地全量 run 验证（3193 passed / 36 failed，
 #   其中 35 条命中基线，多出的 1 条是 SemanticMemoryStoreTests 的本地偶发，单跑该类通过，按
 #   "复现 >=2 次才收"不收）；macOS 一侧本地只跑了这三个类（40 tests 0 failures、无 exceeded
