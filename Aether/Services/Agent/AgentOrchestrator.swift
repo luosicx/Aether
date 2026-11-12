@@ -23,14 +23,9 @@ final class AgentOrchestrator {
         case noActiveTask
         /// 没有可执行的子任务
         case noExecutableSubTask
-        /// 子任务执行失败，携带子任务 ID 与原因（向后兼容变体，不保留原始 Error 上下文）
-        case subTaskFailed(UUID, String)
-        /// 子任务执行失败，携带子任务 ID、原因与底层错误。
-        /// - Parameters:
-        ///   - id: 子任务 ID
-        ///   - reason: 用户可见的错误信息（通常为 `error.localizedDescription`）
-        ///   - underlying: 原始底层错误，保留用于诊断
-        case subTaskFailedWithCause(id: UUID, reason: String, underlying: Error)
+        /// 子任务执行失败，携带子任务 ID 与原因。`underlying` 保留原始底层错误用于诊断，
+        /// 没有时为 nil。
+        case subTaskFailed(UUID, String, underlying: Error? = nil)
         /// 审查未通过，携带子任务 ID 与原因
         case reviewFailed(UUID, String)
 
@@ -40,9 +35,7 @@ final class AgentOrchestrator {
                 return "当前没有正在执行的任务"
             case .noExecutableSubTask:
                 return "没有可执行的子任务"
-            case .subTaskFailed(let id, let reason):
-                return "子任务 \(id) 执行失败：\(reason)"
-            case .subTaskFailedWithCause(let id, let reason, _):
+            case .subTaskFailed(let id, let reason, _):
                 return "子任务 \(id) 执行失败：\(reason)"
             case .reviewFailed(let id, let reason):
                 return "子任务 \(id) 审查未通过：\(reason)"
@@ -650,8 +643,8 @@ final class AgentOrchestrator {
             // 执行失败：更新状态并持久化
             _ = task.updateSubTaskStatus(id: subTask.id, status: .failed, result: error.localizedDescription)
             try modelContext.save()
-            // P2-3: 携带 underlying 保留原始 Error 上下文
-            throw OrchestratorError.subTaskFailedWithCause(id: subTask.id, reason: error.localizedDescription, underlying: error)
+            // P2-3: underlying 保留原始错误用于诊断
+            throw OrchestratorError.subTaskFailed(subTask.id, error.localizedDescription, underlying: error)
         }
 
         // 更新结果并标记完成

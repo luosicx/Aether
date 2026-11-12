@@ -15,6 +15,7 @@ final class SemanticMemoryStoreTests: XCTestCase {
     private var stub: StubEmbeddingService!
     private var memoryService: MemoryService!
     private var store: SemanticMemoryStore!
+    private var vectorFactory: VectorStoreFactory!
 
     override func setUpWithError() throws {
         // 隔离 Keychain：使用内存后端
@@ -28,13 +29,22 @@ final class SemanticMemoryStoreTests: XCTestCase {
         context = ModelContext(container)
 
         stub = StubEmbeddingService()
-        memoryService = MemoryService(modelContext: context, embeddingService: stub)
-        store = SemanticMemoryStore(memoryService: memoryService)
+        // 隔离向量存储：VectorStoreFactory.shared 缓存的 store 会累积整个测试进程写过的向量，
+        // RecallEngine 的 ANN 候选窗口（top-20）被别的用例的向量占满后，本用例自己的记忆会被挤出
+        // 结果集，返回条数就取决于「谁先跑、谁跑了多少条」。
+        vectorFactory = VectorStoreFactory()
+        vectorFactory.setOverride(BruteForceVectorStore())
+        memoryService = MemoryService(modelContext: context, embeddingService: stub, vectorStoreFactory: vectorFactory)
+        store = SemanticMemoryStore(
+            memoryService: memoryService,
+            recallEngine: RecallEngine(vectorStoreFactory: vectorFactory)
+        )
     }
 
     override func tearDownWithError() throws {
         store = nil
         memoryService = nil
+        vectorFactory = nil
         stub = nil
         context = nil
         container = nil
@@ -77,9 +87,11 @@ final class SemanticMemoryStoreTests: XCTestCase {
         stub.embeddingMap["记忆3"] = [1, 0, 0]
         stub.embeddingMap["查询"] = [1, 0, 0]
 
-        _ = try await memoryService.remember(content: "记忆1")
-        _ = try await memoryService.remember(content: "记忆2")
-        _ = try await memoryService.remember(content: "记忆3")
+        // 三条记忆必须分属不同 category：RecallEngine 会按 category 去重（每类只留最高分），
+        // 同类的话无论存几条都只剩 1 条，limit 就没东西可限了。
+        _ = try await memoryService.remember(content: "记忆1", category: "context_1")
+        _ = try await memoryService.remember(content: "记忆2", category: "context_2")
+        _ = try await memoryService.remember(content: "记忆3", category: "context_3")
 
         let memories = try await store.retrieveRelevantMemories(query: "查询", limit: 2)
         XCTAssertEqual(memories.count, 2, "limit=2 应仅返回 2 条")
@@ -89,10 +101,10 @@ final class SemanticMemoryStoreTests: XCTestCase {
     func testRetrieveRelevantMemoriesDefaultLimit() async throws {
         stub.embeddingMap["查询"] = [1, 0, 0]
 
-        // 存入 5 条记忆
+        // 存入 5 条记忆，逐条换 category，避开 RecallEngine 的同类去重（见上）
         for i in 0..<5 {
             stub.embeddingMap["记忆\(i)"] = [1, 0, 0]
-            _ = try await memoryService.remember(content: "记忆\(i)")
+            _ = try await memoryService.remember(content: "记忆\(i)", category: "context_\(i)")
         }
 
         let memories = try await store.retrieveRelevantMemories(query: "查询")

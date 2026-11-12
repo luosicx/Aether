@@ -257,15 +257,29 @@ public struct AnyCodable: Codable, @unchecked Sendable {
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
-        if let int = value as? Int {
+        try Self.encode(value, into: &container)
+    }
+
+    /// 标量按原有顺序分派；嵌套的 `[Any]` / `[String: Any]` 递归包成 `[AnyCodable]` 再编码。
+    /// 之前这两类直接落到 `encodeNil()`，于是 `PluginToolDef.parameters`（JSON Schema 一定是字典）
+    /// 写出去就是 `"parameters": null`，插件工具的参数定义全丢。
+    private static func encode(_ value: Any, into container: inout SingleValueEncodingContainer) throws {
+        switch value {
+        case let int as Int:
             try container.encode(int)
-        } else if let double = value as? Double {
+        case let double as Double:
             try container.encode(double)
-        } else if let bool = value as? Bool {
+        case let bool as Bool:
             try container.encode(bool)
-        } else if let string = value as? String {
+        case let string as String:
             try container.encode(string)
-        } else {
+        case let codable as AnyCodable:
+            try encode(codable.value, into: &container)
+        case let array as [Any]:
+            try container.encode(array.map { AnyCodable($0) })
+        case let dict as [String: Any]:
+            try container.encode(dict.mapValues { AnyCodable($0) })
+        default:
             try container.encodeNil()
         }
     }

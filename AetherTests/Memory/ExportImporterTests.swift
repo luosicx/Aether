@@ -219,7 +219,8 @@ final class ExportImporterTests: XCTestCase {
             )
         ]
         let file = MemoryExportFile(version: 1, exportedAt: now, count: records.count, memories: records)
-        let exportData = try JSONEncoder().encode(file)
+        // 必须用产品侧的 coder：导出文件的日期是 ISO8601，默认策略编出的 Double 时间戳导入方读不进
+        let exportData = try ExportImporter.jsonEncoder().encode(file)
 
         let result = try await exporter.importFromData(exportData)
 

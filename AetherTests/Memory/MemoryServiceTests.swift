@@ -10,6 +10,7 @@ final class MemoryServiceTests: XCTestCase {
     private var context: ModelContext!
     private var stub: StubEmbeddingService!
     private var service: MemoryService!
+    private var vectorFactory: VectorStoreFactory!
 
     override func setUpWithError() throws {
         // 隔离 Keychain：使用内存后端，避免依赖真实系统 Keychain
@@ -23,11 +24,17 @@ final class MemoryServiceTests: XCTestCase {
         context = ModelContext(container)
 
         stub = StubEmbeddingService()
-        service = MemoryService(modelContext: context, embeddingService: stub)
+        // 隔离向量存储：VectorStoreFactory.shared 缓存的 store 会累积整个测试进程写过的向量，
+        // recall 的 limit 是从全局向量里取 top-N 再回 SwiftData 捞实例，别人家的向量挤进来时
+        // 本用例的记忆直接被挤出去，条数与排序就成了跑测顺序的函数。
+        vectorFactory = VectorStoreFactory()
+        vectorFactory.setOverride(BruteForceVectorStore())
+        service = MemoryService(modelContext: context, embeddingService: stub, vectorStoreFactory: vectorFactory)
     }
 
     override func tearDownWithError() throws {
         service = nil
+        vectorFactory = nil
         stub = nil
         context = nil
         container = nil
