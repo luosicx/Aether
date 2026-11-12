@@ -34,6 +34,20 @@ final class ExportImporter {
     /// 导出文件版本
     static let formatVersion: Int = 1
 
+    /// 导出文件的日期一律用 ISO8601 编解码。三处 coder 必须同源：
+    /// 曾经 exportToFile 写 ISO8601、回读用默认策略（Double），写出的文件自己读不回来。
+    nonisolated static func jsonEncoder() -> JSONEncoder {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        return encoder
+    }
+
+    nonisolated static func jsonDecoder() -> JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return decoder
+    }
+
     /// MemoryService 实例（用于访问 SwiftData）
     private let memoryService: MemoryService
     /// 加密层（可选，启用后导出加密的 JSON）
@@ -77,8 +91,7 @@ final class ExportImporter {
             count: records.count,
             memories: records
         )
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        let encoder = Self.jsonEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let jsonData = try encoder.encode(exportFile)
         if encrypt && encryptionLayer.isEnabled {
@@ -96,7 +109,7 @@ final class ExportImporter {
     func exportToFile(url: URL, encrypt: Bool = false) async throws -> Int {
         let data = try await exportAllMemories(encrypt: encrypt)
         try data.write(to: url, options: .atomic)
-        let file = try JSONDecoder().decode(MemoryExportFile.self, from: data)
+        let file = try Self.jsonDecoder().decode(MemoryExportFile.self, from: data)
         return file.count
     }
 

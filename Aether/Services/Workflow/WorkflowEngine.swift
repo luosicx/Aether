@@ -158,13 +158,19 @@ public struct Workflow: Identifiable, Sendable, Codable {
     }
 
     /// 从 JSON 字符串导入
+    /// - Throws: `WorkflowError.invalidJSON`——字符串不是 UTF-8 或不是合法的 Workflow JSON
     public static func fromJSON(_ json: String) throws -> Workflow {
         guard let data = json.data(using: .utf8) else {
             throw WorkflowError.invalidJSON
         }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        return try decoder.decode(Workflow.self, from: data)
+        // 只有取不到 Data 才会走到上面那个 guard：任意字符串都能转 UTF-8，
+        // 所以格式非法实际发生在 decode 这里，必须一起收敛成 invalidJSON。
+        guard let workflow = try? decoder.decode(Workflow.self, from: data) else {
+            throw WorkflowError.invalidJSON
+        }
+        return workflow
     }
 }
 

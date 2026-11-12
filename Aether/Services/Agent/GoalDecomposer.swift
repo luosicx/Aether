@@ -15,13 +15,9 @@ final class GoalDecomposer {
     enum DecomposeError: Error, LocalizedError {
         /// LLM 返回内容为空
         case emptyResponse
-        /// 无法从响应中提取 JSON 数组（向后兼容变体，不保留原始 Error 上下文）
-        case invalidJSON(String)
-        /// 无法从响应中提取 JSON 数组，携带错误信息与底层错误。
-        /// - Parameters:
-        ///   - detail: 用户可见的错误信息（通常含 `error.localizedDescription`）
-        ///   - underlying: 原始底层错误（如解码错误），保留用于诊断
-        case invalidJSONWithCause(detail: String, underlying: Error)
+        /// 无法从响应中提取 JSON 数组。第一个载荷是用户可见的错误信息，
+        /// `underlying` 保留原始底层错误（如解码错误）用于诊断，没有时为 nil。
+        case invalidJSON(String, underlying: Error? = nil)
         /// 解析后的子任务列表为空
         case noSubTasks
 
@@ -29,9 +25,7 @@ final class GoalDecomposer {
             switch self {
             case .emptyResponse:
                 return "LLM 返回内容为空，无法解析子任务"
-            case .invalidJSON(let detail):
-                return "LLM 返回内容无法解析为 JSON 数组：\(detail)"
-            case .invalidJSONWithCause(let detail, _):
+            case .invalidJSON(let detail, _):
                 return "LLM 返回内容无法解析为 JSON 数组：\(detail)"
             case .noSubTasks:
                 return "目标分解后未得到任何子任务"
@@ -206,9 +200,9 @@ final class GoalDecomposer {
         do {
             rawTasks = try decoder.decode([RawSubTask].self, from: data)
         } catch {
-            // P2-3: 携带 underlying 保留原始 Error 上下文
-            throw DecomposeError.invalidJSONWithCause(
-                detail: "无法解码为子任务数组：\(error.localizedDescription)",
+            // P2-3: underlying 保留原始解码错误用于诊断
+            throw DecomposeError.invalidJSON(
+                "无法解码为子任务数组：\(error.localizedDescription)",
                 underlying: error
             )
         }

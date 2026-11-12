@@ -9,12 +9,12 @@ final class SettingsViewTests: XCTestCase {
 
     // MARK: - SettingsSection: CaseIterable
 
-    /// 验证 SettingsSection 包含全部 6 个分类，顺序与声明一致。
+    /// 验证 SettingsSection 包含全部 7 个分类，顺序与声明一致。
     func testSettingsSectionAllCasesCount() {
-        XCTAssertEqual(SettingsSection.allCases.count, 6, "应包含 6 个分类")
+        XCTAssertEqual(SettingsSection.allCases.count, 7, "应包含 7 个分类")
         XCTAssertEqual(
             SettingsSection.allCases,
-            [.provider, .inference, .voice, .features, .health, .about],
+            [.provider, .inference, .voice, .features, .health, .icloud, .about],
             "allCases 顺序应与声明一致"
         )
     }
