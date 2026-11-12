@@ -86,6 +86,29 @@
 #     per-instance UUID，同类另一条用例正是这么断言的，"两条新建记录相等"不可能成立；
 #     ToolRegistry 是进程级单例，别的用例会往里注册测试工具且不注销，绝对数量随执行顺序变
 #     （全量跑实测 27），改成断言 18 个跨平台默认工具都在册——既不被污染撑大，也真能抓住漏注册。
+# - #60 追加：记忆检索族删 6 条（iOS 3 + macOS 3），两种机制，只改用例；两批合计 106→80。
+#   触发点是 #60 那轮 iOS job 报出的 NEW FAILURE
+#   `SemanticMemoryStoreTests/testRetrieveRelevantMemoriesReturnsBySimilarity`（此前只在 main@5090a91
+#   本地飘过一次，当时按"复现不足两次"没收）。它不是前半批引入的：在干净的 9bb6c73 上只跑 Memory/
+#   目录就能稳定复现同一条 `("1") is not equal to ("2")`，前半批也没碰这条路径（ExportImporterTests
+#   自带注入的 factory，从不写单例）。收在这里是因为它已经把 #60 判红了，而机制下面两条说清了。
+#   - 进程级向量存储没隔离（MemoryServiceTests/testRecallReturnsBySimilarityOrder ×2）：
+#     `MemoryService.recall` 走的是"从 VectorStore 取全局 top-limit，再回 SwiftData 按 id 捞实例"，
+#     而这个类用的是 `VectorStoreFactory.shared`——它的 cached store 会攒下整个测试进程写过的每一条
+#     向量。别人的向量占满 limit 窗口后，本用例自己的记忆直接被挤出去，条数就成了"谁先跑、前面跑了
+#     多少条"的函数。Memory/ 目录里 AgingCompactor / ExportImporter / RecallEngine 三个类早就各自
+#     `VectorStoreFactory()` + `setOverride(BruteForceVectorStore())` 注入，只有这两个类漏了。
+#   - 断言与 RecallEngine 的同类去重对着干（SemanticMemoryStoreTests 两条 limit 用例 ×2）：
+#     `retrieveRelevantMemories` 委托 RecallEngine，后者按 category 去重、每类只留最高分，而这两条
+#     用例把 3 条 / 5 条记忆全塞进默认 category "context"——无论存几条都只剩 1 条，limit 根本没有
+#     东西可限。RecallEngineTests 里同类断言一直用 `context_i` 逐个换 category 绕开这一点。
+#   那条 `testRetrieveRelevantMemoriesReturnsBySimilarity` 两条记忆分属 preference/context，不受去重
+#   影响，飘的是上面第一个机制——同进程里 MemoryServiceTests 先写过一批同向向量，与查询正交的那条
+#   进不了 top-20 候选窗口；注入 factory 后它和 6 条锚点一起稳定通过（同目录共 7 条方法受益）。
+#   本地验证：iOS 与 macOS 各 186 tests / 4 failures，那 4 条正是上面前半批修掉的
+#   ExportImporter exportedAt 2 条与 PreferenceExtractor invalidJSONWithCause 2 条——它们在只带
+#   记忆族修复的分支上仍命中豁免，说明两批互不掩盖；反向校验拿修复前的 xcresult 配删完 6 条的
+#   基线跑门，NEW FAILURE 恰好是上面这 7 条方法。
 # - 证据：main@7ccc5ac + PR #56 的 f71be62 / ea16a7e / 4183bd6 / 153b8a8 / bb3b793 / f74e07a 共七轮 run
 #   （产品代码完全相同，只有本基线文件在变）的全部 test job 日志与后六轮闸门自身的 NEW FAILURE
 #   明细；再加 #56 落地后的 main@632e087、#57 的 9147076、main@5090a91 三轮 iOS job 日志——
@@ -147,14 +170,11 @@ macOS:KeychainManagerTests/testConcurrentWrite*
 macOS:MCPClientTests/testSSEEndpointHijackIsRejected
 macOS:MCPDiscoveryServiceTests/testBackgroundScanPaused
 macOS:MCPServerTests/testToolsCallExecutionErrorReturnsIsError
-macOS:MemoryServiceTests/testRecallReturnsBySimilarityOrder
 macOS:OnDeviceModelDownloaderTests/testDeleteModelWhenRemoveItemFails
 macOS:ReminderToolTests/testExecuteDateNotStringIsIgnored
 macOS:ReminderToolTests/testExecuteInvalidDateFormatSlashSeparator
 macOS:SSETransportTests/testHandleSSEEventSameOriginEndpointAccepted
 macOS:SSETransportTests/testSendWithHTTPErrorStatusCodeThrowsTransportError
-macOS:SemanticMemoryStoreTests/testRetrieveRelevantMemoriesDefaultLimit
-macOS:SemanticMemoryStoreTests/testRetrieveRelevantMemoriesRespectsLimit
 macOS:SystemControlToolTests/testExecuteGet*
 macOS:SystemControlToolTests/testExecuteSet*
 macOS:TTSVoiceCatalogTests/testVoiceReturnsNilForInvalidIdentifier
@@ -187,11 +207,8 @@ iOS:KeychainManagerTests/testConcurrentWrite*
 iOS:MCPClientTests/testSSEEndpointHijackIsRejected
 iOS:MCPDiscoveryServiceTests/testBackgroundScanPaused
 iOS:MCPServerTests/testToolsCallExecutionErrorReturnsIsError
-iOS:MemoryServiceTests/testRecallReturnsBySimilarityOrder
 iOS:OnDeviceModelDownloaderTests/testDeleteModelWhenRemoveItemFails
 iOS:ReminderToolTests/testExecuteInvalidDateFormatSlashSeparator
 iOS:SSETransportTests/testHandleSSEEventSameOriginEndpointAccepted
 iOS:SSETransportTests/testSendWithHTTPErrorStatusCodeThrowsTransportError
-iOS:SemanticMemoryStoreTests/testRetrieveRelevantMemoriesDefaultLimit
-iOS:SemanticMemoryStoreTests/testRetrieveRelevantMemoriesRespectsLimit
 iOS:VoiceServiceTests/*~crash
