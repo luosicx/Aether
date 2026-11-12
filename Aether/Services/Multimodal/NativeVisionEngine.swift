@@ -99,6 +99,20 @@ public final class NativeVisionEngine: VisionInferenceEngine, @unchecked Sendabl
 
     // MARK: - 子任务
 
+    /// 单个 Vision 请求的兜底窗口。`VNImageRequestHandler.perform` 的 completion
+    /// 在没有视觉服务的运行环境（如模拟器）里可能永不触发，无界 continuation 会把整条
+    /// `describe` 挂死；到点用同一个 `ResumeOnceContinuation` 以空结果收尾。
+    /// 五个子请求并发执行，故总耗时约等于该窗口而非五倍。
+    private static let requestDeadline: TimeInterval = 10
+
+    private func scheduleDeadline<Value: Sendable>(_ once: ResumeOnceContinuation<Value, Never>,
+                                                   _ fallback: Value) {
+        let seconds = Self.requestDeadline
+        DispatchQueue.global().asyncAfter(deadline: .now() + seconds) {
+            once.resume(returning: fallback)
+        }
+    }
+
     /// 图像分类（VNClassifyImageRequest）
     private func classifyImage(_ image: CGImage) async -> String {
         await withCheckedContinuation { (continuation: CheckedContinuation<String, Never>) in
@@ -115,6 +129,7 @@ public final class NativeVisionEngine: VisionInferenceEngine, @unchecked Sendabl
                 }
                 once.resume(returning: top.joined(separator: " / "))
             }
+            scheduleDeadline(once, "")
             let handler = VNImageRequestHandler(cgImage: image)
             do {
                 try handler.perform([request])
@@ -132,6 +147,7 @@ public final class NativeVisionEngine: VisionInferenceEngine, @unchecked Sendabl
                 let count = request.results?.count ?? 0
                 once.resume(returning: count)
             }
+            scheduleDeadline(once, 0)
             let handler = VNImageRequestHandler(cgImage: image)
             do {
                 try handler.perform([request])
@@ -149,6 +165,7 @@ public final class NativeVisionEngine: VisionInferenceEngine, @unchecked Sendabl
                 let count = request.results?.count ?? 0
                 once.resume(returning: count)
             }
+            scheduleDeadline(once, 0)
             let handler = VNImageRequestHandler(cgImage: image)
             do {
                 try handler.perform([request])
@@ -173,6 +190,7 @@ public final class NativeVisionEngine: VisionInferenceEngine, @unchecked Sendabl
             }
             request.recognitionLevel = .accurate
             request.recognitionLanguages = ["zh-Hans", "en"]
+            scheduleDeadline(once, [])
             let handler = VNImageRequestHandler(cgImage: image)
             do {
                 try handler.perform([request])
@@ -191,6 +209,7 @@ public final class NativeVisionEngine: VisionInferenceEngine, @unchecked Sendabl
                 let payloads = observations.compactMap { $0.payloadStringValue }
                 once.resume(returning: payloads)
             }
+            scheduleDeadline(once, [])
             let handler = VNImageRequestHandler(cgImage: image)
             do {
                 try handler.perform([request])
