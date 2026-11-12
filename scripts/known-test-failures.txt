@@ -104,11 +104,11 @@
 #     东西可限。RecallEngineTests 里同类断言一直用 `context_i` 逐个换 category 绕开这一点。
 #   那条 `testRetrieveRelevantMemoriesReturnsBySimilarity` 两条记忆分属 preference/context，不受去重
 #   影响，飘的是上面第一个机制——同进程里 MemoryServiceTests 先写过一批同向向量，与查询正交的那条
-#   进不了 top-20 候选窗口；注入 factory 后它和 6 条锚点一起稳定通过（同目录共 7 条方法受益）。
-#   本地验证：iOS 与 macOS 各 186 tests / 4 failures，那 4 条正是上面前半批修掉的
-#   ExportImporter exportedAt 2 条与 PreferenceExtractor invalidJSONWithCause 2 条——它们在只带
-#   记忆族修复的分支上仍命中豁免，说明两批互不掩盖；反向校验拿修复前的 xcresult 配删完 6 条的
-#   基线跑门，NEW FAILURE 恰好是上面这 7 条方法。
+#   进不了 top-20 候选窗口。所以本族实际受益 4 个方法（3 个锚点方法 + 这条没锚过的偶发）。
+#   本地验证：干净 main 上只跑 Memory/ 目录 186 条就能稳定复现这 4 个方法（同批失败的另外 4 个是
+#   exportedAt 与 invalidJSONWithCause，归本 PR 前半批）；两批合到同一分支后 iOS 与 macOS 各
+#   186 tests 0 failures。反向校验拿修复前那份 xcresult 配删完 26 条的新基线跑门，NEW FAILURE
+#   恰好 8 条 = 本族 4 个方法 + 前半批 4 个方法，一条不多一条不少。
 # - 证据：main@7ccc5ac + PR #56 的 f71be62 / ea16a7e / 4183bd6 / 153b8a8 / bb3b793 / f74e07a 共七轮 run
 #   （产品代码完全相同，只有本基线文件在变）的全部 test job 日志与后六轮闸门自身的 NEW FAILURE
 #   明细；再加 #56 落地后的 main@632e087、#57 的 9147076、main@5090a91 三轮 iOS job 日志——
