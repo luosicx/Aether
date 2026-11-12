@@ -148,15 +148,25 @@ final class ToolRegistryTests: XCTestCase {
         }
     }
 
-    /// init 后 allToolDefs 应含正确数量的工具（跨平台 14 个，macOS 额外 11 个共 25 个）
-    func testAllToolDefsCount() {
-        #if os(macOS)
-        let expected = 25
-        #else
-        let expected = 14
-        #endif
-        XCTAssertEqual(registry.allToolDefs.count, expected,
-                       "默认应注册 \(expected) 个工具")
+    /// init 应注册全部 18 个跨平台默认工具。
+    ///
+    /// 不断言 `allToolDefs.count`：registry 是进程级单例，别的用例会往同一个实例注册测试工具且
+    /// 不注销（ChatViewModelTests / ToolExecutionCoordinatorTests 各注册一个 ThrowingTool，
+    /// MCP 连接经 MCPClientManager 批量注册适配器），绝对数量随执行顺序变——全量跑时实测 27，
+    /// 单跑本类则是 18。改为断言默认集合都在册：既不会被污染撑大，也能真的抓住"某个默认工具
+    /// 漏注册/被改名"这种回归。
+    func testDefaultCrossPlatformToolsRegistered() {
+        let defaultToolNames: Set<String> = [
+            "create_alarm", "create_reminder", "get_current_time", "calculate",
+            "get_location", "get_device_info", "read_clipboard", "write_clipboard",
+            "open_url", "search_contacts", "get_weather",
+            "run_shortcut", "list_shortcuts", "create_shortcut",
+            "describe_image", "transcribe_audio", "clone_voice", "generate_image"
+        ]
+        let registered = Set(registry.allToolDefs.map(\.function.name))
+        let missing = defaultToolNames.subtracting(registered)
+        XCTAssertEqual(defaultToolNames.count, 18, "默认工具清单本身应有 18 项")
+        XCTAssertTrue(missing.isEmpty, "以下跨平台默认工具未注册：\(missing.sorted())")
     }
 
     /// ToolDef 应可序列化为 JSON，且 JSON 含 "name" 与 "parameters" 字段

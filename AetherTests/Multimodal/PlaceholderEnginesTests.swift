@@ -227,11 +227,24 @@ final class PlaceholderEnginesTests: XCTestCase {
 
     // MARK: - ClonedVoice 数据结构
 
+    /// ClonedVoice 按全字段相等：id 与 createdAt 都参与比较，所以同身份同内容才算相等。
+    /// （`testClonedVoiceIdDefault` 已断言默认 id 是每次不同的 UUID，两条新建记录不该相等。）
     func testClonedVoiceEquality() {
         let path = URL(fileURLWithPath: "/tmp/sample.wav")
-        let voice1 = ClonedVoice(name: "voice1", sampleAudioPath: path, embeddingBase64: "abc")
-        let voice2 = ClonedVoice(name: "voice1", sampleAudioPath: path, embeddingBase64: "abc")
+        let madeAt = Date(timeIntervalSince1970: 1_700_000_000)
+        let voice1 = ClonedVoice(id: "voice-1", name: "voice1", createdAt: madeAt,
+                                 sampleAudioPath: path, embeddingBase64: "abc")
+        let voice2 = ClonedVoice(id: "voice-1", name: "voice1", createdAt: madeAt,
+                                 sampleAudioPath: path, embeddingBase64: "abc")
         XCTAssertEqual(voice1, voice2)
+
+        let otherID = ClonedVoice(id: "voice-2", name: "voice1", createdAt: madeAt,
+                                  sampleAudioPath: path, embeddingBase64: "abc")
+        XCTAssertNotEqual(voice1, otherID, "id 不同不应相等")
+
+        let otherCreatedAt = ClonedVoice(id: "voice-1", name: "voice1", createdAt: madeAt.addingTimeInterval(1),
+                                         sampleAudioPath: path, embeddingBase64: "abc")
+        XCTAssertNotEqual(voice1, otherCreatedAt, "createdAt 不同不应相等")
     }
 
     func testClonedVoiceIdDefault() {
