@@ -36,12 +36,6 @@ public final class NativeTTSEngine: TTSEngine, @unchecked Sendable {
             throw MultimodalError.emptyInput
         }
 
-        // CI 环境下 AVSpeechSynthesizer 可能不可用，避免测试卡住
-        if ProcessInfo.processInfo.environment["CI"] != nil {
-            // 返回最小 WAV 头（44 字节空 PCM），让上层逻辑可继续
-            return Self.emptyWAVHeader()
-        }
-
         let utterance = AVSpeechUtterance(string: text)
         utterance.voice = resolveVoice(voiceId: voiceId)
         utterance.rate = AVSpeechUtteranceDefaultSpeechRate
@@ -51,48 +45,84 @@ public final class NativeTTSEngine: TTSEngine, @unchecked Sendable {
         // 使用 write 接口将合成结果写入 PCM Buffer
         // write 接口为异步回调，每次回调返回一段 AVAudioPCMBuffer
         return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Data, Error>) in
-            var pcmBuffers: [AVAudioPCMBuffer] = []
-            var hasCompleted = false
-            let lock = NSLock()
-
-            // 标记完成（避免多次回调）
-            func finishOnce(_ result: Result<Data, Error>) {
-                lock.lock()
-                defer { lock.unlock() }
-                guard !hasCompleted else { return }
-                hasCompleted = true
-                switch result {
-                case .success(let data):
-                    continuation.resume(returning: data)
-                case .failure(let error):
-                    continuation.resume(throwing: error)
-                }
-            }
+            let once = ResumeOnceContinuation(continuation)
+            let collector = BufferCollector()
 
             self.synthesizer.write(utterance) { buffer in
                 // write 回调类型为 AVAudioBuffer?，需 cast 为 AVAudioPCMBuffer
                 if let pcmBuffer = buffer as? AVAudioPCMBuffer {
-                    lock.lock()
-                    pcmBuffers.append(pcmBuffer)
-                    lock.unlock()
+                    let generation = collector.append(pcmBuffer)
+                    // 模拟器上合成器会持续交付 PCM 帧，却永远不给表示结束的 nil，
+                    // 只认 nil 就得白等满整个总窗口。帧间静默超过 idleDeadline 即视为
+                    // 交付完毕，把已收到的音频编码返回。
+                    DispatchQueue.global().asyncAfter(deadline: .now() + Self.idleDeadline) {
+                        if collector.generation == generation {
+                            once.resume(returning: Self.encodeWAVOrEmpty(buffers: collector.snapshot()))
+                        }
+                    }
                 } else if buffer == nil {
                     // nil 表示合成完成
                     do {
-                        let wavData = try Self.encodeToWAV(buffers: pcmBuffers)
-                        finishOnce(.success(wavData))
+                        once.resume(returning: try Self.encodeToWAV(buffers: collector.snapshot()))
                     } catch {
-                        finishOnce(.failure(error))
+                        once.resume(throwing: error)
                     }
                 }
             }
 
-            // 超时保护（30 秒后强制返回空 WAV，避免卡死）
-            Task {
-                try? await Task.sleep(nanoseconds: 30_000_000_000)
-                let emptyWAV = Self.emptyWAVHeader()
-                finishOnce(.success(emptyWAV))
+            // 一帧都没收到说明该运行环境根本没有合成服务，无需再等帧间静默
+            DispatchQueue.global().asyncAfter(deadline: .now() + Self.firstFrameDeadline) {
+                if collector.generation == 0 {
+                    once.resume(returning: Self.emptyWAVHeader())
+                }
+            }
+            DispatchQueue.global().asyncAfter(deadline: .now() + Self.synthesisDeadline) {
+                once.resume(returning: Self.encodeWAVOrEmpty(buffers: collector.snapshot()))
             }
         }
+    }
+
+    /// 首帧窗口：超过此时长仍没有任何 PCM 帧，判定合成服务不可用。
+    private static let firstFrameDeadline: TimeInterval = 3
+    /// 帧间静默窗口：正常交付时帧与帧的间隔远小于此值。
+    private static let idleDeadline: TimeInterval = 5
+    /// 整段合成的总兜底窗口（与改造前的定长等待一致）。
+    private static let synthesisDeadline: TimeInterval = 30
+
+    /// write 回调与兜底分支分属不同队列，buffer 需要一把锁保护的共享持有者。
+    /// `generation` 同时充当"最近一次交付"的序号，用于判断帧间静默是否已结束。
+    private final class BufferCollector: @unchecked Sendable {
+        private let lock = NSLock()
+        private var buffers: [AVAudioPCMBuffer] = []
+        private var frames = 0
+
+        @discardableResult
+        func append(_ buffer: AVAudioPCMBuffer) -> Int {
+            lock.lock()
+            buffers.append(buffer)
+            frames += 1
+            let generation = frames
+            lock.unlock()
+            return generation
+        }
+
+        var generation: Int {
+            lock.lock()
+            defer { lock.unlock() }
+            return frames
+        }
+
+        func snapshot() -> [AVAudioPCMBuffer] {
+            lock.lock()
+            defer { lock.unlock() }
+            return buffers
+        }
+    }
+
+    /// `encodeToWAV` 声明为 throws 但当前实现不抛错；兜底分支要交付已收到的音频，
+    /// 编不出来时退回 44 字节空 WAV 头。
+    private static func encodeWAVOrEmpty(buffers: [AVAudioPCMBuffer]) -> Data {
+        (try? encodeToWAV(buffers: buffers)) ?? emptyWAVHeader()
     }
 
     /// 根据 voiceId 解析音色

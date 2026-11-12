@@ -40,9 +40,34 @@
 #   所以本轮删掉 5 条锚点而不是再加豁免：设备相关的 ShortcutsToolTests 3 处按既有写法补上
 #   模拟器条件；wall-clock 依赖的 RateLimiterTests 2 条改用 `RateLimiter.acquireChat(now:)`
 #   时间接缝，回拨 61 秒代替真实等待，iOS/macOS 两边都能跑而且不再超时。
-#   剩下 NativeEngines/WhisperASR/MLXVision 那一批超时锚点同源于产品侧——NativeASREngine 的
-#   SFSpeechRecognizer.requestAuthorization 在模拟器上不回调，NativeTTSEngine 的 CI stub
-#   同样失效。改这些要动产品行为，另开 PR 单独评估。
+#   NativeEngines/WhisperASR/MLXVision 那批超时锚点同源于产品侧的无界等待（当时记为"另开 PR
+#   单独评估"），现在三处都改成有界兜底，机制各不相同，别当成同一种"超时豁免"：
+#   - NativeASREngine：SFSpeechRecognizer.requestAuthorization 的回调在模拟器上永不触发
+#     （本地 iPhone 17 复现，把 maximum allowance 放到 150 秒仍无返回）。授权窗口 5 秒、识别
+#     任务窗口 30 秒，到点分别返回"授权回调超时"/取消任务并抛 asrRecognitionFailed。用例侧本来
+#     就接受这个错误，于是同一条用例从 >60s 越线变成 iOS 0.022s（模拟器 recognizer 不可用，走更
+#     早的分支）、macOS 5.013s（真把 5 秒授权窗口跑满）通过。WhisperASR 不可用时降级到它，同源。
+#   - NativeTTSEngine：真机制不是"没有音频"。AVSpeechSynthesizer.write 在模拟器上一直在交付
+#     PCM 帧，只是表示结束的 nil 永不到来，所以每条合成用例都要白等满 30 秒定长兜底
+#     （本地实测 30.03–30.12s）。改为"帧间静默 5 秒即收尾"后是 5.1–6.7s，而且交付的是真音频；
+#     顺手删掉那个读不到 CI 变量、从来没生效过的 environment["CI"] stub。
+#     `testTTSEngineSynthesizeWithVoiceId` 那条精确锚点就是这里来的：30 秒定长正好压在 allowance
+#     临界值上，偶尔越线、偶尔压线通过。
+#   - NativeVisionEngine：本地 1.3s 就正常返回，只有 CI runner 上挂死，故 5 个子请求各加 10 秒
+#     空结果兜底。第一次只加窗口没用——`VNImageRequestHandler.perform` 是同步阻塞调用，
+#     `describe` 的五个 `async let` 把它留在 Swift 协作线程池上跑，runner 的池只有核数量级的
+#     线程，一挂死整个池被抽干，兜底的 resume 自己都排不上线程（PR #59 第一轮 CI 正是这样：
+#     iOS 9 条 + macOS 2 条 `exceeded 1 分钟`，窗口形同不存在）。真正的修法是 perform 挪到
+#     独立队列，且队列 `maxConcurrentOperationCount = 5`：挂死的 perform 永不交还线程，不设上限
+#     就变成了每调一次 `describe` 泄漏 5 条线程。这处的收益本地仍测不出来（本机 Vision 不挂），
+#     只能由 CI 轮次验证；但它同时也是生产侧的上界——一次 Vision 服务卡死原本会冻结整个 App 的
+#     async 工作，而不只是这一个请求。
+#   据此删 iOS 8 条 + macOS 7 条锚点。iOS 一侧由本地全量 run 验证（3193 passed / 36 failed，
+#   其中 35 条命中基线，多出的 1 条是 SemanticMemoryStoreTests 的本地偶发，单跑该类通过，按
+#   "复现 >=2 次才收"不收）；macOS 一侧本地只跑了这三个类（40 tests 0 failures、无 exceeded
+#   execution time 行），删条目的依据是 main@5090a91 两个 macOS 分片 job 日志里同形的挂死记录
+#   ——MLXVision 2 条、NativeEngines 的 ASR/facade/vision* 共 8 条、WhisperASR 2 条全部
+#   exceeded，而 4 条 testTTSEngineSynthesize* 正好卡在 30.02–30.108s，与上面那条机制吻合。
 # - 证据：main@7ccc5ac + PR #56 的 f71be62 / ea16a7e / 4183bd6 / 153b8a8 / bb3b793 / f74e07a 共七轮 run
 #   （产品代码完全相同，只有本基线文件在变）的全部 test job 日志与后六轮闸门自身的 NEW FAILURE
 #   明细；再加 #56 落地后的 main@632e087、#57 的 9147076、main@5090a91 三轮 iOS job 日志——
@@ -52,8 +77,8 @@
 #   xcresult 不计失败，不收。
 # - main@c2005ea（PR #55 之前）里出现过、之后四轮都不复现的失败不收录——那是已经还掉的债，
 #   例如 DesignSystemTests/testAetherIconAllCasesCount。
-# - 下面每一条都早于本 PR：本 PR 只动 ci.yml 与 scripts/，没碰产品与用例代码。它们此前被
-#   `grep -c '"failed"'` 这个恒为 0 的旧门静默放行。
+# - 首轮锚定（#56）收录的每一条都早于那次改动：那次只动 ci.yml 与 scripts/，没碰产品与用例代码。
+#   它们此前被 `grep -c '"failed"'` 这个恒为 0 的旧门静默放行。
 
 # AetherUITests 的超时受害者每轮换人（四轮里换过 4 个方法：testConversationContextMenuActions、
 # testEditSystemPrompt、testUserPreferencePersistence、testDeleteAPIKeyWithConfirmation），逐条追
@@ -107,12 +132,7 @@ macOS:KeychainManagerTests/testConcurrentWrite*
 macOS:MCPClientTests/testSSEEndpointHijackIsRejected
 macOS:MCPDiscoveryServiceTests/testBackgroundScanPaused
 macOS:MCPServerTests/testToolsCallExecutionErrorReturnsIsError
-macOS:MLXVisionEngineTests/testDescribeIncludesFallbackContent
-macOS:MLXVisionEngineTests/testDescribeWithDifferentPrompt
 macOS:MemoryServiceTests/testRecallReturnsBySimilarityOrder
-macOS:NativeEnginesTests/testASREngineTranscribeEmptyFileThrows
-macOS:NativeEnginesTests/testFacadeDescribeImageWithNativeEngine
-macOS:NativeEnginesTests/testVisionEngine*
 macOS:OnDeviceModelDownloaderTests/testDeleteModelWhenRemoveItemFails
 macOS:PlaceholderEnginesTests/testClonedVoiceEquality
 macOS:PluginManagerTests/testManifestCodablePreservesParametersSchema
@@ -135,8 +155,6 @@ macOS:VoiceServiceTests/testDeinitAsyncCleanupAfterRecordingAttempt
 macOS:VoiceServiceTests/testDeinitWhileRecordingReleasesResources
 macOS:VoiceServiceTests/testDidCancelDuringPreviewCleansPreviewState
 macOS:VoiceServiceTests/testRequestPermission*
-macOS:WhisperASREngineTests/testTranscribeCIEnvironmentThrowsOrReturns
-macOS:WhisperASREngineTests/testTranscribeValidAudioFileReturnsWhisperPrefix
 macOS:WorkflowEngineTests/testWorkflowFromInvalidJSON
 
 # ---- iOS（unit-tests job）----
@@ -164,13 +182,7 @@ iOS:KeychainManagerTests/testConcurrentWrite*
 iOS:MCPClientTests/testSSEEndpointHijackIsRejected
 iOS:MCPDiscoveryServiceTests/testBackgroundScanPaused
 iOS:MCPServerTests/testToolsCallExecutionErrorReturnsIsError
-iOS:MLXVisionEngineTests/testDescribeIncludesFallbackContent
-iOS:MLXVisionEngineTests/testDescribeWithDifferentPrompt
 iOS:MemoryServiceTests/testRecallReturnsBySimilarityOrder
-iOS:NativeEnginesTests/testASREngineTranscribeEmptyFileThrows
-iOS:NativeEnginesTests/testFacadeDescribeImageWithNativeEngine
-iOS:NativeEnginesTests/testTTSEngineSynthesizeWithVoiceId
-iOS:NativeEnginesTests/testVisionEngine*
 iOS:OnDeviceModelDownloaderTests/testDeleteModelWhenRemoveItemFails
 iOS:PlaceholderEnginesTests/testClonedVoiceEquality
 iOS:PluginManagerTests/testManifestCodablePreservesParametersSchema
@@ -184,6 +196,4 @@ iOS:SemanticMemoryStoreTests/testRetrieveRelevantMemoriesRespectsLimit
 iOS:SettingsViewTests/testSettingsSectionAllCasesCount
 iOS:ToolRegistryTests/testAllToolDefsCount
 iOS:VoiceServiceTests/*~crash
-iOS:WhisperASREngineTests/testTranscribeCIEnvironmentThrowsOrReturns
-iOS:WhisperASREngineTests/testTranscribeValidAudioFileReturnsWhisperPrefix
 iOS:WorkflowEngineTests/testWorkflowFromInvalidJSON
