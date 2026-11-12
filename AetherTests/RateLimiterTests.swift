@@ -17,9 +17,9 @@ final class RateLimiterTests: XCTestCase {
     /// - Swift 整桶重置（useRust=false）：retryAfter = 60（固定）
     ///
     /// 此处用范围断言 1...60 兼容两种实现，避免算法切换导致 flaky。
-    private func assertChatRateLimited(_ limiter: RateLimiter, file: StaticString = #filePath, line: UInt = #line) async {
+    private func assertChatRateLimited(_ limiter: RateLimiter, now: Date = Date(), file: StaticString = #filePath, line: UInt = #line) async {
         do {
-            try await limiter.acquireChat()
+            try await limiter.acquireChat(now: now)
             XCTFail("应抛 rateLimited", file: file, line: line)
         } catch let error as LLMError {
             guard case .rateLimited(let retryAfter) = error else {
@@ -33,9 +33,9 @@ final class RateLimiterTests: XCTestCase {
     }
 
     /// 辅助：断言 acquireEmbed 抛 LLMError.rateLimited
-    private func assertEmbedRateLimited(_ limiter: RateLimiter, file: StaticString = #filePath, line: UInt = #line) async {
+    private func assertEmbedRateLimited(_ limiter: RateLimiter, now: Date = Date(), file: StaticString = #filePath, line: UInt = #line) async {
         do {
-            try await limiter.acquireEmbed()
+            try await limiter.acquireEmbed(now: now)
             XCTFail("应抛 rateLimited", file: file, line: line)
         } catch let error as LLMError {
             guard case .rateLimited = error else {
@@ -232,75 +232,35 @@ final class RateLimiterTests: XCTestCase {
 
     // MARK: - 补充小缺口测试（60 秒令牌补充）
 
-    /// 验证 refillIfNeeded() 的 elapsed >= 60 分支：令牌耗尽后等待 61 秒，
-    /// 再次 acquireChat 应成功（chatTokens 被重置到 chatPerMin 上限）。
-    /// 覆盖 RateLimiter.swift 第 48-52 行的 elapsed >= 60 分支。
-    /// 注意：测试耗时约 61 秒，仅本地运行；CI 中跳过（maximum-test-execution-time-allowance 60s 限制）。
+    /// 验证补充分支：令牌耗尽后把时间拨到 61 秒之后，acquireChat 应成功。
+    /// 用 `RateLimiter.acquireChat(now:)` 的时间接缝取代真实等待，
+    /// 否则这条用例在 iOS/macOS job 上都会被 60s execution allowance 杀掉。
     func testRefillAfter60SecondsResetsTokens() async throws {
-        // CI 环境跳过：61 秒等待超过 CI 的 maximum-test-execution-time-allowance(60s)
-        try XCTSkipIf(ProcessInfo.processInfo.environment["CI"] != nil,
-                     "CI 环境跳过 61 秒等待测试（超过 maximum-test-execution-time-allowance）")
-        // 请求额外的执行时间（默认 60 秒不够等待 61 秒的 refill）
-        executionTimeAllowance = 90
-        // 在测试方法内创建 limiter，避免 setUp/tearDown 的状态污染
         let limiter = RateLimiter(chatPerMin: 2, embedPerMin: 10)
+        let t0 = Date()
         // 耗尽所有 chat 令牌
-        try await limiter.acquireChat()
-        try await limiter.acquireChat()
+        try await limiter.acquireChat(now: t0)
+        try await limiter.acquireChat(now: t0)
         // 立即再申请应被限流（距上次补充不足 60 秒）
-        await assertChatRateLimited(limiter)
-
-        // 等待 61 秒，使 refillIfNeeded 的 elapsed >= 60 分支被触发
-        let expectation = XCTestExpectation(description: "等待 61 秒后令牌被重置")
-        let queue = DispatchQueue.global()
-        queue.asyncAfter(deadline: .now() + 61) {
-            expectation.fulfill()
-        }
-        await fulfillment(of: [expectation], timeout: 70.0)
+        await assertChatRateLimited(limiter, now: t0)
 
         // 61 秒后再次 acquireChat 应成功（令牌已被重置）
-        do {
-            try await limiter.acquireChat()
-        } catch {
-            XCTFail("等待 61 秒后 acquireChat 应成功，但抛出错误：\(error)")
-        }
+        try await limiter.acquireChat(now: t0.addingTimeInterval(61))
     }
 
-    /// 验证 refillIfNeeded() 在 60 秒后同时重置 chat 与 embed 两类令牌。
-    /// 覆盖 RateLimiter.swift 第 48-52 行的 elapsed >= 60 分支中 chatTokens 与 embedTokens 同时重置。
-    /// 注意：测试耗时约 61 秒，仅本地运行；CI 中跳过（maximum-test-execution-time-allowance 60s 限制）。
+    /// 验证 60 秒后 chat 与 embed 两类令牌同时重置。
     func testRefillResetsBothChatAndEmbedTokens() async throws {
-        // CI 环境跳过：61 秒等待超过 CI 的 maximum-test-execution-time-allowance(60s)
-        try XCTSkipIf(ProcessInfo.processInfo.environment["CI"] != nil,
-                     "CI 环境跳过 61 秒等待测试（超过 maximum-test-execution-time-allowance）")
-        // 请求额外的执行时间（默认 60 秒不够等待 61 秒的 refill）
-        executionTimeAllowance = 90
         let limiter = RateLimiter(chatPerMin: 1, embedPerMin: 1)
+        let t0 = Date()
         // 耗尽两类令牌
-        try await limiter.acquireChat()
-        try await limiter.acquireEmbed()
+        try await limiter.acquireChat(now: t0)
+        try await limiter.acquireEmbed(now: t0)
         // 两类均应被限流
-        await assertChatRateLimited(limiter)
-        await assertEmbedRateLimited(limiter)
-
-        // 等待 61 秒，触发 refillIfNeeded 的 elapsed >= 60 分支
-        let expectation = XCTestExpectation(description: "等待 61 秒后 chat 与 embed 令牌均被重置")
-        let queue = DispatchQueue.global()
-        queue.asyncAfter(deadline: .now() + 61) {
-            expectation.fulfill()
-        }
-        await fulfillment(of: [expectation], timeout: 70.0)
+        await assertChatRateLimited(limiter, now: t0)
+        await assertEmbedRateLimited(limiter, now: t0)
 
         // 61 秒后两类令牌均应被重置到初始上限
-        do {
-            try await limiter.acquireChat()
-        } catch {
-            XCTFail("等待 61 秒后 acquireChat 应成功，但抛出错误：\(error)")
-        }
-        do {
-            try await limiter.acquireEmbed()
-        } catch {
-            XCTFail("等待 61 秒后 acquireEmbed 应成功，但抛出错误：\(error)")
-        }
+        try await limiter.acquireChat(now: t0.addingTimeInterval(61))
+        try await limiter.acquireEmbed(now: t0.addingTimeInterval(61))
     }
 }
