@@ -28,11 +28,20 @@ final class CheckpointManagerTests: XCTestCase {
     }
 
     /// 创建测试用 AgentTask
-    /// - Parameter subTaskCount: 子任务数量
+    /// - Parameters:
+    ///   - subTaskCount: 子任务数量
+    ///   - chained: 是否串成 A→B→C 依赖链（默认无依赖，三个节点可同时执行）
     /// - Returns: 包含指定数量子任务的 AgentTask
-    private func makeTask(subTaskCount: Int = 3) -> AgentTask {
+    private func makeTask(subTaskCount: Int = 3, chained: Bool = false) -> AgentTask {
         let task = AgentTask(goal: "测试目标")
-        let subs = (0..<subTaskCount).map { SubTask(title: "子任务\($0)", order: $0) }
+        var subs: [SubTask] = []
+        var prevID: UUID?
+        for i in 0..<subTaskCount {
+            let deps = chained ? (prevID.map { [$0] } ?? []) : []
+            let sub = SubTask(title: "子任务\(i)", dependencies: deps, order: i)
+            subs.append(sub)
+            prevID = sub.id
+        }
         task.updateSubTasks(subs)
         return task
     }
@@ -354,7 +363,7 @@ final class CheckpointManagerTests: XCTestCase {
 
     /// 模拟恢复：加载已有检查点后，引擎应跳过已完成节点
     func testCheckpointSupportsIdempotentResume() async throws {
-        let task = makeTask(subTaskCount: 3)
+        let task = makeTask(subTaskCount: 3, chained: true)
         let sm = await makeStateMachine(task: task, completedIndices: [0])
         let manager = CheckpointManager(modelContext: nil)
 

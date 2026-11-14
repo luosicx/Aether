@@ -11,7 +11,7 @@ import XCTest
 /// 测试方法：
 /// - 使用 Mock executor 模拟 LLM 调用（零延迟，避免真实 LLM 依赖）
 /// - 使用零延迟 RetryPolicy 避免测试耗时
-/// - 使用 `XCTest.measure` 采集执行时长
+/// - 时长基线直接 `await engine.run` 后卡墙钟上界，见 `runDuration`
 /// - 通过成功率阈值验证性能基线
 ///
 /// 测试约束：
@@ -124,6 +124,34 @@ final class AgentPerformanceBaselineTests: XCTestCase {
         return (completed, skipped, failed, task.subTasks.count)
     }
 
+    // MARK: - 执行时长测量
+
+    /// 跑一遍 DAG 并返回墙钟耗时（秒）。
+    ///
+    /// 不用 `XCTest.measure`：本类是 `@MainActor`，measure 的闭包在主线程同步执行，
+    /// 闭包里再 `Task { @MainActor in ... }` + `wait(for:)`，等于把被测的并行调度
+    /// 压回一个正被阻塞的执行器——能不能跑完取决于 runloop 什么时候抽水，
+    /// CI 上就是稳定超时。直接 await 同一条路径，量的是真实耗时。
+    /// - Parameters:
+    ///   - subs: 子任务列表
+    ///   - executor: 节点执行器
+    /// - Returns: 本次执行耗时（秒）与完成的节点数；后者用来挡住"啥也没跑所以特别快"的假绿
+    private func runDuration(
+        subs: [SubTask],
+        executor: @escaping @Sendable DAGExecutionEngine.NodeExecutor
+    ) async throws -> (elapsed: Double, completed: Int) {
+        let task = AgentTask(goal: "性能测试")
+        task.updateSubTasks(subs)
+        task.markInProgress()
+        let engine = DAGExecutionEngine(
+            retryPolicy: zeroDelayPolicy,
+            checkpointManager: CheckpointManager(modelContext: nil)
+        )
+        let start = Date()
+        try await engine.run(task, executor: executor)
+        return (Date().timeIntervalSince(start), task.subTasks.filter { $0.status == .completed }.count)
+    }
+
     // MARK: - 简单 DAG 基线（≤3 子任务，≥95%）
 
     /// 简单 DAG：3 个并行节点，无失败，成功率应为 100%
@@ -150,26 +178,14 @@ final class AgentPerformanceBaselineTests: XCTestCase {
                                      "简单 DAG 成功率应 ≥ 95%")
     }
 
-    /// 简单 DAG 执行时长基线（measure API）
+    /// 简单 DAG 执行时长基线
     func testSimpleDAGExecutionTime() async throws {
         let subs = makeParallelSubTasks(count: 3)
         let executor = makeStableMockExecutor(failureRate: 0.0)
 
-        measure {
-            let exp = expectation(description: "execution completes")
-            Task { @MainActor in
-                let task = AgentTask(goal: "性能测试")
-                task.updateSubTasks(subs)
-                task.markInProgress()
-                let engine = DAGExecutionEngine(
-                    retryPolicy: zeroDelayPolicy,
-                    checkpointManager: CheckpointManager(modelContext: nil)
-                )
-                try? await engine.run(task, executor: executor)
-                exp.fulfill()
-            }
-            wait(for: [exp], timeout: 5.0)
-        }
+        let stats = try await runDuration(subs: subs, executor: executor)
+        XCTAssertEqual(stats.completed, 3, "3 个节点都应完成")
+        XCTAssertLessThan(stats.elapsed, 5, "3 节点并行 DAG 应在 5 秒内跑完")
     }
 
     // MARK: - 中等 DAG 基线（4-10 子任务，≥85%）
@@ -220,21 +236,9 @@ final class AgentPerformanceBaselineTests: XCTestCase {
         let subs = makeParallelSubTasks(count: 8)
         let executor = makeStableMockExecutor(failureRate: 0.0)
 
-        measure {
-            let exp = expectation(description: "execution completes")
-            Task { @MainActor in
-                let task = AgentTask(goal: "性能测试")
-                task.updateSubTasks(subs)
-                task.markInProgress()
-                let engine = DAGExecutionEngine(
-                    retryPolicy: zeroDelayPolicy,
-                    checkpointManager: CheckpointManager(modelContext: nil)
-                )
-                try? await engine.run(task, executor: executor)
-                exp.fulfill()
-            }
-            wait(for: [exp], timeout: 5.0)
-        }
+        let stats = try await runDuration(subs: subs, executor: executor)
+        XCTAssertEqual(stats.completed, 8, "8 个节点都应完成")
+        XCTAssertLessThan(stats.elapsed, 5, "8 节点并行 DAG 应在 5 秒内跑完")
     }
 
     // MARK: - 复杂 DAG 基线（11-30 子任务，≥70%）
@@ -278,21 +282,9 @@ final class AgentPerformanceBaselineTests: XCTestCase {
         let subs = makeParallelSubTasks(count: 20)
         let executor = makeStableMockExecutor(failureRate: 0.0)
 
-        measure {
-            let exp = expectation(description: "execution completes")
-            Task { @MainActor in
-                let task = AgentTask(goal: "性能测试")
-                task.updateSubTasks(subs)
-                task.markInProgress()
-                let engine = DAGExecutionEngine(
-                    retryPolicy: zeroDelayPolicy,
-                    checkpointManager: CheckpointManager(modelContext: nil)
-                )
-                try? await engine.run(task, executor: executor)
-                exp.fulfill()
-            }
-            wait(for: [exp], timeout: 10.0)
-        }
+        let stats = try await runDuration(subs: subs, executor: executor)
+        XCTAssertEqual(stats.completed, 20, "20 个节点都应完成")
+        XCTAssertLessThan(stats.elapsed, 10, "20 节点并行 DAG 应在 10 秒内跑完")
     }
 
     // MARK: - 性能基线常量验证

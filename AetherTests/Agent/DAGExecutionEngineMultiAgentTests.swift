@@ -81,6 +81,15 @@ final class DAGExecutionEngineMultiAgentTests: XCTestCase {
         SubTask(title: title, description: "\(title)描述", assignedRole: assignedRole, delegatedTo: delegatedTo)
     }
 
+    /// 取回引擎真正写过的那份子任务。
+    ///
+    /// SubTask 是 struct：`task.updateSubTasks(_:)` 把它复制进 @Model 数组后，
+    /// 引擎改的是数组里的那一份，本地这个 struct 会永远停在 pending/nil。
+    /// 断言 status 或 result 必须按 id 回读，否则读的是没人写过的副本。
+    private func committed(_ sub: SubTask, in task: AgentTask) -> SubTask? {
+        task.subTasks.first { $0.id == sub.id }
+    }
+
     // MARK: - SubTask 新字段默认值
 
     /// SubTask 默认创建时 assignedRole 和 delegatedTo 应为 nil
@@ -221,7 +230,7 @@ final class DAGExecutionEngineMultiAgentTests: XCTestCase {
         XCTAssertEqual(mockLLM.chatCallCount, 1)
         XCTAssertEqual(mockLLM.callSystemPrompts.first, AgentRole.researcher.systemPrompt,
                        "应使用 researcher 的 systemPrompt")
-        XCTAssertEqual(sub.status, .completed)
+        XCTAssertEqual(committed(sub, in: task)?.status, .completed)
     }
 
     /// 多个不同角色的子任务应路由到各自 AgentInstance 执行
@@ -264,8 +273,8 @@ final class DAGExecutionEngineMultiAgentTests: XCTestCase {
         XCTAssertEqual(mockLLM.chatCallCount, 1, "应通过委派调用 LLM 一次")
         XCTAssertEqual(mockLLM.callSystemPrompts.first, AgentRole.researcher.systemPrompt,
                        "委派执行应使用 researcher 的 systemPrompt")
-        XCTAssertEqual(sub.status, .completed, "委派任务应完成")
-        XCTAssertEqual(sub.result, "委派研究结果")
+        XCTAssertEqual(committed(sub, in: task)?.status, .completed, "委派任务应完成")
+        XCTAssertEqual(committed(sub, in: task)?.result, "委派研究结果")
     }
 
     /// 委派给不存在的 Agent 应导致任务失败
@@ -321,9 +330,9 @@ final class DAGExecutionEngineMultiAgentTests: XCTestCase {
         XCTAssertTrue(task.isAllSubTasksCompleted, "所有子任务应完成")
 
         // 验证结果
-        XCTAssertEqual(sub1.result, "默认执行结果")
-        XCTAssertEqual(sub2.result, "研究结果")
-        XCTAssertEqual(sub3.result, "协调结果")
+        XCTAssertEqual(committed(sub1, in: task)?.result, "默认执行结果")
+        XCTAssertEqual(committed(sub2, in: task)?.result, "研究结果")
+        XCTAssertEqual(committed(sub3, in: task)?.result, "协调结果")
     }
 
     // MARK: - 向后兼容
@@ -386,8 +395,8 @@ final class DAGExecutionEngineMultiAgentTests: XCTestCase {
             return "单 Agent 结果"
         }
 
-        XCTAssertEqual(sub.status, .completed, "无 messageBus 时单 Agent 流程应正常完成")
-        XCTAssertEqual(sub.result, "单 Agent 结果")
+        XCTAssertEqual(committed(sub, in: task)?.status, .completed, "无 messageBus 时单 Agent 流程应正常完成")
+        XCTAssertEqual(committed(sub, in: task)?.result, "单 Agent 结果")
     }
 
     /// 子任务执行失败时，依赖该子任务的下游子任务应被自动 skip（级联跳过）
@@ -409,7 +418,7 @@ final class DAGExecutionEngineMultiAgentTests: XCTestCase {
             return "下游结果"
         }
 
-        XCTAssertEqual(sub1.status, .failed, "失败任务应标记为 failed")
-        XCTAssertEqual(sub2.status, .skipped, "依赖失败任务的下游应被 skip")
+        XCTAssertEqual(committed(sub1, in: task)?.status, .failed, "失败任务应标记为 failed")
+        XCTAssertEqual(committed(sub2, in: task)?.status, .skipped, "依赖失败任务的下游应被 skip")
     }
 }

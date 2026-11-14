@@ -194,6 +194,44 @@
 #   上面那两条 MCPSecurity 告警，没有 exceeded execution time 行。
 #   再并入 main@9c81652（#61）时只有本文件冲突、代码零交集（#61 只动三个 TCC 工具与它们的用例），
 #   合并树上 macOS 重跑那 4 个类 80 tests 0 failures（含新增端口用例 0.016s），iOS 侧交给 CI。
+# - DAG/Agent 执行族删 27 条（iOS 14 + macOS 13），五种机制，其中两处是产品缺陷。#61/#62 先
+#   落地，所以本批对当前 main 是 53→26：
+#   - 值副本断言（DAGExecutionEngineMultiAgentTests 5 条 ×2）：SubTask 是 struct，
+#     `task.updateSubTasks` 把它复制进 @Model 数组后引擎改的是数组里那一份，用例手里的本地副本
+#     永远停在 pending/nil。改为按 id 回读 `committed(_:in:)`。
+#   - 产品缺陷一 `.inProgress` 恢复只同步状态机、没同步模型（DAGExecutionEngine.run）：调度取的
+#     是 task.subTasks 里 status == .pending 的节点，恢复出来的节点因此永远进不了可执行集，run 以
+#     deadlock 收场。除 testRunReExecutesInProgressNodes 外，这也直接影响真实的中断续跑。
+#   - 产品缺陷二 级联跳过只算一代且只从 .failed 出发（cascadeSkipFailed）：s0 failed → s1 skipped
+#     之后，孙节点 s2 反而被 `nextExecutableSubTasks` 的「skipped 视作已满足」放行、真的跑完。
+#     改成失败子树的传递闭包（种子只有 .failed，传播穿过 .skipped）；用户主动跳过的节点上游没有
+#     failed，进不了种子集，其下游照常放行——那条契约仍然保留。
+#   - 顺序队列 Mock 在并行 DAG 下不成立（AgentOrchestratorTests 3 条）：无依赖子任务同时打进
+#     chat，A 会拿到 B 的响应，审查环节把「执行结果X」当审查结论读，重试队列整体错位。改为按消息
+#     内容分派（Script.executions / reviews / decompose），并给计数与数组加锁——同一处不加锁就是
+#     多线程写同一块堆。但 `AgentOrchestratorTests/*~crash` 两条暂留：那轮 segv 记在
+#     testExecuteAllHandlesEngineDeadlock 上，而它在调度阶段就抛错、根本没并发调 LLM，归因对不上，
+#     没有证据说明加锁修掉的就是它。
+#   - XCTest.measure 堵死被测路径（AgentPerformanceBaselineTests 3 条 ×2）：本类是 @MainActor，
+#     measure 的闭包在主线程同步跑，闭包里再 `Task { @MainActor }` + `wait(for:)` 等于把并行调度
+#     压回一个正被阻塞的执行器，CI 上稳定超时（10.354 / 5.288 / 5.287s）。改为直接 await 同一条
+#     路径再卡墙钟上界，并断言完成节点数，挡住"什么都没跑所以特别快"的假绿。
+#   - CheckpointManagerTests 夹具没建依赖：testCheckpointSupportsIdempotentResume 的注释写着
+#     「s2 依赖 s1」，makeTask 建的却是三个无依赖节点——`nextExecutableSubTasks` 返回 2 条是对的，
+#     断言写错了。给 makeTask 加 chained 参数，只在需要链式的用例传 true。
+#   本地验证分两轮。第一轮基于 9bb6c73（#60 落地前）：iOS 该族 176 tests / 1 failure，剩的那条是
+#   AgentOrchestratorTests/testExecuteNextSubTaskFailureThrows，由 #60 把
+#   OrchestratorError.subTaskFailed 的 WithCause 分裂合并掉负责，本批不重复修、也没替它删那两条锚点。
+#   第二轮在合并 main@b40cc22 后的树上重跑（含构建，Agent 全 17 类 + #60 涉及的 Memory 3 类，
+#   CI 同款 30/60 allowance）：iOS 459 tests 0 failures、macOS 459 tests 0 failures，闸门两侧都
+#   无基线外新增失败；14 个代表方法全绿，testExecuteNextSubTaskFailureThrows 0.014s 通过，
+#   它那两条锚点是 #60 删的，合并基线时按"两侧删除集不重叠"一起归位（本批 27 条不含它）。
+#   macOS 第一次跑撞了 LaunchServices -600「Failed to install or launch the test runner」，
+#   是同机复跑即消的环境噪声、xcresult 里没有任何用例失败，重跑即 459/0。
+#   第三轮并入 #62/#63 后在新 main 上重跑（含构建，Agent 目录 15 个非视图类，同一套超时参数）：
+#   macOS 375 tests 0 failures、iOS 375 tests 0 failures，两侧闸门 exit 0；iOS 第一次同样撞了
+#   「test runner hung before establishing connection」的模拟器启动抖动，复跑即 375/0。
+
 # - 证据：main@7ccc5ac + PR #56 的 f71be62 / ea16a7e / 4183bd6 / 153b8a8 / bb3b793 / f74e07a 共七轮 run
 #   （产品代码完全相同，只有本基线文件在变）的全部 test job 日志与后六轮闸门自身的 NEW FAILURE
 #   明细；再加 #56 落地后的 main@632e087、#57 的 9147076、main@5090a91 三轮 iOS job 日志——
@@ -221,21 +259,8 @@ UI:MCPSettingsUITests/testDeleteMCPServer
 
 # ---- macOS（unit-tests-macos 两个分片共用同一 label）----
 macOS:AgentOrchestratorTests/*~crash
-macOS:AgentOrchestratorTests/testExecuteAllParallelSubTasks
-macOS:AgentOrchestratorTests/testMultiAgent*
-macOS:AgentPerformanceBaselineTests/testComplexDAGExecutionTime
-macOS:AgentPerformanceBaselineTests/testMediumDAGExecutionTime
-macOS:AgentPerformanceBaselineTests/testSimpleDAGExecutionTime
 macOS:ChatViewModelTests/testToggleVoice*
 macOS:ChatViewModelToolSecurityTests/testReadClipboardUnauthorizedDoesNotExecute
-macOS:CheckpointManagerTests/testCheckpointSupportsIdempotentResume
-macOS:DAGExecutionEngineMultiAgentTests/testAssignedRoleRoutingUsesCorrectSystemPrompt
-macOS:DAGExecutionEngineMultiAgentTests/testCrossAgentDelegationViaMessageBus
-macOS:DAGExecutionEngineMultiAgentTests/testDAGEngineWithNilMessageBusFallsBackToSingleAgent
-macOS:DAGExecutionEngineMultiAgentTests/testDelegationFailureCascadesSkipDependents
-macOS:DAGExecutionEngineMultiAgentTests/testMixedExecution
-macOS:DAGExecutionEngineTests/testRunFailedNodeCascadesSkip
-macOS:DAGExecutionEngineTests/testRunReExecutesInProgressNodes
 macOS:KeychainManagerTests/*~crash
 macOS:KeychainManagerTests/testConcurrentWrite*
 macOS:OnDeviceModelDownloaderTests/testDeleteModelWhenRemoveItemFails
@@ -251,21 +276,7 @@ macOS:VoiceServiceTests/testRequestPermission*
 
 # ---- iOS（unit-tests job）----
 iOS:AgentOrchestratorTests/*~crash
-iOS:AgentOrchestratorTests/testExecuteAllParallelSubTasks
-iOS:AgentOrchestratorTests/testMultiAgentCollaborationReviewPass
-iOS:AgentOrchestratorTests/testMultiAgentCollaborationReviewRetry
-iOS:AgentPerformanceBaselineTests/testComplexDAGExecutionTime
-iOS:AgentPerformanceBaselineTests/testMediumDAGExecutionTime
-iOS:AgentPerformanceBaselineTests/testSimpleDAGExecutionTime
 iOS:ChatViewModelToolSecurityTests/testReadClipboardUnauthorizedDoesNotExecute
-iOS:CheckpointManagerTests/testCheckpointSupportsIdempotentResume
-iOS:DAGExecutionEngineMultiAgentTests/testAssignedRoleRoutingUsesCorrectSystemPrompt
-iOS:DAGExecutionEngineMultiAgentTests/testCrossAgentDelegationViaMessageBus
-iOS:DAGExecutionEngineMultiAgentTests/testDAGEngineWithNilMessageBusFallsBackToSingleAgent
-iOS:DAGExecutionEngineMultiAgentTests/testDelegationFailureCascadesSkipDependents
-iOS:DAGExecutionEngineMultiAgentTests/testMixedExecution
-iOS:DAGExecutionEngineTests/testRunFailedNodeCascadesSkip
-iOS:DAGExecutionEngineTests/testRunReExecutesInProgressNodes
 iOS:KeychainManagerTests/*~crash
 iOS:KeychainManagerTests/testConcurrentWrite*
 iOS:OnDeviceModelDownloaderTests/testDeleteModelWhenRemoveItemFails
