@@ -104,10 +104,12 @@ final class AetherUITests: XCTestCase {
                       "应打开会话列表 sheet")
 
         // UITEST_RESET_DATA 已在启动时清空数据，会话列表应为空
-        // v1.1: 星空背景渲染偶致空状态文本延迟，用 descendants 兜底 + 增加 timeout 到 8s
-        let emptyText = app.descendants(matching: .any).matching(identifier: "还没有对话").firstMatch
-        XCTAssertTrue(emptyText.waitForExistence(timeout: 8),
-                      "空会话列表应显示「还没有对话」")
+        // EmptyStateView 用 .accessibilityElement(children: .combine) 把标题与说明合成单个元素，
+        // 文案不再是独立的 staticText；旧断言找的「还没有对话」在产品里早已不存在，只剩 xcstrings 孤儿词条。
+        let emptyState = app.descendants(matching: .any)
+            .matching(identifier: "conversationListEmptyState").firstMatch
+        XCTAssertTrue(emptyState.waitForExistence(timeout: 8),
+                      "空会话列表应显示空状态引导（标题「开始新对话」）")
     }
 
     // MARK: - 流 3：创建新会话出现「新对话」行
