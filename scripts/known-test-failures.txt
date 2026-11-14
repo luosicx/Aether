@@ -248,6 +248,10 @@
 # testEditSystemPrompt、testUserPreferencePersistence、testDeleteAPIKeyWithConfirmation），逐条追
 # 不完；根因是 app 冷启动加交互本来就贴着 120s allowance，不是某条用例写死了。整类只按超时形态
 # 豁免，该类新增的断言失败照旧判红。
+# 本批把 ui-tests job 的窗口从 120/180 抬到 240/300（依据见 .github/workflows/ci.yml 里那段注释：
+# 本地矩阵里 102.0 / 72.6 / 69.9s 三条，CI 对本地耗时比 1.6x-5.3x）。豁免条目一条不动——
+# 抬窗口只是把"慢"和"挂死"分界线画到实测分布之外，能不能因此删掉 *~timeout 与
+# testUserPreferencePersistence，要看新窗口下的 CI 轮次里还有没有 exceeded execution time 行。
 UI:AetherUITests/*~timeout
 # testUserPreferencePersistence 在 ea16a7e 那轮不是超时形态，而是「Failed to get launch progress」，
 # 归到超时豁免之外，所以单独留一条精确条目。
