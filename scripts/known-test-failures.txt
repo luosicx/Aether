@@ -232,10 +232,11 @@
 #   macOS 375 tests 0 failures、iOS 375 tests 0 failures，两侧闸门 exit 0；iOS 第一次同样撞了
 #   「test runner hung before establishing connection」的模拟器启动抖动，复跑即 375/0。
 
-# - 语音族删 7 条（macOS 7）+ Keychain 族删 4 条（双端各 2）+ OnDevice 族删 2 条（双端各 1）：
-#   本批 13 条、六种机制，改产品代码 + 用例配套，没有新增豁免；另修一条从没锚过的 iOS 崩溃形态
+# - 语音族删 7 条（macOS 7）+ Keychain 族删 4 条（双端各 2）+ OnDevice 族删 2 条（双端各 1）+
+#   剪贴板族删 3 条（macOS 2 + iOS 1）：
+#   本批 16 条、七种机制，改产品代码 + 用例配套，没有新增豁免；另修一条从没锚过的 iOS 崩溃形态
 #   （不计入删除数，见语音块里 installTap 那一条）。
-#   #62 先落地，所以本批对当前 main 是 53→40。语音族的直接证据是所以本批对当前 main 是 53→42。语音族的直接证据是
+#   #62/#64 先落地，所以本批对当前 main 是 26→10。语音族的直接证据是
 #   main@b40cc22 的 `unit-tests-macos (2)`（job 131379618980）与 main@9c81652 的同名 job
 #   （132334054858）两轮记录，两轮的形态一字不差：
 #   - requestPermission 无界 await：删 macOS:VoiceServiceTests/testRequestPermission*、
@@ -332,6 +333,38 @@
 #   形态与上面那条 CI 原文一致；改后 macOS 与 iOS 各单跑 OnDeviceModelDownloaderTests
 #   70 tests 0 failures 5 skipped、闸门 exit 0，该用例双端 0.020–0.084s。
 
+# - 剪贴板族删 3 条（macOS 2 + iOS 1）：`ToolAuthorization` 的两个 async 包装把
+#   `withCheckedContinuation` 架在一个没人应答的模态弹窗上——iOS 是 UIAlertController 等人点，
+#   macOS 在无头测试进程里退化成 `NSAlert.runModal()`，主线程被钉住，`await vm.processMessage(...)`
+#   的 ReAct 循环于是永不返回。这三条是首轮锚定（#56 的 f71be62 / ea16a7e）按 job 日志记下的，
+#   CI 侧形态是 exceeded 1 minute。
+#   - 口径是"测试注入 presenter"，接缝开在真正的问题点（弹窗本身），产品默认行为一处没动：
+#     新增 `AuthorizationAlertPresenting`（只负责收集选择）与 `ToolAuthorizationChoice`，原
+#     UIAlertController / NSAlert 代码逐字搬进 `SystemAlertPresenter`，iOS 的 scene 观察者与
+#     `topViewController()` 一起搬走，`ToolAuthorization.init()` 现在只剩 `restoreAlwaysAuthorized()`；
+#     授权状态仍由 `ToolAuthorization.apply(choice:toolName:completion:)` 写，"取消 / 允许一次 /
+#     始终允许"与 `neverAlwaysAllow` 拦截的语义保持原样。
+#   - 两个测试类 setUp 换入 `StubAuthorizationPresenter(choice: .denied)`、tearDown 换回原值。
+#     选 `.denied` 是因为这三条断言的本来就是"用户拒绝后工具不执行、并向 LLM 回错误"；注入单例
+#     安全的前提是 CI 用 `-parallel-testing-enabled NO`（ci.yml:431），换入换出在类内串行。
+#   - 没有给 continuation 加超时兜底：那等于把"用户想超过 N 秒就自动拒绝"写进 shipped 行为，
+#     是为了迁就测试而改坏产品；也没有把这三条改成 XCTSkip。
+#   - A/B 证据（同产品代码，只回退两个测试类的注入，CI 同款 30/60 allowance）：改前 macOS
+#     这两条失败在 `("completed") is not equal to ("failed")`，耗时 19.872s / 43.069s，审计行是
+#     `tool=read_clipboard | authorized=true`——弹窗被系统收回而不是用户点了"确认"，未应答的确认
+#     在 macOS 侧落成了第二个按钮，于是剪贴板真的被读了。这半条是产品侧独立问题，本批没动
+#     （改默认应答会把"确认"流程一起改掉，且这里只有一次复现），单独记着待查。
+#   - 改后：macOS 三类（ChatViewModelToolSecurity / ToolExecutionCoordinator / ToolAuthorization）
+#     32 tests 0 failures 0 skipped、iOS 同三类 32 tests 0 failures，两侧闸门 exit 0，日志里没有
+#     exceeded execution time 行；两条 testReadClipboardUnauthorizedDoesNotExecute 是
+#     macOS 0.151 / 0.200s、iOS 0.174 / 0.093s。
+#   - iOS 首轮合跑另放出一条从没锚过的 `ToolExecutionCoordinatorTests/testToolFailureIsAudited`
+#     （`Exceeded timeout of 5 seconds … 审计日志写入文件`，13.083s）。它不是本批引入的，也留不住：
+#     单跑该方法 0.170s 过、单跑该类 16 tests 全过（该条 0.065s）、两类与三类组合复跑都过
+#     （0.061–0.220s），只有首次冷启动那一轮越线。机制是 `selectedProvider = .onDevice` 下
+#     `processMessage` 多花了约 3 秒，5 秒轮询窗口里审计行还没落盘。按"复现不足两次不收"不锚，
+#     与 #62 那条 SemanticMemoryStoreTests 本地偶发同处理；最终判定由本批 CI 轮次给出。
+
 # - 证据：main@7ccc5ac + PR #56 的 f71be62 / ea16a7e / 4183bd6 / 153b8a8 / bb3b793 / f74e07a 共七轮 run
 #   （产品代码完全相同，只有本基线文件在变）的全部 test job 日志与后六轮闸门自身的 NEW FAILURE
 #   明细；再加 #56 落地后的 main@632e087、#57 的 9147076、main@5090a91 三轮 iOS job 日志——
@@ -369,12 +402,9 @@ UI:MCPSettingsUITests/testDeleteMCPServer
 
 # ---- macOS（unit-tests-macos 两个分片共用同一 label）----
 macOS:AgentOrchestratorTests/*~crash
-macOS:ChatViewModelToolSecurityTests/testReadClipboardUnauthorizedDoesNotExecute
 macOS:SystemControlToolTests/testExecuteGet*
 macOS:SystemControlToolTests/testExecuteSet*
-macOS:ToolExecutionCoordinatorTests/testReadClipboardUnauthorizedDoesNotExecute
 
 # ---- iOS（unit-tests job）----
 iOS:AgentOrchestratorTests/*~crash
-iOS:ChatViewModelToolSecurityTests/testReadClipboardUnauthorizedDoesNotExecute
 iOS:VoiceServiceTests/*~crash

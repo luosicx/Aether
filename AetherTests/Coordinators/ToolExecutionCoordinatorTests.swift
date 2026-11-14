@@ -25,6 +25,7 @@ final class ToolExecutionCoordinatorTests: XCTestCase {
     private var container: ModelContainer!
     private var context: ModelContext!
     private var originalClipboardEnabled: Bool = false
+    private var originalPresenter: AuthorizationAlertPresenting?
     private let auditLogURL = FileManager.default
         .urls(for: .cachesDirectory, in: .userDomainMask)
         .first?
@@ -43,6 +44,9 @@ final class ToolExecutionCoordinatorTests: XCTestCase {
         originalClipboardEnabled = ToolRegistry.shared.isEnabled(name: "read_clipboard")
         // 确保 read_clipboard 处于未授权状态
         ToolAuthorization.shared.revokeAuthorization(toolName: "read_clipboard")
+        // 隔离确认弹窗：CI 上无人应答，真实 presenter 会让 withCheckedContinuation 永远等下去
+        originalPresenter = ToolAuthorization.shared.presenter
+        ToolAuthorization.shared.presenter = StubAuthorizationPresenter(choice: .denied)
         // 清理审计日志，避免历史记录干扰断言
         if let url = auditLogURL {
             try? FileManager.default.removeItem(at: url)
@@ -52,6 +56,9 @@ final class ToolExecutionCoordinatorTests: XCTestCase {
     override func tearDownWithError() throws {
         ToolRegistry.shared.setEnabled(name: "read_clipboard", value: originalClipboardEnabled)
         ToolAuthorization.shared.revokeAuthorization(toolName: "read_clipboard")
+        if let originalPresenter {
+            ToolAuthorization.shared.presenter = originalPresenter
+        }
         context = nil
         container = nil
         KeychainManager.shared.backend = SystemKeychainBackend()

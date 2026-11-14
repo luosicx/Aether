@@ -9,6 +9,7 @@ final class ChatViewModelToolSecurityTests: XCTestCase {
     private var container: ModelContainer!
     private var context: ModelContext!
     private var originalClipboardEnabled: Bool = false
+    private var originalPresenter: AuthorizationAlertPresenting?
     private let auditLogURL = FileManager.default
         .urls(for: .cachesDirectory, in: .userDomainMask)
         .first?
@@ -23,6 +24,10 @@ final class ChatViewModelToolSecurityTests: XCTestCase {
         context = ModelContext(container)
         // 隔离 Keychain：使用内存后端，避免依赖真实系统 Keychain
         KeychainManager.shared.backend = InMemoryKeychainBackend()
+        // 隔离授权弹窗：注入即时拒绝的呈现器。CI 里没人点模态弹窗，
+        // 走真实 UI 时 `withCheckedContinuation` 永不 resume，用例只能挂到超时。
+        originalPresenter = ToolAuthorization.shared.presenter
+        ToolAuthorization.shared.presenter = StubAuthorizationPresenter(choice: .denied)
         // 保存 read_clipboard 原始启用状态，便于恢复
         originalClipboardEnabled = ToolRegistry.shared.isEnabled(name: "read_clipboard")
         // 确保 read_clipboard 处于未授权状态
@@ -36,6 +41,9 @@ final class ChatViewModelToolSecurityTests: XCTestCase {
     override func tearDownWithError() throws {
         ToolRegistry.shared.setEnabled(name: "read_clipboard", value: originalClipboardEnabled)
         ToolAuthorization.shared.revokeAuthorization(toolName: "read_clipboard")
+        if let originalPresenter {
+            ToolAuthorization.shared.presenter = originalPresenter
+        }
         context = nil
         container = nil
         KeychainManager.shared.backend = SystemKeychainBackend()
@@ -173,5 +181,20 @@ final class ChatViewModelToolSecurityTests: XCTestCase {
 
         XCTAssertTrue(logContent.contains("run_terminal_command"), "审计日志应包含工具名")
         XCTAssertTrue(logContent.contains("authorized=false"), "审计日志应记录未授权/失败状态")
+    }
+}
+
+/// 即时应答的授权弹窗呈现器：把「等人点的模态弹窗」换成脚本化的选择。
+/// 只在测试里注入；产品默认仍是 `SystemAlertPresenter`，真实用户照旧看到弹窗。
+final class StubAuthorizationPresenter: AuthorizationAlertPresenting {
+    private let choice: ToolAuthorizationChoice
+
+    init(choice: ToolAuthorizationChoice) {
+        self.choice = choice
+    }
+
+    func present(toolName: String, title: String, message: String, isSensitive: Bool,
+                 completion: @escaping (ToolAuthorizationChoice) -> Void) {
+        completion(choice)
     }
 }
