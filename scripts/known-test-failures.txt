@@ -292,6 +292,11 @@
 #   8 skipped、闸门 exit 0；iOS 那一次 334 tests 1 failure 就是上面 installTap 那条，补上格式判定
 #   后取语音三类（VoiceService / VoiceCoordinator / ChatViewModel）+ KeychainManagerTests 复跑，
 #   iOS 247 tests 0 failures 12 skipped、macOS 同批 249 tests 0 failures 8 skipped，两侧闸门 exit 0。
+# - 本批（含剪贴板 3 条）rebase 到 main@3a7e5c5（#64 已落地）后，在合树上双端各跑一次含构建、
+#   CI 同款 30/60 allowance，覆盖本批全部改动面（语音四类 + Keychain 三类 + OnDevice + 工具三类）：
+#   macOS 395 tests 0 failures 13 skipped、闸门 exit 0；iOS 393 tests 0 failures 17 skipped、
+#   闸门 exit 0。基线按 comm 重导：对 main@3a7e5c5 是 26→10，删除集 16 条与各族小计逐条对上、
+#   零新增；文档门 tests=3554 不变（本批没加用例）。
 
 # - Keychain 族删 4 条（macOS 2 + iOS 2，同一机制双端各记一条）：`InMemoryKeychainBackend.storage`
 #   是裸 `Dictionary`，而 KeychainManagerTests 用 `Task.detached` / `withTaskGroup` 并发打
