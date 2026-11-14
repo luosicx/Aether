@@ -85,6 +85,7 @@ struct ConversationList: View {
                         primaryButtonTitle: "新建对话",
                         primaryAction: { onCreate() }
                     )
+                    .accessibilityIdentifier("conversationListEmptyState")
                 } else {
                     List {
                         // Day 9: 搜索框
