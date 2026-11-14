@@ -16,8 +16,6 @@ final class ContactsToolTests: XCTestCase {
     }
 
     func testExecuteReturnsString() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
-                      "跳过：模拟器/CI 环境通讯录权限不可用")
         let result = try await tool.execute(arguments: ["query": "张"])
         XCTAssertFalse(result.isEmpty)
     }
@@ -70,10 +68,8 @@ final class ContactsToolTests: XCTestCase {
         XCTAssertEqual(result, "错误：请提供搜索关键词")
     }
 
-    /// 真实 CNContactStore 搜索因权限依赖在模拟器/CI 环境跳过，避免权限挂起
-    func testExecuteRealSearchSkippedOnSimulatorOrCI() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
-                      "跳过：模拟器/CI 环境通讯录权限不可用")
+    /// 真实 CNContactStore 搜索应返回字符串（未授权时返回权限提示，同样是非空字符串）
+    func testExecuteRealSearchReturnsString() async throws {
         let result = try await tool.execute(arguments: ["query": "张"])
         XCTAssertTrue(result is String, "执行结果应为字符串类型")
     }
@@ -123,19 +119,15 @@ final class ContactsToolTests: XCTestCase {
         XCTAssertEqual(result, "错误：请提供搜索关键词")
     }
 
-    /// query 为空格字符串应通过 guard（非空），但后续权限请求会跳过
+    /// query 为空格字符串应通过 guard（非空），后续权限阶段返回权限提示或搜索结果
     /// 验证空格不触发 "请提供" 错误（与空字符串不同）
     func testExecuteWhitespaceQueryPassesGuard() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
-                      "跳过：模拟器/CI 环境通讯录权限不可用")
         let result = try await tool.execute(arguments: ["query": "  "])
         XCTAssertNotNil(result as String?, "空格 query 应通过 guard 并返回字符串")
     }
 
     /// query 为长字符串应通过 guard（验证长度无上限）
     func testExecuteLongQueryPassesGuard() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
-                      "跳过：模拟器/CI 环境通讯录权限不可用")
         let longQuery = String(repeating: "张", count: 200)
         let result = try await tool.execute(arguments: ["query": longQuery])
         XCTAssertTrue(result is String, "长 query 应通过 guard 并返回字符串")
@@ -192,9 +184,16 @@ final class ContactsToolTests: XCTestCase {
 
     /// 真实通讯录搜索返回的结果应符合 "姓名：...，电话：..." 或 "未找到匹配的联系人"
     func testExecuteRealSearchResultFormat() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
-                      "跳过：模拟器/CI 环境通讯录权限不可用")
-        let result = try await tool.execute(arguments: ["query": "张"])
+        // 这条用例需要本机真的授予过通讯录权限：未授权时工具返回权限提示、
+        // 或 requestAccess 直接抛错，两种形态都说明环境不具备条件，跳过而不是判红。
+        let result: String
+        do {
+            result = try await tool.execute(arguments: ["query": "张"])
+        } catch {
+            throw XCTSkip("跳过：本机通讯录授权不可用（\(error.localizedDescription)）")
+        }
+        try XCTSkipIf(result == "通讯录权限未授权，请在设置中开启通讯录权限",
+                      "跳过：本机未授予通讯录权限")
         let isFormattedResult = result.contains("姓名：") && result.contains("电话：")
         let isNotFound = result == "未找到匹配的联系人"
         XCTAssertTrue(isFormattedResult || isNotFound,
@@ -207,8 +206,6 @@ final class ContactsToolTests: XCTestCase {
     /// 在模拟器/CI 环境下可能因权限被拒而提前返回，但不应崩溃。
     /// 权限授予时 enumerateContacts 遍历全部联系人并按电话号码过滤。
     func testExecutePhoneNumberSearchUsesFetchRequest() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
-                      "跳过：模拟器/CI 环境通讯录权限不可用")
         // 以数字为 query 触发电话号码搜索路径
         let result = try await tool.execute(arguments: ["query": "138"])
         // 权限授予时返回格式化结果或 "未找到"；权限被拒时返回权限提示
@@ -219,24 +216,18 @@ final class ContactsToolTests: XCTestCase {
     /// 搜索中文姓名应走 unifiedContacts 路径 + CNContactFetchRequest 电话号码匹配路径。
     /// 新代码使用 enumerateContacts 替代 unifiedContacts(predicateForContactsInContainer:)。
     func testExecuteChineseNameSearchExercisesEnumerateContacts() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
-                      "跳过：模拟器/CI 环境通讯录权限不可用")
         let result = try await tool.execute(arguments: ["query": "张三"])
         XCTAssertFalse(result.isEmpty, "中文姓名搜索应返回非空字符串")
     }
 
     /// 搜索英文姓名应正常工作（验证 enumerateContacts 对非中文姓名的支持）
     func testExecuteEnglishNameSearchExercisesEnumerateContacts() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
-                      "跳过：模拟器/CI 环境通讯录权限不可用")
         let result = try await tool.execute(arguments: ["query": "John"])
         XCTAssertFalse(result.isEmpty, "英文姓名搜索应返回非空字符串")
     }
 
     /// 搜索特殊字符应不崩溃（enumerateContacts 遍历 + filter 逻辑健壮性）
     func testExecuteSpecialCharacterSearchDoesNotCrash() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
-                      "跳过：模拟器/CI 环境通讯录权限不可用")
         let result = try await tool.execute(arguments: ["query": "@#$%"])
         XCTAssertFalse(result.isEmpty, "特殊字符搜索应返回非空字符串")
     }
@@ -248,8 +239,6 @@ final class ContactsToolTests: XCTestCase {
     /// 新代码用 enumerateContacts 替代 unifiedContacts(predicateForContactsInContainer:)，
     /// 此测试验证该路径不崩溃且返回符合预期的字符串或权限错误。
     func testExecuteCoversEnumerateContactsPath() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
-                      "跳过：模拟器/CI 环境通讯录权限不可用")
         do {
             let result = try await tool.execute(arguments: ["query": "测试"])
             XCTAssertFalse(result.isEmpty, "execute 应返回非空字符串")
@@ -271,8 +260,6 @@ final class ContactsToolTests: XCTestCase {
     /// execute 按电话号码搜索覆盖 enumerateContacts + filter 路径。
     /// 新代码通过 enumerateContacts 遍历联系人后用 phoneNumbers.filter 过滤匹配项。
     func testExecutePhoneNumberSearchCoversEnumerateContacts() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
-                      "跳过：模拟器/CI 环境通讯录权限不可用")
         do {
             let result = try await tool.execute(arguments: ["query": "138"])
             XCTAssertFalse(result.isEmpty, "execute 应返回非空字符串")
@@ -290,8 +277,6 @@ final class ContactsToolTests: XCTestCase {
     /// execute 按中文姓名搜索覆盖 unifiedContacts + enumerateContacts 双路径。
     /// 新代码先按姓名匹配（unifiedContacts），再通过 enumerateContacts 按电话号码匹配。
     func testExecuteChineseNameSearchCoversBothPaths() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
-                      "跳过：模拟器/CI 环境通讯录权限不可用")
         do {
             let result = try await tool.execute(arguments: ["query": "张三"])
             XCTAssertFalse(result.isEmpty, "execute 应返回非空字符串")
@@ -309,8 +294,6 @@ final class ContactsToolTests: XCTestCase {
     /// execute 多次调用覆盖 enumerateContacts 的重复执行路径。
     /// 验证每次调用独立创建 CNContactFetchRequest 并遍历，不残留状态。
     func testExecuteMultipleCallsCoverEnumerateContacts() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
-                      "跳过：模拟器/CI 环境通讯录权限不可用")
         for _ in 0..<2 {
             do {
                 let result = try await tool.execute(arguments: ["query": "李"])
@@ -325,8 +308,6 @@ final class ContactsToolTests: XCTestCase {
 
     /// execute 按英文姓名搜索覆盖 enumerateContacts 路径（验证非中文 query 的健壮性）。
     func testExecuteEnglishNameSearchCoversEnumerateContacts() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
-                      "跳过：模拟器/CI 环境通讯录权限不可用")
         do {
             let result = try await tool.execute(arguments: ["query": "John"])
             XCTAssertFalse(result.isEmpty, "execute 应返回非空字符串")
@@ -343,8 +324,6 @@ final class ContactsToolTests: XCTestCase {
 
     /// execute 按特殊字符搜索覆盖 enumerateContacts 遍历 + filter 的健壮性（非跳过）。
     func testExecuteSpecialCharSearchCoversEnumerateContacts() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil || ProcessInfo.processInfo.environment["CI"] != nil,
-                      "跳过：模拟器/CI 环境通讯录权限不可用")
         do {
             let result = try await tool.execute(arguments: ["query": "@#$"])
             XCTAssertFalse(result.isEmpty, "execute 应返回非空字符串")
