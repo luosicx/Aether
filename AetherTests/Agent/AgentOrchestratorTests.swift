@@ -918,4 +918,73 @@ final class AgentOrchestratorTests: XCTestCase {
         let fetched = try context.fetch(FetchDescriptor<AgentTask>())
         XCTAssertEqual(fetched.first?.subTasks[0].status, .failed, "失败状态应已持久化")
     }
+
+    /// executeAll 的抛错路径也必须停掉委派监听器。
+    /// 监听器由 executeAll 起，订阅挂在 AgentMessageBus 上，只有取消那个 Task 才会走 AsyncStream 的
+    /// onTermination 把订阅摘掉；改动前 `delegationListener.cancel()` 只写在 happy path 末尾，
+    /// deadlock（.noExecutableSubTask）/ subTaskFailed / stateMachine 三处 throw 与中途 save() 抛错
+    /// 都会把监听器留在总线上：每失败一轮多一个订阅者，旧监听还会继续替已经失败的那轮处理委派消息。
+    func testExecuteAllCancelsDelegationListenerOnThrowPaths() async throws {
+        // 自环依赖 → dagEngine.run 走到 deadlock 分支抛错
+        let task = AgentTask(goal: "监听器释放测试")
+        task.markInProgress()
+        var s0 = SubTask(title: "自环节点", order: 0)
+        s0.dependencies = [s0.id]
+        task.updateSubTasks([s0])
+        context.insert(task)
+        try context.save()
+
+        // init 里会自动恢复这条 inProgress 任务，executeAll 一进来就命中它
+        let orchestrator = makeOrchestrator()
+        XCTAssertNotNil(orchestrator.currentTask, "应自动恢复 inProgress 任务")
+
+        // 监听器的 subscribe 是排在 MainActor 上的 Task，只有 executeAll 挂起时才可能插进来，
+        // 所以先把"订阅确实挂上了"这个前提测出来；测不出来就说明这条用例钉不住任何东西，
+        // 与其给一个恒成立的断言，不如显式跳过并说明原因。
+        let runTask = Task { () -> Result<Void, Error> in
+            do {
+                try await orchestrator.executeAll()
+                return .success(())
+            } catch {
+                return .failure(error)
+            }
+        }
+
+        var sawSubscriber = false
+        for _ in 0..<50 {
+            if await orchestrator.messageBus.subscriberCount(topic: "delegation.requests") > 0 {
+                sawSubscriber = true
+                break
+            }
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        guard sawSubscriber else {
+            _ = await runTask.value
+            throw XCTSkip("没能在 executeAll 抛错之前观察到 delegation.requests 订阅，"
+                          + "这条路径的订阅时序在该次运行里没建立，断言会是空的")
+        }
+
+        let outcome = await runTask.value
+        switch outcome {
+        case .success:
+            XCTFail("自环依赖应让 executeAll 抛 .noExecutableSubTask")
+        case .failure(let error):
+            guard let orchestratorError = error as? AgentOrchestrator.OrchestratorError,
+                  case .noExecutableSubTask = orchestratorError else {
+                return XCTFail("应抛 .noExecutableSubTask，实际：\(error)")
+            }
+        }
+
+        // onTermination 里的 removeSubscriber 自己又是一个 Task，取消之后给它一步时间
+        var released = false
+        for _ in 0..<50 {
+            if await orchestrator.messageBus.subscriberCount(topic: "delegation.requests") == 0 {
+                released = true
+                break
+            }
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        XCTAssertTrue(released, "抛错路径上委派监听器的订阅必须被摘掉（改动前这里恒为 1）")
+    }
+
 }
