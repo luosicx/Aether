@@ -287,6 +287,29 @@
 #     另外 engine.start() 抛错那一路补了就地 removeTap：旧写法是先置 isInputTapInstalled 再 start，
 #     抛错后 stopRecording 还拆得掉；整段挪进专用线程后这条分支若不就地拆，tap 就永久留在
 #     inputNode 上——那是搬迁引入的回归，不是原来就有的。
+#   - 上面那处 5 秒窗口在本 PR 第二轮 CI（run 43595475519 / `unit-tests-macos (2)`）还是没止住挂死，
+#     而且换了红法：testDeinitAsyncCleanupAfterRecordingAttempt 依旧 exceeded 1 minute，
+#     testDidCancelDuringPreviewCleansPreviewState 变成 `Stall on main thread.`
+#     （result=Failed passed=1389 failed=2 skipped=40，两条都是基线外 NEW FAILURE）。同一轮里
+#     testDeinitWhileRecordingReleasesResources 已经是 skipped (5.069s)——窗口对它生效了。
+#     窗口按构造最多吃 5 秒，那 60 秒就不可能花在启动序列里，只可能在窗口之外的主线程同步调用上：
+#     一是 `hasAudioInputDevice()` 的 `AudioObjectGetPropertyData`（同样是向 CoreAudio 取数），
+#     二是 deinit 交给主 actor 的那段清理（`isRunning` / `stop()` / `inputNode.removeTap`）——
+#     用例正是在 startRecording 抛错之后把 service 置 nil，挂点落在这里。而一条根本不碰输入设备的
+#     TTS 用例也被判成主线程 stall，说明代价不是"这一次录音失败"，是每按一次麦克风就多一条钉死在
+#     CoreAudio 里的线程、把整个音频子系统拖住。于是这一处再改三层：设备属性查询移进有界窗口
+#     （新结局 .noInputDevice，错误码 -3 与文案一字未改）；引擎拆除整体排到队列上且调用方不等
+#     （不等就不需要窗口，可能钉死的只有那一条队列）；全进程只开一条音频工作队列，加上一次窗口到期
+#     就置位的进程级熔断位，之后 startRecording 直接快速失败、连 CoreAudio 都不碰。
+#     配套第三条用例 testStartRecordingFailsFastAfterAudioSubsystemStalled 断言熔断后 0.5 秒内抛 -5
+#     （本地 0.203s，对照组是 5 秒整窗），并显式复位熔断位——那是进程级状态，用例不归还就会污染
+#     同一次运行里后面的录音用例。注入用的 body sleep 也从 30 秒降到 1.5 秒，同一个道理：共用队列
+#     被睡死 30 秒的话，测的就不是窗口而是自造的拥堵。
+#     代价写明白：熔断之后本进程再也录不了音（真机要恢复得重启 App），工作队列若被钉住、排在它后面
+#     的拆除就不执行。两条都优于把主线程钉死，但都不免费。
+#     本地 macOS 语音三类（VoiceService / VoiceCoordinator / ChatViewModel）224 tests / 0 failures
+#     / 8 skipped、无 exceeded 行、闸门 exit 0；挂死本身最终仍只能由 CI 轮次判定。
+#     文档计数随第三条用例 3556→3557。
 #   - TTSVoiceCatalog.voice(for:) 对任意字符串都返回对象（testVoiceReturnsNilForInvalidIdentifier
 #     两轮 failed，0.02–0.185s，确定性）：`AVSpeechSynthesisVoice(identifier:)` 已弃用且不校验
 #     identifier，于是 resolveVoice 的中文音色兜底分支永远走不到。改成先按 allVoices()

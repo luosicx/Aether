@@ -833,15 +833,19 @@ final class VoiceServiceTests: XCTestCase {
         XCTAssertNil(service, "service 应被释放，deinit 异步 Task 应正常完成")
     }
 
-    // MARK: - 音频启动序列的有界窗口
+    // MARK: - 音频启动序列的有界窗口与熔断位
 
-    /// 启动序列永不返回时，有界窗口必须按时交回 .stalled，调用方线程不能被钉住。
-    /// CI 上 macOS 的两条 testDeinit* 就是因为 startRecording() 卡在 CoreAudio 绑定里
-    /// 挂满 60 秒 allowance 才判红的。
+    /// 启动序列永不返回时，有界窗口必须按时交回 .stalled 并置起熔断位，调用方线程不能被钉住。
+    /// CI 上 macOS 的 testDeinit* 就是因为 startRecording() 卡在 CoreAudio 绑定里挂满 60 秒
+    /// allowance 才判红的。
+    /// body 只睡 1.5 秒：睡太久会把这条全进程共用的音频工作队列占住，同一次运行里后面的录音用例
+    /// 会排队排到窗口之外——那测的就不是窗口，是自造的拥堵。
     func testAudioSetupThreadGivesUpWithinDeadlineWhenBodyStalls() {
+        defer { VoiceService.resetAudioSubsystemStall() }
+        XCTAssertFalse(VoiceService.isAudioSubsystemStalled, "用例开始时熔断位应是复位状态")
         let start = Date()
-        let outcome = VoiceService.runOnAudioSetupThread(deadline: 0.5) {
-            Thread.sleep(forTimeInterval: 30)
+        let outcome = VoiceService.runBoundedAudioWork(deadline: 0.5) {
+            Thread.sleep(forTimeInterval: 1.5)
             return .ok
         }
         let elapsed = Date().timeIntervalSince(start)
@@ -849,14 +853,43 @@ final class VoiceServiceTests: XCTestCase {
             return XCTFail("body 不返回时应得到 .stalled，实际 \(outcome)")
         }
         XCTAssertLessThan(elapsed, 5, "0.5 秒窗口到期就该返回，实测 \(String(format: "%.2f", elapsed)) 秒")
+        XCTAssertTrue(VoiceService.isAudioSubsystemStalled, "窗口到期就该置熔断位，否则下一次还会陪等一整个窗口")
     }
 
-    /// body 正常完成时结局要原样带回，不能把失败误判成超时。
+    /// body 正常完成时结局要原样带回，不能把失败误判成超时；没到期就不该熔断。
     func testAudioSetupThreadReturnsBodyOutcomeWhenItCompletes() {
-        let outcome = VoiceService.runOnAudioSetupThread(deadline: 5) { .invalidFormat }
+        defer { VoiceService.resetAudioSubsystemStall() }
+        let outcome = VoiceService.runBoundedAudioWork(deadline: 5) { .invalidFormat }
         guard case .invalidFormat = outcome else {
             return XCTFail("body 的 .invalidFormat 应原样带回，实际 \(outcome)")
         }
+        XCTAssertFalse(VoiceService.isAudioSubsystemStalled, "body 答得出来就不该置熔断位")
+    }
+
+    /// 熔断之后 startRecording 必须直接快速失败：既不碰 CoreAudio，也不等窗口。
+    /// 这条在本地也能判（不依赖机器上有没有可用的音频子系统），因为熔断位是显式置起来的。
+    func testStartRecordingFailsFastAfterAudioSubsystemStalled() {
+        defer { VoiceService.resetAudioSubsystemStall() }
+        _ = VoiceService.runBoundedAudioWork(deadline: 0.2) {
+            Thread.sleep(forTimeInterval: 1.5)
+            return .ok
+        }
+        guard VoiceService.isAudioSubsystemStalled else {
+            return XCTFail("上一次有界窗口到期后应已熔断")
+        }
+
+        let service = VoiceService()
+        service.recognizerAvailabilityCheck = { true }
+        let start = Date()
+        XCTAssertThrowsError(try service.startRecording(), "熔断状态下不应再尝试启动录音") { error in
+            let nserror = error as NSError
+            XCTAssertEqual(nserror.domain, "VoiceService")
+            XCTAssertEqual(nserror.code, -5, "快速失败应复用「音频子系统未响应」这一码")
+        }
+        let elapsed = Date().timeIntervalSince(start)
+        XCTAssertLessThan(elapsed, 0.5,
+                          "熔断后不该再排一次窗口，实测 \(String(format: "%.3f", elapsed)) 秒")
+        XCTAssertFalse(service.isRecording, "快速失败不应认录音状态")
     }
 
     // MARK: - 状态转换
