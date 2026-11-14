@@ -232,8 +232,8 @@
 #   macOS 375 tests 0 failures、iOS 375 tests 0 failures，两侧闸门 exit 0；iOS 第一次同样撞了
 #   「test runner hung before establishing connection」的模拟器启动抖动，复跑即 375/0。
 
-# - 语音族删 7 条（macOS 7）：四种机制，改产品代码 + 用例配套，没有新增豁免。#62 先落地，
-#   所以本批对当前 main 是 53→46。直接证据是
+# - 语音族删 7 条（macOS 7）+ Keychain 族删 4 条（双端各 2）：本批 11 条、五种机制，改产品代码 +
+#   用例配套，没有新增豁免。#62 先落地，所以本批对当前 main 是 53→42。语音族的直接证据是
 #   main@b40cc22 的 `unit-tests-macos (2)`（job 131379618980）与 main@9c81652 的同名 job
 #   （132334054858）两轮记录，两轮的形态一字不差：
 #   - requestPermission 无界 await：删 macOS:VoiceServiceTests/testRequestPermission*、
@@ -275,6 +275,30 @@
 #   0 failures 12 skipped，两边闸门 exit 0，声纹与朗读状态机没有回归。挂死类修复的最终判定只能由
 #   CI 轮次给出——本机有麦克风、授权立刻返回，四类挂死在本地一条都复现不了。
 
+# - Keychain 族删 4 条（macOS 2 + iOS 2，同一机制双端各记一条）：`InMemoryKeychainBackend.storage`
+#   是裸 `Dictionary`，而 KeychainManagerTests 用 `Task.detached` / `withTaskGroup` 并发打
+#   `KeychainManager.shared`（save 内部还是 delete + add 两次调用），Swift 字典的并发写会撕裂堆上的
+#   指针。这条不用等 CI：本地单跑该类就复现出来了，而且是两种形态同时出现：写丢失
+#   （testConcurrentWriteMultipleProviders `("nil") is not equal to ("Optional("qwen-concurrent")")`）
+#   和给一个垃圾 tagged pointer 发消息（macOS `-[_NSCoreDataTaggedObjectID count]: unrecognized
+#   selector sent to instance 0x8000000000000000`、iOS `-[NSIndexPath count]: unrecognized selector
+#   sent to instance 0x8000000000000000`——两次跑出来的类名不一样，正是内存被写坏的指纹）。
+#   后者在某些交错下不再是可捕获的 NSException 而是直接把测试进程打崩，这就是
+#   `KeychainManagerTests/*~crash` 两条的来处；删这两条是按"同一 corruption 源"归因，不是按
+#   CI 日志逐条对上——若修后该类再出现 crash 形态失败，说明另有一个源，需要重新锚。
+#   改法与 ToolAuthorization 同例：`OSAllocatedUnfairLock(initialState:)` 包住 storage，
+#   add/delete/copy 各在 withLock 里做一次原子读写；`SystemKeychainBackend` 走 SecItem* 本来就
+#   线程安全，未动。`KeychainManager.backend` 这个 internal var 也没加锁——测试类内串行换入换出，
+#   并发只发生在方法调用上，加锁反而掩盖真正的注入时机问题。
+# - 本地验证（与 CI 同款 -test-timeouts-enabled + 30/60 allowance）：改前闸门数到 macOS
+#   passed=26 failed=2、iOS passed=27 failed=1（两侧总数都是该类的 28 条），且两平台失败的正是
+#   上面那两种形态——改前那两轮复现跑在本工作副本还没带上 Keychain 改动的时候，产品代码与
+#   adcdb73 逐字节相同，归因不受影响。日志里还能看到崩溃后 xcodebuild "Restarting after
+#   unexpected exit" 把整个类从头再跑一遍，最后一遍是 22 tests 0 failures——竞态没撞上而已。
+#   改后：`KeychainManagerTests` + `EncryptionLayerTests` + `SemanticMemoryStoreTests` 三类
+#   macOS 与 iOS 各 57 tests 0 failures、闸门 exit 0；另外把 `KeychainManagerTests` 单独连跑三轮
+#   复验竞态，28 tests 0 failures ×3，单轮 0.041–0.049s。
+
 # - 证据：main@7ccc5ac + PR #56 的 f71be62 / ea16a7e / 4183bd6 / 153b8a8 / bb3b793 / f74e07a 共七轮 run
 #   （产品代码完全相同，只有本基线文件在变）的全部 test job 日志与后六轮闸门自身的 NEW FAILURE
 #   明细；再加 #56 落地后的 main@632e087、#57 的 9147076、main@5090a91 三轮 iOS job 日志——
@@ -313,8 +337,6 @@ UI:MCPSettingsUITests/testDeleteMCPServer
 # ---- macOS（unit-tests-macos 两个分片共用同一 label）----
 macOS:AgentOrchestratorTests/*~crash
 macOS:ChatViewModelToolSecurityTests/testReadClipboardUnauthorizedDoesNotExecute
-macOS:KeychainManagerTests/*~crash
-macOS:KeychainManagerTests/testConcurrentWrite*
 macOS:OnDeviceModelDownloaderTests/testDeleteModelWhenRemoveItemFails
 macOS:SystemControlToolTests/testExecuteGet*
 macOS:SystemControlToolTests/testExecuteSet*
@@ -323,7 +345,5 @@ macOS:ToolExecutionCoordinatorTests/testReadClipboardUnauthorizedDoesNotExecute
 # ---- iOS（unit-tests job）----
 iOS:AgentOrchestratorTests/*~crash
 iOS:ChatViewModelToolSecurityTests/testReadClipboardUnauthorizedDoesNotExecute
-iOS:KeychainManagerTests/*~crash
-iOS:KeychainManagerTests/testConcurrentWrite*
 iOS:OnDeviceModelDownloaderTests/testDeleteModelWhenRemoveItemFails
 iOS:VoiceServiceTests/*~crash
