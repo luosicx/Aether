@@ -232,6 +232,49 @@
 #   macOS 375 tests 0 failures、iOS 375 tests 0 failures，两侧闸门 exit 0；iOS 第一次同样撞了
 #   「test runner hung before establishing connection」的模拟器启动抖动，复跑即 375/0。
 
+# - 语音族删 7 条（macOS 7）：四种机制，改产品代码 + 用例配套，没有新增豁免。#62 先落地，
+#   所以本批对当前 main 是 53→46。直接证据是
+#   main@b40cc22 的 `unit-tests-macos (2)`（job 131379618980）与 main@9c81652 的同名 job
+#   （132334054858）两轮记录，两轮的形态一字不差：
+#   - requestPermission 无界 await：删 macOS:VoiceServiceTests/testRequestPermission*、
+#     macOS:VoiceCoordinatorTests/testToggleVoice*、macOS:ChatViewModelTests/testToggleVoice*。
+#     `SFSpeechRecognizer.requestAuthorization` 的回调在无人应答系统弹窗的环境里永不触发，与 #59
+#     的 NativeASREngine、#61 的三个 TCC 工具是同一处 API、同一个机制，改法照抄：
+#     `ResumeOnceContinuation` + `DispatchQueue.global().asyncAfter` 5 秒窗口，到点按未授权返回。
+#     两轮里 testRequestPermissionReturnsBool / …OnSimulator 都是 exceeded 1 minute；
+#     testToggleVoiceInputStartsRecording / …WhenUnavailableSetsError 是 5.3–5.6s 失败（errorMessage
+#     永远等不到），ChatViewModelTests 那条 11.469s 同理。用例侧把三处 50×0.1s 轮询放宽到 100 次：
+#     原来的 5 秒轮询上限正好压在 5 秒窗口上，修完也会是临界 flaky。
+#   - stopRecording 无条件取 inputNode：`audioEngine.inputNode` 这次访问本身就要向 CoreAudio 查
+#     输入设备，无头机器上它不返回——testToggleVoiceInputStopsRecording 两轮都 exceeded 1 minute，
+#     它是同步用例、没有任何守卫。加 isInputTapInstalled 标记，只有真 installTap 过才去取
+#     inputNode，audioEngine.stop() 同步改成只在 isRunning 时执行。deinit 里原有的 `if isRunning`
+#     已经隐含"装过 tap"，不必改。
+#   - startRecording 直接撞设备绑定：testDeinitWhileRecordingReleasesResources、
+#     testDeinitAsyncCleanupAfterRecordingAttempt 两轮全部 exceeded。在取 inputNode 之前加
+#     macOS-only 的 hasAudioInputDevice()（CoreAudio 属性查询：默认输入设备存在且带输入流），
+#     查不到就抛「未检测到音频输入设备」，用例于是各走自己的 XCTSkip / catch 分支。同类里
+#     testStartRecording* / testStopRecording* 五条早就用 `#if os(macOS) XCTSkipIf(true,
+#     "macOS CI 环境无可靠音频输入")` 认了这件事，这两条 deinit 用例漏了守卫才挂死。没有照抄
+#     那五条的无条件 skip：那是把断言换成沉默，而产品侧在真机上点一下麦克风仍会冻结主线程。
+#   - TTSVoiceCatalog.voice(for:) 对任意字符串都返回对象（testVoiceReturnsNilForInvalidIdentifier
+#     两轮 failed，0.02–0.185s，确定性）：`AVSpeechSynthesisVoice(identifier:)` 已弃用且不校验
+#     identifier，于是 resolveVoice 的中文音色兜底分支永远走不到。改成先按 allVoices()
+#     （来自 speechVoices()）认 identifier，与 NativeTTSEngine.resolveVoice 同一做法。
+# - 同批删 macOS:VoiceServiceTests/testDidCancelDuringPreviewCleansPreviewState，这条不是本轮改好的，
+#   是 #56 批量锚定留下的过期条目：两轮都是 passed (2.018s / 2.028s)。它的机制（真实合成器自然结束
+#   触发 didFinish，与手动 didCancel 抢 isCurrentPreview）早已由用例注释记载的"较长试听文本"缓解，
+#   条目当时没跟着删。
+# - 保留 iOS:VoiceServiceTests/*~crash：语音族在 iOS 侧只有崩溃形态豁免，两轮 iOS 日志里的
+#   crash-exempt 记录与上面四种机制没有对应关系，按"证据不足不删"留着。
+# - 本地验证（与 CI 同款 30/60 allowance）：改前改后都是 101 tests / 0 failures / 6 skipped——本机
+#   有麦克风、授权也能立刻返回，四类挂死在本地一条都复现不了，能确认的只有"没有回归"；本地唯一的
+#   正向信号是这批用例总耗时从 23.6s 降到 11.1s。再把相邻的六个类（VoiceService / VoiceCoordinator /
+#   TTSVoiceCatalog / ChatViewModel / NativeEngines / SettingsView）在并入 #62 的合并树上双端各跑一遍
+#   （含构建，CI 同款 30/60 allowance）：macOS 280 tests 0 failures 8 skipped、iOS 278 tests
+#   0 failures 12 skipped，两边闸门 exit 0，声纹与朗读状态机没有回归。挂死类修复的最终判定只能由
+#   CI 轮次给出——本机有麦克风、授权立刻返回，四类挂死在本地一条都复现不了。
+
 # - 证据：main@7ccc5ac + PR #56 的 f71be62 / ea16a7e / 4183bd6 / 153b8a8 / bb3b793 / f74e07a 共七轮 run
 #   （产品代码完全相同，只有本基线文件在变）的全部 test job 日志与后六轮闸门自身的 NEW FAILURE
 #   明细；再加 #56 落地后的 main@632e087、#57 的 9147076、main@5090a91 三轮 iOS job 日志——
@@ -269,20 +312,13 @@ UI:MCPSettingsUITests/testDeleteMCPServer
 
 # ---- macOS（unit-tests-macos 两个分片共用同一 label）----
 macOS:AgentOrchestratorTests/*~crash
-macOS:ChatViewModelTests/testToggleVoice*
 macOS:ChatViewModelToolSecurityTests/testReadClipboardUnauthorizedDoesNotExecute
 macOS:KeychainManagerTests/*~crash
 macOS:KeychainManagerTests/testConcurrentWrite*
 macOS:OnDeviceModelDownloaderTests/testDeleteModelWhenRemoveItemFails
 macOS:SystemControlToolTests/testExecuteGet*
 macOS:SystemControlToolTests/testExecuteSet*
-macOS:TTSVoiceCatalogTests/testVoiceReturnsNilForInvalidIdentifier
 macOS:ToolExecutionCoordinatorTests/testReadClipboardUnauthorizedDoesNotExecute
-macOS:VoiceCoordinatorTests/testToggleVoice*
-macOS:VoiceServiceTests/testDeinitAsyncCleanupAfterRecordingAttempt
-macOS:VoiceServiceTests/testDeinitWhileRecordingReleasesResources
-macOS:VoiceServiceTests/testDidCancelDuringPreviewCleansPreviewState
-macOS:VoiceServiceTests/testRequestPermission*
 
 # ---- iOS（unit-tests job）----
 iOS:AgentOrchestratorTests/*~crash

@@ -1,3 +1,6 @@
+#if os(macOS)
+import CoreAudio
+#endif
 import Foundation
 import Speech
 @preconcurrency import AVFoundation
@@ -19,6 +22,8 @@ final class VoiceService: NSObject {
     private var recognitionTask: SFSpeechRecognitionTask?
     /// 音频引擎
     private let audioEngine = AVAudioEngine()
+    /// 是否已在 inputNode 上安装 tap（决定 stopRecording / deinit 是否需要移除）
+    private var isInputTapInstalled = false
     /// 语音合成器
     private let synthesizer: AVSpeechSynthesizer
     /// 朗读完成回调（自然结束或被 stop）
@@ -50,16 +55,27 @@ final class VoiceService: NSObject {
         synthesizer.delegate = self
     }
 
-    /// 请求语音识别权限，返回是否授权
+    /// 语音识别授权回调窗口，与 ReminderTool / AlarmTool / ContactsTool 的授权窗口同量级。
+    nonisolated private static let authorizationDeadline: TimeInterval = 5
+
+    /// 请求语音识别权限，返回是否授权。
+    /// `SFSpeechRecognizer.requestAuthorization` 的回调在无法应答系统弹窗的运行环境
+    /// （模拟器、无头 CI）里可能永不触发，无界 await 会把「点击语音输入」整条链路挂死，
+    /// 因此超时按未授权收尾，由调用方走权限提示分支。
     func requestPermission() async -> Bool {
-        await withCheckedContinuation { continuation in
+        let deadline = Self.authorizationDeadline
+        return await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+            let once = ResumeOnceContinuation(continuation)
             SFSpeechRecognizer.requestAuthorization { status in
-                continuation.resume(returning: status == .authorized)
+                once.resume(returning: status == .authorized)
+            }
+            DispatchQueue.global().asyncAfter(deadline: .now() + deadline) {
+                once.resume(returning: false)
             }
         }
     }
 
-    /// 开始录音。流程：1) 检查识别器可用；2) 激活 AVAudioSession（必须在 installTap 之前，
+    /// 开始录音。流程：1) 检查识别器可用与系统输入设备存在；2) 激活 AVAudioSession（必须在 installTap 之前，
     /// 未激活时 inputNode.outputFormat 返回 sampleRate=0/channelCount=0 无效格式，installTab 会崩
     /// IsFormatSampleRateAndChannelCountValid）；3) 创建识别请求；4) installTap 接收音频；5) 启动 audioEngine。
     func startRecording() throws {
@@ -69,6 +85,14 @@ final class VoiceService: NSObject {
         guard let recognizer = speechRecognizer else {
             throw NSError(domain: "VoiceService", code: -1, userInfo: [NSLocalizedDescriptionKey: NSLocalizedString("语音识别器不可用", comment: "")])
         }
+        // 0) 输入设备前置检查 —— 见 hasAudioInputDevice()：没有输入设备时绝不能再碰
+        //    inputNode / installTap / start，否则线程会卡在 CoreAudio 设备绑定里不返回。
+        //    iOS 不走这条路：下面 #if os(iOS) 的 AVAudioSession 激活失败会先抛错。
+        #if os(macOS)
+        guard Self.hasAudioInputDevice() else {
+            throw NSError(domain: "VoiceService", code: -3, userInfo: [NSLocalizedDescriptionKey: NSLocalizedString("未检测到音频输入设备", comment: "")])
+        }
+        #endif
         // 1) 激活 AVAudioSession — 必须在取 outputFormat / installTap 之前完成，
         //    否则 inputNode.outputFormat(forBus:0) 会返回 sampleRate=0 / channelCount=0 的无效格式，
         //    导致 installTap 抛出 "IsFormatSampleRateAndChannelCountValid" 崩溃。
@@ -97,15 +121,24 @@ final class VoiceService: NSObject {
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, _ in
             request.append(buffer)
         }
+        isInputTapInstalled = true
         audioEngine.prepare()
         try audioEngine.start()
         isRecording = true
     }
 
     /// 停止录音，释放 audio session
+    /// 只有真正 installTap 过才去取 inputNode 移除 tap：`audioEngine.inputNode` 本身就会向
+    /// CoreAudio 查询输入设备，在无可应答输入设备的运行环境（无头 CI）里这次访问可能不返回，
+    /// 于是「点击停止录音」把调用方（以及它所在的测试）整条挂死。
     func stopRecording() {
-        audioEngine.stop()
-        audioEngine.inputNode.removeTap(onBus: 0)
+        if audioEngine.isRunning {
+            audioEngine.stop()
+        }
+        if isInputTapInstalled {
+            audioEngine.inputNode.removeTap(onBus: 0)
+            isInputTapInstalled = false
+        }
         recognitionRequest?.endAudio()
         recognitionTask?.cancel()
         isRecording = false
@@ -205,6 +238,8 @@ final class VoiceService: NSObject {
         let audioEngine = self.audioEngine
         let synthesizer = self.synthesizer
         Task { @MainActor [audioEngine, synthesizer] in
+            // isRunning == true 只可能来自 startRecording 成功，那次一定先 installTap 过，
+            // 所以这里不需要额外的状态标记就能保证不会无谓地去取 inputNode。
             if audioEngine.isRunning {
                 audioEngine.stop()
                 audioEngine.inputNode.removeTap(onBus: 0)
@@ -215,6 +250,39 @@ final class VoiceService: NSObject {
             #endif
         }
     }
+
+    #if os(macOS)
+    /// 系统当前是否有可用的默认音频输入设备（且该设备带输入流）。
+    /// `AVAudioEngine.inputNode` / `start()` 在没有输入设备的机器上会进入 CoreAudio 的
+    /// 设备绑定流程并一直等下去（CI 上栈停在 `BindToDeviceInternal → mach_msg`），线程被卡死后
+    /// 该线程上的所有后续用例只能超时。这里只用 CoreAudio 的属性查询（同步、不启动 I/O）
+    /// 做前置判断，无设备时直接抛错，让调用方走「录音启动失败」分支。
+    nonisolated private static func hasAudioInputDevice() -> Bool {
+        var deviceID = AudioDeviceID(kAudioObjectUnknown)
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultInputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        guard AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &deviceID
+        ) == noErr, deviceID != AudioDeviceID(kAudioObjectUnknown) else {
+            return false
+        }
+        // 设备存在还要有输入流：无头机器上可能残留一个没有任何流的聚合设备。
+        var streamSize: UInt32 = 0
+        var streamAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyStreams,
+            mScope: kAudioDevicePropertyScopeInput,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        guard AudioObjectGetPropertyDataSize(deviceID, &streamAddress, 0, nil, &streamSize) == noErr else {
+            return false
+        }
+        return streamSize > 0
+    }
+    #endif
 
 }
 

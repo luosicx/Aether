@@ -65,8 +65,9 @@ final class VoiceCoordinatorTests: XCTestCase {
 
         fx.coordinator.toggleVoiceInput()
 
-        // 轮询等待异步 Task 完成：成功时 isRecording=true，失败时 errorMessage 被设置
-        for _ in 0..<50 {
+        // 轮询等待异步 Task 完成：成功时 isRecording=true，失败时 errorMessage 被设置。
+        // 上限 10s：无头环境里 requestPermission 要走 5s 授权兜底窗口（VoiceService.authorizationDeadline）。
+        for _ in 0..<100 {
             if fx.isRecording.value == true || fx.errorMessage.value != nil { break }
             try await Task.sleep(nanoseconds: 100_000_000) // 0.1s
         }
@@ -106,8 +107,9 @@ final class VoiceCoordinatorTests: XCTestCase {
 
         fx.coordinator.toggleVoiceInput()
 
-        // 轮询等待异步 Task 完成（requestPermission + startRecording 抛错路径）
-        for _ in 0..<50 {
+        // 轮询等待异步 Task 完成（requestPermission + startRecording 抛错路径）。
+        // 上限 10s：无头环境里 requestPermission 要走 5s 授权兜底窗口（VoiceService.authorizationDeadline）。
+        for _ in 0..<100 {
             if fx.errorMessage.value != nil { break }
             try await Task.sleep(nanoseconds: 100_000_000) // 0.1s
         }
