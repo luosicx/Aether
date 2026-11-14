@@ -232,10 +232,10 @@
 #   macOS 375 tests 0 failures、iOS 375 tests 0 failures，两侧闸门 exit 0；iOS 第一次同样撞了
 #   「test runner hung before establishing connection」的模拟器启动抖动，复跑即 375/0。
 
-# - 语音族删 7 条（macOS 7）+ Keychain 族删 4 条（双端各 2）：本批 11 条、六种机制，改产品代码 +
-#   用例配套，没有新增豁免；另修一条从没锚过的 iOS 崩溃形态（不计入删除数，见语音块里
-#   installTap 那一条）。
-#   #62 先落地，所以本批对当前 main 是 53→42。语音族的直接证据是所以本批对当前 main 是 53→42。语音族的直接证据是
+# - 语音族删 7 条（macOS 7）+ Keychain 族删 4 条（双端各 2）+ OnDevice 族删 2 条（双端各 1）：
+#   本批 13 条、六种机制，改产品代码 + 用例配套，没有新增豁免；另修一条从没锚过的 iOS 崩溃形态
+#   （不计入删除数，见语音块里 installTap 那一条）。
+#   #62 先落地，所以本批对当前 main 是 53→40。语音族的直接证据是所以本批对当前 main 是 53→42。语音族的直接证据是
 #   main@b40cc22 的 `unit-tests-macos (2)`（job 131379618980）与 main@9c81652 的同名 job
 #   （132334054858）两轮记录，两轮的形态一字不差：
 #   - requestPermission 无界 await：删 macOS:VoiceServiceTests/testRequestPermission*、
@@ -316,6 +316,22 @@
 #   macOS 与 iOS 各 57 tests 0 failures、闸门 exit 0；另外把 `KeychainManagerTests` 单独连跑三轮
 #   复验竞态，28 tests 0 failures ×3，单轮 0.041–0.049s。
 
+# - OnDevice 族删 2 条（macOS 1 + iOS 1）：`testDeleteModelWhenRemoveItemFails` 的匹配子还写在
+#   P2-3 之前。产品侧 `deleteModel` 在 removeItem 失败时抛的是
+#   `loadFailedWithCause(message:underlying:)`（OnDeviceModelDownloader.swift:293），而用例用
+#   `if case .loadFailed = error` 判——两个不同的 case，永远落到 XCTFail。CI 原文正好把分叉写全了：
+#   main@adcdb73 的 unit-tests job 132344119663，`OnDeviceModelDownloaderTests.swift:1613: 应抛出
+#   loadFailed，实际：loadFailedWithCause(message: "Failed to delete model file: “model.bin” couldn’t
+#   be removed because you don’t have permission to access it.", underlying: Error Domain=
+#   NSCocoaErrorDomain Code=513 …)`——把父目录 chmod 0555 这一招在 runner 上是生效的（513 就是无
+#   权限），坏的只有匹配子。改成按文档契约断言 `loadFailedWithCause`，并检查 underlying 没被丢掉；
+#   message 只断非空不断文案，因为 runner 走英文本地化、本机走中文。同文件 1375 行
+#   `testStartDownloadInvalidDestinationSetsLoadFailed` 不动——它断的是 `handleDownloadDone` 的
+#   裸 `.loadFailed`（OnDeviceModelDownloader.swift:356），那条路径 P2-3 没碰过，也确实一直是过的。
+# - 本地验证：改前本机单跑该类，同一条在 1613 行失败（"应抛出 loadFailed，实际：…"，0.084s），
+#   形态与上面那条 CI 原文一致；改后 macOS 与 iOS 各单跑 OnDeviceModelDownloaderTests
+#   70 tests 0 failures 5 skipped、闸门 exit 0，该用例双端 0.020–0.084s。
+
 # - 证据：main@7ccc5ac + PR #56 的 f71be62 / ea16a7e / 4183bd6 / 153b8a8 / bb3b793 / f74e07a 共七轮 run
 #   （产品代码完全相同，只有本基线文件在变）的全部 test job 日志与后六轮闸门自身的 NEW FAILURE
 #   明细；再加 #56 落地后的 main@632e087、#57 的 9147076、main@5090a91 三轮 iOS job 日志——
@@ -354,7 +370,6 @@ UI:MCPSettingsUITests/testDeleteMCPServer
 # ---- macOS（unit-tests-macos 两个分片共用同一 label）----
 macOS:AgentOrchestratorTests/*~crash
 macOS:ChatViewModelToolSecurityTests/testReadClipboardUnauthorizedDoesNotExecute
-macOS:OnDeviceModelDownloaderTests/testDeleteModelWhenRemoveItemFails
 macOS:SystemControlToolTests/testExecuteGet*
 macOS:SystemControlToolTests/testExecuteSet*
 macOS:ToolExecutionCoordinatorTests/testReadClipboardUnauthorizedDoesNotExecute
@@ -362,5 +377,4 @@ macOS:ToolExecutionCoordinatorTests/testReadClipboardUnauthorizedDoesNotExecute
 # ---- iOS（unit-tests job）----
 iOS:AgentOrchestratorTests/*~crash
 iOS:ChatViewModelToolSecurityTests/testReadClipboardUnauthorizedDoesNotExecute
-iOS:OnDeviceModelDownloaderTests/testDeleteModelWhenRemoveItemFails
 iOS:VoiceServiceTests/*~crash
