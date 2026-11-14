@@ -290,4 +290,42 @@ final class SSETransportTests: XCTestCase {
 
         await transport.disconnect()
     }
+
+    // MARK: - 8. 同源校验的端口口径
+
+    /// 端口必须真的一致才算同源：SSE 连接省略端口（隐式 80）时，指向 `:9999` 的 endpoint
+    /// 不能因为"两边各写了一侧端口"就被放行；反过来 endpoint 用相对路径继承端口时应正常接受。
+    func testHandleSSEEventEndpointPortMustMatch() async throws {
+        // 场景 1：SSE 省略端口，endpoint 显式指到 9999 → 按跨源拒绝
+        SSEMockURLProtocol.reset()
+        SSEMockURLProtocol.sseData = makeEndpointSSEResponse(endpoint: "http://localhost:9999/messages")
+        let hijackTransport = SSETransport(urlString: "http://localhost/sse", headers: nil, session: makeMockSession())
+        let hijackStream = hijackTransport.messages()
+        try await hijackTransport.connect()
+        _ = await collectMessages(from: hijackStream, timeoutSeconds: 3)
+        do {
+            _ = try await hijackTransport.send(Data("{}".utf8))
+            XCTFail("端口不同的 endpoint 应被拒绝，不应设置 postEndpoint")
+        } catch let error as MCPError {
+            if case .connectionFailed = error {
+                // 预期：被当作劫持拒绝
+            } else {
+                XCTFail("应为 connectionFailed 错误，实际: \(error)")
+            }
+        } catch {
+            XCTFail("应为 MCPError，实际: \(error)")
+        }
+        await hijackTransport.disconnect()
+
+        // 场景 2：endpoint 是相对路径，端口随 SSE 连接（9999）→ 同源接受，send 不再抛错
+        SSEMockURLProtocol.reset()
+        SSEMockURLProtocol.sseData = makeEndpointSSEResponse(endpoint: "/messages")
+        SSEMockURLProtocol.postStatusCode = 200
+        let sameOrigin = SSETransport(urlString: "http://localhost:9999/sse", headers: nil, session: makeMockSession())
+        let sameOriginStream = sameOrigin.messages()
+        try await sameOrigin.connect()
+        _ = await collectMessages(from: sameOriginStream, timeoutSeconds: 3)
+        try await sameOrigin.send(Data("{}".utf8))
+        await sameOrigin.disconnect()
+    }
 }
