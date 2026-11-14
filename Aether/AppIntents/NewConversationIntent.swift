@@ -3,8 +3,8 @@ import Foundation
 import SwiftData
 
 /// Day 18: 「新建对话」AppIntent，让 Siri / 快捷指令能在以太中创建新会话。
-/// 由于 AppIntent 无直接访问主 App 的 ModelContext，这里创建独立 ModelContainer
-/// （schema 与 AetherApp 保持一致以保证读写同一 SQLite 文件）。
+/// AppIntent 拿不到主 App 注入的 ModelContext，因此复用 `AetherApp.sharedModelContainer`
+/// ——schema 与存储位置都由 AetherApp 单点定义，intent 与主 App 必然读写同一个 store。
 ///
 /// P1-2: ModelContext 非 Sendable，AppIntent perform 在后台 actor 执行，
 /// 故用 `MainActor.run { ... }` 将 ModelContext 操作 hop 到主线程，
@@ -19,12 +19,10 @@ struct NewConversationIntent: AppIntent {
     func perform() async throws -> some IntentResult & ReturnsValue<String> {
         // P1-2: 整个 ModelContext 生命周期在 MainActor 上完成，避免跨 actor 访问
         let conversationId: String = try await MainActor.run {
-            // 创建与主 App 同 schema 的 ModelContainer（读写同一 SQLite 文件）
-            let container = try ModelContainer(
-                for: Conversation.self, ChatMessage.self,
-                DocumentChunk.self, MessageFeedback.self, HealthInsight.self
-            )
-            let context = ModelContext(container)
+            // 复用共享容器，不在这里列模型清单：旧写法自建 `ModelContainer(for: 5 个模型)`，
+            // CoreData 把同一 store 里多出来的 UserPreference / AgentTask / Memory 当"实体被移除"，
+            // 直接删表并清空数据，之后主 App 那次 save 就报 `no such table: ZUSERPREFERENCE`。
+            let context = ModelContext(AetherApp.sharedModelContainer)
             // 创建新 Conversation 并持久化
             let conversation = Conversation()
             context.insert(conversation)
