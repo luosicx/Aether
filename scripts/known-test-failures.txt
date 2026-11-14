@@ -260,6 +260,33 @@
 #     testStartRecording* / testStopRecording* 五条早就用 `#if os(macOS) XCTSkipIf(true,
 #     "macOS CI 环境无可靠音频输入")` 认了这件事，这两条 deinit 用例漏了守卫才挂死。没有照抄
 #     那五条的无条件 skip：那是把断言换成沉默，而产品侧在真机上点一下麦克风仍会冻结主线程。
+#   - 上面那条 hasAudioInputDevice() 被本 PR 自己的 CI 轮次否掉了，所以追加一处有界窗口
+#     （run 43580203027 / `unit-tests-macos (2)`，头提交 8687cf2、检出的是合并提交 9f6ac12）：
+#     两条 deinit 用例照旧 exceeded 1 minute，闸门因此判红
+#     （result=Failed passed=1388 failed=2 skipped=39，NEW FAILURE 恰好这两条，重跑一模一样）。
+#     那台 runner 上「默认输入设备存在、且带输入流」这两项都过，却仍然绑不上——属性查询挡得住
+#     "一个输入设备都没有"，挡不住"设备在但 BindToDeviceInternal → mach_msg 不返回"（同一份日志里
+#     还能看到 AddInstanceForFactory: No factory registered）。继续加设备判定没有意义，改为把
+#     `engine.inputNode` → `recognizer.recognitionTask(with:)` → outputFormat 判定 → installTap →
+#     prepare → start() 整段放进专用串行队列，主线程只在信号量上有界等待 5 秒，与
+#     authorizationDeadline 同量级；到期返回 .stalled、抛 code -5「音频子系统未响应」，用例落回
+#     它们本来就有的 catch / XCTSkip 分支。跨线程只传 Sendable 结局，识别任务经 carrier 交接。
+#     诚实记一句：卡点到底是 CoreAudio 还是 ASR 守护进程，日志分不出来，所以两处一起搬进窗口里。
+#     .stalled 时既不读也不 cancel 那条识别任务——写它的还是那条线程，主线程读同一个强引用变量
+#     就是并发读写；cancel 之后它仍可能把 tap 装上、往已结束的 request 里灌缓冲。代价按"弃用
+#     一条线程"记账，这也是有界等待换主线程不被钉住的唯一成本。
+#     配套新增 testAudioSetupThreadGivesUpWithinDeadlineWhenBodyStalls /
+#     …ReturnsBodyOutcomeWhenItCompletes：前者用 30 秒 sleep 的 body 配 0.5 秒窗口，断言拿到
+#     .stalled 且 elapsed < 5（本机 0.502s，窗口按点返回）；后者断言 body 真跑完时结局原样带回、
+#     不会被误判成超时。两条都不碰麦克风与授权，本地就能判，不像上面四类挂死本地一条都复现不了。
+#     本地 macOS 整类 79 tests / 0 failures / 6 skipped、日志里没有 exceeded 行，那两条 deinit
+#     用例 0.687s / 0.088s 通过（本机有麦克风，走的是真实装 tap 的路径，与 CI 的 .stalled 分支不同）。
+#     合完这处再跑相邻两个消费方：语音三类（VoiceService / VoiceCoordinator / ChatViewModel）双端各
+#     一次含构建、CI 同款 30/60 allowance —— macOS 231 tests / 0 failures / 8 skipped，
+#     iOS 233 tests / 0 failures / 12 skipped，两侧闸门 exit 0，两份日志里都没有 exceeded 行。
+#     另外 engine.start() 抛错那一路补了就地 removeTap：旧写法是先置 isInputTapInstalled 再 start，
+#     抛错后 stopRecording 还拆得掉；整段挪进专用线程后这条分支若不就地拆，tap 就永久留在
+#     inputNode 上——那是搬迁引入的回归，不是原来就有的。
 #   - TTSVoiceCatalog.voice(for:) 对任意字符串都返回对象（testVoiceReturnsNilForInvalidIdentifier
 #     两轮 failed，0.02–0.185s，确定性）：`AVSpeechSynthesisVoice(identifier:)` 已弃用且不校验
 #     identifier，于是 resolveVoice 的中文音色兜底分支永远走不到。改成先按 allVoices()
@@ -297,6 +324,9 @@
 #   macOS 395 tests 0 failures 13 skipped、闸门 exit 0；iOS 393 tests 0 failures 17 skipped、
 #   闸门 exit 0。基线按 comm 重导：对 main@3a7e5c5 是 26→10，删除集 16 条与各族小计逐条对上、
 #   零新增；文档门 tests=3554 不变（本批没加用例）。
+#   上面那处有界窗口是本批落地后追加的 hotfix：多了两条 testAudioSetupThread*，文档门
+#   从 3554 改到 3556；删除集不变（16 条），因为修的目的正是让已经删掉的
+#   macOS:VoiceServiceTests/testDeinit* 两条不再以 NEW FAILURE 回来，而不是再删别的。
 
 # - Keychain 族删 4 条（macOS 2 + iOS 2，同一机制双端各记一条）：`InMemoryKeychainBackend.storage`
 #   是裸 `Dictionary`，而 KeychainManagerTests 用 `Task.detached` / `withTaskGroup` 并发打

@@ -2,6 +2,9 @@
 import CoreAudio
 #endif
 import Foundation
+#if canImport(os)
+import os
+#endif
 import Speech
 @preconcurrency import AVFoundation
 
@@ -78,6 +81,7 @@ final class VoiceService: NSObject {
     /// 开始录音。流程：1) 检查识别器可用与系统输入设备存在；2) 激活 AVAudioSession（必须在 installTap 之前，
     /// 未激活时 inputNode.outputFormat 返回 sampleRate=0/channelCount=0 无效格式，installTab 会崩
     /// IsFormatSampleRateAndChannelCountValid）；3) 创建识别请求；4) installTap 接收音频；5) 启动 audioEngine。
+    /// 其中 4)~5)（含取 inputNode 与创建识别任务）在专用线程上有界执行，见 runOnAudioSetupThread。
     func startRecording() throws {
         guard recognizerAvailabilityCheck() else {
             throw NSError(domain: "VoiceService", code: -1, userInfo: [NSLocalizedDescriptionKey: NSLocalizedString("语音识别器不可用", comment: "")])
@@ -106,34 +110,92 @@ final class VoiceService: NSObject {
         recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
         guard let request = recognitionRequest else { return }
         request.shouldReportPartialResults = true
-        let inputNode = audioEngine.inputNode
-        recognitionTask = recognizer.recognitionTask(with: request) { [weak self] result, _ in
-            if let result = result {
-                let text = result.bestTranscription.formattedString
-                Task { @MainActor [weak self] in
-                    guard let self = self else { return }
-                    self.recognizedText = text
-                    self.onRecognized?(text)
-                }
-            }
+        // 2)~5) 从取 inputNode 到 engine.start() 整段放到专用线程上有界执行（见 runOnAudioSetupThread）。
+        let carrier = VoiceAudioSetupCarrier(engine: audioEngine, recognizer: recognizer,
+                                             request: request, sink: VoiceRecognitionSink(service: self))
+        let outcome = Self.runOnAudioSetupThread(deadline: Self.audioSetupDeadline) {
+            Self.performAudioSetup(carrier: carrier)
         }
-        // 2) 激活 session 后再取 format。模拟器上 setActive 可能成功而输入格式仍是
-        //    sampleRate=0 / channelCount=0，把这种格式直接交给 installTap 会撞上 CoreAudio 的
-        //    IsFormatSampleRateAndChannelCountValid 断言、整个进程被打死（真机上麦克风被占用/
-        //    无权限时同样可能拿到无效格式）。先判掉，让调用方拿到可展示的抛错。
-        let recordingFormat = inputNode.outputFormat(forBus: 0)
-        guard recordingFormat.sampleRate > 0, recordingFormat.channelCount > 0 else {
+        switch outcome {
+        case .ok:
+            // 信号量已经建好 happens-before，这里读 carrier.task 才是安全的
+            recognitionTask = carrier.task
+            isInputTapInstalled = true
+            isRecording = true
+        case .invalidFormat:
+            recognitionTask = carrier.task
             recognitionTask?.cancel()
             recognitionTask = nil
             throw NSError(domain: "VoiceService", code: -4, userInfo: [NSLocalizedDescriptionKey: NSLocalizedString("音频输入格式无效", comment: "")])
+        case .startFailed(let reason):
+            recognitionTask = carrier.task
+            recognitionTask?.cancel()
+            recognitionTask = nil
+            throw NSError(domain: "VoiceService", code: -6, userInfo: [NSLocalizedDescriptionKey: String(format: NSLocalizedString("音频引擎启动失败: %@", comment: ""), reason)])
+        case .stalled:
+            // 既不读也不 cancel carrier.task：那条线程还在写它，主线程读同一个强引用变量就是
+            // 并发读写；cancel 也不安全，被弃用的线程稍后仍可能把 tap 装上并往 request 里灌缓冲，
+            // 已 cancel 的请求再收缓冲不是安全操作。这里只报错、不认录音状态，
+            // 那次识别任务连同引擎若真跑起来，由 stopRecording / deinit 的 isRunning 分支收尾。
+            throw NSError(domain: "VoiceService", code: -5, userInfo: [NSLocalizedDescriptionKey: NSLocalizedString("音频子系统未响应", comment: "")])
+        }
+    }
+
+    /// 音频启动序列的有界窗口，与 `authorizationDeadline` 取同一量级。
+    nonisolated private static let audioSetupDeadline: TimeInterval = 5
+
+    /// 在专用线程上跑 `body`，最多等 `deadline` 秒；窗口到期返回 `.stalled`。
+    /// `AVAudioEngine.inputNode` / `outputFormat(forBus:)` / `installTap` / `prepare` / `start()`
+    /// 与 `SFSpeechRecognizer.recognitionTask(with:)` 都是同步向 CoreAudio / Assistant 守护进程
+    /// 发请求的调用，在输入设备存在却绑不上的机器上可能永不返回（CI 栈停在
+    /// `BindToDeviceInternal → mach_msg`，控制台同时打 `AddInstanceForFactory: No factory registered`）。
+    /// 本类是 @MainActor，一次永不返回就把主线程永久钉住：用户点麦克风后 UI 再也回不来，
+    /// 测试里则整条用例只能等 xcodebuild 的 60 秒 allowance 把它打死。
+    /// `hasAudioInputDevice()` 只挡得住「一个输入设备都没有」，挡不住「设备存在但绑不上」，
+    /// 所以这里做有界等待而不是继续加设备判定。被弃用的线程无法解绑，是这次取舍的代价。
+    /// internal 是给单测留的口：用一个 sleep 远超窗口的 body 就能在本地证明它按时返回。
+    internal nonisolated static func runOnAudioSetupThread(
+        deadline: TimeInterval,
+        _ body: @escaping @Sendable () -> VoiceAudioSetupOutcome
+    ) -> VoiceAudioSetupOutcome {
+        let done = DispatchSemaphore(value: 0)
+        let box = OSAllocatedUnfairLock(initialState: VoiceAudioSetupOutcome.ok)
+        DispatchQueue(label: "com.aether.voice.audiosetup").async {
+            box.withLock { $0 = body() }
+            done.signal()
+        }
+        guard done.wait(timeout: .now() + deadline) == .success else { return .stalled }
+        return box.withLock { $0 }
+    }
+
+    /// 专用线程上执行的启动序列本体；跨线程只传 Sendable 结局，识别任务留在 carrier 里交接。
+    nonisolated private static func performAudioSetup(carrier: VoiceAudioSetupCarrier) -> VoiceAudioSetupOutcome {
+        let inputNode = carrier.engine.inputNode
+        carrier.task = carrier.recognizer.recognitionTask(with: carrier.request) { result, _ in
+            carrier.sink.handle(result)
+        }
+        // 模拟器上 setActive 可能成功而输入格式仍是 sampleRate=0 / channelCount=0，
+        // 这种格式交给 installTap 会撞上 IsFormatSampleRateAndChannelCountValid 断言、整个进程被打死
+        // （真机上麦克风被占用/无权限时同样可能拿到无效格式）。先判掉。
+        let recordingFormat = inputNode.outputFormat(forBus: 0)
+        guard recordingFormat.sampleRate > 0, recordingFormat.channelCount > 0 else {
+            carrier.task?.cancel()
+            return .invalidFormat
         }
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, _ in
-            request.append(buffer)
+            carrier.request.append(buffer)
         }
-        isInputTapInstalled = true
-        audioEngine.prepare()
-        try audioEngine.start()
-        isRecording = true
+        carrier.engine.prepare()
+        do {
+            try carrier.engine.start()
+        } catch {
+            // tap 已经装上、引擎却没跑起来：在这里就地拆掉。回到主线程再拆要走
+            // isInputTapInstalled 标记，而这条分支接下来就抛错、调用方只会去 stopRecording，
+            // 那时标记为 false 就会把 tap 永久留在 inputNode 上。
+            inputNode.removeTap(onBus: 0)
+            return .startFailed(reason: error.localizedDescription)
+        }
+        return .ok
     }
 
     /// 停止录音，释放 audio session
@@ -294,6 +356,59 @@ final class VoiceService: NSObject {
     #endif
 
 }
+
+// MARK: - 音频启动序列的跨线程载体
+
+/// 启动序列的四种结局。只带 Sendable 值，便于跨线程交接。
+internal enum VoiceAudioSetupOutcome: Sendable {
+    case ok
+    /// 有界窗口到期，body 仍未返回——那条线程只能弃用
+    case stalled
+    /// 输入格式 sampleRate / channelCount 为 0，installTap 会撞 CoreAudio 断言
+    case invalidFormat
+    /// engine.start() 抛错，带原始描述
+    case startFailed(reason: String)
+}
+
+/// AVAudioEngine / SFSpeechRecognizer / 识别请求都不是 Sendable，但启动期间它们只被这一条专用线程
+/// 使用，主线程只在信号量上等待，交接点有 happens-before，故用 @unchecked Sendable 过编译。
+private final class VoiceAudioSetupCarrier {
+    let engine: AVAudioEngine
+    let recognizer: SFSpeechRecognizer
+    let request: SFSpeechAudioBufferRecognitionRequest
+    let sink: VoiceRecognitionSink
+    var task: SFSpeechRecognitionTask?
+
+    init(engine: AVAudioEngine, recognizer: SFSpeechRecognizer,
+         request: SFSpeechAudioBufferRecognitionRequest, sink: VoiceRecognitionSink) {
+        self.engine = engine
+        self.recognizer = recognizer
+        self.request = request
+        self.sink = sink
+    }
+}
+
+extension VoiceAudioSetupCarrier: @unchecked Sendable {}
+
+/// 把识别结果送回 @MainActor 的持有者；weak 以免 deinit 前被闭包延长生命周期。
+private final class VoiceRecognitionSink {
+    weak var service: VoiceService?
+
+    init(service: VoiceService) {
+        self.service = service
+    }
+
+    func handle(_ result: SFSpeechRecognitionResult?) {
+        guard let text = result?.bestTranscription.formattedString else { return }
+        Task { @MainActor [weak service] in
+            guard let service = service else { return }
+            service.recognizedText = text
+            service.onRecognized?(text)
+        }
+    }
+}
+
+extension VoiceRecognitionSink: @unchecked Sendable {}
 
 // MARK: - AVSpeechSynthesizerDelegate
 

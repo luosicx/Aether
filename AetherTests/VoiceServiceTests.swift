@@ -833,6 +833,32 @@ final class VoiceServiceTests: XCTestCase {
         XCTAssertNil(service, "service 应被释放，deinit 异步 Task 应正常完成")
     }
 
+    // MARK: - 音频启动序列的有界窗口
+
+    /// 启动序列永不返回时，有界窗口必须按时交回 .stalled，调用方线程不能被钉住。
+    /// CI 上 macOS 的两条 testDeinit* 就是因为 startRecording() 卡在 CoreAudio 绑定里
+    /// 挂满 60 秒 allowance 才判红的。
+    func testAudioSetupThreadGivesUpWithinDeadlineWhenBodyStalls() {
+        let start = Date()
+        let outcome = VoiceService.runOnAudioSetupThread(deadline: 0.5) {
+            Thread.sleep(forTimeInterval: 30)
+            return .ok
+        }
+        let elapsed = Date().timeIntervalSince(start)
+        guard case .stalled = outcome else {
+            return XCTFail("body 不返回时应得到 .stalled，实际 \(outcome)")
+        }
+        XCTAssertLessThan(elapsed, 5, "0.5 秒窗口到期就该返回，实测 \(String(format: "%.2f", elapsed)) 秒")
+    }
+
+    /// body 正常完成时结局要原样带回，不能把失败误判成超时。
+    func testAudioSetupThreadReturnsBodyOutcomeWhenItCompletes() {
+        let outcome = VoiceService.runOnAudioSetupThread(deadline: 5) { .invalidFormat }
+        guard case .invalidFormat = outcome else {
+            return XCTFail("body 的 .invalidFormat 应原样带回，实际 \(outcome)")
+        }
+    }
+
     // MARK: - 状态转换
 
     /// speak 后调用 previewVoice 应正确切换到试听状态。
