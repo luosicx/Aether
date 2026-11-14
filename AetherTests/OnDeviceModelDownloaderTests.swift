@@ -1187,12 +1187,16 @@ final class OnDeviceModelDownloaderTests: XCTestCase {
     /// isDownloading=true 时再次调用 startDownload 应直接返回，不发起新请求
     func testStartDownloadWhenAlreadyDownloadingSkipsNewRequest() async throws {
         let downloader = OnDeviceModelDownloader()
-        // 使用较大文件确保第一次下载在第二次调用时仍在进行
-        let content = Data(count: 8 * 1024 * 1024)
-        try serveFile(named: "slow.bin", data: content)
+        // 文件名必须带 `slow-` 前缀：serveFile 只对这一前缀匀速发送（每 64KB 睡 50ms）。
+        // 原来叫 "slow.bin"，前缀匹配不上，8MB 走的是普通路径、从本机一口气发完，
+        // 第一次下载在第一轮 10ms 轮询被排上之前就结束并把 isDownloading 落回 false，
+        // didStart 于是按运气判（main@3a7e5c5 的 unit-tests-macos (2) 就是它判红的）。
+        // 2MB = 32 个分块 ≈ 1.6 秒在飞，比轮询周期长两个数量级，窗口不再靠时序赌。
+        let content = Data(count: 2 * 1024 * 1024)
+        try serveFile(named: "slow-already-downloading.bin", data: content)
         try serveFile(named: "should-not-request.bin", data: "unexpected".data(using: .utf8)!)
 
-        let firstURL = baseURL.appendingPathComponent("slow.bin")
+        let firstURL = baseURL.appendingPathComponent("slow-already-downloading.bin")
         let secondURL = baseURL.appendingPathComponent("should-not-request.bin")
         let destURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("concurrent-\(UUID().uuidString).bin")
