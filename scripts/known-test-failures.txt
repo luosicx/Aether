@@ -308,8 +308,9 @@
 #     代价写明白：熔断之后本进程再也录不了音（真机要恢复得重启 App），工作队列若被钉住、排在它后面
 #     的拆除就不执行。两条都优于把主线程钉死，但都不免费。
 #     本地 macOS 语音三类（VoiceService / VoiceCoordinator / ChatViewModel）224 tests / 0 failures
-#     / 8 skipped、无 exceeded 行、闸门 exit 0；挂死本身最终仍只能由 CI 轮次判定。
-#     文档计数随第三条用例 3556→3557。
+#     / 8 skipped、无 exceeded 行、闸门 exit 0；iOS 同一批 222 tests / 0 failures / 12 skipped、
+#     闸门 exit 0，三条窗口/熔断用例两边分别是 0.503 / 1.008 / 0.203s 与 0.538 / 1.003 / 0.207s。
+#     挂死本身最终仍只能由 CI 轮次判定。文档计数随第三条用例 3556→3557。
 #   - TTSVoiceCatalog.voice(for:) 对任意字符串都返回对象（testVoiceReturnsNilForInvalidIdentifier
 #     两轮 failed，0.02–0.185s，确定性）：`AVSpeechSynthesisVoice(identifier:)` 已弃用且不校验
 #     identifier，于是 resolveVoice 的中文音色兜底分支永远走不到。改成先按 allVoices()
