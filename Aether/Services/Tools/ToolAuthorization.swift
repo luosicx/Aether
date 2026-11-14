@@ -14,6 +14,25 @@ enum ToolAuthorizationResult: Sendable, Equatable {
     case denied
 }
 
+/// 用户对确认弹窗的选择结果。授权状态的写入由 ToolAuthorization 负责，
+/// 呈现器只收集选择，便于测试注入即时应答而不必自己复制授权逻辑。
+enum ToolAuthorizationChoice: Equatable {
+    /// 取消 / 关闭弹窗
+    case denied
+    /// 「允许一次」，或非敏感工具的「确认」
+    case once
+    /// 「始终允许」（仅敏感工具提供该按钮）
+    case always
+}
+
+/// 授权确认弹窗的呈现器。只在主线程调用，故不要求 Sendable。
+/// 产品侧用 `SystemAlertPresenter` 弹真实 UI；测试侧可注入即时应答的实现，
+/// 避免「无人点击 → continuation 永不 resume」把调用方整条挂死。
+protocol AuthorizationAlertPresenting {
+    func present(toolName: String, title: String, message: String, isSensitive: Bool,
+                 completion: @escaping (ToolAuthorizationChoice) -> Void)
+}
+
 /// 敏感/高危工具的运行时授权组件。
 /// 在调用可能泄露隐私或影响系统的工具前，强制弹出用户确认。
 ///
@@ -47,23 +66,11 @@ final class ToolAuthorization: @unchecked Sendable {
 
     private let alwaysAuthorizedKeyPrefix = "aether.tool.auth.always."
 
-    #if os(iOS)
-    /// 最近激活的 scene。iPhone Duo 分屏/多窗口下可能同时存在多个 foregroundActive scene，
-    /// 弹窗优先落在用户最近交互的 scene，避免授权弹窗出现在错误窗口。仅主线程读写。
-    private weak var lastActiveScene: UIWindowScene?
-    #endif
+    /// 弹窗呈现器（测试可注入即时应答的实现）
+    internal var presenter: AuthorizationAlertPresenting = SystemAlertPresenter()
 
     private init() {
         restoreAlwaysAuthorized()
-        #if os(iOS)
-        NotificationCenter.default.addObserver(
-            forName: UIScene.didActivateNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] notification in
-            self?.lastActiveScene = notification.object as? UIWindowScene
-        }
-        #endif
     }
 
     /// 查询某工具的当前授权状态
@@ -97,13 +104,18 @@ final class ToolAuthorization: @unchecked Sendable {
                 return
             }
             let message = details ?? "该操作可能影响系统状态，请确认是否继续。"
-            self.showAlert(
+            self.presenter.present(
                 toolName: toolName,
                 title: "确认执行「\(toolName)」",
                 message: message,
-                isSensitive: false,
-                completion: completion
-            )
+                isSensitive: false
+            ) { [weak self] choice in
+                guard let self else {
+                    completion(.denied)
+                    return
+                }
+                self.apply(choice: choice, toolName: toolName, completion: completion)
+            }
         }
     }
 
@@ -124,13 +136,33 @@ final class ToolAuthorization: @unchecked Sendable {
                 return
             }
             let message = purpose ?? "该工具将访问您的敏感数据。"
-            self.showAlert(
+            self.presenter.present(
                 toolName: toolName,
                 title: "允许访问「\(toolName)」？",
                 message: message,
-                isSensitive: true,
-                completion: completion
-            )
+                isSensitive: true
+            ) { [weak self] choice in
+                guard let self else {
+                    completion(.denied)
+                    return
+                }
+                self.apply(choice: choice, toolName: toolName, completion: completion)
+            }
+        }
+    }
+
+    /// 把用户的选择不落成授权状态再回传结果。`neverAlwaysAllow` 的拦截在 `grantAlways` 里。
+    private func apply(choice: ToolAuthorizationChoice, toolName: String,
+                       completion: (ToolAuthorizationResult) -> Void) {
+        switch choice {
+        case .denied:
+            completion(.denied)
+        case .once:
+            grantSessionAuthorization(toolName: toolName)
+            completion(.authorized(sessionOnly: true))
+        case .always:
+            grantAlways(toolName)
+            completion(.authorized(sessionOnly: false))
         }
     }
 
@@ -196,25 +228,44 @@ private extension ToolAuthorization {
         UserDefaults.standard.set(true, forKey: "\(alwaysAuthorizedKeyPrefix)\(toolName)")
     }
 
-    func showAlert(toolName: String, title: String, message: String, isSensitive: Bool, completion: @escaping (ToolAuthorizationResult) -> Void) {
+}
+
+/// 真实系统的授权确认弹窗：iOS 用 UIAlertController，macOS 用 NSAlert。
+/// 只负责收集用户的选择，授权状态由 `ToolAuthorization.apply(choice:toolName:completion:)` 写入。
+final class SystemAlertPresenter: AuthorizationAlertPresenting {
+    #if os(iOS)
+    /// 最近激活的 scene。iPhone Duo 分屏/多窗口下可能同时存在多个 foregroundActive scene，
+    /// 弹窗优先落在用户最近交互的 scene，避免授权弹窗出现在错误窗口。仅主线程读写。
+    private weak var lastActiveScene: UIWindowScene?
+
+    init() {
+        NotificationCenter.default.addObserver(
+            forName: UIScene.didActivateNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            self?.lastActiveScene = notification.object as? UIWindowScene
+        }
+    }
+    #endif
+
+    func present(toolName: String, title: String, message: String, isSensitive: Bool,
+                 completion: @escaping (ToolAuthorizationChoice) -> Void) {
         #if os(iOS)
         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "取消", style: .cancel) { _ in
             completion(.denied)
         })
         if isSensitive {
-            alert.addAction(UIAlertAction(title: "允许一次", style: .default) { [weak self] _ in
-                self?.grantSessionAuthorization(toolName: toolName)
-                completion(.authorized(sessionOnly: true))
+            alert.addAction(UIAlertAction(title: "允许一次", style: .default) { _ in
+                completion(.once)
             })
-            alert.addAction(UIAlertAction(title: "始终允许", style: .default) { [weak self] _ in
-                self?.grantAlways(toolName)
-                completion(.authorized(sessionOnly: false))
+            alert.addAction(UIAlertAction(title: "始终允许", style: .default) { _ in
+                completion(.always)
             })
         } else {
-            alert.addAction(UIAlertAction(title: "确认", style: .default) { [weak self] _ in
-                self?.grantSessionAuthorization(toolName: toolName)
-                completion(.authorized(sessionOnly: true))
+            alert.addAction(UIAlertAction(title: "确认", style: .default) { _ in
+                completion(.once)
             })
         }
         guard let root = topViewController() else {
@@ -239,8 +290,17 @@ private extension ToolAuthorization {
             alert.addButton(withTitle: "确认")
         }
         alert.buttons.first?.keyEquivalent = "\u{1b}"
-        let handler: (NSApplication.ModalResponse) -> Void = { [weak self] response in
-            self?.handleAlertResponse(response, toolName: toolName, isSensitive: isSensitive, completion: completion)
+        let handler: (NSApplication.ModalResponse) -> Void = { response in
+            switch response {
+            case .alertFirstButtonReturn:
+                completion(.denied)
+            case .alertSecondButtonReturn:
+                completion(.once)
+            case .alertThirdButtonReturn where isSensitive:
+                completion(.always)
+            default:
+                completion(.denied)
+            }
         }
         if let window = NSApplication.shared.keyWindow {
             alert.beginSheetModal(for: window, completionHandler: handler)
@@ -250,25 +310,8 @@ private extension ToolAuthorization {
         #endif
     }
 
-    #if !os(iOS)
-    func handleAlertResponse(_ response: NSApplication.ModalResponse, toolName: String, isSensitive: Bool, completion: @escaping (ToolAuthorizationResult) -> Void) {
-        switch response {
-        case .alertFirstButtonReturn:
-            completion(.denied)
-        case .alertSecondButtonReturn:
-            grantSessionAuthorization(toolName: toolName)
-            completion(.authorized(sessionOnly: true))
-        case .alertThirdButtonReturn where isSensitive:
-            grantAlways(toolName)
-            completion(.authorized(sessionOnly: false))
-        default:
-            completion(.denied)
-        }
-    }
-    #endif
-
     #if os(iOS)
-    func topViewController() -> UIViewController? {
+    private func topViewController() -> UIViewController? {
         let scenes = UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }
         let scene = scenes.first(where: { $0 === lastActiveScene && $0.activationState == .foregroundActive })

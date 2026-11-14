@@ -232,6 +232,202 @@
 #   macOS 375 tests 0 failures、iOS 375 tests 0 failures，两侧闸门 exit 0；iOS 第一次同样撞了
 #   「test runner hung before establishing connection」的模拟器启动抖动，复跑即 375/0。
 
+# - 语音族删 7 条（macOS 7）+ Keychain 族删 4 条（双端各 2）+ OnDevice 族删 2 条（双端各 1）+
+#   剪贴板族删 3 条（macOS 2 + iOS 1）：
+#   本批 16 条、七种机制，改产品代码 + 用例配套，没有新增豁免；另修一条从没锚过的 iOS 崩溃形态
+#   （不计入删除数，见语音块里 installTap 那一条）。
+#   #62/#64 先落地，所以本批对当前 main 是 26→10。语音族的直接证据是
+#   main@b40cc22 的 `unit-tests-macos (2)`（job 131379618980）与 main@9c81652 的同名 job
+#   （132334054858）两轮记录，两轮的形态一字不差：
+#   - requestPermission 无界 await：删 macOS:VoiceServiceTests/testRequestPermission*、
+#     macOS:VoiceCoordinatorTests/testToggleVoice*、macOS:ChatViewModelTests/testToggleVoice*。
+#     `SFSpeechRecognizer.requestAuthorization` 的回调在无人应答系统弹窗的环境里永不触发，与 #59
+#     的 NativeASREngine、#61 的三个 TCC 工具是同一处 API、同一个机制，改法照抄：
+#     `ResumeOnceContinuation` + `DispatchQueue.global().asyncAfter` 5 秒窗口，到点按未授权返回。
+#     两轮里 testRequestPermissionReturnsBool / …OnSimulator 都是 exceeded 1 minute；
+#     testToggleVoiceInputStartsRecording / …WhenUnavailableSetsError 是 5.3–5.6s 失败（errorMessage
+#     永远等不到），ChatViewModelTests 那条 11.469s 同理。用例侧把三处 50×0.1s 轮询放宽到 100 次：
+#     原来的 5 秒轮询上限正好压在 5 秒窗口上，修完也会是临界 flaky。
+#   - stopRecording 无条件取 inputNode：`audioEngine.inputNode` 这次访问本身就要向 CoreAudio 查
+#     输入设备，无头机器上它不返回——testToggleVoiceInputStopsRecording 两轮都 exceeded 1 minute，
+#     它是同步用例、没有任何守卫。加 isInputTapInstalled 标记，只有真 installTap 过才去取
+#     inputNode，audioEngine.stop() 同步改成只在 isRunning 时执行。deinit 里原有的 `if isRunning`
+#     已经隐含"装过 tap"，不必改。
+#   - startRecording 直接撞设备绑定：testDeinitWhileRecordingReleasesResources、
+#     testDeinitAsyncCleanupAfterRecordingAttempt 两轮全部 exceeded。在取 inputNode 之前加
+#     macOS-only 的 hasAudioInputDevice()（CoreAudio 属性查询：默认输入设备存在且带输入流），
+#     查不到就抛「未检测到音频输入设备」，用例于是各走自己的 XCTSkip / catch 分支。同类里
+#     testStartRecording* / testStopRecording* 五条早就用 `#if os(macOS) XCTSkipIf(true,
+#     "macOS CI 环境无可靠音频输入")` 认了这件事，这两条 deinit 用例漏了守卫才挂死。没有照抄
+#     那五条的无条件 skip：那是把断言换成沉默，而产品侧在真机上点一下麦克风仍会冻结主线程。
+#   - 上面那条 hasAudioInputDevice() 被本 PR 自己的 CI 轮次否掉了，所以追加一处有界窗口
+#     （run 43580203027 / `unit-tests-macos (2)`，头提交 8687cf2、检出的是合并提交 9f6ac12）：
+#     两条 deinit 用例照旧 exceeded 1 minute，闸门因此判红
+#     （result=Failed passed=1388 failed=2 skipped=39，NEW FAILURE 恰好这两条，重跑一模一样）。
+#     那台 runner 上「默认输入设备存在、且带输入流」这两项都过，却仍然绑不上——属性查询挡得住
+#     "一个输入设备都没有"，挡不住"设备在但 BindToDeviceInternal → mach_msg 不返回"（同一份日志里
+#     还能看到 AddInstanceForFactory: No factory registered）。继续加设备判定没有意义，改为把
+#     `engine.inputNode` → `recognizer.recognitionTask(with:)` → outputFormat 判定 → installTap →
+#     prepare → start() 整段放进专用串行队列，主线程只在信号量上有界等待 5 秒，与
+#     authorizationDeadline 同量级；到期返回 .stalled、抛 code -5「音频子系统未响应」，用例落回
+#     它们本来就有的 catch / XCTSkip 分支。跨线程只传 Sendable 结局，识别任务经 carrier 交接。
+#     诚实记一句：卡点到底是 CoreAudio 还是 ASR 守护进程，日志分不出来，所以两处一起搬进窗口里。
+#     .stalled 时既不读也不 cancel 那条识别任务——写它的还是那条线程，主线程读同一个强引用变量
+#     就是并发读写；cancel 之后它仍可能把 tap 装上、往已结束的 request 里灌缓冲。代价按"弃用
+#     一条线程"记账，这也是有界等待换主线程不被钉住的唯一成本。
+#     配套新增 testAudioSetupThreadGivesUpWithinDeadlineWhenBodyStalls /
+#     …ReturnsBodyOutcomeWhenItCompletes：前者用 30 秒 sleep 的 body 配 0.5 秒窗口，断言拿到
+#     .stalled 且 elapsed < 5（本机 0.502s，窗口按点返回）；后者断言 body 真跑完时结局原样带回、
+#     不会被误判成超时。两条都不碰麦克风与授权，本地就能判，不像上面四类挂死本地一条都复现不了。
+#     本地 macOS 整类 79 tests / 0 failures / 6 skipped、日志里没有 exceeded 行，那两条 deinit
+#     用例 0.687s / 0.088s 通过（本机有麦克风，走的是真实装 tap 的路径，与 CI 的 .stalled 分支不同）。
+#     合完这处再跑相邻两个消费方：语音三类（VoiceService / VoiceCoordinator / ChatViewModel）双端各
+#     一次含构建、CI 同款 30/60 allowance —— macOS 231 tests / 0 failures / 8 skipped，
+#     iOS 233 tests / 0 failures / 12 skipped，两侧闸门 exit 0，两份日志里都没有 exceeded 行。
+#     另外 engine.start() 抛错那一路补了就地 removeTap：旧写法是先置 isInputTapInstalled 再 start，
+#     抛错后 stopRecording 还拆得掉；整段挪进专用线程后这条分支若不就地拆，tap 就永久留在
+#     inputNode 上——那是搬迁引入的回归，不是原来就有的。
+#   - 上面那处 5 秒窗口在本 PR 第二轮 CI（run 43595475519 / `unit-tests-macos (2)`）还是没止住挂死，
+#     而且换了红法：testDeinitAsyncCleanupAfterRecordingAttempt 依旧 exceeded 1 minute，
+#     testDidCancelDuringPreviewCleansPreviewState 变成 `Stall on main thread.`
+#     （result=Failed passed=1389 failed=2 skipped=40，两条都是基线外 NEW FAILURE）。同一轮里
+#     testDeinitWhileRecordingReleasesResources 已经是 skipped (5.069s)——窗口对它生效了。
+#     窗口按构造最多吃 5 秒，那 60 秒就不可能花在启动序列里，只可能在窗口之外的主线程同步调用上：
+#     一是 `hasAudioInputDevice()` 的 `AudioObjectGetPropertyData`（同样是向 CoreAudio 取数），
+#     二是 deinit 交给主 actor 的那段清理（`isRunning` / `stop()` / `inputNode.removeTap`）——
+#     用例正是在 startRecording 抛错之后把 service 置 nil，挂点落在这里。而一条根本不碰输入设备的
+#     TTS 用例也被判成主线程 stall，说明代价不是"这一次录音失败"，是每按一次麦克风就多一条钉死在
+#     CoreAudio 里的线程、把整个音频子系统拖住。于是这一处再改三层：设备属性查询移进有界窗口
+#     （新结局 .noInputDevice，错误码 -3 与文案一字未改）；引擎拆除整体排到队列上且调用方不等
+#     （不等就不需要窗口，可能钉死的只有那一条队列）；全进程只开一条音频工作队列，加上一次窗口到期
+#     就置位的进程级熔断位，之后 startRecording 直接快速失败、连 CoreAudio 都不碰。
+#     配套第三条用例 testStartRecordingFailsFastAfterAudioSubsystemStalled 断言熔断后 0.5 秒内抛 -5
+#     （本地 0.203s，对照组是 5 秒整窗），并显式复位熔断位——那是进程级状态，用例不归还就会污染
+#     同一次运行里后面的录音用例。注入用的 body sleep 也从 30 秒降到 1.5 秒，同一个道理：共用队列
+#     被睡死 30 秒的话，测的就不是窗口而是自造的拥堵。
+#     代价写明白：熔断之后本进程再也录不了音（真机要恢复得重启 App），工作队列若被钉住、排在它后面
+#     的拆除就不执行。两条都优于把主线程钉死，但都不免费。
+#     本地 macOS 语音三类（VoiceService / VoiceCoordinator / ChatViewModel）224 tests / 0 failures
+#     / 8 skipped、无 exceeded 行、闸门 exit 0；iOS 同一批 222 tests / 0 failures / 12 skipped、
+#     闸门 exit 0，三条窗口/熔断用例两边分别是 0.503 / 1.008 / 0.203s 与 0.538 / 1.003 / 0.207s。
+#     挂死本身最终仍只能由 CI 轮次判定。文档计数随第三条用例 3556→3557。
+#     第三轮 CI（run 43599112242，全部 job success）判定到了：`unit-tests-macos (2)` 由连续两轮
+#     判红转为通过，两条 testDeinit* 与那条 `Stall on main thread.` 都不再出现，被删掉的
+#     macOS:VoiceServiceTests/testDeinit*、…/testRequestPermission*、VoiceCoordinatorTests 与
+#     ChatViewModelTests 的 testToggleVoice* 也没有以 NEW FAILURE 回来。
+#   - TTSVoiceCatalog.voice(for:) 对任意字符串都返回对象（testVoiceReturnsNilForInvalidIdentifier
+#     两轮 failed，0.02–0.185s，确定性）：`AVSpeechSynthesisVoice(identifier:)` 已弃用且不校验
+#     identifier，于是 resolveVoice 的中文音色兜底分支永远走不到。改成先按 allVoices()
+#     （来自 speechVoices()）认 identifier，与 NativeTTSEngine.resolveVoice 同一做法。
+#   - 合并树双端联跑又放出一条只在本地现形的形态：iOS `testStartRecordingPathHandlesSuccessOrFailure`
+#     撞 `required condition is false: IsFormatSampleRateAndChannelCountValid(format)`。A/B 证明它
+#     与本批无关——同一台机器、同一台 iPhone 17 模拟器，用 adcdb73 未改动的 VoiceService 单跑该类，
+#     passed=70 failed=1，就是这一条。CI 侧同一条是 passed (0.199s)（main@adcdb73 的 unit-tests job
+#     132344119663）——那边要么在 `session.setActive(true)` 就抛错走了 catch，要么拿到的格式本身
+#     有效；本机是 setActive 成功、而 `inputNode.outputFormat(forBus:0)` 仍返回
+#     sampleRate=0/channelCount=0，installTap 于是把进程打死。两边共同的窟窿是 installTap 之前
+#     没有格式判定，产品侧补上（无效格式即取消识别任务并抛 code -4），两种环境收敛到同一条路径：
+#     要么真装上 tap，要么拿到可展示的抛错。
+#     这条不计入删除数——它本来就没锚住：闸门的 CRASH_MARKS 不含 "required condition is false"，
+#     所以它在任何一轮都只会是 NEW FAILURE；`iOS:VoiceServiceTests/*~crash` 另有 CI 证据，保留不动。
+# - 同批删 macOS:VoiceServiceTests/testDidCancelDuringPreviewCleansPreviewState，这条不是本轮改好的，
+#   是 #56 批量锚定留下的过期条目：两轮都是 passed (2.018s / 2.028s)。它的机制（真实合成器自然结束
+#   触发 didFinish，与手动 didCancel 抢 isCurrentPreview）早已由用例注释记载的"较长试听文本"缓解，
+#   条目当时没跟着删。
+# - 保留 iOS:VoiceServiceTests/*~crash：语音族在 iOS 侧只有崩溃形态豁免，两轮 iOS 日志里的
+#   crash-exempt 记录与上面四种机制没有对应关系，按"证据不足不删"留着。
+# - 本地验证（与 CI 同款 30/60 allowance）：改前改后都是 101 tests / 0 failures / 6 skipped——本机
+#   有麦克风、授权也能立刻返回，四类挂死在本地一条都复现不了，能确认的只有"没有回归"；本地唯一的
+#   正向信号是这批用例总耗时从 23.6s 降到 11.1s。再把相邻的六个类（VoiceService / VoiceCoordinator /
+#   TTSVoiceCatalog / ChatViewModel / NativeEngines / SettingsView）在并入 #62 的合并树上双端各跑一遍
+#   （含构建，CI 同款 30/60 allowance）：macOS 280 tests 0 failures 8 skipped、iOS 278 tests
+#   0 failures 12 skipped，两边闸门 exit 0，声纹与朗读状态机没有回归。挂死类修复的最终判定只能由
+#   CI 轮次给出——本机有麦克风、授权立刻返回，四类挂死在本地一条都复现不了。
+#   合批后的合并树（语音六类 + Keychain 三类，双端各一次含构建）：macOS 337 tests 0 failures
+#   8 skipped、闸门 exit 0；iOS 那一次 334 tests 1 failure 就是上面 installTap 那条，补上格式判定
+#   后取语音三类（VoiceService / VoiceCoordinator / ChatViewModel）+ KeychainManagerTests 复跑，
+#   iOS 247 tests 0 failures 12 skipped、macOS 同批 249 tests 0 failures 8 skipped，两侧闸门 exit 0。
+# - 本批（含剪贴板 3 条）rebase 到 main@3a7e5c5（#64 已落地）后，在合树上双端各跑一次含构建、
+#   CI 同款 30/60 allowance，覆盖本批全部改动面（语音四类 + Keychain 三类 + OnDevice + 工具三类）：
+#   macOS 395 tests 0 failures 13 skipped、闸门 exit 0；iOS 393 tests 0 failures 17 skipped、
+#   闸门 exit 0。基线按 comm 重导：对 main@3a7e5c5 是 26→10，删除集 16 条与各族小计逐条对上、
+#   零新增；文档门 tests=3554 不变（本批没加用例）。
+#   上面那处有界窗口是本批落地后追加的 hotfix：多了两条 testAudioSetupThread*，文档门
+#   从 3554 改到 3556；删除集不变（16 条），因为修的目的正是让已经删掉的
+#   macOS:VoiceServiceTests/testDeinit* 两条不再以 NEW FAILURE 回来，而不是再删别的。
+
+# - Keychain 族删 4 条（macOS 2 + iOS 2，同一机制双端各记一条）：`InMemoryKeychainBackend.storage`
+#   是裸 `Dictionary`，而 KeychainManagerTests 用 `Task.detached` / `withTaskGroup` 并发打
+#   `KeychainManager.shared`（save 内部还是 delete + add 两次调用），Swift 字典的并发写会撕裂堆上的
+#   指针。这条不用等 CI：本地单跑该类就复现出来了，而且是两种形态同时出现：写丢失
+#   （testConcurrentWriteMultipleProviders `("nil") is not equal to ("Optional("qwen-concurrent")")`）
+#   和给一个垃圾 tagged pointer 发消息（macOS `-[_NSCoreDataTaggedObjectID count]: unrecognized
+#   selector sent to instance 0x8000000000000000`、iOS `-[NSIndexPath count]: unrecognized selector
+#   sent to instance 0x8000000000000000`——两次跑出来的类名不一样，正是内存被写坏的指纹）。
+#   后者在某些交错下不再是可捕获的 NSException 而是直接把测试进程打崩，这就是
+#   `KeychainManagerTests/*~crash` 两条的来处；删这两条是按"同一 corruption 源"归因，不是按
+#   CI 日志逐条对上——若修后该类再出现 crash 形态失败，说明另有一个源，需要重新锚。
+#   改法与 ToolAuthorization 同例：`OSAllocatedUnfairLock(initialState:)` 包住 storage，
+#   add/delete/copy 各在 withLock 里做一次原子读写；`SystemKeychainBackend` 走 SecItem* 本来就
+#   线程安全，未动。`KeychainManager.backend` 这个 internal var 也没加锁——测试类内串行换入换出，
+#   并发只发生在方法调用上，加锁反而掩盖真正的注入时机问题。
+# - 本地验证（与 CI 同款 -test-timeouts-enabled + 30/60 allowance）：改前闸门数到 macOS
+#   passed=26 failed=2、iOS passed=27 failed=1（两侧总数都是该类的 28 条），且两平台失败的正是
+#   上面那两种形态——改前那两轮复现跑在本工作副本还没带上 Keychain 改动的时候，产品代码与
+#   adcdb73 逐字节相同，归因不受影响。日志里还能看到崩溃后 xcodebuild "Restarting after
+#   unexpected exit" 把整个类从头再跑一遍，最后一遍是 22 tests 0 failures——竞态没撞上而已。
+#   改后：`KeychainManagerTests` + `EncryptionLayerTests` + `SemanticMemoryStoreTests` 三类
+#   macOS 与 iOS 各 57 tests 0 failures、闸门 exit 0；另外把 `KeychainManagerTests` 单独连跑三轮
+#   复验竞态，28 tests 0 failures ×3，单轮 0.041–0.049s。
+
+# - OnDevice 族删 2 条（macOS 1 + iOS 1）：`testDeleteModelWhenRemoveItemFails` 的匹配子还写在
+#   P2-3 之前。产品侧 `deleteModel` 在 removeItem 失败时抛的是
+#   `loadFailedWithCause(message:underlying:)`（OnDeviceModelDownloader.swift:293），而用例用
+#   `if case .loadFailed = error` 判——两个不同的 case，永远落到 XCTFail。CI 原文正好把分叉写全了：
+#   main@adcdb73 的 unit-tests job 132344119663，`OnDeviceModelDownloaderTests.swift:1613: 应抛出
+#   loadFailed，实际：loadFailedWithCause(message: "Failed to delete model file: “model.bin” couldn’t
+#   be removed because you don’t have permission to access it.", underlying: Error Domain=
+#   NSCocoaErrorDomain Code=513 …)`——把父目录 chmod 0555 这一招在 runner 上是生效的（513 就是无
+#   权限），坏的只有匹配子。改成按文档契约断言 `loadFailedWithCause`，并检查 underlying 没被丢掉；
+#   message 只断非空不断文案，因为 runner 走英文本地化、本机走中文。同文件 1375 行
+#   `testStartDownloadInvalidDestinationSetsLoadFailed` 不动——它断的是 `handleDownloadDone` 的
+#   裸 `.loadFailed`（OnDeviceModelDownloader.swift:356），那条路径 P2-3 没碰过，也确实一直是过的。
+# - 本地验证：改前本机单跑该类，同一条在 1613 行失败（"应抛出 loadFailed，实际：…"，0.084s），
+#   形态与上面那条 CI 原文一致；改后 macOS 与 iOS 各单跑 OnDeviceModelDownloaderTests
+#   70 tests 0 failures 5 skipped、闸门 exit 0，该用例双端 0.020–0.084s。
+
+# - 剪贴板族删 3 条（macOS 2 + iOS 1）：`ToolAuthorization` 的两个 async 包装把
+#   `withCheckedContinuation` 架在一个没人应答的模态弹窗上——iOS 是 UIAlertController 等人点，
+#   macOS 在无头测试进程里退化成 `NSAlert.runModal()`，主线程被钉住，`await vm.processMessage(...)`
+#   的 ReAct 循环于是永不返回。这三条是首轮锚定（#56 的 f71be62 / ea16a7e）按 job 日志记下的，
+#   CI 侧形态是 exceeded 1 minute。
+#   - 口径是"测试注入 presenter"，接缝开在真正的问题点（弹窗本身），产品默认行为一处没动：
+#     新增 `AuthorizationAlertPresenting`（只负责收集选择）与 `ToolAuthorizationChoice`，原
+#     UIAlertController / NSAlert 代码逐字搬进 `SystemAlertPresenter`，iOS 的 scene 观察者与
+#     `topViewController()` 一起搬走，`ToolAuthorization.init()` 现在只剩 `restoreAlwaysAuthorized()`；
+#     授权状态仍由 `ToolAuthorization.apply(choice:toolName:completion:)` 写，"取消 / 允许一次 /
+#     始终允许"与 `neverAlwaysAllow` 拦截的语义保持原样。
+#   - 两个测试类 setUp 换入 `StubAuthorizationPresenter(choice: .denied)`、tearDown 换回原值。
+#     选 `.denied` 是因为这三条断言的本来就是"用户拒绝后工具不执行、并向 LLM 回错误"；注入单例
+#     安全的前提是 CI 用 `-parallel-testing-enabled NO`（ci.yml:431），换入换出在类内串行。
+#   - 没有给 continuation 加超时兜底：那等于把"用户想超过 N 秒就自动拒绝"写进 shipped 行为，
+#     是为了迁就测试而改坏产品；也没有把这三条改成 XCTSkip。
+#   - A/B 证据（同产品代码，只回退两个测试类的注入，CI 同款 30/60 allowance）：改前 macOS
+#     这两条失败在 `("completed") is not equal to ("failed")`，耗时 19.872s / 43.069s，审计行是
+#     `tool=read_clipboard | authorized=true`——弹窗被系统收回而不是用户点了"确认"，未应答的确认
+#     在 macOS 侧落成了第二个按钮，于是剪贴板真的被读了。这半条是产品侧独立问题，本批没动
+#     （改默认应答会把"确认"流程一起改掉，且这里只有一次复现），单独记着待查。
+#   - 改后：macOS 三类（ChatViewModelToolSecurity / ToolExecutionCoordinator / ToolAuthorization）
+#     32 tests 0 failures 0 skipped、iOS 同三类 32 tests 0 failures，两侧闸门 exit 0，日志里没有
+#     exceeded execution time 行；两条 testReadClipboardUnauthorizedDoesNotExecute 是
+#     macOS 0.151 / 0.200s、iOS 0.174 / 0.093s。
+#   - iOS 首轮合跑另放出一条从没锚过的 `ToolExecutionCoordinatorTests/testToolFailureIsAudited`
+#     （`Exceeded timeout of 5 seconds … 审计日志写入文件`，13.083s）。它不是本批引入的，也留不住：
+#     单跑该方法 0.170s 过、单跑该类 16 tests 全过（该条 0.065s）、两类与三类组合复跑都过
+#     （0.061–0.220s），只有首次冷启动那一轮越线。机制是 `selectedProvider = .onDevice` 下
+#     `processMessage` 多花了约 3 秒，5 秒轮询窗口里审计行还没落盘。按"复现不足两次不收"不锚，
+#     与 #62 那条 SemanticMemoryStoreTests 本地偶发同处理；最终判定由本批 CI 轮次给出。
+
 # - 证据：main@7ccc5ac + PR #56 的 f71be62 / ea16a7e / 4183bd6 / 153b8a8 / bb3b793 / f74e07a 共七轮 run
 #   （产品代码完全相同，只有本基线文件在变）的全部 test job 日志与后六轮闸门自身的 NEW FAILURE
 #   明细；再加 #56 落地后的 main@632e087、#57 的 9147076、main@5090a91 三轮 iOS job 日志——
@@ -269,25 +465,9 @@ UI:MCPSettingsUITests/testDeleteMCPServer
 
 # ---- macOS（unit-tests-macos 两个分片共用同一 label）----
 macOS:AgentOrchestratorTests/*~crash
-macOS:ChatViewModelTests/testToggleVoice*
-macOS:ChatViewModelToolSecurityTests/testReadClipboardUnauthorizedDoesNotExecute
-macOS:KeychainManagerTests/*~crash
-macOS:KeychainManagerTests/testConcurrentWrite*
-macOS:OnDeviceModelDownloaderTests/testDeleteModelWhenRemoveItemFails
 macOS:SystemControlToolTests/testExecuteGet*
 macOS:SystemControlToolTests/testExecuteSet*
-macOS:TTSVoiceCatalogTests/testVoiceReturnsNilForInvalidIdentifier
-macOS:ToolExecutionCoordinatorTests/testReadClipboardUnauthorizedDoesNotExecute
-macOS:VoiceCoordinatorTests/testToggleVoice*
-macOS:VoiceServiceTests/testDeinitAsyncCleanupAfterRecordingAttempt
-macOS:VoiceServiceTests/testDeinitWhileRecordingReleasesResources
-macOS:VoiceServiceTests/testDidCancelDuringPreviewCleansPreviewState
-macOS:VoiceServiceTests/testRequestPermission*
 
 # ---- iOS（unit-tests job）----
 iOS:AgentOrchestratorTests/*~crash
-iOS:ChatViewModelToolSecurityTests/testReadClipboardUnauthorizedDoesNotExecute
-iOS:KeychainManagerTests/*~crash
-iOS:KeychainManagerTests/testConcurrentWrite*
-iOS:OnDeviceModelDownloaderTests/testDeleteModelWhenRemoveItemFails
 iOS:VoiceServiceTests/*~crash

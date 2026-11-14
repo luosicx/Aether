@@ -115,9 +115,15 @@ enum TTSVoiceCatalog {
     }
 
     /// 根据 identifier 查找 `AVSpeechSynthesisVoice`。
-    /// 使用 `AVSpeechSynthesisVoice(identifier:)` 构造,失败返回 nil。
+    /// identifier 必须是当前设备实际安装的音色（`allVoices()` 里的 id），否则返回 nil；
+    /// 直接喂 `AVSpeechSynthesisVoice(identifier:)` 不可靠：该构造器已弃用，且在部分系统上
+    /// 对任意字符串都会返回一个对象，调用方拿不到"这个音色不存在"的信号，
+    /// VoiceService.resolveVoice 的中文音色兜底分支也就永远不会走到。
     static func voice(for identifier: String) -> AVSpeechSynthesisVoice? {
-        AVSpeechSynthesisVoice(identifier: identifier)
+        guard allVoices().contains(where: { $0.id == identifier }) else {
+            return nil
+        }
+        return AVSpeechSynthesisVoice(identifier: identifier)
     }
 
     /// 预置中文常用音色 fallback 列表。

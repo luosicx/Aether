@@ -1588,7 +1588,7 @@ final class OnDeviceModelDownloaderTests: XCTestCase {
 
     // MARK: - 36. deleteModel 删除失败
 
-    /// 文件存在但 removeItem 失败时，deleteModel 应抛出 loadFailed。
+    /// 文件存在但 removeItem 失败时，deleteModel 应抛出携带底层 error 的 loadFailedWithCause。
     func testDeleteModelWhenRemoveItemFails() async throws {
         let tempDir = FileManager.default.temporaryDirectory
         let parentDir = tempDir.appendingPathComponent("readonly-\(UUID().uuidString)")
@@ -1607,11 +1607,15 @@ final class OnDeviceModelDownloaderTests: XCTestCase {
             try await downloader.deleteModel(at: testFile)
             XCTFail("删除只读目录中的文件应失败")
         } catch let error as OnDeviceError {
-            if case .loadFailed = error {
-                // expected
-            } else {
-                XCTFail("应抛出 loadFailed，实际：\(error)")
+            // P2-3 起 removeItem 的失败走 loadFailedWithCause（带 underlying），
+            // 与裸 loadFailed 是两个 case；这里按契约断言前者，并检查底层 error 没被丢掉。
+            guard case .loadFailedWithCause(let message, let underlying) = error else {
+                XCTFail("应抛出 loadFailedWithCause，实际：\(error)")
+                return
             }
+            XCTAssertFalse(message.isEmpty, "message 应保留删除失败的描述")
+            XCTAssertTrue(underlying.localizedDescription.contains("model.bin"),
+                          "underlying 应保留原始 FileManager 错误，实际：\(underlying.localizedDescription)")
         } catch {
             XCTFail("应抛出 OnDeviceError，实际：\(error)")
         }

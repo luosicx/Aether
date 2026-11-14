@@ -193,9 +193,10 @@ final class ChatViewModelTests: XCTestCase {
         vm.voiceService.recognizerAvailabilityCheck = { false }
 
         vm.toggleVoiceInput()
-        // 轮询等待 errorMessage 被设置（替代固定 Task.sleep）
+        // 轮询等待 errorMessage 被设置（替代固定 Task.sleep）。
+        // 上限 10s：无头环境里 requestPermission 要走 5s 授权兜底窗口（VoiceService.authorizationDeadline）。
         let expectation = XCTestExpectation(description: "errorMessage 被设置")
-        for _ in 0..<50 {
+        for _ in 0..<100 {
             if vm.errorMessage != nil {
                 expectation.fulfill()
                 break
