@@ -252,7 +252,7 @@ UI:AetherUITests/*~timeout
 # testUserPreferencePersistence 在 ea16a7e 那轮不是超时形态，而是「Failed to get launch progress」，
 # 归到超时豁免之外，所以单独留一条精确条目。
 UI:AetherUITests/testUserPreferencePersistence
-# 下面两条每轮都失败或在 allowance 内，或只飘过一次，按精确条目记着等修。
+# 下面这条在 allowance 内、或只飘过一次，按精确条目记着等修。
 # - 原 `UI:AetherUITests/testOpenConversationListShowsEmptyState`（本批删除）：用例在 accessibility
 #   tree 里找 identifier「还没有对话」，而产品空状态是 ConversationList 的 EmptyStateView
 #   (title:"开始新对话", message:"点击右上角 + 按钮创建新会话")。「还没有对话」只剩
@@ -264,7 +264,26 @@ UI:AetherUITests/testUserPreferencePersistence
 #   用例锁这个 identifier，不再依赖任何中文文案（与该类既有的 identifier 优先口径一致）。
 #   本地 iPhone 17、CI 同款 120/180 allowance、-parallel-testing-enabled NO：
 #   修后三轮全通过 30.030s / 26.732s / 27.138s，比修前省掉那 8 秒空等。
-UI:GestureUITests/testDragReorderEditMode
+# - 原 `UI:GestureUITests/testDragReorderEditMode`（本批删除）：CI 每轮红在 `app.buttons["完成"]`
+#   ——main@3a7e5c5 那轮 38.982s、XCTAssertTrue failed「进入编辑模式后应显示「完成」按钮」。
+#   同一个按钮按 identifier 查（editConversationsButton）在同一轮是通的：它带
+#   accessibilityIdentifier（ConversationList.swift:324），这一版系统上带 identifier 的工具栏按钮
+#   按 label 查不出来。改成断言状态效果——进入编辑模式让「新建对话」从工具栏消失
+#   （ConversationList.swift:328 的 `if !isEditMode`），退出后回来。本地改前 24.265s、改后 33.480s
+#   都通过：本地一直是绿的、只有 CI 红，正是"依赖文案查询"只在 CI 那套系统上失效的形态。
+# - `UI:MCPSettingsUITests/testDeleteMCPServer` 保留，但它钉的债换了内容。改前这条用例从头到尾没
+#   验证过删除：`cells.containing(.staticText, identifier: "待删除 Server")` 匹配不上（containing 比的
+#   是子元素的 identifier，而 serverRow 的文案只有 label），整段左滑 + 确认流程被外层 if 跳过，
+#   末尾靠 `XCTAssertTrue(true)` 收场。改后真走左滑 → 系统行操作 → 产品标注的
+#   confirmDeleteServerButton → 断言本次那条消失，Server 名每次唯一。名字必须唯一是因为 MCP 配置存在
+#   UserDefaults，而 UITEST_RESET_DATA 只清 SwiftData（AetherApp+Shared.swift:142 →
+#   ChatStorage.wipeAllData）：写死同名时列表里同时有旧记录和本次新加的，按名字找的那条 staticText
+#   永远还在，改后第一次本地跑就是这样红的；跳过添加表单、直接删残留那条的探针证明左滑 + 弹窗 +
+#   点「删除」这条链路本身是通的（rows 从 1 变 0、弹窗元素全部消失）。
+#   本地改后 90.213s 通过；CI 侧同一批的本地/CI 耗时比从 1.6x（dragReorder 24.3s→39.0s）到
+#   5.3x（emptyState 19.0s→99.8s）不等，90 秒落在这个区间里，120s allowance 够不够没有依据，
+#   所以条目先留着——它现在钉的是"耗时"而不是"断言"，等有 CI 轮次证明它不再越线时随 #17 的口径
+#   重定一起删（同一条线上还有 UI:AetherUITests/*~timeout 与 testUserPreferencePersistence）。
 UI:MCPSettingsUITests/testDeleteMCPServer
 
 # ---- macOS（unit-tests-macos 两个分片共用同一 label）----
