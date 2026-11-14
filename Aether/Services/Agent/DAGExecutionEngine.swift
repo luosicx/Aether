@@ -141,7 +141,10 @@ final class DAGExecutionEngine {
             case .failed:
                 await stateMachine.override(nodeID: sub.id, status: .failed)
             case .inProgress:
-                // 重新执行 inProgress 节点
+                // 重新执行 inProgress 节点。
+                // 模型侧状态必须跟着回落：调度取的是 task.subTasks 里 status == .pending 的节点，
+                // 只改状态机的话节点永远进不了可执行集，run 会以 deadlock 收场。
+                _ = task.updateSubTaskStatus(id: sub.id, status: .pending)
                 await stateMachine.override(nodeID: sub.id, status: .pending)
             case .pending:
                 // 保持 pending
@@ -268,19 +271,32 @@ final class DAGExecutionEngine {
         }
     }
 
-    /// 级联跳过 failed 节点的下游依赖
+    /// 级联跳过 failed 节点的下游依赖（整棵失败子树，不只第一代）
     ///
-    /// 当某节点 failed 后，依赖它的 pending 节点应自动 skipped。
+    /// 传染规则：pending/skipped 节点的依赖里出现孤儿，它就成了孤儿；种子是 failed 节点。
+    /// 之前只算一代就停：s1 被跳过之后，孙节点 s2 会被 `nextExecutableSubTasks()` 里
+    /// 「skipped 视作已满足」放行、真的跑起来——父节点都没做成，孙节点却 completed。
+    /// 也正因为这条放行规则，传播必须穿过 `.skipped`，否则上一轮已跳过的中间节点
+    /// 会让本轮的孙节点再次漏网。
+    /// 用户主动跳过的节点（`skipFailedNode`）上游没有 failed，进不了种子集，
+    /// 其下游因此照常放行——这正是「skipped 视作已满足」存在的意义。
     /// - Parameter task: 所属 AgentTask
     /// - Returns: 是否有节点被跳过（true 表示有进展）
     private func cascadeSkipFailed(task: AgentTask) async -> Bool {
-        let failedIDs = Set(task.subTasks.filter { $0.status == .failed }.map(\.id))
-        guard !failedIDs.isEmpty else { return false }
+        let subTasks = task.subTasks
+        var orphans = Set(subTasks.filter { $0.status == .failed }.map(\.id))
+        guard !orphans.isEmpty else { return false }
 
         var progressed = false
-        for sub in task.subTasks where sub.status == .pending {
-            // 若依赖中包含 failed 节点，标记为 skipped
-            if !Set(sub.dependencies).isDisjoint(with: failedIDs) {
+        var changed = true
+        while changed {
+            changed = false
+            for sub in subTasks where sub.status == .pending || sub.status == .skipped {
+                guard !orphans.contains(sub.id),
+                      sub.dependencies.contains(where: orphans.contains) else { continue }
+                orphans.insert(sub.id)
+                changed = true
+                guard sub.status == .pending else { continue }
                 _ = task.updateSubTaskStatus(id: sub.id, status: .skipped, result: "依赖节点失败，自动跳过")
                 do {
                     try await stateMachine.markSkipped(sub.id)

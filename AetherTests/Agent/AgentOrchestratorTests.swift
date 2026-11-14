@@ -25,39 +25,90 @@ final class AgentOrchestratorTests: XCTestCase {
 
     // MARK: - Mock LLMProvider
 
-    /// 按调用顺序依次返回预设响应的 Mock LLMProvider
-    final class MockLLMProvider: LLMProvider {
+    /// 并发安全的 Mock LLMProvider
+    ///
+    /// executor 闭包跑在 DAG 引擎的 TaskGroup 子任务里，无依赖的子任务会同时打进来：
+    /// - 计数与数组不加锁就是多线程写同一块堆（本类在 CI 上的 segv 受害者每轮都在换）；
+    /// - 响应若仍按调用顺序出队，A 会拿到 B 的响应，审查环节还会把"执行结果X"当审查结论读。
+    /// 所以并行场景用 `script` 按内容取响应，`responses` 顺序队列只留给链式子任务。
+    final class MockLLMProvider: LLMProvider, @unchecked Sendable {
+
+        /// 按内容分派的响应脚本
+        struct Script {
+            /// 子任务标题 → 依次返回的执行结果；次数用尽后重复最后一条（重试场景）
+            var executions: [String: [String]] = [:]
+            /// 执行结果 → 审查结论；未命中即"通过"
+            var reviews: [String: String] = [:]
+            /// 目标分解响应（子任务 JSON）
+            var decompose: String = ""
+        }
+
         /// 响应队列：第 N 次 chat 调用返回 responses[N-1]
         var responses: [String] = []
-        /// 调用计数
-        private(set) var chatCallCount = 0
-        /// 记录每次调用的 messages
-        private(set) var callMessages: [[APIMessage]] = []
-        /// 记录每次调用的 config.systemPrompt
-        private(set) var callSystemPrompts: [String] = []
+        /// 内容脚本；非 nil 时优先于 responses
+        var script: Script?
+
+        private let lock = NSLock()
+        private var _chatCallCount = 0
+        private var _callMessages: [[APIMessage]] = []
+        private var _callSystemPrompts: [String] = []
+        /// 子任务标题 → 已执行次数，用于让 script.executions 按次序出队
+        private var _executionAttempts: [String: Int] = [:]
+
+        var chatCallCount: Int { lock.withLock { _chatCallCount } }
+        var callMessages: [[APIMessage]] { lock.withLock { _callMessages } }
+        var callSystemPrompts: [String] { lock.withLock { _callSystemPrompts } }
+
+        /// 记账并取响应
+        private func respond(messages: [APIMessage], config: ChatConfig) -> String {
+            lock.withLock {
+                _chatCallCount += 1
+                _callMessages.append(messages)
+                _callSystemPrompts.append(config.systemPrompt)
+                if let script { return scriptReply(script, messages: messages) }
+                let index = _chatCallCount - 1
+                return index < responses.count ? responses[index] : ""
+            }
+        }
+
+        /// 按消息内容分派：审查看「执行结果：」，执行看「子任务：」，其余是目标分解。
+        /// 用内容而不是 systemPrompt 判角色，是因为分解用的并非 AgentRole 的文案。
+        private func scriptReply(_ script: Script, messages: [APIMessage]) -> String {
+            let user = messages.last?.content ?? ""
+            if let reviewed = Self.fieldValue(user, label: "执行结果") {
+                return script.reviews[reviewed] ?? "通过"
+            }
+            if let title = Self.fieldValue(user, label: "子任务") {
+                let queue = script.executions[title] ?? []
+                guard !queue.isEmpty else { return "" }
+                let attempt = _executionAttempts[title, default: 0]
+                _executionAttempts[title] = attempt + 1
+                return queue[min(attempt, queue.count - 1)]
+            }
+            return script.decompose
+        }
+
+        private static func fieldValue(_ content: String, label: String) -> String? {
+            let prefix = "\(label)："
+            for line in content.split(separator: "\n", omittingEmptySubsequences: false)
+            where line.hasPrefix(prefix) {
+                return String(line.dropFirst(prefix.count))
+            }
+            return nil
+        }
 
         func chat(messages: [APIMessage], config: ChatConfig, apiKey: String) -> AsyncStream<String> {
             AsyncStream { continuation in
-                self.chatCallCount += 1
-                self.callMessages.append(messages)
-                self.callSystemPrompts.append(config.systemPrompt)
-                let index = self.chatCallCount - 1
-                if index < self.responses.count {
-                    continuation.yield(self.responses[index])
-                }
+                let reply = respond(messages: messages, config: config)
+                if !reply.isEmpty { continuation.yield(reply) }
                 continuation.finish()
             }
         }
 
         func chat(messages: [APIMessage], config: ChatConfig, tools: [ToolDef], apiKey: String) -> AsyncStream<ParsedChunk> {
             AsyncStream { continuation in
-                self.chatCallCount += 1
-                self.callMessages.append(messages)
-                self.callSystemPrompts.append(config.systemPrompt)
-                let index = self.chatCallCount - 1
-                if index < self.responses.count {
-                    continuation.yield(ParsedChunk(content: self.responses[index], toolCalls: nil))
-                }
+                let reply = respond(messages: messages, config: config)
+                if !reply.isEmpty { continuation.yield(ParsedChunk(content: reply, toolCalls: nil)) }
                 continuation.finish()
             }
         }
@@ -350,11 +401,10 @@ final class AgentOrchestratorTests: XCTestCase {
 
     /// executeAll：并行执行无依赖子任务
     func testExecuteAllParallelSubTasks() async throws {
-        mockLLM.responses = [
-            parallelSubTasksJSON,  // 分解
-            "结果A",               // 执行并行任务A
-            "结果B"                // 执行并行任务B
-        ]
+        mockLLM.script = MockLLMProvider.Script(
+            executions: ["并行任务A": ["结果A"], "并行任务B": ["结果B"]],
+            decompose: parallelSubTasksJSON
+        )
 
         let orchestrator = makeOrchestrator()
         _ = try await orchestrator.startTask(goal: "并行目标")
@@ -366,9 +416,9 @@ final class AgentOrchestratorTests: XCTestCase {
             return
         }
         XCTAssertTrue(task.isAllSubTasksCompleted, "所有子任务应完成")
-        // 验证两个子任务都有结果（顺序可能因并行而不同）
-        let results = task.subTasks.compactMap { $0.result }.sorted()
-        XCTAssertEqual(results, ["结果A", "结果B"])
+        // 并行执行不保证先后，按标题取结果；换成按调用顺序出队就会 A 拿到 B 的响应
+        XCTAssertEqual(task.subTasks.first { $0.title == "并行任务A" }?.result, "结果A")
+        XCTAssertEqual(task.subTasks.first { $0.title == "并行任务B" }?.result, "结果B")
     }
 
     // MARK: - DAG 依赖正确性
@@ -501,13 +551,13 @@ final class AgentOrchestratorTests: XCTestCase {
 
     /// 多 Agent 协作：reviewer 审查通过
     func testMultiAgentCollaborationReviewPass() async throws {
-        mockLLM.responses = [
-            parallelSubTasksJSON,  // 分解（planner）
-            "执行结果A",            // 执行A（executor）
-            "通过",                 // 审查A（reviewer）
-            "执行结果B",            // 执行B（executor）
-            "通过"                  // 审查B（reviewer）
-        ]
+        mockLLM.script = MockLLMProvider.Script(
+            executions: [
+                "并行任务A": ["执行结果A"],
+                "并行任务B": ["执行结果B"],
+            ],
+            decompose: parallelSubTasksJSON
+        )
 
         let orchestrator = makeOrchestrator(enableReview: true)
         _ = try await orchestrator.startTask(goal: "需审查的目标")
@@ -523,15 +573,15 @@ final class AgentOrchestratorTests: XCTestCase {
 
     /// 多 Agent 协作：reviewer 审查不通过后重试
     func testMultiAgentCollaborationReviewRetry() async throws {
-        mockLLM.responses = [
-            parallelSubTasksJSON,  // 分解
-            "第一次结果",           // 执行A
-            "通过",                 // 审查A通过
-            "第一次结果B",          // 执行B
-            "不通过",               // 审查B不通过
-            "重试结果B",            // 重试执行B
-            "通过"                  // 重试审查B通过
-        ]
+        mockLLM.script = MockLLMProvider.Script(
+            executions: [
+                "并行任务A": ["第一次结果A"],
+                // 审查不通过后 orchestrator 会用同一份消息重跑，第二次取到重试结果
+                "并行任务B": ["第一次结果B", "重试结果B"],
+            ],
+            reviews: ["第一次结果B": "不通过"],
+            decompose: parallelSubTasksJSON
+        )
 
         let orchestrator = makeOrchestrator(enableReview: true)
         _ = try await orchestrator.startTask(goal: "需重试的目标")
@@ -543,6 +593,8 @@ final class AgentOrchestratorTests: XCTestCase {
             return
         }
         XCTAssertTrue(task.isAllSubTasksCompleted, "重试后所有子任务应完成")
+        // A 一次通过，不该被 B 的重试带着重跑
+        XCTAssertEqual(task.subTasks.first { $0.title == "并行任务A" }?.result, "第一次结果A")
         // 最终结果应为重试后的结果
         let resultB = task.subTasks.first { $0.title == "并行任务B" }?.result
         XCTAssertEqual(resultB, "重试结果B", "应使用重试后的结果")
