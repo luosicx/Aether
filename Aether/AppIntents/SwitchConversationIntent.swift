@@ -22,12 +22,10 @@ struct SwitchConversationIntent: AppIntent {
     func perform() async throws -> some IntentResult & ReturnsValue<String> {
         // P1-2: 整个 ModelContext 生命周期在 MainActor 上完成，避免跨 actor 访问
         let resultTitle: String = try await MainActor.run {
-            // 创建与主 App 同 schema 的 ModelContainer
-            let container = try ModelContainer(
-                for: Conversation.self, ChatMessage.self,
-                DocumentChunk.self, MessageFeedback.self, HealthInsight.self
-            )
-            let context = ModelContext(container)
+            // 复用主 App 的共享容器：schema 与存储位置单点定义，避免自建残缺 schema 的
+            // ModelContainer 触发 CoreData 破坏性迁移（把 store 里的 UserPreference /
+            // AgentTask / Memory 三张表当实体移除直接删掉）
+            let context = ModelContext(AetherApp.sharedModelContainer)
             // 查询 title CONTAINS keyword 的 Conversation，按 createdAt 降序取首个。
             // 将 keyword 绑定到局部常量，避免 #Predicate 宏捕获 self（self 引用无法在谓词中表达）
             let keyword = self.keyword

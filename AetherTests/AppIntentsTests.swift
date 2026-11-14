@@ -1,5 +1,6 @@
 import XCTest
 import AppIntents
+import SwiftData
 import AetherFoundation
 import AetherServices
 import AetherDesign
@@ -69,6 +70,29 @@ final class AppIntentsTests: XCTestCase {
             XCTAssertFalse(value.isEmpty, "perform 返回的 uuidString 不应为空")
         } catch {
             // 测试环境 SwiftData 文件路径可能无权限，允许抛错，只要不 crash 即可
+        }
+    }
+
+    /// 回归：intent 的 perform 不得让主 App 的共享 store 丢表。
+    /// 旧写法在 intent 里自建只含 5 个模型的 ModelContainer，CoreData 把同一 store 里多出来的
+    /// UserPreference / AgentTask / Memory 当"实体被移除"直接删表（Persistent History
+    /// truncation），之后主 App 对这三张表的读写全部报 `no such table`。这里先访问共享容器
+    /// 把 8 张表建起来，再跑两个 intent，最后要求三张表仍然读得动。
+    @MainActor
+    func testIntentPerformKeepsFullStoreSchemaUsable() async throws {
+        let sharedContainer = AetherApp.sharedModelContainer
+        var switchIntent = SwitchConversationIntent()
+        switchIntent.keyword = "zzz_no_such_conversation_zzz"
+        _ = try await switchIntent.perform()
+        _ = try await NewConversationIntent().perform()
+
+        let context = ModelContext(sharedContainer)
+        do {
+            _ = try context.fetch(FetchDescriptor<UserPreference>())
+            _ = try context.fetch(FetchDescriptor<AgentTask>())
+            _ = try context.fetch(FetchDescriptor<Memory>())
+        } catch {
+            XCTFail("intent 执行后主 App 的表应仍可读，实际报错（schema 被残缺容器迁移掉）: \(error)")
         }
     }
 
