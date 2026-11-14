@@ -95,7 +95,8 @@ final class VoiceService: NSObject {
         #endif
         // 1) 激活 AVAudioSession — 必须在取 outputFormat / installTap 之前完成，
         //    否则 inputNode.outputFormat(forBus:0) 会返回 sampleRate=0 / channelCount=0 的无效格式，
-        //    导致 installTap 抛出 "IsFormatSampleRateAndChannelCountValid" 崩溃。
+        //    导致 installTap 抛出 "IsFormatSampleRateAndChannelCountValid" 崩溃。激活成功只是必要
+        //    条件，不充分 —— 见下面第 2 步的格式判定。
         #if os(iOS)
         let session = AVAudioSession.sharedInstance()
         try session.setCategory(.playAndRecord, mode: .default, options: .defaultToSpeaker)
@@ -116,8 +117,16 @@ final class VoiceService: NSObject {
                 }
             }
         }
-        // 2) 激活 session 后再取 format — 此时 sampleRate / channelCount 已有效
+        // 2) 激活 session 后再取 format。模拟器上 setActive 可能成功而输入格式仍是
+        //    sampleRate=0 / channelCount=0，把这种格式直接交给 installTap 会撞上 CoreAudio 的
+        //    IsFormatSampleRateAndChannelCountValid 断言、整个进程被打死（真机上麦克风被占用/
+        //    无权限时同样可能拿到无效格式）。先判掉，让调用方拿到可展示的抛错。
         let recordingFormat = inputNode.outputFormat(forBus: 0)
+        guard recordingFormat.sampleRate > 0, recordingFormat.channelCount > 0 else {
+            recognitionTask?.cancel()
+            recognitionTask = nil
+            throw NSError(domain: "VoiceService", code: -4, userInfo: [NSLocalizedDescriptionKey: NSLocalizedString("音频输入格式无效", comment: "")])
+        }
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, _ in
             request.append(buffer)
         }

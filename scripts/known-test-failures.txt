@@ -232,8 +232,10 @@
 #   macOS 375 tests 0 failures、iOS 375 tests 0 failures，两侧闸门 exit 0；iOS 第一次同样撞了
 #   「test runner hung before establishing connection」的模拟器启动抖动，复跑即 375/0。
 
-# - 语音族删 7 条（macOS 7）+ Keychain 族删 4 条（双端各 2）：本批 11 条、五种机制，改产品代码 +
-#   用例配套，没有新增豁免。#62 先落地，所以本批对当前 main 是 53→42。语音族的直接证据是
+# - 语音族删 7 条（macOS 7）+ Keychain 族删 4 条（双端各 2）：本批 11 条、六种机制，改产品代码 +
+#   用例配套，没有新增豁免；另修一条从没锚过的 iOS 崩溃形态（不计入删除数，见语音块里
+#   installTap 那一条）。
+#   #62 先落地，所以本批对当前 main 是 53→42。语音族的直接证据是所以本批对当前 main 是 53→42。语音族的直接证据是
 #   main@b40cc22 的 `unit-tests-macos (2)`（job 131379618980）与 main@9c81652 的同名 job
 #   （132334054858）两轮记录，两轮的形态一字不差：
 #   - requestPermission 无界 await：删 macOS:VoiceServiceTests/testRequestPermission*、
@@ -261,6 +263,17 @@
 #     两轮 failed，0.02–0.185s，确定性）：`AVSpeechSynthesisVoice(identifier:)` 已弃用且不校验
 #     identifier，于是 resolveVoice 的中文音色兜底分支永远走不到。改成先按 allVoices()
 #     （来自 speechVoices()）认 identifier，与 NativeTTSEngine.resolveVoice 同一做法。
+#   - 合并树双端联跑又放出一条只在本地现形的形态：iOS `testStartRecordingPathHandlesSuccessOrFailure`
+#     撞 `required condition is false: IsFormatSampleRateAndChannelCountValid(format)`。A/B 证明它
+#     与本批无关——同一台机器、同一台 iPhone 17 模拟器，用 adcdb73 未改动的 VoiceService 单跑该类，
+#     passed=70 failed=1，就是这一条。CI 侧同一条是 passed (0.199s)（main@adcdb73 的 unit-tests job
+#     132344119663）——那边要么在 `session.setActive(true)` 就抛错走了 catch，要么拿到的格式本身
+#     有效；本机是 setActive 成功、而 `inputNode.outputFormat(forBus:0)` 仍返回
+#     sampleRate=0/channelCount=0，installTap 于是把进程打死。两边共同的窟窿是 installTap 之前
+#     没有格式判定，产品侧补上（无效格式即取消识别任务并抛 code -4），两种环境收敛到同一条路径：
+#     要么真装上 tap，要么拿到可展示的抛错。
+#     这条不计入删除数——它本来就没锚住：闸门的 CRASH_MARKS 不含 "required condition is false"，
+#     所以它在任何一轮都只会是 NEW FAILURE；`iOS:VoiceServiceTests/*~crash` 另有 CI 证据，保留不动。
 # - 同批删 macOS:VoiceServiceTests/testDidCancelDuringPreviewCleansPreviewState，这条不是本轮改好的，
 #   是 #56 批量锚定留下的过期条目：两轮都是 passed (2.018s / 2.028s)。它的机制（真实合成器自然结束
 #   触发 didFinish，与手动 didCancel 抢 isCurrentPreview）早已由用例注释记载的"较长试听文本"缓解，
@@ -274,6 +287,10 @@
 #   （含构建，CI 同款 30/60 allowance）：macOS 280 tests 0 failures 8 skipped、iOS 278 tests
 #   0 failures 12 skipped，两边闸门 exit 0，声纹与朗读状态机没有回归。挂死类修复的最终判定只能由
 #   CI 轮次给出——本机有麦克风、授权立刻返回，四类挂死在本地一条都复现不了。
+#   合批后的合并树（语音六类 + Keychain 三类，双端各一次含构建）：macOS 337 tests 0 failures
+#   8 skipped、闸门 exit 0；iOS 那一次 334 tests 1 failure 就是上面 installTap 那条，补上格式判定
+#   后取语音三类（VoiceService / VoiceCoordinator / ChatViewModel）+ KeychainManagerTests 复跑，
+#   iOS 247 tests 0 failures 12 skipped、macOS 同批 249 tests 0 failures 8 skipped，两侧闸门 exit 0。
 
 # - Keychain 族删 4 条（macOS 2 + iOS 2，同一机制双端各记一条）：`InMemoryKeychainBackend.storage`
 #   是裸 `Dictionary`，而 KeychainManagerTests 用 `Task.detached` / `withTaskGroup` 并发打
