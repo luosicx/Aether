@@ -464,7 +464,7 @@
 # 同一 helper 还只向上滑，而 swipeUp 带惯性：Form 懒渲染，一次甩过目标节就再也找不回来。
 # PluginSettingsUITests/testViewPluginPermissions 在 #65 第四轮滑满 10 次仍未命中 pluginManagementLink，
 # 同轮另外四条都是 3 次命中；main@7bfa84c 同一条 passed，本地两轮也各 3 次命中，属 flake 而非回归。
-# 修法分三步收敛，前两步都被实测否掉：
+# 修法分四步收敛：前两步被实测否掉，第三步保留，第四步才补上真正的根因。
 # 1) 整屏 swipeUp/swipeDown + 可视区边界停止条件：元素在边界两侧振荡
 #    （本地实测 up/down/up/down/up 后回扫到顶，用例反而红）。
 # 2) 半屏定长拖拽 + 预算用尽后反向回扫：本地 10 条两轮全过，但 CI 第五轮（run 43691929701）
@@ -473,14 +473,27 @@
 #    方向 0.25→0.75（手指向下），连拖 6 次后 t=209.19/209.36 Table 与 CollectionView 双双不存在
 #    ——在 Form 顶部向下拖就是 sheet 的下滑关闭手势，整个设置 Form 被拖没了；
 #    随后 scroller() 兜底返回没查 .exists 的 scrollViews.firstMatch，解析快照即抛。
-# 3) 终版：只向下滚、去掉反向回扫；拖拽在终点 thenHoldForDuration: 0.3 停住再抬手，
+# 3) 只向下滚、去掉反向回扫；拖拽在终点 thenHoldForDuration: 0.3 停住再抬手，
 #    抬手速度归零，步长精确等于半屏，从源头消掉过冲，也就不需要反向兜底。
 #    注意 withVelocity 是拖拽本身的速度而非抬手速度：设 0 被 XCTest 拒绝（必须 > 0），
 #    设 1 会让 406pt 拖 406 秒，本地实测直接挂到 240s allowance。
-#    容器改成「已存在的滚动容器里面积最大的那个」且三个候选都查 .exists：Picker 菜单也是
-#    CollectionView 且比 Form 窄，firstMatch 会选中菜单，拖拽就落在菜单里而不是 Form 上。
-#    本地 iPhone 17、240/300 窗口：受影响的 10 条用例连续两轮全过（507.255s / 504.577s，
-#    testUserPreferencePersistence 107.631s / 109.708s），门报 baseline(UI)=0。
+#    三个滚动容器候选都查 .exists：视图切换瞬间可能一个容器都没有，
+#    直接对不存在的 firstMatch 取坐标会抛「Failed to get matching snapshot」。
+# 4) 但 CI 第六轮（run 43699917306）testUserPreferencePersistence 仍撞穿 240s allowance。
+#    真因不在滚动而在 Picker 菜单没关。语气 Picker 弹出的是独立顶层容器里的 CollectionView
+#    （platter {{120,186.3},{250,146}}；CollectionView 报的 874 是内容高不是可视高），
+#    它抢走 collectionViews.firstMatch，拖拽于是全落在菜单里而不是 Form 上
+#    （该轮 63 次容器解析只有 3 次命中 Form {{0,62},{402,812}}）。
+#    第二遍验证只 waitForExistence 查「正式」选项、从不点选，菜单因此不会自己关；
+#    第一遍点了选项才关，所以第一遍一直是干净的——这也是本地长期绿、CI 红的原因。
+#    关菜单的落点试错两次：再点锚点行不行（菜单开着时 tonePicker 行本身从树上消失，
+#    .exists 为假、补点根本不执行）；点窗口 dy 0.05 也不行（那落在状态栏，手势被系统吃掉）。
+#    终版点设置 sheet 导航栏空白处 (dx 0.35, dy 0.12)：导航栏 {{0,78},{402,54}} 恒在
+#    platter 上方，x 避开右侧「完成」按钮 {{324,82},{58,36}}，该处无任何按钮。
+#    本地 iPhone 17、240/300 窗口：testUserPreferencePersistence 单跑两轮 122.630s / 96.900s，
+#    容器解析 24/8 次全部命中 Form、菜单容器 0 次（修前 168s、40 次落在菜单里）。
+#    受影响的 10 条用例连续两轮全过（496.194s / 497.087s，testEditSystemPrompt 93.022s / 92.168s、
+#    testUserPreferencePersistence 105.655s / 105.119s），门报 baseline(UI)=0。
 # 下面这条在 allowance 内、或只飘过一次，按精确条目记着等修。
 # - 原 `UI:AetherUITests/testOpenConversationListShowsEmptyState`（本批删除）：用例在 accessibility
 #   tree 里找 identifier「还没有对话」，而产品空状态是 ConversationList 的 EmptyStateView

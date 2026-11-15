@@ -28,11 +28,13 @@ final class PluginSettingsUITests: XCTestCase {
     /// （CI 实测四条用例 3 次滑动即命中，失败那条滑满 10 次仍未命中）；
     /// 过冲后只能反向拖，而在 Form 顶部反向拖等于 sheet 的下滑关闭手势。
     private func scrollToElement(_ element: XCUIElement, in app: XCUIApplication, maxAttempts: Int = 10) {
-        // 取面积最大的滚动容器：弹层也是 CollectionView 且比 Form 窄，firstMatch 会选中弹层。
+        // 三个候选都要查 .exists：视图切换瞬间可能一个滚动容器都没有，
+        // 直接对不存在的 firstMatch 取坐标会抛「Failed to get matching snapshot」。
         func scroller() -> XCUIElement? {
-            [app.tables.firstMatch, app.collectionViews.firstMatch, app.scrollViews.firstMatch]
-                .filter { $0.exists }
-                .max { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }
+            if app.tables.firstMatch.exists { return app.tables.firstMatch }
+            if app.collectionViews.firstMatch.exists { return app.collectionViews.firstMatch }
+            if app.scrollViews.firstMatch.exists { return app.scrollViews.firstMatch }
+            return nil
         }
         func settled(in container: XCUIElement?) -> Bool {
             guard element.exists, element.isHittable else { return false }
@@ -53,6 +55,8 @@ final class PluginSettingsUITests: XCTestCase {
             _ = element.waitForExistence(timeout: 1)
         }
     }
+
+
 
     // MARK: - 流 1：进入插件管理页
 

@@ -32,6 +32,16 @@ final class AetherUITests: XCTestCase {
         _ = app.keyboards.firstMatch.waitForNonExistence(timeout: 3)
     }
 
+    /// 关掉 Picker 弹出的菜单：点设置 sheet 导航栏的空白处。
+    /// 菜单是独立顶层容器里的 CollectionView，会抢走 collectionViews.firstMatch，
+    /// 不关掉它后续滚动就全落在菜单里而不是 Form 上，预算耗尽撞穿 allowance。
+    /// 落点约束：导航栏恒在菜单 platter 上方；x 避开右侧「完成」按钮；
+    /// dy 不能取 0.05——那落在状态栏，手势被系统吃掉，菜单不会关。
+    /// 也不能再点锚点行：菜单开着时 tonePicker 行本身会从 accessibility tree 里消失。
+    private func dismissPickerOverlay(in app: XCUIApplication) {
+        app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.35, dy: 0.12)).tap()
+    }
+
     /// 在 Form 中向下滚动到目标元素整块进入可视区（Form 底部的 Section 可能需要滚动才可见）。
     /// 停止条件不能用 isHittable：元素只露出几 pt 时它也为真，而中心仍在屏外，
     /// tap 合成不到键盘焦点（CI 实测 editor 落在 y=865.7、窗高 874）。
@@ -41,12 +51,13 @@ final class AetherUITests: XCTestCase {
     /// （CI 实测连拖 6 次后整个设置 Form 从树上消失）。步长精确等于半屏，不需要反向兜底。
     /// 注意 withVelocity 是拖拽本身的速度而非抬手速度，调小它只会把拖拽拉长到挂死。
     private func scrollToElement(_ element: XCUIElement, in app: XCUIApplication, maxAttempts: Int = 8) {
-        // 取面积最大的滚动容器：Picker 菜单也是 CollectionView 且比 Form 窄，
-        // firstMatch 会选中菜单，拖拽就落在菜单里而不是 Form 上。
+        // 三个候选都要查 .exists：视图切换瞬间可能一个滚动容器都没有，
+        // 直接对不存在的 firstMatch 取坐标会抛「Failed to get matching snapshot」。
         func scroller() -> XCUIElement? {
-            [app.tables.firstMatch, app.collectionViews.firstMatch, app.scrollViews.firstMatch]
-                .filter { $0.exists }
-                .max { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }
+            if app.tables.firstMatch.exists { return app.tables.firstMatch }
+            if app.collectionViews.firstMatch.exists { return app.collectionViews.firstMatch }
+            if app.scrollViews.firstMatch.exists { return app.scrollViews.firstMatch }
+            return nil
         }
         func settled(in container: XCUIElement?) -> Bool {
             guard element.exists, element.isHittable else { return false }
@@ -511,13 +522,7 @@ final class AetherUITests: XCTestCase {
         } else {
             // iOS 26.2 (CI): 选项元素不存在时，只验证 tonePicker 存在即可（已通过上方断言）
             // 选项菜单可能未渲染或为不同元素类型，跳过选项验证避免 CI 误报
-        }
-        // 轮询 Picker 选项消失，替代固定 sleep
-        let pickerDismissedDeadline = Date().addingTimeInterval(0.5)
-        while app.descendants(matching: .any).matching(
-            NSPredicate(format: "label == %@", "正式")
-        ).firstMatch.exists && Date() < pickerDismissedDeadline {
-            Thread.sleep(forTimeInterval: 0.1)
+            dismissPickerOverlay(in: app)
         }
 
         // 工具 Toggle：勾选 calculate（可能在 toneRow 下方，需要再滚动一点）
@@ -591,21 +596,9 @@ final class AetherUITests: XCTestCase {
         let formalOpt = app.descendants(matching: .any).matching(
             NSPredicate(format: "label == %@", "正式")
         ).firstMatch
-        if formalOpt.waitForExistence(timeout: 5) {
-            // 选项存在，验证通过（保持选中）
-        } else {
-            // iOS 26.2 (CI): 选项元素不存在时，只验证 tonePicker 存在即可（已通过上方断言）
-        }
-        // 回到设置主页面（Picker 选项列表可能有返回按钮）
-        let backButton = app.navigationBars.buttons.firstMatch
-        if backButton.waitForExistence(timeout: 2) {
-            backButton.tap()
-            // 轮询 settingsButton 出现，替代固定 sleep
-            let backDeadline = Date().addingTimeInterval(0.5)
-            while !app.buttons["settingsButton"].exists && Date() < backDeadline {
-                Thread.sleep(forTimeInterval: 0.1)
-            }
-        }
+        // 这一遍只验证选项可见、不点选，菜单不会像第一遍那样被选项 tap 关掉，必须显式关
+        _ = formalOpt.waitForExistence(timeout: 5)
+        dismissPickerOverlay(in: app)
 
         // 验证 calculate 工具保持开启
         // Day 18: SettingsView Toggle 改用 toolDef.function.description 作为标签
