@@ -268,6 +268,11 @@ final class AgentOrchestrator {
 
         // v1.1 Phase B: 设置委派监听器（在 dagEngine.run 之前启动，确保订阅就绪）
         let delegationListener = startDelegationListener()
+        // 监听器归本方法管：下面 deadlock / subTaskFailed / stateMachine 三处 throw 以及中途 save()
+        // 抛错都得把它收掉。订阅挂在 AgentMessageBus 上，只有取消那个 Task 才会走 AsyncStream 的
+        // onTermination 去 removeSubscriber——漏一次就永久多一个订阅者，而且旧监听还会继续替已经
+        // 失败的那轮处理 delegation.requests 消息。
+        defer { delegationListener.cancel() }
 
         // v1.1 Phase B: 捕获 Agent 实例快照用于角色路由（@MainActor final class 为 Sendable）
         let agentInstancesSnapshot = self.agentInstances
@@ -361,9 +366,6 @@ final class AgentOrchestrator {
                 throw OrchestratorError.subTaskFailed(UUID(), smError.localizedDescription)
             }
         }
-
-        // v1.1 Phase B: 停止委派监听器
-        delegationListener.cancel()
     }
 
     // MARK: - v1.1 Phase B: 委派监听与执行
