@@ -418,6 +418,14 @@ jobs:
         id: test
         continue-on-error: true
         run: |
+          # 240/300（原来 120/180）。依据是本地整类串行矩阵（iPhone 17、窗口放到 600/900 取自然耗时）：
+          # testUserPreferencePersistence 102.0s、testSaveAPIKey 72.6s、testEditSystemPrompt 69.9s，
+          # 而 CI 侧对同批用例的耗时比观测到 1.6x（dragReorder 24.3s→39.0s）到 5.3x
+          # （emptyState 19.0s→99.8s）——120s 正好压在这条带上，所以"超时受害者每轮换人"，
+          # 见 scripts/known-test-failures.txt 的 UI 段。
+          # 试过改用例自带的 executionTimeAllowance：在 setUp 里赋值 5 秒、命令行给 120 秒，
+          # 14 秒的用例照样通过（NSLog 读回确实是 5），也就是这个属性在 job 传了命令行窗口之后
+          # 就不起作用了，只能在 job 上调。
           xcodebuild test-without-building \
             -project Aether.xcodeproj \
             -scheme Aether-iOS \
@@ -426,8 +434,8 @@ jobs:
             -derivedDataPath build \
             -only-testing:AetherUITests \
             -test-timeouts-enabled YES \
-            -default-test-execution-time-allowance 120 \
-            -maximum-test-execution-time-allowance 180 \
+            -default-test-execution-time-allowance 240 \
+            -maximum-test-execution-time-allowance 300 \
             -parallel-testing-enabled NO \
             -resultBundlePath UITestResults.xcresult \
             CODE_SIGNING_ALLOWED=NO ARCHS=arm64 SWIFT_STRICT_CONCURRENCY=complete
