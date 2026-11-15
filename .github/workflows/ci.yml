@@ -122,7 +122,7 @@ jobs:
             -resultBundlePath TestResults.xcresult \
             CODE_SIGNING_ALLOWED=NO ARCHS=arm64 SWIFT_STRICT_CONCURRENCY=complete
           status=$?
-          echo "xcodebuild exit: $status（失败判定见 Verify Test Results）" >> "$GITHUB_STEP_SUMMARY"
+          echo "xcodebuild exit code: $status (failures are judged by the xcresult gate below)" >> "$GITHUB_STEP_SUMMARY"
           exit 0
 
       - name: Verify Test Results
@@ -448,7 +448,7 @@ jobs:
             -resultBundlePath UITestResults.xcresult \
             CODE_SIGNING_ALLOWED=NO ARCHS=arm64 SWIFT_STRICT_CONCURRENCY=complete
           status=$?
-          echo "xcodebuild exit: $status（失败判定见 Verify UIT Results）" >> "$GITHUB_STEP_SUMMARY"
+          echo "xcodebuild exit code: $status (failures are judged by the xcresult gate below)" >> "$GITHUB_STEP_SUMMARY"
           exit 0
 
       - name: Verify UIT Results
@@ -605,7 +605,7 @@ jobs:
             -resultBundlePath TestResultsMacOS.xcresult \
             CODE_SIGNING_ALLOWED=NO SWIFT_STRICT_CONCURRENCY=complete
           status=$?
-          echo "xcodebuild exit: $status（失败判定见 Verify macOS Test Results）" >> "$GITHUB_STEP_SUMMARY"
+          echo "xcodebuild exit code: $status (failures are judged by the xcresult gate below)" >> "$GITHUB_STEP_SUMMARY"
           exit 0
 
       - name: Verify macOS Test Results
