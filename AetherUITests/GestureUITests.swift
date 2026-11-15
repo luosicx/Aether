@@ -206,17 +206,26 @@ final class GestureUITests: XCTestCase {
         // 点击「编辑」按钮进入编辑模式
         let editButton = app.buttons["editConversationsButton"]
         XCTAssertTrue(editButton.waitForExistence(timeout: 8), "应存在编辑按钮")
+        XCTAssertTrue(app.buttons["newConversationButton"].firstMatch.waitForExistence(timeout: 8),
+                      "进入编辑模式前「新建对话」按钮应在工具栏上")
+
         editButton.tap()
 
-        // 验证进入编辑模式——按钮文案变为「完成」
-        let doneButton = app.buttons["完成"]
-        XCTAssertTrue(doneButton.waitForExistence(timeout: 8), "进入编辑模式后应显示「完成」按钮")
+        // 验证进入编辑模式：不看文案，看状态效果。
+        // 旧断言 `app.buttons["完成"]` 在 CI 的 iOS 26 上恒查不到（testDragReorderEditMode 每轮红的
+        // 就是这一行，38.982s）：这个工具栏按钮带 accessibilityIdentifier（ConversationList.swift:324），
+        // 而带 identifier 的工具栏按钮在这一版系统上按 label 查不出来——同一行上面那两条 identifier
+        // 查询都是通的。改用它真正改变的东西断言：`if !isEditMode` 让「新建对话」在编辑模式里消失、
+        // 退出后回来（ConversationList.swift:328），比读一个文案更能说明状态真切过去了。
+        XCTAssertTrue(app.buttons["newConversationButton"].firstMatch.waitForNonExistence(timeout: 8),
+                      "进入编辑模式后应隐藏「新建对话」按钮")
 
         // 退出编辑模式
-        doneButton.tap()
-        _ = app.buttons["editConversationsButton"].waitForExistence(timeout: 8)
+        editButton.tap()
+        XCTAssertTrue(app.buttons["newConversationButton"].firstMatch.waitForExistence(timeout: 8),
+                      "退出编辑模式后应恢复「新建对话」按钮")
 
         // 核心验证：编辑模式可进入/退出且不 crash（.onMove 已注册）
-        XCTAssertTrue(app.buttons["editConversationsButton"].exists, "退出编辑模式后应恢复「编辑」按钮")
+        XCTAssertTrue(editButton.exists, "退出编辑模式后「编辑」按钮应仍在工具栏")
     }
 }

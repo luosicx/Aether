@@ -164,6 +164,13 @@ final class MCPSettingsUITests: XCTestCase {
         let app = makeApp()
         app.launch()
 
+        // 每次跑都用唯一的 Server 名：MCP 配置存在 UserDefaults（MCPSettingsView.saveConfigs），
+        // 而 UITEST_RESET_DATA 只清 SwiftData（AetherApp+Shared.swift:142 → ChatStorage.wipeAllData），
+        // 上一轮留下的条目会一直在列表里。名字写死成「待删除 Server」时，列表里会同时有旧的和新加的
+        // 两条同名记录：删掉任意一条，按名字找的那条 staticText 都还在，断言就永远红——本地实测正是
+        // 这个形状（探针单跑残留那一条时，同样的左滑 + 确认弹窗 + 点「删除」把记录真删掉了，rows=0）。
+        let serverName = "UITestDel-\(UUID().uuidString.prefix(8))"
+
         // 打开设置
         XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(timeout: 10))
         app.buttons["settingsButton"].tap()
@@ -194,7 +201,7 @@ final class MCPSettingsUITests: XCTestCase {
         let nameField = app.textFields["serverNameField"]
         XCTAssertTrue(nameField.waitForExistence(timeout: 5))
         nameField.tap()
-        nameField.typeText("待删除 Server")
+        nameField.typeText(serverName)
 
         // 确保使用 SSE 传输并填 URL
         let urlField = app.textFields["urlField"]
@@ -239,67 +246,37 @@ final class MCPSettingsUITests: XCTestCase {
         saveButton.tap()
 
         // 验证 Server 已添加
-        let serverText = app.staticTexts["待删除 Server"]
+        let serverText = app.staticTexts[serverName]
         XCTAssertTrue(serverText.waitForExistence(timeout: 8), "添加后应出现条目")
 
-        // 左滑删除（Form 中 onDelete 行为）
-        let cell = app.cells.containing(.staticText, identifier: "待删除 Server").firstMatch
-        if cell.waitForExistence(timeout: 5) {
-            cell.swipeLeft()
-            // onDelete 触发的系统 Delete 按钮（英文 label "Delete"）
-            let deleteButton = app.descendants(matching: .any).matching(
-                NSPredicate(format: "label == %@", "Delete")
-            ).firstMatch
-            let deleteLabelButton = app.descendants(matching: .any).matching(
-                NSPredicate(format: "label == %@", "删除")
-            ).firstMatch
-            if deleteButton.waitForExistence(timeout: 5) {
-                deleteButton.tap()
-            } else if deleteLabelButton.waitForExistence(timeout: 3) {
-                deleteLabelButton.tap()
-            } else {
-                // 兜底：通过行点击进入编辑后无法直接删除，
-                // 改为直接查找删除确认按钮（confirmationDialog 触发）
-                cell.tap()
-            }
-        }
+        // 左滑删除（Form 的 ForEach.onDelete → 系统行操作 → confirmationDialog）
+        // 行 identifier 是 `mcpServerRow_<UUID>`（MCPSettingsView.swift:67），UUID 在测试里不可预知，
+        // 所以按「前缀 + 本用例自己的名字」两条一起筛——只按前缀取 firstMatch 会删到残留记录那一行。
+        // 旧写法 `cells.containing(.staticText, identifier: "待删除 Server")` 永远匹配不上：containing
+        // 比的是子元素的 identifier，而 serverRow 里的文案只有 label、没有 identifier，于是整段删除流程
+        // 被外层 if 跳过，末尾再用 XCTAssertTrue(true) 收场——这条用例从头到尾没验证过"删除"这件事。
+        let row = app.buttons.matching(
+            NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@",
+                        "mcpServerRow_", serverName)
+        ).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 5), "添加后应能按 mcpServerRow_ + 本次名字定位到 Server 行")
+        row.swipeLeft()
+        // 行操作按钮由系统按模拟器语言生成（英文 "Delete"、中文 "删除"）；此刻确认弹窗还没出现，
+        // 按 label 精确匹配不会撞到弹窗里那个同为「删除」的 destructive 按钮。
+        let rowActionDelete = app.descendants(matching: .any).matching(
+            NSPredicate(format: "label == %@ OR label == %@", "Delete", "删除")
+        ).firstMatch
+        XCTAssertTrue(rowActionDelete.waitForExistence(timeout: 5), "左滑后应出现删除行操作")
+        rowActionDelete.tap()
 
-        // 处理确认弹窗（confirmationDialog）——优先用 accessibilityIdentifier 定位
+        // 确认弹窗的 destructive 按钮由产品标注了 identifier
         let confirmDelete = app.descendants(matching: .any).matching(
             NSPredicate(format: "identifier == %@", "confirmDeleteServerButton")
         ).firstMatch
-        let altConfirmDelete = app.descendants(matching: .any).matching(
-            NSPredicate(format: "label == %@", "删除")
-        ).firstMatch
-        if confirmDelete.waitForExistence(timeout: 5) {
-            confirmDelete.tap()
-        } else if altConfirmDelete.waitForExistence(timeout: 3) {
-            altConfirmDelete.tap()
-        }
+        XCTAssertTrue(confirmDelete.waitForExistence(timeout: 5), "应弹出删除确认并提供「删除」按钮")
+        confirmDelete.tap()
 
-        // 验证 Server 已被删除（条目消失）——增加超时覆盖动画
-        let deleted = serverText.waitForNonExistence(timeout: 10)
-        // 删除验证为非阻塞：部分模拟器版本左滑行为不稳定
-        // 核心验证已通过（进入 MCP 配置页 + 添加成功 + 触发删除流程）
-        if !deleted {
-            // 重试：再次尝试左滑删除
-            if cell.exists {
-                cell.swipeLeft()
-                let retryDelete = app.descendants(matching: .any).matching(
-                    NSPredicate(format: "label == %@", "Delete")
-                ).firstMatch
-                if retryDelete.waitForExistence(timeout: 3) {
-                    retryDelete.tap()
-                }
-                let retryConfirm = app.descendants(matching: .any).matching(
-                    NSPredicate(format: "identifier == %@", "confirmDeleteServerButton")
-                ).firstMatch
-                if retryConfirm.waitForExistence(timeout: 5) {
-                    retryConfirm.tap()
-                }
-            }
-            _ = serverText.waitForNonExistence(timeout: 5)
-        }
-        XCTAssertTrue(true, "删除流程已触发，UI 交互验证通过")
+        // 真断言：本用例添加的那条消失（名字唯一，残留记录不会让这条断言永远落空）
+        XCTAssertTrue(serverText.waitForNonExistence(timeout: 10), "确认删除后本次添加的条目应消失")
     }
 }
