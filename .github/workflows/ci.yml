@@ -75,7 +75,7 @@ jobs:
           path: coverage-rust
 
       - name: Setup iOS Simulator
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@v4
         with:
           timeout_minutes: 5
           max_attempts: 2
@@ -103,8 +103,11 @@ jobs:
 
       - name: Run Unit Tests
         id: test
-        continue-on-error: true
+        # 只要有失败用例（含基线锚定的历史债）xcodebuild 就以 65 退出，
+        # 直接用它会往运行页塞一条 error 注释。失败判定统一交给下一步读 xcresult：
+        # 基线外新增失败由脚本非零退出染红 job，基线内失败放行。
         run: |
+          set +e
           xcodebuild test-without-building \
             -project Aether.xcodeproj \
             -scheme Aether-iOS \
@@ -118,9 +121,13 @@ jobs:
             -enableCodeCoverage YES \
             -resultBundlePath TestResults.xcresult \
             CODE_SIGNING_ALLOWED=NO ARCHS=arm64 SWIFT_STRICT_CONCURRENCY=complete
+          status=$?
+          echo "xcodebuild exit: $status（失败判定见 Verify Test Results）" >> "$GITHUB_STEP_SUMMARY"
+          exit 0
 
       - name: Verify Test Results
-        if: steps.test.outcome != 'success'
+        # 构建失败时没有可信的 xcresult，且 job 已在构建步染红
+        if: steps.build.outcome == 'success'
         run: bash scripts/check-xcresult-failures.sh TestResults.xcresult iOS
 
       - name: Check Coverage Threshold (≥ 80%, iOS Swift + Rust core, excluding Views/DesignSystem/App/Protocols)
@@ -388,7 +395,7 @@ jobs:
           path: Packages/AetherCore
 
       - name: Setup iOS Simulator
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@v4
         with:
           timeout_minutes: 5
           max_attempts: 2
@@ -416,8 +423,9 @@ jobs:
 
       - name: Run UI Tests
         id: test
-        continue-on-error: true
+        # 见 unit-tests：xcodebuild 的 65 交给 xcresult 闸门判定，避免 error 注释
         run: |
+          set +e
           # 240/300（原来 120/180）。依据是本地整类串行矩阵（iPhone 17、窗口放到 600/900 取自然耗时）：
           # testUserPreferencePersistence 102.0s、testSaveAPIKey 72.6s、testEditSystemPrompt 69.9s，
           # 而 CI 侧对同批用例的耗时比观测到 1.6x（dragReorder 24.3s→39.0s）到 5.3x
@@ -439,9 +447,12 @@ jobs:
             -parallel-testing-enabled NO \
             -resultBundlePath UITestResults.xcresult \
             CODE_SIGNING_ALLOWED=NO ARCHS=arm64 SWIFT_STRICT_CONCURRENCY=complete
+          status=$?
+          echo "xcodebuild exit: $status（失败判定见 Verify UIT Results）" >> "$GITHUB_STEP_SUMMARY"
+          exit 0
 
       - name: Verify UIT Results
-        if: steps.test.outcome != 'success'
+        if: steps.build.outcome == 'success'
         run: bash scripts/check-xcresult-failures.sh UITestResults.xcresult UI
 
   # 安全相关测试（ToolRegistry/ToolAuthorization/Keychain/Telemetry 等）已包含在
@@ -574,8 +585,9 @@ jobs:
 
       - name: Run Unit Tests (macOS)
         id: test
-        continue-on-error: true
+        # 见 unit-tests：xcodebuild 的 65 交给 xcresult 闸门判定，避免 error 注释
         run: |
+          set +e
           ONLY_ARGS=()
           while IFS= read -r arg; do ONLY_ARGS+=("$arg"); done < /tmp/shard-args.txt
           xcodebuild test-without-building \
@@ -592,9 +604,12 @@ jobs:
             -enableCodeCoverage YES \
             -resultBundlePath TestResultsMacOS.xcresult \
             CODE_SIGNING_ALLOWED=NO SWIFT_STRICT_CONCURRENCY=complete
+          status=$?
+          echo "xcodebuild exit: $status（失败判定见 Verify macOS Test Results）" >> "$GITHUB_STEP_SUMMARY"
+          exit 0
 
       - name: Verify macOS Test Results
-        if: steps.test.outcome != 'success'
+        if: steps.build_macos.outcome == 'success'
         run: bash scripts/check-xcresult-failures.sh TestResultsMacOS.xcresult macOS
 
       - name: Generate macOS cobertura.xml
@@ -647,7 +662,7 @@ jobs:
   # KV/D1/上游 API 均为内存 Mock，故无需构建 WASM 或下载 artifact。
   bff-e2e-tests:
     needs: []
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     defaults:
       run:
@@ -657,7 +672,7 @@ jobs:
 
       - name: Setup Node.js
         # D-1: Node.js 20 已于 2026-04-30 EOL，升级到 22 LTS（向后兼容）
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: 'npm'
@@ -677,7 +692,7 @@ jobs:
     # 统合所有平台测试 job 的结果（iOS / macOS / Android / Windows / Rust）
     # 任一上游测试失败均会反映到此处，作为 PR 合并的总质量门
     needs: [unit-tests, unit-tests-macos, ui-tests, android-build, windows-build, rust]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: always()
     steps:
       - name: Aggregate platform test results
@@ -723,7 +738,7 @@ jobs:
     # 依赖 coverage-summary（即所有测试 job 完成）后再运行 SonarQube 分析
     needs: [unit-tests, unit-tests-macos, rust]
     # 仅做覆盖率合并与 Sonar 扫描，不依赖 Xcode，放到 Linux runner 更快也更省
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: always()
     permissions:
       contents: read
@@ -794,7 +809,7 @@ jobs:
 
       - name: Setup Java 21 (SonarScanner)
         # SonarScanner CLI 8.x 要求 Java 21+，Java 17 会在启动时直接报错退出
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: 'temurin'
           java-version: '21'
@@ -839,7 +854,7 @@ jobs:
   # Android 客户端构建验证
   android-build:
     needs: rust
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
@@ -857,13 +872,13 @@ jobs:
             ${{ runner.os }}-gradle-
 
       - name: Setup JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: 'temurin'
           java-version: '17'
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
         with:
           packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
 
@@ -878,7 +893,7 @@ jobs:
             android-ndk-
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Download Rust .so artifacts
         # 下载 rust job 构建的 Android .so 产物，放入 jniLibs 供 APK 打包
@@ -930,7 +945,7 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Setup .NET 8
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '8.0.x'
 
@@ -992,7 +1007,7 @@ jobs:
   # 首个落地单元（SSE）可不依赖 xcframework 产物（CI 仅校验 Rust 侧 + WASM）。
   rust:
     name: Rust core (fmt + clippy + test)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     defaults:
       run:
@@ -1055,7 +1070,7 @@ jobs:
 
       - name: Setup Android NDK
         # 安装 NDK 供 cargo-ndk 链接 .so 产物（arm64-v8a / x86_64）
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
         with:
           packages: 'ndk;27.0.12077973'
 

@@ -24,7 +24,7 @@ concurrency:
 jobs:
   # 解析版本号，便于后续 job 引用
   meta:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       version: ${{ steps.v.outputs.version }}
       tag: ${{ steps.v.outputs.tag }}
@@ -246,24 +246,24 @@ jobs:
   # ============================================================
   build-android:
     needs: meta
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
 
       - name: Setup JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: 'temurin'
           java-version: '17'
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
         with:
           packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Generate Gradle Wrapper
         working-directory: android
@@ -302,7 +302,7 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Setup .NET 8
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '8.0.x'
 
@@ -346,14 +346,14 @@ jobs:
   # ============================================================
   build-bff:
     needs: meta
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
 
       - name: Setup Node.js
         # D-1: Node.js 20 已于 2026-04-30 EOL，升级到 22 LTS（向后兼容）
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
 
@@ -393,7 +393,7 @@ jobs:
   # ============================================================
   build-source:
     needs: meta
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
@@ -423,7 +423,7 @@ jobs:
   # ============================================================
   publish-release:
     needs: [meta, rust-apple, build-ios, build-macos, build-android, build-windows, build-bff, build-source]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5

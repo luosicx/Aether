@@ -147,15 +147,14 @@ public class ChatViewModel : INotifyPropertyChanged
 public class RelayCommand : ICommand
 {
     private readonly Action<object?> _execute;
-    private readonly Func<object?, bool>? _canExecute;
 
-    public RelayCommand(Action<object?> execute, Func<object?, bool>? canExecute = null)
+    public RelayCommand(Action<object?> execute)
     {
         _execute = execute;
-        _canExecute = canExecute;
     }
 
-    public bool CanExecute(object? parameter) => _canExecute?.Invoke(parameter) ?? true;
+    public bool CanExecute(object? parameter) => true;
     public void Execute(object? parameter) => _execute(parameter);
-    public event EventHandler? CanExecuteChanged;
+    // 命令始终可执行，没有可失效的条件，WPF 不需要重新查询；显式空实现满足 ICommand 成员。
+    public event EventHandler? CanExecuteChanged { add { } remove { } }
 }
