@@ -21,38 +21,35 @@ final class PluginSettingsUITests: XCTestCase {
         return app
     }
 
-    /// 在 Form 中滚动到目标元素整块进入可视区。
+    /// 在 Form 中向下滚动到目标元素整块进入可视区。
     /// 停止条件不能用 isHittable：元素只露出几 pt 时它也为真，而中心仍在屏外，tap 会落空。
-    /// 滑动用定长拖拽而不是 swipeUp：swipeUp 带惯性，一次可能甩过整节（CI 实测四条用例
-    /// 3 次滑动即命中，失败那条滑满 10 次仍未命中），而 Form 懒渲染，甩过去就再也找不回来。
+    /// 拖拽要在终点停住再抬手（thenHoldForDuration），抬手速度归零才不会带惯性过冲：
+    /// swipeUp 和直接抬手的拖拽都会甩过目标节，而 Form 懒渲染，甩过去就再也找不回来
+    /// （CI 实测四条用例 3 次滑动即命中，失败那条滑满 10 次仍未命中）；
+    /// 过冲后只能反向拖，而在 Form 顶部反向拖等于 sheet 的下滑关闭手势。
     private func scrollToElement(_ element: XCUIElement, in app: XCUIApplication, maxAttempts: Int = 10) {
-        func scroller() -> XCUIElement {
-            if app.tables.firstMatch.exists { return app.tables.firstMatch }
-            if app.collectionViews.firstMatch.exists { return app.collectionViews.firstMatch }
-            return app.scrollViews.firstMatch
+        // 取面积最大的滚动容器：弹层也是 CollectionView 且比 Form 窄，firstMatch 会选中弹层。
+        func scroller() -> XCUIElement? {
+            [app.tables.firstMatch, app.collectionViews.firstMatch, app.scrollViews.firstMatch]
+                .filter { $0.exists }
+                .max { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }
         }
-        func scroll(_ container: XCUIElement, towardTop: Bool) {
-            let from = container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: towardTop ? 0.25 : 0.75))
-            let to = container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: towardTop ? 0.75 : 0.25))
-            from.press(forDuration: 0.05, thenDragTo: to)
-        }
-        func settled() -> Bool {
+        func settled(in container: XCUIElement?) -> Bool {
             guard element.exists, element.isHittable else { return false }
-            let visible = scroller().frame
+            guard let visible = container?.frame else { return true }
             let frame = element.frame
             return frame.minY >= visible.minY && frame.maxY <= visible.maxY
         }
         var attempts = 0
-        while attempts < maxAttempts && !settled() {
+        while attempts < maxAttempts {
             let container = scroller()
-            scroll(container, towardTop: element.exists && element.frame.minY < container.frame.minY)
+            if settled(in: container) { return }
+            if let container {
+                let from = container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75))
+                let to = container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25))
+                from.press(forDuration: 0.05, thenDragTo: to, withVelocity: .default, thenHoldForDuration: 0.3)
+            }
             attempts += 1
-            _ = element.waitForExistence(timeout: 1)
-        }
-        var recovery = 0
-        while recovery < maxAttempts && !settled() {
-            scroll(scroller(), towardTop: true)
-            recovery += 1
             _ = element.waitForExistence(timeout: 1)
         }
     }

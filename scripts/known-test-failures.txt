@@ -464,9 +464,23 @@
 # 同一 helper 还只向上滑，而 swipeUp 带惯性：Form 懒渲染，一次甩过目标节就再也找不回来。
 # PluginSettingsUITests/testViewPluginPermissions 在 #65 第四轮滑满 10 次仍未命中 pluginManagementLink，
 # 同轮另外四条都是 3 次命中；main@7bfa84c 同一条 passed，本地两轮也各 3 次命中，属 flake 而非回归。
-# 修法：滑动改成定长拖拽（半屏、无惯性），预算用尽后回扫。整屏 swipeUp/swipeDown 步长过大，
-# 会让元素在可视区边界两侧振荡（第一版改法本地实测 up/down/up/down/up 后回扫到顶，用例反而红），
-# 定长拖拽同时消掉惯性与振荡。本地 iPhone 17、240/300 窗口：受影响的 10 条用例两轮全过。
+# 修法分三步收敛，前两步都被实测否掉：
+# 1) 整屏 swipeUp/swipeDown + 可视区边界停止条件：元素在边界两侧振荡
+#    （本地实测 up/down/up/down/up 后回扫到顶，用例反而红）。
+# 2) 半屏定长拖拽 + 预算用尽后反向回扫：本地 10 条两轮全过，但 CI 第五轮（run 43691929701）
+#    testUserPreferencePersistence 红在「Failed to get matching snapshot: No matches found for …
+#    ScrollView」。日志给出决定性时序：t=203.90 那次拖拽还落在 Form {{0,62},{402,812}} 上、
+#    方向 0.25→0.75（手指向下），连拖 6 次后 t=209.19/209.36 Table 与 CollectionView 双双不存在
+#    ——在 Form 顶部向下拖就是 sheet 的下滑关闭手势，整个设置 Form 被拖没了；
+#    随后 scroller() 兜底返回没查 .exists 的 scrollViews.firstMatch，解析快照即抛。
+# 3) 终版：只向下滚、去掉反向回扫；拖拽在终点 thenHoldForDuration: 0.3 停住再抬手，
+#    抬手速度归零，步长精确等于半屏，从源头消掉过冲，也就不需要反向兜底。
+#    注意 withVelocity 是拖拽本身的速度而非抬手速度：设 0 被 XCTest 拒绝（必须 > 0），
+#    设 1 会让 406pt 拖 406 秒，本地实测直接挂到 240s allowance。
+#    容器改成「已存在的滚动容器里面积最大的那个」且三个候选都查 .exists：Picker 菜单也是
+#    CollectionView 且比 Form 窄，firstMatch 会选中菜单，拖拽就落在菜单里而不是 Form 上。
+#    本地 iPhone 17、240/300 窗口：受影响的 10 条用例连续两轮全过（507.255s / 504.577s，
+#    testUserPreferencePersistence 107.631s / 109.708s），门报 baseline(UI)=0。
 # 下面这条在 allowance 内、或只飘过一次，按精确条目记着等修。
 # - 原 `UI:AetherUITests/testOpenConversationListShowsEmptyState`（本批删除）：用例在 accessibility
 #   tree 里找 identifier「还没有对话」，而产品空状态是 ConversationList 的 EmptyStateView
