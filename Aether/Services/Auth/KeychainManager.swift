@@ -1,5 +1,6 @@
 import Foundation
 import Security
+import os
 import AetherFoundation
 
 /// 应用错误类型，LocalizedError 协议提供用户友好描述
@@ -37,8 +38,16 @@ struct SystemKeychainBackend: KeychainBackend {
 }
 
 /// 内存 Keychain 后端（测试用，不依赖真实 Keychain）
-final class InMemoryKeychainBackend: KeychainBackend {
-    private var storage: [String: Data] = [:]
+///
+/// 三个方法会被并发调用：`KeychainManagerTests` 用 `Task.detached` 与 `withTaskGroup` 同时打
+/// `KeychainManager.shared`（save 内部是 delete + add 两次调用）。原来直接读写裸
+/// `Dictionary`，Swift 的字典不是线程安全的，并发写会让堆上出现撕裂的指针——实测双端都能稳定
+/// 复现两种形态：写丢失（读回 nil）与给一个垃圾 tagged pointer 发消息
+/// （`-[_NSCoreDataTaggedObjectID count]: unrecognized selector` / `-[NSIndexPath count] …`），
+/// 后者在某些调度交错下直接把测试进程打崩，CI 里就是 KeychainManagerTests 的 `*~crash` 豁免。
+/// 与 ToolAuthorization 同法用 `OSAllocatedUnfairLock` 包住存储。
+final class InMemoryKeychainBackend: KeychainBackend, @unchecked Sendable {
+    private let storageLock = OSAllocatedUnfairLock(initialState: [String: Data]())
 
     private func key(for query: CFDictionary) -> String? {
         // 从 query dict 提取 service + account 作为存储 key
@@ -51,19 +60,20 @@ final class InMemoryKeychainBackend: KeychainBackend {
     func secItemAdd(_ query: CFDictionary) -> OSStatus {
         guard let key = key(for: query) else { return errSecParam }
         guard let dict = query as? [String: Any] else { return errSecParam }
-        storage[key] = dict[kSecValueData as String] as? Data
+        storageLock.withLock { $0[key] = dict[kSecValueData as String] as? Data }
         return errSecSuccess
     }
 
     func secItemDelete(_ query: CFDictionary) -> OSStatus {
         guard let key = key(for: query) else { return errSecParam }
-        storage.removeValue(forKey: key)
+        storageLock.withLock { $0.removeValue(forKey: key) }
         return errSecSuccess
     }
 
     func secItemCopyMatching(_ query: CFDictionary, _ result: UnsafeMutablePointer<CFTypeRef?>) -> OSStatus {
         guard let key = key(for: query) else { return errSecParam }
-        if let data = storage[key] {
+        let data = storageLock.withLock { $0[key] }
+        if let data = data {
             result.pointee = data as CFTypeRef
             return errSecSuccess
         }

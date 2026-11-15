@@ -21,16 +21,70 @@ final class PluginSettingsUITests: XCTestCase {
         return app
     }
 
-    /// 在 Form 中向下滚动以找到目标元素
+    /// 打开设置 sheet 并确认它真的出现了。
+    /// CI 上偶发首次 tap 不生效（按钮在无障碍树里、事件也合成了，但 sheet 没起来），
+    /// 此时 app 仍停在聊天页，后续滚动落在消息列表上，最后以「Failed to tap」这种难懂的形式失败。
+    /// 判据用工具栏「完成」按钮的显式 identifier：CI（Xcode 26.3）上 sheet 根导航栏匹配不到
+    /// navigationBars["设置"]，照那个判会误杀（第 8 轮五条全红在这里）。
+    /// 补点前先查 settingsButton 是否仍可点：sheet 起来了它会被盖住，isHittable 为假，不会再点一次。
+    private func openSettings() -> XCUIApplication {
+        let app = makeApp()
+        app.launch()
+
+        let settingsButton = app.buttons["settingsButton"]
+        XCTAssertTrue(settingsButton.waitForExistence(timeout: 10), "应存在设置按钮")
+        settingsButton.tap()
+
+        let settingsOpened = app.buttons["settingsDoneButton"]
+        if !settingsOpened.waitForExistence(timeout: 10), settingsButton.isHittable {
+            settingsButton.tap()
+        }
+        XCTAssertTrue(settingsOpened.waitForExistence(timeout: 10), "应打开设置页")
+        return app
+    }
+
+    /// 在 Form 中向下滚动到目标元素整块进入可视区。
+    /// 停止条件不能用 isHittable：元素只露出几 pt 时它也为真，而中心仍在屏外，tap 会落空。
+    /// 拖拽要在终点停住再抬手（thenHoldForDuration），抬手速度归零才不会带惯性过冲：
+    /// swipeUp 和直接抬手的拖拽都会甩过目标节，而 Form 懒渲染，甩过去就再也找不回来
+    /// （CI 实测四条用例 3 次滑动即命中，失败那条滑满 10 次仍未命中）；
+    /// 过冲后只能反向拖，而在 Form 顶部反向拖等于 sheet 的下滑关闭手势。
     private func scrollToElement(_ element: XCUIElement, in app: XCUIApplication, maxAttempts: Int = 10) {
+        // 三个候选都要查 .exists：视图切换瞬间可能一个滚动容器都没有，
+        // 直接对不存在的 firstMatch 取坐标会抛「Failed to get matching snapshot」。
+        func scroller() -> XCUIElement? {
+            if app.tables.firstMatch.exists { return app.tables.firstMatch }
+            if app.collectionViews.firstMatch.exists { return app.collectionViews.firstMatch }
+            if app.scrollViews.firstMatch.exists { return app.scrollViews.firstMatch }
+            return nil
+        }
         var attempts = 0
-        while (!element.exists || !element.isHittable) && attempts < maxAttempts {
-            let scroller = app.tables.firstMatch.exists
-                ? app.tables.firstMatch
-                : (app.collectionViews.firstMatch.exists
-                    ? app.collectionViews.firstMatch
-                    : app.scrollViews.firstMatch)
-            scroller.swipeUp()
+        var nudges = 0
+        while attempts < maxAttempts {
+            guard let container = scroller() else {
+                attempts += 1
+                _ = element.waitForExistence(timeout: 1)
+                continue
+            }
+            // 元素已渲染但只露出一部分时，再整屏拖一次会把它推出懒渲染窗口、再也找不回来
+            // （CI 上 testUninstallPlugin 就是这样滑满 10 次仍未命中）。改为约 1/6 屏的小步微调。
+            // 向下微调只在目标已渲染且位于可视区上方时发生，此时 Form 不在顶部，不会触发下滑关闭。
+            if element.exists, element.isHittable, nudges < 4 {
+                let visible = container.frame
+                let frame = element.frame
+                if frame.minY >= visible.minY, frame.maxY <= visible.maxY { return }
+                let above = frame.minY < visible.minY
+                let from = container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: above ? 0.42 : 0.58))
+                let to = container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: above ? 0.58 : 0.42))
+                from.press(forDuration: 0.05, thenDragTo: to, withVelocity: .default, thenHoldForDuration: 0.3)
+                nudges += 1
+                _ = element.waitForExistence(timeout: 1)
+                continue
+            }
+            if element.exists, element.isHittable { return }
+            let from = container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75))
+            let to = container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25))
+            from.press(forDuration: 0.05, thenDragTo: to, withVelocity: .default, thenHoldForDuration: 0.3)
             attempts += 1
             _ = element.waitForExistence(timeout: 1)
         }
@@ -40,12 +94,7 @@ final class PluginSettingsUITests: XCTestCase {
 
     /// 打开设置 → 点击插件管理 → 验证插件管理页出现
     func testNavigateToPluginSettings() {
-        let app = makeApp()
-        app.launch()
-
-        // 打开设置
-        XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(timeout: 10))
-        app.buttons["settingsButton"].tap()
+        let app = openSettings()
 
         // 滚动找到插件管理链接
         let pluginLink = app.descendants(matching: .any).matching(identifier: "pluginManagementLink").firstMatch
@@ -62,12 +111,11 @@ final class PluginSettingsUITests: XCTestCase {
 
     /// 进入插件管理页后应显示空状态提示
     func testPluginSettingsShowsEmptyState() {
-        let app = makeApp()
-        app.launch()
+        let app = openSettings()
 
-        app.buttons["settingsButton"].tap()
         let pluginLink = app.descendants(matching: .any).matching(identifier: "pluginManagementLink").firstMatch
         scrollToElement(pluginLink, in: app)
+        XCTAssertTrue(pluginLink.waitForExistence(timeout: 5), "应存在插件管理入口")
         pluginLink.tap()
 
         XCTAssertTrue(app.navigationBars["插件管理"].waitForExistence(timeout: 5))
@@ -80,12 +128,11 @@ final class PluginSettingsUITests: XCTestCase {
 
     /// 点击安装示例插件 → 验证插件出现在列表中
     func testInstallSamplePlugin() {
-        let app = makeApp()
-        app.launch()
+        let app = openSettings()
 
-        app.buttons["settingsButton"].tap()
         let pluginLink = app.descendants(matching: .any).matching(identifier: "pluginManagementLink").firstMatch
         scrollToElement(pluginLink, in: app)
+        XCTAssertTrue(pluginLink.waitForExistence(timeout: 5), "应存在插件管理入口")
         pluginLink.tap()
 
         XCTAssertTrue(app.navigationBars["插件管理"].waitForExistence(timeout: 5))
@@ -110,12 +157,11 @@ final class PluginSettingsUITests: XCTestCase {
 
     /// 安装插件后点击卸载 → 验证插件从列表消失
     func testUninstallPlugin() {
-        let app = makeApp()
-        app.launch()
+        let app = openSettings()
 
-        app.buttons["settingsButton"].tap()
         let pluginLink = app.descendants(matching: .any).matching(identifier: "pluginManagementLink").firstMatch
         scrollToElement(pluginLink, in: app)
+        XCTAssertTrue(pluginLink.waitForExistence(timeout: 5), "应存在插件管理入口")
         pluginLink.tap()
 
         XCTAssertTrue(app.navigationBars["插件管理"].waitForExistence(timeout: 5))
@@ -147,12 +193,11 @@ final class PluginSettingsUITests: XCTestCase {
 
     /// 安装插件后展开权限查看 → 验证权限信息显示
     func testViewPluginPermissions() {
-        let app = makeApp()
-        app.launch()
+        let app = openSettings()
 
-        app.buttons["settingsButton"].tap()
         let pluginLink = app.descendants(matching: .any).matching(identifier: "pluginManagementLink").firstMatch
         scrollToElement(pluginLink, in: app)
+        XCTAssertTrue(pluginLink.waitForExistence(timeout: 5), "应存在插件管理入口")
         pluginLink.tap()
 
         XCTAssertTrue(app.navigationBars["插件管理"].waitForExistence(timeout: 5))

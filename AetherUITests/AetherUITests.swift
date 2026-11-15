@@ -32,16 +32,84 @@ final class AetherUITests: XCTestCase {
         _ = app.keyboards.firstMatch.waitForNonExistence(timeout: 3)
     }
 
-    /// 在 Form 中向下滚动以找到目标元素（Form 底部的 Section 可能需要滚动才可见）
+    /// 关掉 Picker 弹出的菜单：点设置 sheet 导航栏的空白处。
+    /// 菜单是独立顶层容器里的 CollectionView，会抢走 collectionViews.firstMatch，
+    /// 不关掉它后续滚动就全落在菜单里而不是 Form 上，预算耗尽撞穿 allowance。
+    /// 落点约束：导航栏恒在菜单 platter 上方；x 避开右侧「完成」按钮；
+    /// dy 不能取 0.05——那落在状态栏，手势被系统吃掉，菜单不会关。
+    /// 也不能再点锚点行：菜单开着时 tonePicker 行本身会从 accessibility tree 里消失。
+    private func dismissPickerOverlay(in app: XCUIApplication) {
+        app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.35, dy: 0.12)).tap()
+    }
+
+    /// 打开设置 sheet 并确认它真的出现了。
+    /// CI 上偶发 tap 不生效（按钮在无障碍树里、事件也合成了，但 sheet 没起来——例如刚点完「完成」
+    /// 关掉上一轮 sheet 就立刻再开）。此时 app 仍停在聊天页，后续滚动落在消息列表上，
+    /// 用例会一路滑到 allowance 撞穿才失败，日志只剩一堆 CollectionView 拖拽。
+    /// 判据用工具栏「完成」按钮的显式 identifier：sheet 根导航栏在 CI（Xcode 26.3）上
+    /// 匹配不到 navigationBars["设置"]。补点前查 settingsButton 是否仍可点——
+    /// sheet 起来了它会被盖住，isHittable 为假，不会再点一次。
+    private func openSettings(in app: XCUIApplication) {
+        let settingsButton = app.buttons["settingsButton"]
+        guard settingsButton.waitForExistence(timeout: 10) else {
+            XCTFail("应存在设置按钮")
+            return
+        }
+        settingsButton.tap()
+
+        let doneButton = app.buttons["settingsDoneButton"]
+        if !doneButton.waitForExistence(timeout: 10), settingsButton.isHittable {
+            settingsButton.tap()
+        }
+        XCTAssertTrue(doneButton.waitForExistence(timeout: 10), "应打开设置页")
+    }
+
+    /// 在 Form 中向下滚动到目标元素整块进入可视区（Form 底部的 Section 可能需要滚动才可见）。
+    /// 停止条件不能用 isHittable：元素只露出几 pt 时它也为真，而中心仍在屏外，
+    /// tap 合成不到键盘焦点（CI 实测 editor 落在 y=865.7、窗高 874）。
+    /// 拖拽要在终点停住再抬手（thenHoldForDuration），抬手速度归零才不会带惯性过冲：
+    /// swipeUp 和直接抬手的拖拽都会甩过目标节，而 Form 懒渲染，甩过去就再也找不回来；
+    /// 过冲后只能反向拖，而在 Form 顶部反向拖等于 sheet 的下滑关闭手势
+    /// （CI 实测连拖 6 次后整个设置 Form 从树上消失）。步长精确等于半屏，不需要反向兜底。
+    /// 注意 withVelocity 是拖拽本身的速度而非抬手速度，调小它只会把拖拽拉长到挂死。
     private func scrollToElement(_ element: XCUIElement, in app: XCUIApplication, maxAttempts: Int = 8) {
+        // 三个候选都要查 .exists：视图切换瞬间可能一个滚动容器都没有，
+        // 直接对不存在的 firstMatch 取坐标会抛「Failed to get matching snapshot」。
+        func scroller() -> XCUIElement? {
+            if app.tables.firstMatch.exists { return app.tables.firstMatch }
+            if app.collectionViews.firstMatch.exists { return app.collectionViews.firstMatch }
+            if app.scrollViews.firstMatch.exists { return app.scrollViews.firstMatch }
+            return nil
+        }
         var attempts = 0
-        while (!element.exists || !element.isHittable) && attempts < maxAttempts {
-            let scroller = app.tables.firstMatch.exists
-                ? app.tables.firstMatch
-                : (app.collectionViews.firstMatch.exists
-                    ? app.collectionViews.firstMatch
-                    : app.scrollViews.firstMatch)
-            scroller.swipeUp()
+        var nudges = 0
+        while attempts < maxAttempts {
+            guard let container = scroller() else {
+                attempts += 1
+                _ = element.waitForExistence(timeout: 1)
+                continue
+            }
+            if element.exists, element.isHittable {
+                let visible = container.frame
+                let frame = element.frame
+                if frame.minY >= visible.minY, frame.maxY <= visible.maxY { return }
+                // 已渲染但只露出一部分时，整屏再拖一次会把它推出懒渲染窗口，再也找不回来
+                // （CI 上 testUninstallPlugin 就是这样滑满 10 次仍未命中）。改用约 1/6 屏的小步微调。
+                // 向下微调只发生在目标已渲染且位于可视区上方时，此时 Form 不在顶部，不会触发下滑关闭。
+                if nudges < 4 {
+                    let above = frame.minY < visible.minY
+                    let from = container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: above ? 0.42 : 0.58))
+                    let to = container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: above ? 0.58 : 0.42))
+                    from.press(forDuration: 0.05, thenDragTo: to, withVelocity: .default, thenHoldForDuration: 0.3)
+                    nudges += 1
+                    _ = element.waitForExistence(timeout: 1)
+                    continue
+                }
+                return
+            }
+            let from = container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75))
+            let to = container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25))
+            from.press(forDuration: 0.05, thenDragTo: to, withVelocity: .default, thenHoldForDuration: 0.3)
             attempts += 1
             _ = element.waitForExistence(timeout: 1)
         }
@@ -128,7 +196,7 @@ final class AetherUITests: XCTestCase {
         let app = makeApp()
         app.launch()
 
-        app.buttons["settingsButton"].tap()
+        openSettings(in: app)
         let secureField = app.secureTextFields["deepseekAPIKeySecureField"]
         // Day 17: 新增「健康」Section 后 API Key 输入框被推到 Form 更下方，
         // 需先滚动让 SwiftUI Form 懒渲染该元素到 accessibility tree
@@ -159,7 +227,7 @@ final class AetherUITests: XCTestCase {
         let app = makeApp()
         app.launch()
 
-        app.buttons["settingsButton"].tap()
+        openSettings(in: app)
         let secureField = app.secureTextFields["deepseekAPIKeySecureField"]
         // Day 17: 新增「健康」Section 后需先滚动到可见区域
         scrollToElement(secureField, in: app)
@@ -210,7 +278,7 @@ final class AetherUITests: XCTestCase {
         let app = makeApp()
         app.launch()
 
-        app.buttons["settingsButton"].tap()
+        openSettings(in: app)
 
         let ragToggle = app.switches["ragToggle"]
         // Day 17: 先滚动让元素进入 accessibility tree（必须在 waitForExistence 之前）
@@ -278,7 +346,7 @@ final class AetherUITests: XCTestCase {
         let app = makeApp()
         app.launch()
 
-        app.buttons["settingsButton"].tap()
+        openSettings(in: app)
 
         // 先滚动 Form 让模型 Picker 区域进入可见范围
         // 不依赖 scrollToElement（它需要元素已存在），直接滚动固定次数
@@ -414,7 +482,7 @@ final class AetherUITests: XCTestCase {
         dismissKeyboard(in: app)
 
         // 打开设置
-        app.buttons["settingsButton"].tap()
+        openSettings(in: app)
         // Day 13: 新增「供应商」「自动降级」Section 后 TextEditor 被推到 Form 较下方，
         // SwiftUI Form 懒渲染：必须先滚动到 TextEditor 才会进入 accessibility tree。
         // 顺序：先 scrollToElement 让 TextEditor 渲染，再用 waitForExistence 确认。
@@ -427,9 +495,8 @@ final class AetherUITests: XCTestCase {
 
         // 完成 → 持久化到会话
         app.buttons["settingsDoneButton"].tap()
-        // 重进设置验证
-        XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(timeout: 5))
-        app.buttons["settingsButton"].tap()
+        // 重进设置验证（刚关掉 sheet 立刻再开，CI 上 tap 可能被吞，openSettings 会校验并补点）
+        openSettings(in: app)
 
         let editor2 = app.textViews["systemPromptTextEditor"]
         scrollToElement(editor2, in: app)
@@ -444,7 +511,7 @@ final class AetherUITests: XCTestCase {
         let app = makeApp()
         app.launch()
 
-        app.buttons["settingsButton"].tap()
+        openSettings(in: app)
 
         // 语气 Picker 选「正式」（Form 默认 picker 为导航式：点击行 → 推入选项列表）
         // 「用户偏好」Section 在 Form 底部，需要滚动到可见
@@ -490,13 +557,7 @@ final class AetherUITests: XCTestCase {
         } else {
             // iOS 26.2 (CI): 选项元素不存在时，只验证 tonePicker 存在即可（已通过上方断言）
             // 选项菜单可能未渲染或为不同元素类型，跳过选项验证避免 CI 误报
-        }
-        // 轮询 Picker 选项消失，替代固定 sleep
-        let pickerDismissedDeadline = Date().addingTimeInterval(0.5)
-        while app.descendants(matching: .any).matching(
-            NSPredicate(format: "label == %@", "正式")
-        ).firstMatch.exists && Date() < pickerDismissedDeadline {
-            Thread.sleep(forTimeInterval: 0.1)
+            dismissPickerOverlay(in: app)
         }
 
         // 工具 Toggle：勾选 calculate（可能在 toneRow 下方，需要再滚动一点）
@@ -537,7 +598,7 @@ final class AetherUITests: XCTestCase {
         app.launchArguments = ["UITEST_DISABLE_NETWORK", "UITEST_DISABLE_SPLASH"]
         app.launch()
         XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(timeout: 8), "重进后应回到主界面")
-        app.buttons["settingsButton"].tap()
+        openSettings(in: app)
 
         // 验证语气保持「正式」（需要滚动到用户偏好 Section）
         // iOS 26.2 (CI): 用 descendants(matching: .any) 跨元素类型搜索 tonePicker identifier（同首次进入）
@@ -570,21 +631,9 @@ final class AetherUITests: XCTestCase {
         let formalOpt = app.descendants(matching: .any).matching(
             NSPredicate(format: "label == %@", "正式")
         ).firstMatch
-        if formalOpt.waitForExistence(timeout: 5) {
-            // 选项存在，验证通过（保持选中）
-        } else {
-            // iOS 26.2 (CI): 选项元素不存在时，只验证 tonePicker 存在即可（已通过上方断言）
-        }
-        // 回到设置主页面（Picker 选项列表可能有返回按钮）
-        let backButton = app.navigationBars.buttons.firstMatch
-        if backButton.waitForExistence(timeout: 2) {
-            backButton.tap()
-            // 轮询 settingsButton 出现，替代固定 sleep
-            let backDeadline = Date().addingTimeInterval(0.5)
-            while !app.buttons["settingsButton"].exists && Date() < backDeadline {
-                Thread.sleep(forTimeInterval: 0.1)
-            }
-        }
+        // 这一遍只验证选项可见、不点选，菜单不会像第一遍那样被选项 tap 关掉，必须显式关
+        _ = formalOpt.waitForExistence(timeout: 5)
+        dismissPickerOverlay(in: app)
 
         // 验证 calculate 工具保持开启
         // Day 18: SettingsView Toggle 改用 toolDef.function.description 作为标签
