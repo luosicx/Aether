@@ -1,4 +1,5 @@
 #if os(macOS)
+import Foundation
 import XCTest
 @testable import Aether
 
@@ -14,11 +15,10 @@ final class SystemControlToolTests: XCTestCase {
         XCTAssertEqual(result, "错误：请提供 action 参数")
     }
 
-    /// set_volume 调用 NSAppleScript 触发 System Events 自动化权限对话框，
-    /// CI 环境无用户响应会 hang 到测试超时，与 AlarmTool/ReminderTool 一律加 CI guard
+    /// set_volume 需要 System Events 自动化授权，CI 环境无人应答授权对话框，
+    /// 由 skipWhenAutomationUnavailable 统一跳过。
     func testExecuteSetVolume() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["CI"] != nil,
-                      "跳过：CI 环境下 NSAppleScript 触发 System Events 自动化权限对话框挂起")
+        try skipWhenAutomationUnavailable()
         let result = try await tool.execute(arguments: ["action": "set_volume", "value": 50])
         XCTAssertTrue(result.contains("已") || result.contains("错误"), "实际：\(result)")
     }
@@ -27,10 +27,9 @@ final class SystemControlToolTests: XCTestCase {
 
     /// get_volume 应调用修复后的 getVolume()（AppleScript 移入 tell 块内部）。
     /// 返回值为音量数字字符串或 AppleScript 错误信息。
-    /// CI guard：getVolume 通过 NSAppleScript 调用 System Events，CI 无自动化权限会 hang
+    /// CI guard：调用 getVolume 需要 System Events 自动化授权
     func testExecuteGetVolume() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["CI"] != nil,
-                      "跳过：CI 环境下 NSAppleScript 触发 System Events 自动化权限对话框挂起")
+        try skipWhenAutomationUnavailable()
         let result = try await tool.execute(arguments: ["action": "get_volume"])
         XCTAssertFalse(result.isEmpty, "get_volume 应返回非空字符串，实际：\(result)")
         // 成功时返回数字（0-100），失败时返回 "错误：..." 前缀
@@ -43,10 +42,9 @@ final class SystemControlToolTests: XCTestCase {
     /// set_brightness 传入有效 value 50 应调用 setBrightnessViaGamma。
     /// 新代码检查 runAppleScript 返回值前缀，失败时返回 "设置亮度失败：..."。
     /// 在测试环境中可能因辅助功能权限不足而返回错误，但不应崩溃。
-    /// CI guard：setBrightnessViaGamma 通过 NSAppleScript 调用 System Events key code，CI 会 hang
+    /// CI guard：调用 setBrightnessViaGamma 需要 System Events 自动化授权
     func testExecuteSetBrightnessWithValidValue() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["CI"] != nil,
-                      "跳过：CI 环境下 NSAppleScript 触发 System Events 自动化权限对话框挂起")
+        try skipWhenAutomationUnavailable()
         let result = try await tool.execute(arguments: ["action": "set_brightness", "value": 50])
         // 成功时返回 "已尝试设置亮度..."；失败时返回 "设置亮度失败：错误：..."
         XCTAssertTrue(result.contains("亮度"),
@@ -54,20 +52,18 @@ final class SystemControlToolTests: XCTestCase {
     }
 
     /// set_brightness 传入边界值 0 应正常执行（不崩溃）
-    /// CI guard：调用 setBrightnessViaGamma → NSAppleScript，CI 会 hang
+    /// CI guard：调用 setBrightnessViaGamma 需要 System Events 自动化授权
     func testExecuteSetBrightnessMinValue() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["CI"] != nil,
-                      "跳过：CI 环境下 NSAppleScript 触发 System Events 自动化权限对话框挂起")
+        try skipWhenAutomationUnavailable()
         let result = try await tool.execute(arguments: ["action": "set_brightness", "value": 0])
         XCTAssertTrue(result.contains("亮度"),
                       "set_brightness value=0 应返回亮度相关结果，实际：\(result)")
     }
 
     /// set_brightness 传入边界值 100 应正常执行（不崩溃）
-    /// CI guard：调用 setBrightnessViaGamma → NSAppleScript，CI 会 hang
+    /// CI guard：调用 setBrightnessViaGamma 需要 System Events 自动化授权
     func testExecuteSetBrightnessMaxValue() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["CI"] != nil,
-                      "跳过：CI 环境下 NSAppleScript 触发 System Events 自动化权限对话框挂起")
+        try skipWhenAutomationUnavailable()
         let result = try await tool.execute(arguments: ["action": "set_brightness", "value": 100])
         XCTAssertTrue(result.contains("亮度"),
                       "set_brightness value=100 应返回亮度相关结果，实际：\(result)")
@@ -147,10 +143,9 @@ final class SystemControlToolTests: XCTestCase {
     /// 失败路径：AppleScript 执行失败 → result 以 "错误：" 开头 → 返回 "设置亮度失败：错误：..."
     /// 成功路径：AppleScript 执行成功 → 返回 "已尝试设置亮度（可能需要辅助功能权限）"
     /// 测试环境通常无辅助功能权限，应走失败路径；但两条路径都需验证格式正确。
-    /// CI guard：setBrightnessViaGamma 通过 NSAppleScript 调用 System Events key code，CI 会 hang
+    /// CI guard：调用 setBrightnessViaGamma 需要 System Events 自动化授权
     func testExecuteSetBrightnessFailurePathWrapsError() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["CI"] != nil,
-                      "跳过：CI 环境下 NSAppleScript 触发 System Events 自动化权限对话框挂起")
+        try skipWhenAutomationUnavailable()
         let result = try await tool.execute(arguments: ["action": "set_brightness", "value": 50])
         if result.hasPrefix("设置亮度失败") {
             // 新代码失败路径：包装原始错误
@@ -168,8 +163,7 @@ final class SystemControlToolTests: XCTestCase {
     /// set_brightness 边界值 0 的失败路径也应正确包装错误
     /// CI guard：曾导致 run #30151532917 unit-tests-macos hang 1 分钟超时取消的根因
     func testExecuteSetBrightnessMinValueFailurePath() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["CI"] != nil,
-                      "跳过：CI 环境下 NSAppleScript 触发 System Events 自动化权限对话框挂起")
+        try skipWhenAutomationUnavailable()
         let result = try await tool.execute(arguments: ["action": "set_brightness", "value": 0])
         if result.hasPrefix("设置亮度失败") {
             XCTAssertTrue(result.contains("错误"),
@@ -181,10 +175,9 @@ final class SystemControlToolTests: XCTestCase {
     }
 
     /// set_brightness 边界值 100 的失败路径也应正确包装错误
-    /// CI guard：与 MinValue 同因，调用 setBrightnessViaGamma → NSAppleScript，CI 会 hang
+    /// CI guard：与 MinValue 同因，调用 setBrightnessViaGamma 需要 System Events 自动化授权
     func testExecuteSetBrightnessMaxValueFailurePath() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["CI"] != nil,
-                      "跳过：CI 环境下 NSAppleScript 触发 System Events 自动化权限对话框挂起")
+        try skipWhenAutomationUnavailable()
         let result = try await tool.execute(arguments: ["action": "set_brightness", "value": 100])
         if result.hasPrefix("设置亮度失败") {
             XCTAssertTrue(result.contains("错误"),
@@ -197,10 +190,9 @@ final class SystemControlToolTests: XCTestCase {
 
     /// get_volume 新脚本验证：return output volume of (get volume settings) 移入 tell 块。
     /// 成功时返回 0-100 的数字字符串；失败时返回 "错误：..." 前缀。
-    /// CI guard：getVolume 通过 NSAppleScript 调用 System Events，CI 无自动化权限会 hang
+    /// CI guard：调用 getVolume 需要 System Events 自动化授权
     func testExecuteGetVolumeNewScriptReturnsNumberOrError() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["CI"] != nil,
-                      "跳过：CI 环境下 NSAppleScript 触发 System Events 自动化权限对话框挂起")
+        try skipWhenAutomationUnavailable()
         let result = try await tool.execute(arguments: ["action": "get_volume"])
         if let volume = Int(result) {
             XCTAssertTrue((0...100).contains(volume),
@@ -212,10 +204,9 @@ final class SystemControlToolTests: XCTestCase {
     }
 
     /// get_volume 多次调用应一致返回数字或错误（验证新脚本稳定性）
-    /// CI guard：调用 getVolume → NSAppleScript，CI 会 hang
+    /// CI guard：调用 getVolume 需要 System Events 自动化授权
     func testExecuteGetVolumeMultipleCallsConsistent() async throws {
-        try XCTSkipIf(ProcessInfo.processInfo.environment["CI"] != nil,
-                      "跳过：CI 环境下 NSAppleScript 触发 System Events 自动化权限对话框挂起")
+        try skipWhenAutomationUnavailable()
         let result1 = try await tool.execute(arguments: ["action": "get_volume"])
         let result2 = try await tool.execute(arguments: ["action": "get_volume"])
         // 两次调用结果类型应一致（都是数字或都是错误）
@@ -223,6 +214,28 @@ final class SystemControlToolTests: XCTestCase {
         let isNumber2 = Int(result2) != nil
         XCTAssertEqual(isNumber1, isNumber2,
                        "多次 get_volume 结果类型应一致，第一次：\(result1)，第二次：\(result2)")
+    }
+
+    /// AppleScript 有界执行：无人应答的调用必须在窗口内返回错误，不能拖到 allowance 超时。
+    /// 用 `delay 30` 取代系统授权场景——不需要任何权限，也能在 CI 上验证 terminate 生效。
+    func testAppleScriptTimeoutReturnsErrorWithinWindow() async {
+        let started = Date()
+        let result = await tool.runAppleScript("delay 30")
+        let elapsed = Date().timeIntervalSince(started)
+        XCTAssertTrue(result.hasPrefix("错误"), "超时应返回错误前缀，实际：\(result)")
+        XCTAssertLessThan(elapsed, 12, "应在有界窗口内返回，实际耗时：\(elapsed)s")
+    }
+
+    // MARK: - 辅助
+
+    /// macOS 单测宿主由 xcodebuild 经 testmanagerd 启动，不继承 shell 环境，
+    /// 读不到 workflow 注入的 `CI=true`（runner 上 MLXVoiceTTSEngineTests 走的就是"非 CI"分支），
+    /// 因此补一条 GitHub 托管 runner 的用户名判据。
+    /// CI 上没有 System Events 自动化授权，真实调用只会等到有界窗口超时。
+    private func skipWhenAutomationUnavailable() throws {
+        let isCI = ProcessInfo.processInfo.environment["CI"] != nil
+            || NSUserName() == "runner"
+        try XCTSkipIf(isCI, "跳过：CI 环境无 System Events 自动化授权")
     }
 }
 #endif

@@ -12,6 +12,9 @@
     <Version>1.0.0</Version>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
     <FileVersion>1.0.0.0</FileVersion>
+    <!-- CS8669：Strings.Designer.cs 由 resgen 生成，带可空注解却没有 #nullable 指令；
+         文件级指令会在下次重新生成时丢失，所以按警告号在项目层抑制。 -->
+    <NoWarn>$(NoWarn);CS8669</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

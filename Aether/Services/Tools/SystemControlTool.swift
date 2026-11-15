@@ -39,9 +39,9 @@ final class SystemControlTool: ToolProtocol, @unchecked Sendable {
         }
         switch action {
         case "get_brightness": return getBrightness()
-        case "set_brightness": return setBrightness(arguments)
-        case "get_volume": return getVolume()
-        case "set_volume": return setVolume(arguments)
+        case "set_brightness": return await setBrightness(arguments)
+        case "get_volume": return await getVolume()
+        case "set_volume": return await setVolume(arguments)
         default: return "错误：不支持的操作，支持 get_brightness/set_brightness/get_volume/set_volume"
         }
     }
@@ -55,22 +55,22 @@ final class SystemControlTool: ToolProtocol, @unchecked Sendable {
     }
 
     /// 设置屏幕亮度：将 0-100 归一化为 0-1，再通过 gamma 调整模拟
-    private func setBrightness(_ arguments: [String: Any]) -> String {
+    private func setBrightness(_ arguments: [String: Any]) async -> String {
         guard let value = arguments["value"] as? Int, (0...100).contains(value) else {
             return "错误：请提供 0-100 之间的 value 参数"
         }
         // 简化实现：仅校验 value 范围，实际亮度调整通过 AppleScript key code 107 实现
         _ = value
         // 用 AppleScript 设置亮度（需要辅助功能权限）
-        return setBrightnessViaGamma()
+        return await setBrightnessViaGamma()
     }
 
     /// 通过 AppleScript 模拟亮度调整（需要辅助功能权限）
     /// - Note: 简化占位实现，仅发送 key code 107；后续可基于 value 循环发键实现精细控制。
-    private func setBrightnessViaGamma() -> String {
-        // NOSONAR: NSAppleScript 仅执行固定的 key code 107 字符串，无外部输入注入风险
+    private func setBrightnessViaGamma() async -> String {
+        // NOSONAR: osascript 仅执行固定的 key code 107 字符串，无外部输入注入风险
         let script = "tell application \"System Events\" to key code 107"
-        let result = runAppleScript(script)
+        let result = await runAppleScript(script)
         // 检查 AppleScript 执行结果，失败时返回错误信息
         if result.hasPrefix("错误：") {
             return "设置亮度失败：\(result)"
@@ -79,33 +79,74 @@ final class SystemControlTool: ToolProtocol, @unchecked Sendable {
     }
 
     /// 获取系统音量：通过 AppleScript 读取 volume settings
-    private func getVolume() -> String {
+    private func getVolume() async -> String {
         let script = """
         tell application "System Events"
             return output volume of (get volume settings)
         end tell
         """
-        return runAppleScript(script)
+        return await runAppleScript(script)
     }
 
     /// 设置系统音量：通过 AppleScript 的 set volume 命令
-    private func setVolume(_ arguments: [String: Any]) -> String {
+    private func setVolume(_ arguments: [String: Any]) async -> String {
         guard let value = arguments["value"] as? Int, (0...100).contains(value) else {
             return "错误：请提供 0-100 之间的 value 参数"
         }
         let script = "set volume output volume \(value)"
-        return runAppleScript(script)
+        return await runAppleScript(script)
     }
 
     /// 执行 AppleScript 脚本并返回输出，错误以字符串形式返回
     /// - Note: 调用方负责校验脚本来源（本工具内 script 为常量字面量，无注入风险）
-    private func runAppleScript(_ source: String) -> String {
-        let script = NSAppleScript(source: source) // NOSONAR: source 为常量字面量，无注入风险
-        var errorInfo: NSDictionary?
-        let output = script?.executeAndReturnError(&errorInfo)
-        if let error = errorInfo {
-            return "错误：\(error[NSAppleScript.errorMessage] as? String ?? "未知错误")"
+    /// internal 而非 private：单测用 `delay 30` 这样的脚本验证有界窗口。
+    func runAppleScript(_ source: String) async -> String {
+        await withCheckedContinuation { continuation in
+            Self.appleScriptQueue.async {
+                continuation.resume(returning: Self.executeAppleScript(source))
+            }
         }
-        return output?.stringValue ?? "已执行"
+    }
+
+    /// 单次 AppleScript 执行窗口。
+    /// `NSAppleScript.executeAndReturnError` 在等待系统自动化授权时没有超时：CI runner、
+    /// 无头会话里授权对话框无人应答，调用会一直阻塞，整条用例被 allowance 打死。
+    /// 改为子进程 osascript + 有界等待，超时直接 terminate，工具调用不会再挂死。
+    nonisolated private static let appleScriptTimeout: TimeInterval = 5
+
+    /// 串行队列：并发调用不会叠出多条被拖住的线程；osascript 超时会被 terminate，队列不会被堵住。
+    nonisolated private static let appleScriptQueue = DispatchQueue(label: "com.aether.tool.systemcontrol.applescript")
+
+    nonisolated private static func executeAppleScript(_ source: String) -> String {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+        process.arguments = ["-e", source]
+        let stdout = Pipe()
+        let stderr = Pipe()
+        process.standardOutput = stdout
+        process.standardError = stderr
+
+        let finished = DispatchSemaphore(value: 0)
+        process.terminationHandler = { _ in finished.signal() }
+        do {
+            try process.run()
+        } catch {
+            return "错误：无法启动 osascript：\(error.localizedDescription)"
+        }
+
+        if finished.wait(timeout: .now() + appleScriptTimeout) == .timedOut {
+            process.terminate()
+            _ = finished.wait(timeout: .now() + 1)
+            return "错误：AppleScript 执行超时（\(Int(appleScriptTimeout)) 秒）"
+        }
+
+        let output = String(data: stdout.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard process.terminationStatus == 0 else {
+            let message = String(data: stderr.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return "错误：\(message.isEmpty ? "AppleScript 退出码 \(process.terminationStatus)" : message)"
+        }
+        return output.isEmpty ? "已执行" : output
     }
 }
