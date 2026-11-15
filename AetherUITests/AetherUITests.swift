@@ -42,6 +42,28 @@ final class AetherUITests: XCTestCase {
         app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.35, dy: 0.12)).tap()
     }
 
+    /// 打开设置 sheet 并确认它真的出现了。
+    /// CI 上偶发 tap 不生效（按钮在无障碍树里、事件也合成了，但 sheet 没起来——例如刚点完「完成」
+    /// 关掉上一轮 sheet 就立刻再开）。此时 app 仍停在聊天页，后续滚动落在消息列表上，
+    /// 用例会一路滑到 allowance 撞穿才失败，日志只剩一堆 CollectionView 拖拽。
+    /// 判据用工具栏「完成」按钮的显式 identifier：sheet 根导航栏在 CI（Xcode 26.3）上
+    /// 匹配不到 navigationBars["设置"]。补点前查 settingsButton 是否仍可点——
+    /// sheet 起来了它会被盖住，isHittable 为假，不会再点一次。
+    private func openSettings(in app: XCUIApplication) {
+        let settingsButton = app.buttons["settingsButton"]
+        guard settingsButton.waitForExistence(timeout: 10) else {
+            XCTFail("应存在设置按钮")
+            return
+        }
+        settingsButton.tap()
+
+        let doneButton = app.buttons["settingsDoneButton"]
+        if !doneButton.waitForExistence(timeout: 10), settingsButton.isHittable {
+            settingsButton.tap()
+        }
+        XCTAssertTrue(doneButton.waitForExistence(timeout: 10), "应打开设置页")
+    }
+
     /// 在 Form 中向下滚动到目标元素整块进入可视区（Form 底部的 Section 可能需要滚动才可见）。
     /// 停止条件不能用 isHittable：元素只露出几 pt 时它也为真，而中心仍在屏外，
     /// tap 合成不到键盘焦点（CI 实测 editor 落在 y=865.7、窗高 874）。
@@ -174,7 +196,7 @@ final class AetherUITests: XCTestCase {
         let app = makeApp()
         app.launch()
 
-        app.buttons["settingsButton"].tap()
+        openSettings(in: app)
         let secureField = app.secureTextFields["deepseekAPIKeySecureField"]
         // Day 17: 新增「健康」Section 后 API Key 输入框被推到 Form 更下方，
         // 需先滚动让 SwiftUI Form 懒渲染该元素到 accessibility tree
@@ -205,7 +227,7 @@ final class AetherUITests: XCTestCase {
         let app = makeApp()
         app.launch()
 
-        app.buttons["settingsButton"].tap()
+        openSettings(in: app)
         let secureField = app.secureTextFields["deepseekAPIKeySecureField"]
         // Day 17: 新增「健康」Section 后需先滚动到可见区域
         scrollToElement(secureField, in: app)
@@ -256,7 +278,7 @@ final class AetherUITests: XCTestCase {
         let app = makeApp()
         app.launch()
 
-        app.buttons["settingsButton"].tap()
+        openSettings(in: app)
 
         let ragToggle = app.switches["ragToggle"]
         // Day 17: 先滚动让元素进入 accessibility tree（必须在 waitForExistence 之前）
@@ -324,7 +346,7 @@ final class AetherUITests: XCTestCase {
         let app = makeApp()
         app.launch()
 
-        app.buttons["settingsButton"].tap()
+        openSettings(in: app)
 
         // 先滚动 Form 让模型 Picker 区域进入可见范围
         // 不依赖 scrollToElement（它需要元素已存在），直接滚动固定次数
@@ -460,7 +482,7 @@ final class AetherUITests: XCTestCase {
         dismissKeyboard(in: app)
 
         // 打开设置
-        app.buttons["settingsButton"].tap()
+        openSettings(in: app)
         // Day 13: 新增「供应商」「自动降级」Section 后 TextEditor 被推到 Form 较下方，
         // SwiftUI Form 懒渲染：必须先滚动到 TextEditor 才会进入 accessibility tree。
         // 顺序：先 scrollToElement 让 TextEditor 渲染，再用 waitForExistence 确认。
@@ -473,9 +495,8 @@ final class AetherUITests: XCTestCase {
 
         // 完成 → 持久化到会话
         app.buttons["settingsDoneButton"].tap()
-        // 重进设置验证
-        XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(timeout: 5))
-        app.buttons["settingsButton"].tap()
+        // 重进设置验证（刚关掉 sheet 立刻再开，CI 上 tap 可能被吞，openSettings 会校验并补点）
+        openSettings(in: app)
 
         let editor2 = app.textViews["systemPromptTextEditor"]
         scrollToElement(editor2, in: app)
@@ -490,7 +511,7 @@ final class AetherUITests: XCTestCase {
         let app = makeApp()
         app.launch()
 
-        app.buttons["settingsButton"].tap()
+        openSettings(in: app)
 
         // 语气 Picker 选「正式」（Form 默认 picker 为导航式：点击行 → 推入选项列表）
         // 「用户偏好」Section 在 Form 底部，需要滚动到可见
@@ -577,7 +598,7 @@ final class AetherUITests: XCTestCase {
         app.launchArguments = ["UITEST_DISABLE_NETWORK", "UITEST_DISABLE_SPLASH"]
         app.launch()
         XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(timeout: 8), "重进后应回到主界面")
-        app.buttons["settingsButton"].tap()
+        openSettings(in: app)
 
         // 验证语气保持「正式」（需要滚动到用户偏好 Section）
         // iOS 26.2 (CI): 用 descendants(matching: .any) 跨元素类型搜索 tonePicker identifier（同首次进入）
