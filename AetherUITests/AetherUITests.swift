@@ -59,21 +59,35 @@ final class AetherUITests: XCTestCase {
             if app.scrollViews.firstMatch.exists { return app.scrollViews.firstMatch }
             return nil
         }
-        func settled(in container: XCUIElement?) -> Bool {
-            guard element.exists, element.isHittable else { return false }
-            guard let visible = container?.frame else { return true }
-            let frame = element.frame
-            return frame.minY >= visible.minY && frame.maxY <= visible.maxY
-        }
         var attempts = 0
+        var nudges = 0
         while attempts < maxAttempts {
-            let container = scroller()
-            if settled(in: container) { return }
-            if let container {
-                let from = container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75))
-                let to = container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25))
-                from.press(forDuration: 0.05, thenDragTo: to, withVelocity: .default, thenHoldForDuration: 0.3)
+            guard let container = scroller() else {
+                attempts += 1
+                _ = element.waitForExistence(timeout: 1)
+                continue
             }
+            if element.exists, element.isHittable {
+                let visible = container.frame
+                let frame = element.frame
+                if frame.minY >= visible.minY, frame.maxY <= visible.maxY { return }
+                // 已渲染但只露出一部分时，整屏再拖一次会把它推出懒渲染窗口，再也找不回来
+                // （CI 上 testUninstallPlugin 就是这样滑满 10 次仍未命中）。改用约 1/6 屏的小步微调。
+                // 向下微调只发生在目标已渲染且位于可视区上方时，此时 Form 不在顶部，不会触发下滑关闭。
+                if nudges < 4 {
+                    let above = frame.minY < visible.minY
+                    let from = container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: above ? 0.42 : 0.58))
+                    let to = container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: above ? 0.58 : 0.42))
+                    from.press(forDuration: 0.05, thenDragTo: to, withVelocity: .default, thenHoldForDuration: 0.3)
+                    nudges += 1
+                    _ = element.waitForExistence(timeout: 1)
+                    continue
+                }
+                return
+            }
+            let from = container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75))
+            let to = container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25))
+            from.press(forDuration: 0.05, thenDragTo: to, withVelocity: .default, thenHoldForDuration: 0.3)
             attempts += 1
             _ = element.waitForExistence(timeout: 1)
         }
