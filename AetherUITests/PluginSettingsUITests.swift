@@ -21,17 +21,38 @@ final class PluginSettingsUITests: XCTestCase {
         return app
     }
 
-    /// 在 Form 中向下滚动以找到目标元素
+    /// 在 Form 中滚动到目标元素整块进入可视区。
+    /// 停止条件不能用 isHittable：元素只露出几 pt 时它也为真，而中心仍在屏外，tap 会落空。
+    /// 滑动用定长拖拽而不是 swipeUp：swipeUp 带惯性，一次可能甩过整节（CI 实测四条用例
+    /// 3 次滑动即命中，失败那条滑满 10 次仍未命中），而 Form 懒渲染，甩过去就再也找不回来。
     private func scrollToElement(_ element: XCUIElement, in app: XCUIApplication, maxAttempts: Int = 10) {
+        func scroller() -> XCUIElement {
+            if app.tables.firstMatch.exists { return app.tables.firstMatch }
+            if app.collectionViews.firstMatch.exists { return app.collectionViews.firstMatch }
+            return app.scrollViews.firstMatch
+        }
+        func scroll(_ container: XCUIElement, towardTop: Bool) {
+            let from = container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: towardTop ? 0.25 : 0.75))
+            let to = container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: towardTop ? 0.75 : 0.25))
+            from.press(forDuration: 0.05, thenDragTo: to)
+        }
+        func settled() -> Bool {
+            guard element.exists, element.isHittable else { return false }
+            let visible = scroller().frame
+            let frame = element.frame
+            return frame.minY >= visible.minY && frame.maxY <= visible.maxY
+        }
         var attempts = 0
-        while (!element.exists || !element.isHittable) && attempts < maxAttempts {
-            let scroller = app.tables.firstMatch.exists
-                ? app.tables.firstMatch
-                : (app.collectionViews.firstMatch.exists
-                    ? app.collectionViews.firstMatch
-                    : app.scrollViews.firstMatch)
-            scroller.swipeUp()
+        while attempts < maxAttempts && !settled() {
+            let container = scroller()
+            scroll(container, towardTop: element.exists && element.frame.minY < container.frame.minY)
             attempts += 1
+            _ = element.waitForExistence(timeout: 1)
+        }
+        var recovery = 0
+        while recovery < maxAttempts && !settled() {
+            scroll(scroller(), towardTop: true)
+            recovery += 1
             _ = element.waitForExistence(timeout: 1)
         }
     }
@@ -153,6 +174,7 @@ final class PluginSettingsUITests: XCTestCase {
         app.buttons["settingsButton"].tap()
         let pluginLink = app.descendants(matching: .any).matching(identifier: "pluginManagementLink").firstMatch
         scrollToElement(pluginLink, in: app)
+        XCTAssertTrue(pluginLink.waitForExistence(timeout: 5), "应存在插件管理入口")
         pluginLink.tap()
 
         XCTAssertTrue(app.navigationBars["插件管理"].waitForExistence(timeout: 5))

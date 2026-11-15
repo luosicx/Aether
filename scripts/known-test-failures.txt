@@ -444,14 +444,29 @@
 # testEditSystemPrompt、testUserPreferencePersistence、testDeleteAPIKeyWithConfirmation），逐条追
 # 不完；根因是 app 冷启动加交互本来就贴着 120s allowance，不是某条用例写死了。整类只按超时形态
 # 豁免，该类新增的断言失败照旧判红。
-# 本批把 ui-tests job 的窗口从 120/180 抬到 240/300（依据见 .github/workflows/ci.yml 里那段注释：
-# 本地矩阵里 102.0 / 72.6 / 69.9s 三条，CI 对本地耗时比 1.6x-5.3x）。豁免条目一条不动——
-# 抬窗口只是把"慢"和"挂死"分界线画到实测分布之外，能不能因此删掉 *~timeout 与
-# testUserPreferencePersistence，要看新窗口下的 CI 轮次里还有没有 exceeded execution time 行。
-UI:AetherUITests/*~timeout
-# testUserPreferencePersistence 在 ea16a7e 那轮不是超时形态，而是「Failed to get launch progress」，
-# 归到超时豁免之外，所以单独留一条精确条目。
-UI:AetherUITests/testUserPreferencePersistence
+# #70 把 ui-tests job 的窗口从 120/180 抬到 240/300（依据见 .github/workflows/ci.yml 里那段注释：
+# 本地矩阵里 102.0 / 72.6 / 69.9s 三条，CI 对本地耗时比 1.6x-5.3x）。当时约定豁免条目一条不动，
+# 删除条件是「新窗口下的 CI 轮次里不再有 exceeded execution time 行」。
+# main@7bfa84c（run 43686604160）满足该条件：整轮 22 条用例零 exceeded 行，
+# testUserPreferencePersistence 172.498s、testDeleteMCPServer 89.020s 都在窗口内通过。
+# 故本批删除下面三条：
+# - 原 `UI:AetherUITests/*~timeout`
+# - 原 `UI:AetherUITests/testUserPreferencePersistence`（它在 ea16a7e 那轮不是超时形态，而是
+#   「Failed to get launch progress」，归不到超时豁免里，才单独留过一条精确条目）
+# - 原 `UI:MCPSettingsUITests/testDeleteMCPServer`（详见下方该条的叙事）
+#
+# 本批另修一条从没锚过的 UI 失败——main@7bfa84c 那轮唯一的红线 AetherUITests/testEditSystemPrompt，
+# 在 `editor.typeText` 处报「Neither element nor any descendant has keyboard focus」。CI 快照给出
+# 决定性几何：窗口 {{0,0},{402,874}}、Form 可视区底边 y=874，而 systemPromptTextEditor 落在
+# {{32,865.7},{338,120}}——只露出 8.3pt，中心 y≈925 在屏外。scrollToElement 的停止条件是 isHittable，
+# 而它对「只露一线」也判真（CI 滑 2 次就停，本地 Xcode 27.2 判假、滑 6 次才停，所以本地一直是绿的），
+# 于是循环提前停下、tap 合成不到焦点。修法：停止条件改成「整块落在滚动容器可视区内」。
+# 同一 helper 还只向上滑，而 swipeUp 带惯性：Form 懒渲染，一次甩过目标节就再也找不回来。
+# PluginSettingsUITests/testViewPluginPermissions 在 #65 第四轮滑满 10 次仍未命中 pluginManagementLink，
+# 同轮另外四条都是 3 次命中；main@7bfa84c 同一条 passed，本地两轮也各 3 次命中，属 flake 而非回归。
+# 修法：滑动改成定长拖拽（半屏、无惯性），预算用尽后回扫。整屏 swipeUp/swipeDown 步长过大，
+# 会让元素在可视区边界两侧振荡（第一版改法本地实测 up/down/up/down/up 后回扫到顶，用例反而红），
+# 定长拖拽同时消掉惯性与振荡。本地 iPhone 17、240/300 窗口：受影响的 10 条用例两轮全过。
 # 下面这条在 allowance 内、或只飘过一次，按精确条目记着等修。
 # - 原 `UI:AetherUITests/testOpenConversationListShowsEmptyState`（本批删除）：用例在 accessibility
 #   tree 里找 identifier「还没有对话」，而产品空状态是 ConversationList 的 EmptyStateView
@@ -480,11 +495,9 @@ UI:AetherUITests/testUserPreferencePersistence
 #   ChatStorage.wipeAllData）：写死同名时列表里同时有旧记录和本次新加的，按名字找的那条 staticText
 #   永远还在，改后第一次本地跑就是这样红的；跳过添加表单、直接删残留那条的探针证明左滑 + 弹窗 +
 #   点「删除」这条链路本身是通的（rows 从 1 变 0、弹窗元素全部消失）。
-#   本地改后 90.213s 通过；CI 侧同一批的本地/CI 耗时比从 1.6x（dragReorder 24.3s→39.0s）到
-#   5.3x（emptyState 19.0s→99.8s）不等，90 秒落在这个区间里，120s allowance 够不够没有依据，
-#   所以条目先留着——它现在钉的是"耗时"而不是"断言"，等有 CI 轮次证明它不再越线时随 #17 的口径
-#   重定一起删（同一条线上还有 UI:AetherUITests/*~timeout 与 testUserPreferencePersistence）。
-UI:MCPSettingsUITests/testDeleteMCPServer
+#   本地改后 90.213s 通过；当时 120s allowance 够不够没有依据（CI 对本地耗时比 1.6x-5.3x），
+#   所以条目先留着——它钉的是"耗时"而不是"断言"。#70 抬到 240/300 后，main@7bfa84c
+#   （run 43686604160）实测 89.020s 通过、整轮零 exceeded 行，删除条件满足，本批删除。
 
 # ---- macOS（unit-tests-macos 两个分片共用同一 label）----
 macOS:AgentOrchestratorTests/*~crash
