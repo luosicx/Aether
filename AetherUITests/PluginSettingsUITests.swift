@@ -24,6 +24,8 @@ final class PluginSettingsUITests: XCTestCase {
     /// 打开设置 sheet 并确认它真的出现了。
     /// CI 上偶发首次 tap 不生效（按钮在无障碍树里、事件也合成了，但 sheet 没起来），
     /// 此时 app 仍停在聊天页，后续滚动落在消息列表上，最后以「Failed to tap」这种难懂的形式失败。
+    /// 判据用工具栏「完成」按钮的显式 identifier：CI（Xcode 26.3）上 sheet 根导航栏匹配不到
+    /// navigationBars["设置"]，照那个判会误杀（第 8 轮五条全红在这里）。
     /// 补点前先查 settingsButton 是否仍可点：sheet 起来了它会被盖住，isHittable 为假，不会再点一次。
     private func openSettings() -> XCUIApplication {
         let app = makeApp()
@@ -33,11 +35,11 @@ final class PluginSettingsUITests: XCTestCase {
         XCTAssertTrue(settingsButton.waitForExistence(timeout: 10), "应存在设置按钮")
         settingsButton.tap()
 
-        let settingsNavBar = app.navigationBars["设置"]
-        if !settingsNavBar.waitForExistence(timeout: 10), settingsButton.isHittable {
+        let settingsOpened = app.buttons["settingsDoneButton"]
+        if !settingsOpened.waitForExistence(timeout: 10), settingsButton.isHittable {
             settingsButton.tap()
         }
-        XCTAssertTrue(settingsNavBar.waitForExistence(timeout: 10), "应打开设置页")
+        XCTAssertTrue(settingsOpened.waitForExistence(timeout: 10), "应打开设置页")
         return app
     }
 
