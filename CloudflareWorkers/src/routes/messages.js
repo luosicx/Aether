@@ -7,7 +7,7 @@
  */
 
 import { jsonError } from "../lib/llm.js";
-import { jsonOk } from "../lib/utils.js";
+import { clampInt, jsonOk } from "../lib/utils.js";
 
 /**
  * GET /conversations/:conversationId/messages - 列出某会话下的消息
@@ -20,8 +20,8 @@ export async function handleListMessages(request, env, ctx, conversationId) {
   if (!db) return jsonError(503, "数据库未配置");
 
   const url = new URL(request.url);
-  const limit = Math.min(parseInt(url.searchParams.get("limit") || "100", 10), 500);
-  const offset = parseInt(url.searchParams.get("offset") || "0", 10);
+  const limit = clampInt(url.searchParams.get("limit"), { min: 1, max: 500, fallback: 100 });
+  const offset = clampInt(url.searchParams.get("offset"), { min: 0, max: 1_000_000, fallback: 0 });
   const order = url.searchParams.get("order") === "desc" ? "DESC" : "ASC";
 
   try {

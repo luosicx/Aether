@@ -259,6 +259,34 @@ public class AetherApiClientTest
     }
 
     [Fact]
+    public async Task StreamChatAsync_ManagedPath_ErrorType_ThrowsWithMessage()
+    {
+        var sseBuilder = new StringBuilder();
+        sseBuilder.AppendLine("data: {\"type\":\"delta\",\"content\":\"部分\"}");
+        sseBuilder.AppendLine("data: {\"type\":\"error\",\"message\":\"上游限流\"}");
+        sseBuilder.AppendLine();
+
+        var handler = new StubStreamHandler(sseBuilder.ToString());
+        var http = new HttpClient(handler);
+        var client = CreateClientWithStubHttp(http, SampleBaseUrl, SampleToken);
+        client.UseRustSse = false;
+
+        var request = new ChatRequest { Message = "hi" };
+        var chunks = new List<string>();
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+        {
+            await foreach (var chunk in client.StreamChatAsync(request))
+            {
+                chunks.Add(chunk);
+            }
+        });
+
+        Assert.Equal("上游限流", ex.Message);
+        Assert.Single(chunks);
+        Assert.Equal("部分", chunks[0]);
+    }
+
+    [Fact]
     public async Task StreamChatAsync_ManagedPath_IgnoresNonDataLines()
     {
         var sseBuilder = new StringBuilder();

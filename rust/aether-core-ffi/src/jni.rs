@@ -6,16 +6,8 @@
 
 use jni::objects::{JClass, JString};
 use jni::JNIEnv;
-use std::collections::BTreeMap;
 
-use aether_core::{parse_with_tool_accumulation, redact, AccumulatedToolCall};
-
-// 全局累积器（thread-local）。生产应改为 per-Instance 字段，
-// 此处用 thread-local 兜底，符合"首个落地单元"的最小可行原则。
-thread_local! {
-    static ACC: std::cell::RefCell<BTreeMap<i64, AccumulatedToolCall>> =
-        std::cell::RefCell::new(BTreeMap::new());
-}
+use aether_core::{parse_chunk, redact};
 
 /// 创建 JString 并转为原始 jstring 指针（所有权转移给 JVM）。
 /// 分配失败返回 null。
@@ -26,8 +18,14 @@ fn new_jstring(env: &mut JNIEnv, s: &str) -> jni::sys::jstring {
     }
 }
 
+/// 解析单行 SSE（无状态），返回 `{"content": <Option>}` 的 JSON 串；
+/// 非 data 行 / 解析失败返回空串。
+///
+/// 早期实现用 thread_local 累积器跨 chunk 累积 tool_calls：协程在挂起点后可能
+/// 恢复到另一个线程，累积状态会串流（上一轮 tool_calls 残留到下一轮）且永不释放；
+/// Android 侧只消费 content，故改为与 C ABI `aether_sse_parse_chunk` 一致的无状态解析。
 #[no_mangle]
-pub extern "system" fn Java_com_aether_rust_SseBridge_parseWithTools(
+pub extern "system" fn Java_com_aether_rust_SseBridge_parseChunk(
     mut env: JNIEnv,
     _class: JClass,
     line: JString,
@@ -36,26 +34,12 @@ pub extern "system" fn Java_com_aether_rust_SseBridge_parseWithTools(
         Ok(s) => s.into(),
         Err(_) => return new_jstring(&mut env, ""),
     };
-    let json = ACC.with(|acc| {
-        let mut acc = acc.borrow_mut();
-        parse_with_tool_accumulation(&line, &mut acc).and_then(|p| {
-            serde_json::to_string(&serde_json::json!({
-                "content": p.content,
-                "toolCalls": p.tool_calls,
-                "usage": p.usage,
-            }))
-            .ok()
-        })
-    });
-    match json {
-        Some(j) => new_jstring(&mut env, &j),
+    match parse_chunk(&line) {
+        Some(content) => serde_json::to_string(&serde_json::json!({ "content": content }))
+            .map(|j| new_jstring(&mut env, &j))
+            .unwrap_or_else(|_| new_jstring(&mut env, "")),
         None => new_jstring(&mut env, ""),
     }
-}
-
-#[no_mangle]
-pub extern "system" fn Java_com_aether_rust_SseBridge_reset(_env: JNIEnv, _class: JClass) {
-    ACC.with(|acc| acc.borrow_mut().clear());
 }
 
 /// f64 余弦相似度（Android RAG/Memory 用）。入参两个 double[]，返回 double。

@@ -164,6 +164,50 @@ describe("E2E /conversations CRUD", () => {
     expect(data.conversations.map((c) => c.id)).toEqual(["c1", "c2"]);
   });
 
+  it("GET /conversations 非法 limit/offset 回退为安全值", async () => {
+    let seenBinds;
+    const env = makeEnv([
+      [
+        "WHERE user_id = ?1 ORDER BY",
+        {
+          all: (binds) => {
+            seenBinds = binds;
+            return { results: [] };
+          },
+        },
+      ],
+    ]);
+    const req = makeRequest("/conversations?limit=abc&offset=-5", {
+      method: "GET",
+      token: VALID_TOKEN,
+    });
+    const resp = await worker.fetch(req, env, {});
+    expect(resp.status).toBe(200);
+    expect(seenBinds).toEqual([USER_ID, 50, 0]);
+  });
+
+  it("GET /conversations 超大 limit 被夹紧到 200", async () => {
+    let seenBinds;
+    const env = makeEnv([
+      [
+        "WHERE user_id = ?1 ORDER BY",
+        {
+          all: (binds) => {
+            seenBinds = binds;
+            return { results: [] };
+          },
+        },
+      ],
+    ]);
+    const req = makeRequest("/conversations?limit=9999", {
+      method: "GET",
+      token: VALID_TOKEN,
+    });
+    const resp = await worker.fetch(req, env, {});
+    expect(resp.status).toBe(200);
+    expect(seenBinds).toEqual([USER_ID, 200, 0]);
+  });
+
   it("GET /conversations/:id 返回单个会话", async () => {
     const row = convRow({ id: "conv-xyz" });
     const env = makeEnv([

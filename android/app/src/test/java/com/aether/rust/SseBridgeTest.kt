@@ -5,6 +5,7 @@ import com.aether.data.api.ChatStreamClient
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respondOk
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
@@ -42,5 +43,30 @@ class SseBridgeTest {
     @Test
     fun parseLineReturnsNullForNonDataLine() {
         assertNull(streamClient.parseLine("event: ping"))
+    }
+
+    // MARK: - BFF 流内错误事件（纯 Kotlin 解析，不依赖 JNI）
+
+    @Test
+    fun bffErrorMessageExtractsMessage() {
+        assertEquals(
+            "上游限流",
+            streamClient.bffErrorMessage("""{"type":"error","message":"上游限流"}""")
+        )
+    }
+
+    @Test
+    fun bffErrorMessageFallsBackWhenMessageMissing() {
+        assertEquals(
+            "服务暂时不可用，请稍后再试",
+            streamClient.bffErrorMessage("""{"type":"error"}""")
+        )
+    }
+
+    @Test
+    fun bffErrorMessageIgnoresNonErrorPayloads() {
+        assertNull(streamClient.bffErrorMessage("""{"type":"delta","content":"hi"}"""))
+        assertNull(streamClient.bffErrorMessage("""{"type":"done"}"""))
+        assertNull(streamClient.bffErrorMessage("[DONE]"))
     }
 }

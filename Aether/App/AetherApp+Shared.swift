@@ -161,6 +161,9 @@ extension AetherApp {
 
         // v1.1 Phase C: 注入 ToolRegistry 到 PluginManager，使插件工具可注册到工具注册中心
         PluginToolRegistryBridge.setup()
+
+        // 端侧推理 provider 依赖 MLX、保留在 App target，启动时注入供 ModelProviderFactory.make(.onDevice) 使用
+        ModelProviderFactory.onDeviceProviderFactory = { OfflineLLMProvider() }
     }
 }
 

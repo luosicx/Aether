@@ -7,7 +7,7 @@
  */
 
 import { jsonError } from "../lib/llm.js";
-import { jsonOk } from "../lib/utils.js";
+import { clampInt, jsonOk } from "../lib/utils.js";
 
 /**
  * GET /memory - 列出当前用户的记忆
@@ -19,8 +19,8 @@ export async function handleListMemory(request, env, ctx) {
   if (!db) return jsonError(503, "数据库未配置");
 
   const url = new URL(request.url);
-  const limit = Math.min(parseInt(url.searchParams.get("limit") || "50", 10), 200);
-  const offset = parseInt(url.searchParams.get("offset") || "0", 10);
+  const limit = clampInt(url.searchParams.get("limit"), { min: 1, max: 200, fallback: 50 });
+  const offset = clampInt(url.searchParams.get("offset"), { min: 0, max: 1_000_000, fallback: 0 });
   const category = url.searchParams.get("category");
 
   try {
@@ -81,7 +81,7 @@ export async function handleSearchMemory(request, env, ctx) {
     return jsonError(400, "query 不能为空");
   }
 
-  const limit = typeof body.limit === "number" ? body.limit : 5;
+  const limit = clampInt(body.limit, { min: 1, max: 50, fallback: 5 });
   // 无 DB 时降级为空结果，不阻断检索接口
   const memories = ctx.db ? await ctx.db.searchMemories(body.query, limit) : [];
   return jsonOk({ memories, query: body.query });

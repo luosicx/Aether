@@ -7,7 +7,7 @@
  */
 
 import { jsonError } from "../lib/llm.js";
-import { jsonOk } from "../lib/utils.js";
+import { clampInt, jsonOk } from "../lib/utils.js";
 
 /**
  * POST /rag/search - 检索与查询相关的文档分块
@@ -26,7 +26,7 @@ export async function handleSearchDocuments(request, env, ctx) {
     return jsonError(400, "query 不能为空");
   }
 
-  const limit = typeof body.limit === "number" ? body.limit : 3;
+  const limit = clampInt(body.limit, { min: 1, max: 50, fallback: 3 });
   // 无 DB 时降级为空结果，不阻断检索接口
   const chunks = ctx.db ? await ctx.db.searchChunks(body.query, limit) : [];
   return jsonOk({ chunks, query: body.query });

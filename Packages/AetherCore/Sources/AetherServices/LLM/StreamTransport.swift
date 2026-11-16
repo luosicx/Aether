@@ -21,7 +21,7 @@ public final class StreamTransport: @unchecked Sendable {
     private let timeout: TimeInterval
     /// HTTP 非 2xx 时把状态码 + 响应体映射为 LLMError（各供应商语义不同）。
     private let httpErrorMapper: @Sendable (HTTPURLResponse, String) -> LLMError
-    /// 单实例对应单条流的解析状态（tool_calls 跨 chunk 累积）。
+    /// 纯文本解析用的无状态解析器（`parseChunk` 不读写 Rust 侧累积状态，可并发共享）。
     private let parser = SSEParser()
 
     public init(
@@ -58,11 +58,15 @@ public final class StreamTransport: @unchecked Sendable {
     /// 带 tool_calls 累积的增量流。HTTP/网络错误已由传输层上报通知，此处只结束流。
     public func chunkStream(for request: URLRequest) -> AsyncStream<ParsedChunk> {
         AsyncStream { continuation in
+            // 每条流独占解析器：Rust `AetherSseState` 会跨 chunk 累积 tool_calls 且没有重置入口。
+            // 复用同一 transport（同一 client 的多轮 ReAct 请求）会把上一轮的工具调用残留到下一轮，
+            // 导致内容回复被误判为新的工具调用、工具被重复执行。
+            let parser = SSEParser()
             let task = Task {
                 var accumulated: [Int: AccumulatedToolCall] = [:]
                 do {
                     for try await line in self.lines(for: request) {
-                        if let parsed = self.parser.parseWithToolAccumulation(from: line, accumulated: &accumulated) {
+                        if let parsed = parser.parseWithToolAccumulation(from: line, accumulated: &accumulated) {
                             continuation.yield(parsed)
                         }
                     }
@@ -96,6 +100,13 @@ public final class StreamTransport: @unchecked Sendable {
                     }
                     for try await line in bytes.lines {
                         try Task.checkCancellation()
+                        // BFF 出错时 HTTP 状态已是 200，错误只以流内 error 事件下发；
+                        // 不在此拦截会被解析成 done，用户只看到没有任何提示的空回复。
+                        if let message = self.parser.errorMessage(from: line) {
+                            throw LLMError.llmErrorOccurred(
+                                message.isEmpty ? NSLocalizedString("服务暂时不可用，请稍后再试", comment: "") : message
+                            )
+                        }
                         continuation.yield(line)
                     }
                     continuation.finish()

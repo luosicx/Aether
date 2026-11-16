@@ -89,7 +89,7 @@ android/app/src/main/java/com/aether/
         └── Theme.kt
 ```
 
-单元测试位于 `android/app/src/test/java/com/aether/`，共 12 个测试文件、105 个测试用例（JUnit + Robolectric）。
+单元测试位于 `android/app/src/test/java/com/aether/`，共 12 个测试文件、88 个测试用例（JUnit + Robolectric）。
 
 ---
 
@@ -240,8 +240,7 @@ Android 端通过 JNI 调用 Rust core，桥接代码位于 `com.aether.rust` �
 
 | JNI 函数 | Kotlin 桥接 | 用途 |
 |----------|-------------|------|
-| `Java_com_aether_rust_SseBridge_parseWithTools` | `SseBridge.kt` | SSE 流式解析（含工具调用） |
-| `Java_com_aether_rust_SseBridge_reset` | `SseBridge.kt` | 重置解析器状态 |
+| `Java_com_aether_rust_SseBridge_parseChunk` | `SseBridge.kt` | SSE 流式解析（无状态） |
 | `Java_com_aether_rust_VectorMath_cosineF64` | `VectorMath.kt` | f64 向量余弦相似度 |
 | `Java_com_aether_rust_Redact_redact` | `Redact.kt` | 文本脱敏 |
 
@@ -253,7 +252,7 @@ Android 端通过 JNI 调用 Rust core，桥接代码位于 `com.aether.rust` �
 
 **解析与降级**：
 
-`ChatStreamClient` SSE 解析统一走 Rust JNI（`SseBridge.parseWithTools`，同时支持 OpenAI `choices` 与 BFF `type/content` 两种 envelope），不再保留 Kotlin 重复解析器；JNI 不可用（打包损坏）时 `parseLine` 返回 null 不崩溃。`VectorMath.cosineF64Safe` / `Redact.redactSafe` 仍提供 `*Safe` 回退路径。
+`ChatStreamClient` SSE 解析统一走 Rust JNI（`SseBridge.parseChunk` 无状态解析，同时支持 OpenAI `choices` 与 BFF `type/content` 两种 envelope），不再保留 Kotlin 重复解析器；JNI 不可用（打包损坏）时 `parseLine` 返回 null 不崩溃。`VectorMath.cosineF64Safe` / `Redact.redactSafe` 仍提供 `*Safe` 回退路径。
 
 ---
 
@@ -268,14 +267,14 @@ Android 端通过 JNI 调用 Rust core，桥接代码位于 `com.aether.rust` �
   - `.so` 产物由 CI `rust` job 通过 `cargo-ndk` 构建（`aarch64-linux-android` + `x86_64-linux-android`），上传为 artifact `aether-core-android-so`。
   - `android-build` CI job 下载 `.so` 并放入 `android/app/src/main/jniLibs/{arm64-v8a,x86_64}/`，通过 Gradle jniLibs 打包进 APK。
   - `ChatStreamClient` SSE 解析统一走 Rust JNI（支持 OpenAI 与 BFF 两种 envelope），JNI 不可用时返回 null 不崩溃。
-- **基础单元测试已覆盖**：Android 端已新增 12 个测试文件、105 个测试用例，CI 执行 `testDebugUnitTest`：
+- **基础单元测试已覆盖**：Android 端已新增 12 个测试文件、88 个测试用例，CI 执行 `testDebugUnitTest`：
   - `ModelsTest`：Conversation / ChatMessage / Memory JSON 序列化与默认值。
   - `BffConfigTest`：BffConfig 默认值 + BffConfigStore 读写（Robolectric + DataStore）。
   - `ConversationRepositoryTest` / `ConversationRepositoryRoomTest`：Room DAO CRUD + 排序 + 级联删除（Room in-memory database）。
   - `SseBridgeTest`：JNI 不可用时的降级行为（返回 null 不崩溃）。
   - `VectorMathTest`：JNI 不可用时的 `cosineF64Safe` 回退（返回 0.0）。
   - `RedactTest`：JNI 不可用时的 `redactSafe` 回退。
-  - `ChatViewModelDeleteTest` / `MarkdownTextTest` / `HealthViewModelTest` / `KnowledgeBaseViewModelTest` / `LanguageManagerTest`：各模块 ViewModel 与 UI 逻辑测试。
+  - `ChatViewModelDeleteTest` / `MarkdownTextTest` / `HealthViewModelTest` / `KnowledgeBaseViewModelTest` / `AetherApiContractTest`：各模块 ViewModel、UI 逻辑与 BFF 契约回归测试。
 
 ### 10.1 功能清单
 
@@ -289,7 +288,7 @@ Android 端通过 JNI 调用 Rust core，桥接代码位于 `com.aether.rust` �
 | Rust Redact JNI | ✅ | Redact.kt + jni.rs，redactSafe 回退 |
 | 消息长按菜单 | ✅ | 复制 / 重发 / 删除 DropdownMenu |
 | Rust JNI 集成 | ✅ | 4 个 JNI 函数（SSE 解析 + 向量数学 + 脱敏） |
-| 单元测试 | ✅ | testDebugUnitTest，12 文件 105 用例 |
+| 单元测试 | ✅ | testDebugUnitTest，12 文件 88 用例 |
 
 ---
 

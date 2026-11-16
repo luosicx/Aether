@@ -56,6 +56,15 @@ public final class AetherRustSSEParser: @unchecked Sendable {
         return (view.content, view.toolCalls, view.usage)
     }
 
+    /// 提取 BFF 流内错误事件（`{"type":"error","message":"..."}`）的消息。
+    /// 消息缺失时返回空串；非 error 行 / 解析失败返回 nil。纯函数，可并发调用。
+    public func errorMessage(_ line: String) -> String? {
+        guard let raw = line.withCString({ aether_sse_error_message($0) }) else { return nil }
+        guard let json = takeString(raw),
+              let data = json.data(using: .utf8) else { return nil }
+        return try? JSONDecoder().decode(String.self, from: data)
+    }
+
     private func takeString(_ raw: UnsafeMutablePointer<CChar>) -> String? {
         defer { aether_free_string(raw) }
         return String(cString: raw, encoding: .utf8)

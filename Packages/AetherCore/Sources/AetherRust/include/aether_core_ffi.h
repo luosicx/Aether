@@ -86,6 +86,14 @@ AETHER_EXPORT char *aether_sse_parse_chunk(const char *line);
 AETHER_EXPORT char *aether_sse_extract_content(const char *line);
 
 /**
+ * 提取 BFF 流内错误事件的用户可见消息（`data: {"type":"error","message":"..."}`）。
+ * 返回消息的 JSON 串（`""` 表示消息缺失）；非 error 事件 / 解析失败返回空指针。
+ * # Safety
+ * `line` 必须是合法 NUL 结尾 UTF-8。
+ */
+AETHER_EXPORT char *aether_sse_error_message(const char *line);
+
+/**
  * 带 tool_calls 累积的解析，返回 `ParsedChunk` 的 JSON 串。
  * # Safety
  * `line` 合法 UTF-8；`state` 来自 `aether_sse_state_new`。

@@ -13,23 +13,30 @@ public actor RemoteConfigService {
     /// 缓存有效期，24 小时
     private let cacheTTL: TimeInterval = 24 * 3600
 
-    /// 远程配置 endpoint，默认指向阿里云 OSS 公开读 URL（占位），可通过 init 注入用于测试
-    private let endpointURL: URL
+    /// 远程配置 endpoint，默认指向阿里云 OSS 公开读 URL（占位），可通过 init 注入用于测试。
+    /// 默认 URL 字符串无效时为 nil，`fetch()` 直接走回退逻辑（不再 fatalError）。
+    private let endpointURL: URL?
+
+    /// 默认 endpoint 字符串（占位）
+    private static let defaultEndpointString =
+        "https://aether-config.oss-cn-hangzhou.aliyuncs.com/remote_config.json"
 
     /// 单例，供 App 启动时异步拉取
     public static let shared = RemoteConfigService()
 
     /// 允许测试注入 endpoint
     public init(endpointURL: URL? = nil) {
-        guard let url = endpointURL ?? URL(string: "https://aether-config.oss-cn-hangzhou.aliyuncs.com/remote_config.json") else {
-            fatalError("远程配置 URL 无效，无法初始化 RemoteConfigService")
-        }
-        self.endpointURL = url
+        self.endpointURL = endpointURL ?? URL(string: Self.defaultEndpointString)
     }
 
     /// 异步拉取远程配置：请求 endpoint → 解码 RemoteConfig → 写入 fetchedAt → 缓存到 UserDefaults → 更新 currentConfig。
     /// 失败时回退到 loadCachedConfig()，若也为 nil 则用 fallbackConfig()。方法不抛错，保证调用方安全 fire-and-forget。
     public func fetch() async {
+        // 端点无效（默认 URL 字符串损坏）时无法发起请求，直接走回退逻辑
+        guard let endpointURL else {
+            applyFallback()
+            return
+        }
         do {
             // 拉取远程 JSON
             let (data, response) = try await URLSession.shared.data(for: URLRequest(url: endpointURL))

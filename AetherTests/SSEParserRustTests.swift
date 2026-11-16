@@ -60,4 +60,21 @@ final class SSEParserRustTests: XCTestCase {
         XCTAssertEqual(result?.toolCalls?.first?.arguments, #"{"city":"BJ"}"#)
         XCTAssertEqual(result?.toolCalls?.first?.name, "get_weather")
     }
+
+    // MARK: - BFF 流内 error 事件
+
+    func testErrorMessageExtractsBffError() {
+        let parser = SSEParser()
+        XCTAssertEqual(parser.errorMessage(from: #"data: {"type":"error","message":"上游限流"}"#), "上游限流")
+        // 消息缺失时返回空串，由调用方兜底文案
+        XCTAssertEqual(parser.errorMessage(from: #"data: {"type":"error"}"#), "")
+    }
+
+    func testErrorMessageIgnoresNonErrorLines() {
+        let parser = SSEParser()
+        XCTAssertNil(parser.errorMessage(from: #"data: {"type":"delta","content":"hi"}"#))
+        XCTAssertNil(parser.errorMessage(from: #"data: {"type":"done"}"#))
+        XCTAssertNil(parser.errorMessage(from: "data: [DONE]"))
+        XCTAssertNil(parser.errorMessage(from: "event: ping"))
+    }
 }
