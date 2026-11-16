@@ -190,7 +190,14 @@ if shape_exempt:
                          % len(shape_exempt))
     summary_lines += ['- `%s`（%s 形态）— %s' % (t, s, r.replace('|', '\\|'))
                       for t, r, s in shape_exempt[:20]]
+    # 崩溃栈常落在系统符号里（如模拟器 CoreAudio 死锁），后续步骤据此导出 xcresult 诊断包
     summary_lines.append('')
+    summary_lines.append('诊断包：`%s-crash-diagnostics*` artifact（崩溃日志 + 线程栈）' % label)
+    summary_lines.append('')
+    step_output = os.environ.get('GITHUB_OUTPUT')
+    if step_output:
+        with open(step_output, 'a', encoding='utf-8') as fh:
+            fh.write('shape_exempt=true\n')
 summary_lines += ['- `%s`' % t for t, _ in known_hits[:200]]
 emit_section(summary_lines)
 sys.exit(0)

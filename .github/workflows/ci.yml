@@ -126,9 +126,32 @@ jobs:
           exit 0
 
       - name: Verify Test Results
+        id: verify_ios
         # 构建失败时没有可信的 xcresult，且 job 已在构建步染红
         if: steps.build.outcome == 'success'
         run: bash scripts/check-xcresult-failures.sh TestResults.xcresult iOS
+
+      - name: Export iOS crash diagnostics
+        # 崩溃/超时的责任用例由 xcresult 归因，栈常落在系统符号里（如模拟器音频设备消失后
+        # CoreAudio IOFormatsChanged 死锁 abort）；诊断包里的崩溃日志与线程栈才是能定位的证据。
+        if: steps.verify_ios.outputs.shape_exempt == 'true'
+        run: |
+          rm -rf crash-diagnostics
+          xcrun xcresulttool export diagnostics --path TestResults.xcresult --output-path crash-diagnostics || true
+          if [ ! -d crash-diagnostics ] || [ -z "$(ls -A crash-diagnostics)" ]; then
+            echo "diagnostics export unavailable; falling back to full xcresult bundle"
+            rm -rf crash-diagnostics
+            cp -R TestResults.xcresult crash-diagnostics
+          fi
+
+      - name: Upload iOS crash diagnostics
+        if: steps.verify_ios.outputs.shape_exempt == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: iOS-crash-diagnostics
+          path: crash-diagnostics
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Check Coverage Threshold (≥ 80%, iOS Swift + Rust core, excluding Views/DesignSystem/App/Protocols)
         id: coverage
@@ -609,8 +632,30 @@ jobs:
           exit 0
 
       - name: Verify macOS Test Results
+        id: verify_macos
         if: steps.build_macos.outcome == 'success'
         run: bash scripts/check-xcresult-failures.sh TestResultsMacOS.xcresult macOS
+
+      - name: Export macOS crash diagnostics
+        # 同上：崩溃/超时豁免的轮次导出诊断包，避免只剩"责任用例"没有栈。
+        if: steps.verify_macos.outputs.shape_exempt == 'true'
+        run: |
+          rm -rf crash-diagnostics-macos
+          xcrun xcresulttool export diagnostics --path TestResultsMacOS.xcresult --output-path crash-diagnostics-macos || true
+          if [ ! -d crash-diagnostics-macos ] || [ -z "$(ls -A crash-diagnostics-macos)" ]; then
+            echo "diagnostics export unavailable; falling back to full xcresult bundle"
+            rm -rf crash-diagnostics-macos
+            cp -R TestResultsMacOS.xcresult crash-diagnostics-macos
+          fi
+
+      - name: Upload macOS crash diagnostics
+        if: steps.verify_macos.outputs.shape_exempt == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: macOS-crash-diagnostics-${{ matrix.shard }}
+          path: crash-diagnostics-macos
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Generate macOS cobertura.xml
         if: always()
