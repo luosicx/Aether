@@ -7,8 +7,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.LibraryBooks
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -185,7 +185,7 @@ fun SettingsScreen(
             EntryRow(
                 title = stringResource(R.string.settings_knowledge_base),
                 subtitle = stringResource(R.string.settings_knowledge_base_subtitle),
-                icon = Icons.Default.LibraryBooks,
+                icon = Icons.AutoMirrored.Filled.LibraryBooks,
                 onClick = onOpenKnowledgeBase
             )
             EntryRow(
@@ -297,7 +297,7 @@ private fun ModelSelector(
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier
                 .fillMaxWidth()
-                .menuAnchor(),
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
             shape = RoundedCornerShape(AetherCornerRadius.medium)
         )
         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {

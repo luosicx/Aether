@@ -113,7 +113,7 @@ abstract class AetherDatabase : RoomDatabase() {
                     context.applicationContext,
                     AetherDatabase::class.java,
                     "aether.db"
-                ).fallbackToDestructiveMigration().build().also { INSTANCE = it }
+                ).fallbackToDestructiveMigration(dropAllTables = true).build().also { INSTANCE = it }
             }
     }
 }

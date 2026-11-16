@@ -13,10 +13,10 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.LibraryBooks
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
@@ -83,7 +83,7 @@ fun ChatScreen(
                 actions = {
                     IconButton(onClick = onOpenKnowledgeBase) {
                         Icon(
-                            Icons.Default.LibraryBooks,
+                            Icons.AutoMirrored.Filled.LibraryBooks,
                             contentDescription = stringResource(R.string.chat_knowledge_base)
                         )
                     }

@@ -5,8 +5,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.Bedtime
-import androidx.compose.material.icons.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.*
@@ -91,7 +91,7 @@ fun HealthScreen(
                     title = stringResource(R.string.health_steps),
                     value = summary?.steps?.toString() ?: "—",
                     unit = stringResource(R.string.health_steps_unit),
-                    icon = Icons.Default.DirectionsWalk
+                    icon = Icons.AutoMirrored.Filled.DirectionsWalk
                 )
                 MetricCard(
                     title = stringResource(R.string.health_sleep_hours),
