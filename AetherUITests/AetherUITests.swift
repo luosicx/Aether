@@ -58,7 +58,7 @@ final class AetherUITests: XCTestCase {
         settingsButton.tap()
 
         let doneButton = app.buttons["settingsDoneButton"]
-        if !doneButton.waitForExistence(timeout: 10), settingsButton.isHittable {
+        if !pollExists(doneButton, timeout: 10), settingsButton.isHittable {
             settingsButton.tap()
         }
         XCTAssertTrue(doneButton.waitForExistence(timeout: 10), "应打开设置页")
@@ -86,7 +86,7 @@ final class AetherUITests: XCTestCase {
         while attempts < maxAttempts {
             guard let container = scroller() else {
                 attempts += 1
-                _ = element.waitForExistence(timeout: 1)
+                _ = pollExists(element, timeout: 1)
                 continue
             }
             if element.exists, element.isHittable {
@@ -102,7 +102,7 @@ final class AetherUITests: XCTestCase {
                     let to = container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: above ? 0.58 : 0.42))
                     from.press(forDuration: 0.05, thenDragTo: to, withVelocity: .default, thenHoldForDuration: 0.3)
                     nudges += 1
-                    _ = element.waitForExistence(timeout: 1)
+                    _ = pollExists(element, timeout: 1)
                     continue
                 }
                 return
@@ -111,8 +111,21 @@ final class AetherUITests: XCTestCase {
             let to = container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25))
             from.press(forDuration: 0.05, thenDragTo: to, withVelocity: .default, thenHoldForDuration: 0.3)
             attempts += 1
-            _ = element.waitForExistence(timeout: 1)
+            _ = pollExists(element, timeout: 1)
         }
+    }
+
+    /// 轮询元素是否出现，替代 `waitForExistence` 的超时等待。
+    /// XCTest 在 waitForExistence 超时时会抓 accessibility 全树快照做失败分诊
+    /// （日志里的「Collecting debug information to assist test failure triage」），
+    /// 滚动循环里每次落空都要付 1s 等待 + 快照开销；轮询 exists 只查一次树、不留分诊记录。
+    private func pollExists(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if element.exists { return true }
+            Thread.sleep(forTimeInterval: 0.1)
+        }
+        return element.exists
     }
 
     /// 轮询 Toggle 值，替代 Thread.sleep 等待动画完成
@@ -515,29 +528,32 @@ final class AetherUITests: XCTestCase {
 
         // 语气 Picker 选「正式」（Form 默认 picker 为导航式：点击行 → 推入选项列表）
         // 「用户偏好」Section 在 Form 底部，需要滚动到可见
-        // iOS 26.2 (CI): Picker label「语气」不渲染为 StaticText
-        // 用 descendants(matching: .any) 跨元素类型搜索 tonePicker identifier（picker/otherElement/cell 均可命中）
-        let toneById = app.descendants(matching: .any).matching(identifier: "tonePicker").firstMatch
-        let toneByText = app.staticTexts["语气"].firstMatch
+        // iOS 26.2 (CI): Picker label「语气」不渲染为 StaticText，且该行渲染为 Button
+        // （tap 日志里 interrupting element 的类型就是 Button）。buttons 查询只扫按钮集合，
+        // 比 descendants(matching: .any) 的全树扫描快一个量级；旧版渲染成 cell/otherElement 时才走兜底。
+        let toneById = app.buttons["tonePicker"]
 
         // 如果直接找不到，滚动 Form（限制 10 次，避免 CI 超时）
-        // 滚动条件：任一候选元素存在即停止（toneById 适配 iOS 26.2，toneByText 适配旧版）
-        if !toneById.exists && !toneByText.exists {
+        if !toneById.exists {
             let formScroller = app.collectionViews.firstMatch.exists
                 ? app.collectionViews.firstMatch
                 : (app.tables.firstMatch.exists ? app.tables.firstMatch : app.scrollViews.firstMatch)
             var scrollAttempts = 0
-            while !toneById.exists && !toneByText.exists && scrollAttempts < 10 {
+            while !toneById.exists && scrollAttempts < 10 {
                 formScroller.swipeUp()
                 scrollAttempts += 1
-                _ = toneById.waitForExistence(timeout: 1)
+                _ = pollExists(toneById, timeout: 1)
             }
         }
 
         // 定位 Picker 行：identifier 优先（iOS 26.2），staticText 兜底（旧版），cell 兜底
+        let toneFallback = app.descendants(matching: .any).matching(identifier: "tonePicker").firstMatch
+        let toneByText = app.staticTexts["语气"].firstMatch
         let toneRow: XCUIElement
         if toneById.exists {
             toneRow = toneById
+        } else if toneFallback.exists {
+            toneRow = toneFallback
         } else if toneByText.exists {
             toneRow = toneByText
         } else {
@@ -552,7 +568,7 @@ final class AetherUITests: XCTestCase {
         let formalOption = app.descendants(matching: .any).matching(
             NSPredicate(format: "label == %@", "正式")
         ).firstMatch
-        if formalOption.waitForExistence(timeout: 5) {
+        if pollExists(formalOption, timeout: 5) {
             formalOption.tap()
         } else {
             // iOS 26.2 (CI): 选项元素不存在时，只验证 tonePicker 存在即可（已通过上方断言）
@@ -601,23 +617,27 @@ final class AetherUITests: XCTestCase {
         openSettings(in: app)
 
         // 验证语气保持「正式」（需要滚动到用户偏好 Section）
-        // iOS 26.2 (CI): 用 descendants(matching: .any) 跨元素类型搜索 tonePicker identifier（同首次进入）
-        let toneById2 = app.descendants(matching: .any).matching(identifier: "tonePicker").firstMatch
-        let toneByText2 = app.staticTexts["语气"].firstMatch
-        // Form 容器优先 tables（SwiftUI Form 在 XCUI 中通常为 table），collectionViews 兜底
-        var scrollAttempts2 = 0
-        while !toneById2.exists && !toneByText2.exists && scrollAttempts2 < 16 {
-            let scroller = app.tables.firstMatch.exists
+        // 同首次进入：buttons 快速路径 + 旧版渲染形态兜底
+        let toneById2 = app.buttons["tonePicker"]
+        if !toneById2.exists {
+            let formScroller = app.tables.firstMatch.exists
                 ? app.tables.firstMatch
                 : (app.collectionViews.firstMatch.exists ? app.collectionViews.firstMatch : app.scrollViews.firstMatch)
-            scroller.swipeUp()
-            scrollAttempts2 += 1
-            _ = toneById2.waitForExistence(timeout: 1)
+            var scrollAttempts2 = 0
+            while !toneById2.exists && scrollAttempts2 < 16 {
+                formScroller.swipeUp()
+                scrollAttempts2 += 1
+                _ = pollExists(toneById2, timeout: 1)
+            }
         }
         // 定位 Picker 行：identifier 优先（iOS 26.2），staticText 兜底（旧版），cell 兜底
+        let toneFallback2 = app.descendants(matching: .any).matching(identifier: "tonePicker").firstMatch
+        let toneByText2 = app.staticTexts["语气"].firstMatch
         let toneRow2: XCUIElement
         if toneById2.exists {
             toneRow2 = toneById2
+        } else if toneFallback2.exists {
+            toneRow2 = toneFallback2
         } else if toneByText2.exists {
             toneRow2 = toneByText2
         } else {
@@ -632,7 +652,7 @@ final class AetherUITests: XCTestCase {
             NSPredicate(format: "label == %@", "正式")
         ).firstMatch
         // 这一遍只验证选项可见、不点选，菜单不会像第一遍那样被选项 tap 关掉，必须显式关
-        _ = formalOpt.waitForExistence(timeout: 5)
+        _ = pollExists(formalOpt, timeout: 5)
         dismissPickerOverlay(in: app)
 
         // 验证 calculate 工具保持开启

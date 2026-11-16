@@ -455,6 +455,12 @@
 #   「Failed to get launch progress」，归不到超时豁免里，才单独留过一条精确条目）
 # - 原 `UI:MCPSettingsUITests/testDeleteMCPServer`（详见下方该条的叙事）
 #
+# 一轮干净不等于窗口稳健：main@7d3883a（run 43825367887）又撞线——
+# testUserPreferencePersistence 267.104s 超 240s（xcresult 里该用例最后仍 passed），
+# 同轮 testEditSystemPrompt 196.0s vs 平时 92-93s，是整台模拟器慢 ~2x 的轮次。
+# 此后窗口抬到 300/360（ci.yml 注释有数据），并把用例滚动循环里的失败等待换成 pollExists：
+# XCTest 每次 waitForExistence 超时都会抓 accessibility 全树快照做失败分诊，滚动循环每轮都付这笔钱。
+# 基线仍不收任何 UI 条目——超时是环境余量问题，不是用例已知失败。
 # 本批另修一条从没锚过的 UI 失败——main@7bfa84c 那轮唯一的红线 AetherUITests/testEditSystemPrompt，
 # 在 `editor.typeText` 处报「Neither element nor any descendant has keyboard focus」。CI 快照给出
 # 决定性几何：窗口 {{0,0},{402,874}}、Form 可视区底边 y=874，而 systemPromptTextEditor 落在
