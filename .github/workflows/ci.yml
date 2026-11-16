@@ -868,7 +868,7 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4
         with:
-          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+          packages: 'platform-tools platforms;android-37.0 build-tools;36.0.0'
 
       - name: Setup Gradle
         # Gradle User Home 的缓存（依赖 + wrapper 发行包）由本 action 统一管理；

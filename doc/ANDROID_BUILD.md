@@ -22,12 +22,12 @@ Aether Android 客户端使用 **Kotlin + Jetpack Compose + Room** 技术栈：
 
 | 项 | 要求 | 说明 |
 |----|------|------|
-| IDE | Android Studio Hedgehog+ | 推荐 IDE |
+| IDE | Android Studio（最新稳定版） | 推荐 IDE |
 | JDK | 17 (temurin) | `sourceCompatibility` / `targetCompatibility` 均为 17 |
-| Android SDK | API 29+ | `minSdk=29`，`targetSdk=35`，Build Tools 35.0.0 |
+| Android SDK | API 29+ | `minSdk=29`，`targetSdk=35`，`compileSdk=37`，Build Tools 36.0.0 |
 | Android NDK | r25+ | Rust 交叉编译 `.so` 所需 |
-| Kotlin | 1.9+ | Compose 编译器 1.5.14 |
-| Gradle | 8.10 | **已随仓库提交 `gradlew`，无需手动安装** |
+| Kotlin | 2.4 | AGP 9 内置 Kotlin 编译；Compose 编译器随 Kotlin 版本发布 |
+| Gradle | 9.9.1 | **已随仓库提交 `gradlew`，无需手动安装** |
 | Rust | 1.75+（可选） | 构建 `libaether_core_ffi.so` 所需；不构建 `.so` 时可省略 |
 | cargo-ndk | 最新 | `cargo install cargo-ndk` |
 | Rust target | aarch64-linux-android + x86_64-linux-android | `rustup target add aarch64-linux-android x86_64-linux-android` |
@@ -179,7 +179,7 @@ cd android
 - `android/gradlew`（Unix shell 脚本）
 - `android/gradlew.bat`（Windows 批处理脚本）
 - `android/gradle/wrapper/gradle-wrapper.jar`
-- `android/gradle/wrapper/gradle-wrapper.properties`（指定 Gradle 8.10）
+- `android/gradle/wrapper/gradle-wrapper.properties`（指定 Gradle 9.9.1）
 
 因此：
 
@@ -321,17 +321,13 @@ CI 工作流定义于 `.github/workflows/ci.yml` 的 `android-build` job，运�
 
 关键步骤：
 
-1. **缓存 Gradle**：`actions/cache@v5` 缓存 `~/.gradle/caches` 与 wrapper
-2. **缓存 NDK**：`actions/cache@v5` 缓存 `~/.android/sdk/ndk/*`
-3. **Setup JDK 17**：`actions/setup-java@v4` 安装 temurin JDK 17
-4. **Setup Android SDK**：`android-actions/setup-android@v3` 安装 `platforms;android-35` + `build-tools;35.0.0`
-5. **Setup Gradle**：`gradle/actions/setup-gradle@v3`
-6. **Download Rust .so artifacts**：下载 `aether-core-android-so` artifact（含 aarch64 + x86_64 两个 ABI 的 `.so`）
-7. **Place .so into jniLibs**：用 `find` 将 `.so` 分别放入 `jniLibs/arm64-v8a/` 与 `jniLibs/x86_64/`
-8. **Generate Gradle Wrapper**：`gradle wrapper --gradle-version 8.10`
-9. **Build Debug APK**：`./gradlew assembleDebug --no-daemon --stacktrace`
-10. **Run unit tests**：`./gradlew testDebugUnitTest --no-daemon --stacktrace`
-11. **Upload APK artifact**：上传 `app-debug.apk` 为 artifact `android-apk`
+1. **Setup JDK 17**：`actions/setup-java@v6` 安装 temurin JDK 17
+2. **Setup Android SDK**：`android-actions/setup-android@v4` 安装 `platforms;android-37.0` + `build-tools;36.0.0`
+3. **Setup Gradle**：`gradle/actions/setup-gradle@v6`，Gradle User Home 缓存（依赖 + wrapper 发行包）由该 action 统一管理，不再叠加 `actions/cache`
+4. **Download Rust .so artifacts**：下载 `aether-core-android-so` artifact（含 aarch64 + x86_64 两个 ABI 的 `.so`）
+5. **Place .so into jniLibs**：用 `find` 将 `.so` 分别放入 `jniLibs/arm64-v8a/` 与 `jniLibs/x86_64/`
+6. **Build + unit tests**：一次 Gradle 调用完成 `./gradlew assembleDebug testDebugUnitTest --no-daemon --stacktrace`
+7. **Upload APK artifact**：上传 `app-debug.apk` 为 artifact `android-apk`
 
 ---
 

@@ -1,13 +1,13 @@
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")  // Kotlin 2.x 起 Compose 编译器随 Kotlin 版本发布
     id("org.jetbrains.kotlin.plugin.serialization")  // 为 @Serializable 模型生成序列化器
     id("com.google.devtools.ksp")  // Room 用 KSP 代替 kapt
 }
 
 android {
     namespace = "com.aether.app"
-    compileSdk = 34
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.aether.app"
@@ -23,22 +23,25 @@ android {
         compose = true
         buildConfig = true
     }
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.14"
-    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions { jvmTarget = "17" }
 
     // jniLibs 目录：CI 构建的 Rust .so 产物放置于此，打包进 APK
-    sourceSets["main"].jniLibs.srcDirs("src/main/jniLibs")
+    sourceSets["main"].jniLibs.directories.add("src/main/jniLibs")
 
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
         }
+    }
+}
+
+// built-in Kotlin 下 android.kotlinOptions 已移除，改用顶层 kotlin.compilerOptions
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 
@@ -50,7 +53,7 @@ configurations.all {
 
 dependencies {
     // Compose BOM
-    val composeBom = platform("androidx.compose:compose-bom:2024.09.00")
+    val composeBom = platform("androidx.compose:compose-bom:2026.09.00")
     implementation(composeBom)
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.material3:material3")
@@ -72,13 +75,13 @@ dependencies {
     // Jetpack Security (加密存储敏感数据，如 BFF Token)
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
-    // Room (本地持久化)
-    implementation("androidx.room:room-runtime:2.6.1")
-    implementation("androidx.room:room-ktx:2.6.1")
-    ksp("androidx.room:room-compiler:2.6.1")
+    // Room (本地持久化)；2.7+ 才完整支持 KSP2
+    implementation("androidx.room:room-runtime:2.8.5")
+    implementation("androidx.room:room-ktx:2.8.5")
+    ksp("androidx.room:room-compiler:2.8.5")
 
     // Kotlinx Serialization
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.13.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
     // Markwon (Markdown 渲染：core + 表格 + 任务列表 + 删除线 + 链接 + 语法高亮)
@@ -93,7 +96,7 @@ dependencies {
     // ===== 单元测试依赖 =====
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
-    testImplementation("androidx.room:room-testing:2.6.1")
+    testImplementation("androidx.room:room-testing:2.8.5")
     testImplementation("org.robolectric:robolectric:4.14.1")
     testImplementation("io.ktor:ktor-client-mock:2.3.12")
     testImplementation("io.ktor:ktor-http:2.3.12")
