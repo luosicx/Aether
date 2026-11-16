@@ -535,5 +535,11 @@
 macOS:AgentOrchestratorTests/*~crash
 
 # ---- iOS（unit-tests job）----
+# 形态豁免的轮次会导出 `iOS-crash-diagnostics` artifact（崩溃日志 + 线程栈）。
+# VoiceServiceTests 的崩溃已实锤是模拟器音频侧：Default-InputOutput 设备消失后
+# `AQMEIO.cpp` 连续 2.5s 超时、18 个 AudioQueue 客户端停不下来，最后
+# `IOFormatsChanged: RPC timeout. Apparently deadlocked. Aborting now.` 把进程 abort，
+# 栈落在系统符号里（failureText 就是 `Crash: Aether at <external symbol>`）。
+# 本机同参数单跑该用例 10 轮、整类 80 tests 全过，复现不了；真栈要看诊断包。
 iOS:AgentOrchestratorTests/*~crash
 iOS:VoiceServiceTests/*~crash
