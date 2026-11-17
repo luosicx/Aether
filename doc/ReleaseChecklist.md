@@ -163,7 +163,7 @@
   ```bash
   cd windows && dotnet test Aether.sln
   ```
-- [ ] 预期输出：`Passed: 72` / `Failed: 0`（7 个测试文件，xUnit + WpfFact）
+- [ ] 预期输出：`Passed: 102` / `Failed: 0`（7 个测试文件，xUnit + WpfFact）
 - [ ] Rust `aether_core_ffi.dll` 构建验证：
   ```bash
   cd rust/aether-core-ffi && cargo build --release --target x86_64-pc-windows-msvc

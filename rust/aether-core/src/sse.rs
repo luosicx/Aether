@@ -52,6 +52,9 @@ struct BffEvent {
     kind: String,
     #[serde(default)]
     content: Option<String>,
+    /// 仅 `type: error` 事件携带（routes/chat.js 已脱敏）。
+    #[serde(default)]
+    message: Option<String>,
 }
 
 /// token 用量（OpenAI 兼容上游仅在 `stream_options.include_usage` 时下发）。
@@ -116,10 +119,26 @@ fn parse_line(line: &str) -> Option<ParsedLine> {
             content: event.content,
             usage: None,
         }),
-        // BFF done 与 [DONE] 语义一致；error 不产出内容（与旧行为一致，流自然结束）
+        // BFF done 与 [DONE] 语义一致；error 这里只表示"不产出内容"，
+        // 错误消息由 `error_message` 单独提取（客户端每行先检查，避免静默空回复）。
         "done" | "error" => Some(ParsedLine::Done),
         _ => None,
     }
+}
+
+/// 提取 BFF 流内错误事件的用户可见消息。
+///
+/// BFF `POST /chat/stream` 出错时 HTTP 状态码已是 200，错误只能以
+/// `data: {"type":"error","message":"..."}`（已脱敏）下发。此前的解析把它当作
+/// Done，客户端只看到一个没有内容的收尾事件，用户侧表现为"空回复"而没有任何错误提示。
+/// 非 data 行 / 非 error 事件 / 不可解析返回 None；消息缺失时返回空串，由客户端兜底文案。
+pub fn error_message(line: &str) -> Option<String> {
+    let data = strip_data_prefix(line)?;
+    let event: BffEvent = serde_json::from_str(&data).ok()?;
+    if event.kind != "error" {
+        return None;
+    }
+    Some(event.message.unwrap_or_default())
 }
 
 /// Workers `parseSSEEvent` 语义：返回 content 字符串。
@@ -244,6 +263,31 @@ mod tests {
     #[test]
     fn done_returns_some_none() {
         assert_eq!(parse_chunk("data: [DONE]"), Some(None));
+    }
+
+    #[test]
+    fn error_event_exposes_message() {
+        let line = r#"data: {"type":"error","message":"上游限流"}"#;
+        assert_eq!(error_message(line), Some("上游限流".to_string()));
+    }
+
+    #[test]
+    fn error_event_without_message_yields_empty_string() {
+        let line = r#"data: {"type":"error"}"#;
+        assert_eq!(error_message(line), Some(String::new()));
+    }
+
+    #[test]
+    fn error_message_ignores_non_error_lines() {
+        let delta = r#"data: {"type":"delta","content":"hi"}"#;
+        let done = r#"data: {"type":"done"}"#;
+        let openai = r#"data: {"choices":[{"delta":{"content":"hi"}}]}"#;
+        let done_marker = "data: [DONE]";
+        let non_data = "event: ping";
+        let malformed = "data: {not json";
+        for line in [delta, done, openai, done_marker, non_data, malformed] {
+            assert_eq!(error_message(line), None, "line: {line}");
+        }
     }
 
     #[test]

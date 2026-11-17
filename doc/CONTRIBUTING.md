@@ -533,7 +533,7 @@ cd android
 - 新增 ViewModel 必须补对应 `*Test.kt`（如 `ChatViewModelDeleteTest.kt` / `HealthViewModelTest.kt`）
 - 新增 Repository / Dao 必须补 `*Test.kt`，使用 Robolectric 内存数据库（`Room.inMemoryDatabaseBuilder`）
 - 新增 Rust JNI 包装类必须补 `*Test.kt`，**测试走纯 Kotlin 回退路径**（不依赖 .so）
-- 新增 strings.xml key 必须同步补充 8 种 `values-<locale>/strings.xml`，否则 `LanguageManagerTest` 会失败
+- 新增 strings.xml key 必须同步补充 8 种 `values-<locale>/strings.xml`（缺失 key 会回退到默认语言，需保持 8 个 locale 完整）
 - CI 中 `android-build` job（`ubuntu-latest` runner，约 2m40s）会自动跑 `./gradlew testDebugUnitTest`
 
 ### 4.6 跨平台 PR 测试要求

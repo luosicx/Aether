@@ -10,8 +10,9 @@ import AetherFoundation
 ///   客户端用 STS 签名后直传 OSS；或后端提供预签名 URL 接口，客户端直接 POST 到预签名 URL。
 /// - 当前实现通过 `authorizationHeader` 注入凭证；未提供凭证时立即拒绝上传。
 public actor LogUploader {
-    /// 上报 endpoint，默认从 `APIConfig.telemetryUploadEndpoint` 读取，可通过 init 注入用于测试
-    private let endpointURL: URL
+    /// 上报 endpoint，默认从 `APIConfig.telemetryUploadEndpoint` 读取，可通过 init 注入用于测试。
+    /// 默认配置 URL 字符串无效时为 nil，上传记为 failed（不再 fatalError）。
+    private let endpointURL: URL?
 
     /// 上传凭证，通常为 STS 临时签名后的 Authorization header 或预签名 URL 附带参数。
     /// `nil` 或空字符串表示无凭证，将拒绝上传。
@@ -38,10 +39,7 @@ public actor LogUploader {
     ///   - endpointURL: 上传端点，nil 则使用 `APIConfig.telemetryUploadEndpoint`
     ///   - authorizationHeader: 上传凭证，nil 或空字符串则拒绝上传
     public init(endpointURL: URL? = nil, authorizationHeader: String? = nil) {
-        guard let url = endpointURL ?? URL(string: APIConfig.telemetryUploadEndpoint) else {
-            fatalError("遥测上传端点 URL 无效，无法初始化 LogUploader")
-        }
-        self.endpointURL = url
+        self.endpointURL = endpointURL ?? URL(string: APIConfig.telemetryUploadEndpoint)
         self.authorizationHeader = authorizationHeader
     }
 
@@ -77,6 +75,11 @@ public actor LogUploader {
         // 安全校验：无凭证拒绝上传，避免将敏感日志发送到公开端点
         guard let authorizationHeader = authorizationHeader, !authorizationHeader.isEmpty else {
             throw LogUploaderError.missingCredentials
+        }
+
+        // 端点无效（默认配置字符串损坏）时拒绝上传，不进入重试
+        guard let endpointURL else {
+            throw LogUploaderError.invalidEndpoint
         }
 
         // 编码为 JSON 数组
@@ -116,11 +119,16 @@ public enum LogUploaderError: Error, LocalizedError {
     /// 缺少上传凭证。需要后端提供 STS 临时凭证或预签名 URL。
     case missingCredentials
 
+    /// 上传端点配置无效（`APIConfig.telemetryUploadEndpoint` 无法解析为 URL）。
+    case invalidEndpoint
+
     /// 用户可见的错误描述（中文本地化）。
     public var errorDescription: String? {
         switch self {
         case .missingCredentials:
             return NSLocalizedString("缺少日志上传凭证，请联系管理员获取 STS 临时凭证或预签名 URL", comment: "")
+        case .invalidEndpoint:
+            return NSLocalizedString("日志上传端点配置无效，已跳过本次上报", comment: "")
         }
     }
 }

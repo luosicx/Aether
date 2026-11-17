@@ -4,9 +4,17 @@ import AetherFoundation
 /// Day 13: LLM 供应商工厂。根据 ModelProvider 实例化对应的 LLMProvider client。
 /// 生产侧调用点：ChatViewModel.makeLLMProvider()
 public enum ModelProviderFactory {
+    /// App 层注入的端侧 provider 工厂。
+    ///
+    /// `OfflineLLMProvider` 依赖 MLX / MLXInferenceEngine，保留在 App target，无法从
+    /// AetherServices 直接引用；App 启动时（`AetherApp.sharedInit`）注入。
+    /// 未注入时 `make(.onDevice)` 返回兜底 provider（上报错误后结束流），绝不 crash：
+    /// 设置页可选中「端侧推理」，断网自动切换也会走到这里。
+    public nonisolated(unsafe) static var onDeviceProviderFactory: (@Sendable () -> LLMProvider)?
+
     /// 根据 provider 返回对应的 LLMProvider 实例
     /// - Parameter provider: 供应商枚举值
-    /// - Returns: 对应的 LLMProvider（DeepSeekClient / QwenClient）
+    /// - Returns: 对应的 LLMProvider（DeepSeekClient / QwenClient / 端侧 provider）
     public static func make(_ provider: ModelProvider) -> LLMProvider {
         switch provider {
         case .deepseek:
@@ -14,9 +22,12 @@ public enum ModelProviderFactory {
         case .qwen:
             return QwenClient()
         case .onDevice:
-            // Day 16: 端侧推理走 OfflineLLMProvider（内部转发 MLXInferenceEngine）
-            // TODO: OfflineLLMProvider 尚未迁移到 AetherServices，待后续 Task 处理
-            fatalError("OfflineLLMProvider not yet migrated to AetherServices")
+            if let factory = onDeviceProviderFactory {
+                return factory()
+            }
+            return UnavailableLLMProvider(
+                message: NSLocalizedString("端侧推理暂不可用，请重试或切换供应商", comment: "")
+            )
         }
     }
 
@@ -32,5 +43,37 @@ public enum ModelProviderFactory {
             return BFFProxyClient(provider: provider, config: bffConfig)
         }
         return make(provider)
+    }
+}
+
+/// 端侧 provider 未注入时的兜底：不发任何请求，直接上报错误并结束流。
+/// 用于替代此前的 fatalError —— 设置页与断网自动切换都能把用户带到端侧推理。
+private struct UnavailableLLMProvider: LLMProvider {
+    let message: String
+
+    func chat(messages: [APIMessage], config: ChatConfig, apiKey: String) -> AsyncStream<String> {
+        AsyncStream { continuation in
+            let task = Task {
+                await StreamTransport.report(.llmErrorOccurred(message))
+                continuation.finish()
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
+    func chat(
+        messages: [APIMessage], config: ChatConfig, tools: [ToolDef], apiKey: String
+    ) -> AsyncStream<ParsedChunk> {
+        AsyncStream { continuation in
+            let task = Task {
+                await StreamTransport.report(.llmErrorOccurred(message))
+                continuation.finish()
+            }
+            continuation.onTermination = { _ in task.cancel() }
+        }
+    }
+
+    func embed(texts: [String], apiKey: String) async throws -> [[Float]] {
+        throw LLMError.llmErrorOccurred(message)
     }
 }

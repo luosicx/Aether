@@ -830,7 +830,7 @@ v1.5.0 起 Windows 端（`windows/Aether.Windows/Services/AetherApiClient.cs`）
 |----|-----------|---------|-------------|
 | Apple（iOS / iPad / macOS） | `Services/LLM/BFFProxyClient.swift` | `URLSession`（`StreamTransport` 统一传输） | `SSEParser` / `AetherRust/SSE.swift` |
 | Windows | `windows/Aether.Windows/Services/AetherApiClient.cs` | `HttpClient` | `JsonDocument`（默认）/ `AetherNativeBridge.ParseSseChunk`（`UseRustSse` 开关） |
-| Android | `android/app/src/main/java/com/aether/data/api/{AetherApi,ChatStreamClient}.kt` | Ktor `HttpClient` | `SseBridge.parseWithTools`（Rust JNI，统一 OpenAI/BFF envelope；JNI 不可用返回 null） |
+| Android | `android/app/src/main/java/com/aether/data/api/{AetherApi,ChatStreamClient}.kt` | Ktor `HttpClient` | `SseBridge.parseChunk`（Rust JNI 无状态解析，统一 OpenAI/BFF envelope；JNI 不可用返回 null） |
 
 ### 10.2 共享 BFF HTTP 端点清单
 
@@ -962,13 +962,14 @@ class ChatStreamClient(private val client: HttpClient, private val config: BffCo
 
 ### 11.1 Windows 端 P/Invoke 契约（AetherNativeBridge.cs）
 
-Windows 端通过 P/Invoke 调用 `aether_core_ffi.dll` 导出的 C ABI 函数。`AetherNativeBridge` 静态类声明原始 P/Invoke 并封装三个友好方法，`DllNotFoundException` 安全处理，DLL 不可用时返回 null / 0 / 原值兜底。
+Windows 端通过 P/Invoke 调用 `aether_core_ffi.dll` 导出的 C ABI 函数。`AetherNativeBridge` 静态类声明原始 P/Invoke 并封装友好方法（ParseSseChunk / ParseSseError / CosineF32 / Redact），`DllNotFoundException` 安全处理，DLL 不可用时返回 null / 0 / 原值兜底。
 
 #### 11.1.1 C ABI 导出函数（`aether_core_ffi.dll`）
 
 | C 函数签名 | 返回值 | 用途 |
 |-----------|--------|------|
 | `aether_sse_parse_chunk(const char* line)` | `char*`（JSON 字符串 `"null"` 或 `"\"...\""`，需 `aether_free_string` 释放） | 解析单行 SSE，返回 content 的 JSON 串；非 data 行或失败返回空指针 |
+| `aether_sse_error_message(const char* line)` | `char*`（JSON 字符串 `"\"...\""`/`"\"\""`，需 `aether_free_string` 释放） | 提取 BFF 流内 `{"type":"error","message":"..."}` 的错误消息；非 error 行或失败返回空指针 |
 | `aether_cosine_f32(const float* a, uintptr_t a_len, const float* b, uintptr_t b_len)` | `float` | f32 余弦相似度；空指针或长度不等返回 0 |
 | `aether_redact(const char* input)` | `char*`（NUL 结尾 UTF-8 字符串，需 `aether_free_string` 释放） | 对输入字符串脱敏（UUID / 邮箱 / URL / Token / 凭证 / 路径） |
 | `aether_free_string(char* ptr)` | `void` | 释放上述函数返回的字符串；空指针安全 |
@@ -996,14 +997,13 @@ public static class AetherNativeBridge
 
 ### 11.2 Android 端 JNI 契约（libaether_core_ffi.so）
 
-Android 端通过 JNI 调用 `libaether_core_ffi.so`，Rust 侧 `rust/aether-core-ffi/src/jni.rs` 暴露 4 个 `Java_com_aether_rust_*` 导出函数，按 `JNI_OnLoad` 的 `System.loadLibrary("aether_core_ffi")` 约定命名。
+Android 端通过 JNI 调用 `libaether_core_ffi.so`，Rust 侧 `rust/aether-core-ffi/src/jni.rs` 暴露 3 个 `Java_com_aether_rust_*` 导出函数，按 `JNI_OnLoad` 的 `System.loadLibrary("aether_core_ffi")` 约定命名。
 
 #### 11.2.1 JNI 导出函数签名
 
 | JNI 函数签名 | 返回值 | 用途 |
 |-------------|--------|------|
-| `Java_com_aether_rust_SseBridge_parseWithTools(JNIEnv, jclass, jstring line)` | `jstring`（JSON `{"content":"...","toolCalls":[...]}`，解析失败返回空串 `""`） | 解析 SSE 行，使用 thread_local 累积器跨 chunk 累积 tool_calls |
-| `Java_com_aether_rust_SseBridge_reset(JNIEnv, jclass)` | `void` | 清空 thread_local 累积器（新会话开始时调用） |
+| `Java_com_aether_rust_SseBridge_parseChunk(JNIEnv, jclass, jstring line)` | `jstring`（JSON `{"content":"..."}` / `{"content":null}`，解析失败返回空串 `""`） | 无状态解析单行 SSE，返回 content 增量 |
 | `Java_com_aether_rust_VectorMath_cosineF64(JNIEnv, jclass, jdoubleArray a, jdoubleArray b)` | `jdouble` | f64 余弦相似度计算；空数组或长度不等返回 0.0 |
 | `Java_com_aether_rust_Redact_redact(JNIEnv, jclass, jstring input)` | `jstring`（脱敏后字符串，解析失败返回空串） | 敏感信息脱敏（UUID / 邮箱 / URL / Token / 凭证 / 路径） |
 
@@ -1012,8 +1012,7 @@ Android 端通过 JNI 调用 `libaether_core_ffi.so`，Rust 侧 `rust/aether-cor
 ```kotlin
 object SseBridge {
     init { System.loadLibrary("aether_core_ffi") }
-    external fun parseWithTools(line: String): String  // {"content":"...","toolCalls":[...]} 或 ""
-    external fun reset()
+    external fun parseChunk(line: String): String  // {"content":"..."} / {"content":null} 或 ""
 }
 
 object VectorMath {
@@ -1033,32 +1032,21 @@ object Redact {
 }
 ```
 
-#### 11.2.3 `parseWithTools` 返回格式
+#### 11.2.3 `parseChunk` 返回格式
 
 ```json
-{
-  "content": "你好",
-  "toolCalls": [
-    {
-      "id": "call_1",
-      "type": "function",
-      "name": "calculate",
-      "arguments": "{\"expression\":\"1+2\"}"
-    }
-  ],
-  "usage": { "prompt_tokens": 3, "completion_tokens": 5, "total_tokens": 8 }
-}
+{ "content": "你好" }
 ```
 
 - `content`：当前 chunk 的文本增量；无 content 时为 `null`。
-- `toolCalls`：累积后的全部工具调用列表（跨 chunk 拼接 `arguments`）；无工具调用时为 `null` 或空数组。
-- `usage`：上游 token 用量（仅 `stream_options.include_usage` 末块下发）；无用量时为 `null`。
-- 解析失败 / 非 data 行 / `[DONE]` / BFF `done|error` 返回空串 `""`，调用方据此跳过该行。
+- `[DONE]` / BFF `done` / BFF `error` 事件返回 `{"content":null}`，调用方跳过该行（BFF 错误消息由客户端在解析前单独识别）。
+- 解析失败 / 非 data 行返回空串 `""`，调用方据此跳过该行。
+- 无状态设计：早期版本用 thread_local 累积器跨 chunk 拼接 tool_calls，协程换线程后会串流且永不释放，已移除；Android 端只消费 content。
 
 #### 11.2.4 回退约定
 
 - `SseBridge`：`init` 块抛 `UnsatisfiedLinkError` 会导致 object 永久初始化失败（后续访问抛 `NoClassDefFoundError`），因此 `VectorMath` / `Redact` 改用 `nativeLoaded` 标记 + `*Safe` 包装方法。
-- `ChatStreamClient.parseLine` 捕获 `Throwable` 后返回 null（SSE 解析统一在 Rust，支持 OpenAI 与 BFF 两种 envelope，无 Kotlin 重复解析器）。
+- `ChatStreamClient.parseLine` 捕获 `Throwable` 后返回 null（SSE 解析统一走 Rust 无状态解析，支持 OpenAI 与 BFF 两种 envelope）。
 - `VectorMath.cosineF64Safe` / `Redact.redactSafe` 在 `nativeLoaded = false` 时直接返回 0.0 / 原值，不抛异常。
 
 ---

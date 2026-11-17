@@ -504,6 +504,42 @@ final class DeepSeekClientTests: XCTestCase {
         XCTAssertNil(chunks[0].toolCalls, "无 tool_calls 时 toolCalls 应为 nil")
     }
 
+    /// 回归：同一 client 连续两次带工具请求，第二轮的纯内容响应不得携带第一轮累积的 tool_calls。
+    /// Rust 侧 tool_calls 累积状态跟随解析器存活，每条流必须使用独立解析器；
+    /// 否则 ReAct 第二轮会把内容回复误判为工具调用并重复执行工具。
+    func testChatWithToolsSecondStreamHasNoStaleToolCalls() async {
+        let firstSSE = """
+        data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"get_weather","arguments":"{\\"city\\":\\"BJ\\"}"}}]}}]}
+
+        data: [DONE]
+
+        """
+        let secondSSE = """
+        data: {"choices":[{"delta":{"content":"done"}}]}
+
+        data: [DONE]
+
+        """
+        let messages = [APIMessage(role: "user", content: "hi", images: nil, toolCallId: nil, toolName: nil, toolCalls: nil)]
+        let tools = [ToolDef(type: "function", function: ToolDef.FunctionDef(name: "get_weather", description: "weather", parameters: ["type": AnyCodable("object")]))]
+
+        MockURLProtocol.responseData = firstSSE.data(using: .utf8)
+        var firstChunks: [ParsedChunk] = []
+        for await chunk in client.chat(messages: messages, config: .default, tools: tools, apiKey: apiKey) {
+            firstChunks.append(chunk)
+        }
+        XCTAssertEqual(firstChunks.last?.toolCalls?.first?.id, "call_1", "第一轮应解析出工具调用")
+
+        MockURLProtocol.responseData = secondSSE.data(using: .utf8)
+        var secondChunks: [ParsedChunk] = []
+        for await chunk in client.chat(messages: messages, config: .default, tools: tools, apiKey: apiKey) {
+            secondChunks.append(chunk)
+        }
+        XCTAssertEqual(secondChunks.count, 1)
+        XCTAssertEqual(secondChunks[0].content, "done")
+        XCTAssertNil(secondChunks[0].toolCalls, "第二轮内容响应不应携带上一轮累积的 tool_calls")
+    }
+
     /// sendRequestWithTools：SSE 仅含 [DONE]，不应 yield 任何 chunk
     func testChatWithToolsStreamDoneOnly() async {
         MockURLProtocol.responseData = Data("data: [DONE]\n\n".utf8)

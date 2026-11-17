@@ -12,6 +12,12 @@ public final class SSEParser: @unchecked Sendable {
 
     public init() {}
 
+    /// 提取 BFF 流内错误事件（`{"type":"error","message":"..."}`）的用户可见消息。
+    /// 消息缺失时返回空串；非 error 行/解析失败返回 nil。无状态，可并发调用。
+    public func errorMessage(from line: String) -> String? {
+        rust.errorMessage(line)
+    }
+
     /// 解析单行 SSE 为 ChatChunk。跳过非 `data: ` 前缀行、`[DONE]` 与无 content 行。
     public func parseChunk(from line: String) -> ChatChunk? {
         guard let content = rust.parseChunk(line) else { return nil }

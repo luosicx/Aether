@@ -19,6 +19,11 @@ public static class AetherNativeBridge
     private static extern IntPtr aether_sse_parse_chunk(
         [MarshalAs(UnmanagedType.LPUTF8Str)] string line);
 
+    /// <summary>提取 BFF 流内错误事件消息。非 error 事件或失败返回空指针。</summary>
+    [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
+    private static extern IntPtr aether_sse_error_message(
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string line);
+
     /// <summary>f32 余弦相似度。空指针或长度不等返回 0。</summary>
     [DllImport(DllName, CallingConvention = CallingConvention.Cdecl)]
     private static extern float aether_cosine_f32(
@@ -63,6 +68,40 @@ public static class AetherNativeBridge
             if (string.IsNullOrEmpty(json)) return null;
             // 反序列化 JSON 字符串得到实际 content（"null" → null，"\"hello\"" → hello）
             return JsonSerializer.Deserialize<string?>(json);
+        }
+        finally
+        {
+            aether_free_string(ptr);
+        }
+    }
+
+    /// <summary>
+    /// 提取 BFF 流内错误事件（`{"type":"error","message":"..."}`）的消息。
+    /// 非 error 事件 / DLL 不可用返回 null；消息缺失返回空串。
+    /// </summary>
+    public static string? ParseSseError(string line)
+    {
+        if (string.IsNullOrEmpty(line)) return null;
+
+        IntPtr ptr;
+        try
+        {
+            ptr = aether_sse_error_message(line);
+        }
+        catch (DllNotFoundException)
+        {
+            return null;
+        }
+        catch (EntryPointNotFoundException)
+        {
+            return null;
+        }
+
+        if (ptr == IntPtr.Zero) return null;
+        try
+        {
+            var json = Marshal.PtrToStringUTF8(ptr);
+            return string.IsNullOrEmpty(json) ? null : JsonSerializer.Deserialize<string?>(json);
         }
         finally
         {

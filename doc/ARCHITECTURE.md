@@ -243,7 +243,7 @@ flowchart TB
 
 ### 2.3 Android 端分层架构（v1.5.0）
 
-Android 端基于 Kotlin + Jetpack Compose 实现，采用 MVVM（ViewModel + Compose）+ Repository（先 Room 后网络）+ Rust JNI 三层架构。所有 LLM 调用经 BFF HTTP 契约（`AetherApi` / `ChatStreamClient`），SSE 解析 / 向量数学 / 脱敏算法经 JNI 调用 `libaether_core_ffi.so`（4 个 `Java_com_aether_rust_*` 导出函数），JNI 不可用时回退到纯 Kotlin 实现。
+Android 端基于 Kotlin + Jetpack Compose 实现，采用 MVVM（ViewModel + Compose）+ Repository（先 Room 后网络）+ Rust JNI 三层架构。所有 LLM 调用经 BFF HTTP 契约（`AetherApi` / `ChatStreamClient`），SSE 解析 / 向量数学 / 脱敏算法经 JNI 调用 `libaether_core_ffi.so`（3 个 `Java_com_aether_rust_*` 导出函数），JNI 不可用时回退到纯 Kotlin 实现。
 
 ```mermaid
 flowchart TB
@@ -272,7 +272,7 @@ flowchart TB
         Models["Models.kt"]
     end
     subgraph DroidRust["Rust JNI 层"]
-        SseBridge["SseBridge (parseWithTools / reset)"]
+        SseBridge["SseBridge (parseChunk)"]
         VectorMath["VectorMath (cosineF64)"]
         Redact["Redact (redact)"]
     end
@@ -286,7 +286,7 @@ flowchart TB
 | 领域层 (ViewModels) | `ViewModel` + `StateFlow` 状态管理 + 业务编排 | `ui/chat/ChatViewModel.kt` / `conversation/ConversationListViewModel.kt` / `rag/KnowledgeBaseViewModel.kt` / `health/HealthViewModel.kt` |
 | Repository 层 | 先 Room 后网络（离线优先），`RepositorySyncManager` 协调同步 | `data/repository/ConversationRepository.kt` / `MessageRepository.kt` / `RepositorySyncManager.kt` |
 | 数据层 | Ktor BFF HTTP + Room + DataStore + 模型 | `data/api/AetherApi.kt` / `ChatStreamClient.kt` / `HttpClientFactory.kt` / `BffConfig.kt` / `BffConfigStore.kt` / `data/db/AetherDatabase.kt` / `data/model/Models.kt` |
-| Rust JNI 层 | JNI 桥接 `libaether_core_ffi.so`，4 个导出函数提供 SSE 解析 / 余弦相似度 / 脱敏；JNI 不可用时回退到纯 Kotlin | `rust/SseBridge.kt` / `VectorMath.kt` / `Redact.kt` |
+| Rust JNI 层 | JNI 桥接 `libaether_core_ffi.so`，3 个导出函数提供 SSE 解析 / 余弦相似度 / 脱敏；JNI 不可用时回退到纯 Kotlin | `rust/SseBridge.kt` / `VectorMath.kt` / `Redact.kt` |
 
 
 
@@ -944,8 +944,7 @@ end note
 - **`xcframework`**（Apple 三端）：`aether_core.xcframework` 包含 ios-arm64 / ios-arm64-simulator / macos-arm64 三个 slice，每个含 `Headers/`（`aether_core_ffi.h` + `module.modulemap`）与 `libaether_core_ffi.a`，由 Swift 侧 `AetherRust` 通过 `AetherRustBin` binaryTarget 引用。
 - **`aether_core_ffi.dll`**（Windows x64，v1.5.0 新增）：`cargo build --release --target x86_64-pc-windows-msvc` 产物，C ABI 动态库（cdylib）。C# 侧 `AetherNativeBridge.cs` 通过 P/Invoke 调用四个导出函数：`aether_sse_parse_chunk` / `aether_cosine_f32` / `aether_redact` / `aether_free_string`。`DllNotFoundException` 安全处理，DLL 不可用时返回 null / 0 / 原值，调用方自动回退到托管实现。
 - **`libaether_core_ffi.so`**（Android arm64-v8a + x86_64，v1.5.0 新增）：`cargo build --release --target aarch64-linux-android` / `--target x86_64-linux-android` 产物，JNI 动态库（cdylib + `jni = "0.21"`）。Rust 侧 `rust/aether-core-ffi/src/jni.rs` 暴露 4 个 JNI 导出函数：
-  - `Java_com_aether_rust_SseBridge_parseWithTools(JEnv, JClass, JString) -> jstring`：解析 SSE 行，使用 thread_local 累积器，返回 JSON `{"content":"...","toolCalls":[...]}`。
-  - `Java_com_aether_rust_SseBridge_reset(JEnv, JClass)`：清空 thread_local 累积器。
+  - `Java_com_aether_rust_SseBridge_parseChunk(JEnv, JClass, JString) -> jstring`：无状态解析 SSE 行，返回 JSON `{"content":"..."}` / `{"content":null}`（解析失败返回空串）。
   - `Java_com_aether_rust_VectorMath_cosineF64(JEnv, JClass, jdoubleArray, jdoubleArray) -> jdouble`：f64 余弦相似度计算。
   - `Java_com_aether_rust_Redact_redact(JEnv, JClass, JString) -> jstring`：敏感信息脱敏（UUID / 邮箱 / URL / Token / 凭证 / 路径）。
   
@@ -1127,7 +1126,7 @@ Windows 端位于 `windows/Aether.Windows/` 目录，基于 WPF .NET 8（MVVM + 
 | `windows/Aether.Windows/Services/BffConfigStore.cs` | BFF 配置持久化：`%LOCALAPPDATA%/Aether/bff_config.json` 存 JSON，UserToken 通过 DPAPI（`CurrentUser` 范围）加密为 Base64 存储；提供 `BaseUrl` / `UserToken` / `DefaultModel` / `AccentColor` / `Language` 属性。 |
 | `windows/Aether.Windows/Services/LanguageService.cs` | i18n 单例：读取 `BffConfigStore.Language` 切换 `Strings.Designer.cs` 资源文化，支持 8 种语言（zh-Hans / zh-Hant / en / ja / ko / fr / de / es）。 |
 | `windows/Aether.Windows/Services/MarkdownRenderer.cs` | Markdown 渲染：基于 Markdig 解析 Markdown 文本生成 WPF `FlowDocument`，供 ChatMessage.MarkdownDocument 持有。 |
-| `windows/Aether.Windows/Native/AetherNativeBridge.cs` | Rust FFI P/Invoke 桥接：声明 `aether_sse_parse_chunk` / `aether_cosine_f32` / `aether_redact` / `aether_free_string` 四个 C ABI 函数，封装为 `ParseSseChunk` / `CosineF32` / `Redact` 三个友好方法；`DllNotFoundException` 安全处理，DLL 不可用时返回 null / 0 / 原值兜底。 |
+| `windows/Aether.Windows/Native/AetherNativeBridge.cs` | Rust FFI P/Invoke 桥接：声明 `aether_sse_parse_chunk` / `aether_sse_error_message` / `aether_cosine_f32` / `aether_redact` / `aether_free_string` 五个 C ABI 函数，封装为 `ParseSseChunk` / `ParseSseError` / `CosineF32` / `Redact` 友好方法；`DllNotFoundException` 安全处理，DLL 不可用时返回 null / 0 / 原值兜底。 |
 | `windows/Aether.Windows/ViewModels/ChatViewModel.cs` | 聊天 ViewModel：管理消息列表 / 流式状态 / 输入框，调用 `AetherApiClient.StreamChatAsync` 接收 SSE 流并更新 UI；`INotifyPropertyChanged` 通知。 |
 | `windows/Aether.Windows/ViewModels/ConversationListViewModel.cs` | 会话列表 ViewModel：管理会话 CRUD、置顶排序、删除选中（编辑模式），调用 `AetherApiClient.GetConversationsAsync` / `CreateConversationAsync` / `DeleteConversationAsync`。 |
 | `windows/Aether.Windows/ViewModels/SettingsViewModel.cs` | 设置 ViewModel：管理 BFF 配置（BaseUrl / UserToken / DefaultModel）读写、语言切换、主题色，调用 `BffConfigStore.SaveAsync` 持久化。 |
@@ -1148,7 +1147,7 @@ Android 端位于 `android/app/src/main/java/com/aether/` 目录，包名 `com.a
 | `android/app/src/main/java/com/aether/ui/navigation/AetherApp.kt` | Compose 导航图：定义 Chat / ConversationList / Settings / KnowledgeBase / Health 五个目的地的 `NavHost` 路由。 |
 | `android/app/src/main/java/com/aether/data/model/Models.kt` | 数据模型：`Conversation` / `ChatMessage` / `ToolCall` / `ChatRequest` / `Memory` / `MemorySearchRequest` / `DocumentChunk` / `RagSearchRequest` / `HealthSummary`，使用 `@Serializable` 与 BFF DTO 一一对应。 |
 | `android/app/src/main/java/com/aether/data/api/AetherApi.kt` | BFF HTTP 客户端：基于 Ktor `HttpClient`，提供 `listConversations` / `createConversation` / `getConversation` / `updateConversation` / `deleteConversation` / `listMessages` / `deleteMessage` / `submitFeedback` / `listMemory` / `createMemory` / `searchMemory` / `deleteMemory` / `searchDocuments` / `uploadHealthSummary` / `getHealthSummary` 等方法；`withAuth()` 统一注入 `X-BFF-Token` header。 |
-| `android/app/src/main/java/com/aether/data/api/ChatStreamClient.kt` | SSE 流式聊天：Ktor `HttpStatement` + `response.bodyAsChannel()` 读取 SSE 行，`parseLine` 统一调用 `SseBridge.parseWithTools`（Rust JNI，同时支持 OpenAI `choices` 与 BFF `{"type":"delta","content":"..."}` 两种 envelope），JNI 不可用时返回 null 不崩溃，返回 `Flow<String>`。 |
+| `android/app/src/main/java/com/aether/data/api/ChatStreamClient.kt` | SSE 流式聊天：Ktor `HttpStatement` + `response.bodyAsChannel()` 读取 SSE 行，`parseLine` 统一调用 `SseBridge.parseChunk`（Rust JNI 无状态解析，同时支持 OpenAI `choices` 与 BFF `{"type":"delta","content":"..."}` 两种 envelope），JNI 不可用时返回 null 不崩溃，返回 `Flow<String>`。 |
 | `android/app/src/main/java/com/aether/data/api/HttpClientFactory.kt` | Ktor `HttpClient` 工厂：配置 `ContentNegotiation`（kotlinx.serialization）/ `HttpTimeout` / `UserAgent` / `Logging` 等插件。 |
 | `android/app/src/main/java/com/aether/data/api/BffConfig.kt` | BFF 配置数据类：`baseUrl`（默认 `BuildConfig.BFF_BASE_URL`）+ `userToken`（默认空串，运行时从 `BffConfigStore` 读取）。 |
 | `android/app/src/main/java/com/aether/data/api/BffConfigStore.kt` | BFF 配置持久化：非敏感数据（baseUrl / defaultModel / accentColor / language）用 `DataStore Preferences`，敏感数据（userToken）用 `EncryptedSharedPreferences`（AES256-GCM）；暴露 `Flow<BffConfig>` / `setBaseUrl` / `setUserToken` / `setLanguage` 等。 |
@@ -1156,7 +1155,7 @@ Android 端位于 `android/app/src/main/java/com/aether/` 目录，包名 `com.a
 | `android/app/src/main/java/com/aether/data/repository/ConversationRepository.kt` | 会话 Repository：先 Room 后网络，离线优先；从 `AetherApi.listConversations` 拉取后写入 Room，下次离线读取 Room 缓存。 |
 | `android/app/src/main/java/com/aether/data/repository/MessageRepository.kt` | 消息 Repository：管理消息 CRUD 与流式追加，先 Room 后网络。 |
 | `android/app/src/main/java/com/aether/data/repository/RepositorySyncManager.kt` | Repository 同步管理器：协调 Room 与网络同步，处理冲突合并与重试。 |
-| `android/app/src/main/java/com/aether/rust/SseBridge.kt` | Rust SSE JNI 桥接：`object SseBridge` 声明 `external fun parseWithTools(line: String): String` 与 `external fun reset()`，`System.loadLibrary("aether_core_ffi")` 加载 .so；返回 `{"content":"...","toolCalls":[...]}` JSON 串。 |
+| `android/app/src/main/java/com/aether/rust/SseBridge.kt` | Rust SSE JNI 桥接：`object SseBridge` 声明 `external fun parseChunk(line: String): String`，`System.loadLibrary("aether_core_ffi")` 加载 .so；返回 `{"content":"..."}` / `{"content":null}` JSON 串。 |
 | `android/app/src/main/java/com/aether/rust/VectorMath.kt` | Rust 向量数学 JNI 桥接：`external fun cosineF64(a: DoubleArray, b: DoubleArray): Double`；`nativeLoaded` 标记加载结果，`cosineF64Safe` 在 JNI 不可用时返回 0.0。 |
 | `android/app/src/main/java/com/aether/rust/Redact.kt` | Rust 脱敏 JNI 桥接：`external fun redact(input: String): String`；`redactSafe` 在 JNI 不可用时返回原文。 |
 | `android/app/src/main/java/com/aether/ui/chat/ChatScreen.kt` | 聊天 Compose 屏幕：`LazyColumn` 消息列表 + 输入栏 + 发送按钮，状态由 `ChatViewModel` 暴露的 `StateFlow` 驱动。 |
@@ -1536,7 +1535,7 @@ sequenceDiagram
 
 ### 4.12 Android 端数据流（v1.5.0）
 
-Android 端数据流核心是 Room 缓存 + SSE 流式：用户在 `ChatScreen` 输入文本 → `ChatViewModel` 调用 `MessageRepository` → `ChatStreamClient.streamChat` 返回 `Flow<String>` → ViewModel 收集 Flow 并写入 Room（`MessageRepository`）→ `StateFlow` 驱动 Compose UI 实时刷新。SSE 解析优先走 Rust JNI（`SseBridge.parseWithTools`），JNI 不可用回退到纯 Kotlin。
+Android 端数据流核心是 Room 缓存 + SSE 流式：用户在 `ChatScreen` 输入文本 → `ChatViewModel` 调用 `MessageRepository` → `ChatStreamClient.streamChat` 返回 `Flow<String>` → ViewModel 收集 Flow 并写入 Room（`MessageRepository`）→ `StateFlow` 驱动 Compose UI 实时刷新。SSE 解析走 Rust JNI（`SseBridge.parseChunk`），JNI 不可用时 `parseLine` 返回 null 跳过该行。
 
 ```mermaid
 sequenceDiagram
@@ -1578,7 +1577,7 @@ sequenceDiagram
 
 **关键说明**：
 - **离线优先**：`ConversationRepository` / `MessageRepository` 采用「先 Room 后网络」策略，离线时读取 Room 缓存，联网时拉取 BFF 并写入 Room 同步。
-- **Rust JNI 解析**：`ChatStreamClient.parseLine` 统一调用 `SseBridge.parseWithTools`（同时支持 OpenAI choices 与 BFF delta/done/error 两种 envelope），JNI 不可用或解析失败时返回 null 跳过该行，不崩溃；`Redact.redactSafe` / `VectorMath.cosineF64Safe` 同样在 JNI 不可用时返回原值 / 0.0。
+- **Rust JNI 解析**：`ChatStreamClient.parseLine` 统一调用 `SseBridge.parseChunk`（无状态，同时支持 OpenAI choices 与 BFF delta/done/error 两种 envelope），JNI 不可用或解析失败时返回 null 跳过该行，不崩溃；`Redact.redactSafe` / `VectorMath.cosineF64Safe` 同样在 JNI 不可用时返回原值 / 0.0。
 - **状态驱动 UI**：ViewModel 暴露 `StateFlow<ChatUiState>`，Compose 通过 `collectAsStateWithLifecycle()` 订阅，避免不必要的重组。
 
 ---
@@ -1702,7 +1701,7 @@ sequenceDiagram
 
 - **方案**：采用 Kotlin + Jetpack Compose（MVVM + Repository）而非 React Native / Flutter / 传统 View 体系。
 - **理由**：Jetpack Compose 是 Google 官方现代 UI 工具包，与 Kotlin 协程 / StateFlow 深度契合；Material 3 主题与动态颜色开箱即用；Room + DataStore + EncryptedSharedPreferences 提供完整离线优先与加密存储方案。
-- **Rust 集成**：通过 JNI 调用 `libaether_core_ffi.so`（`aether-core-ffi/src/jni.rs` 暴露 4 个 `Java_com_aether_rust_*` 函数），`SseBridge` / `VectorMath` / `Redact` 三个 Kotlin object 桥接；`nativeLoaded` 标记加载结果，JNI 不可用时 `*Safe` 方法返回原值 / 0.0。
+- **Rust 集成**：通过 JNI 调用 `libaether_core_ffi.so`（`aether-core-ffi/src/jni.rs` 暴露 3 个 `Java_com_aether_rust_*` 函数），`SseBridge` / `VectorMath` / `Redact` 三个 Kotlin object 桥接；`nativeLoaded` 标记加载结果，JNI 不可用时 `*Safe` 方法返回原值 / 0.0。
 - **离线优先**：Room v1（`ConversationEntity` + `MessageEntity`）作为离线缓存层，`ConversationRepository` 采用「先 Room 后网络」策略；`RepositorySyncManager` 协调同步与冲突合并。
 - **配置持久化**：非敏感数据（baseUrl / defaultModel / accentColor / language）用 `DataStore Preferences`，敏感数据（userToken）用 `EncryptedSharedPreferences`（`AES256-GCM` + `AES256-SIV`）。
 - **影响范围**：`android/app/src/main/java/com/aether/` 全部 26 个源文件。
@@ -1759,7 +1758,7 @@ sequenceDiagram
 | PerformanceMonitor | `Services/Performance/PerformanceMonitor.swift` | iOS 17.0+ / macOS 14.0+ |
 | PrivacyInfo.xcprivacy | `Resources/PrivacyInfo.xcprivacy` | iOS 17.0+ / macOS 14.0+ / Xcode 16+（App Store 审核要求） |
 | AttributedString（Markdown） | `Views/Chat/Markdown*.swift` / `CodeSyntaxHighlighter.swift` | iOS 17.0+ / macOS 14.0+ / Foundation |
-| XCTest | `AetherTests/` 203 文件（3559 用例） | Xcode 16+ / Swift 5.9+ |
+| XCTest | `AetherTests/` 203 文件（3564 用例） | Xcode 16+ / Swift 5.9+ |
 | XCUITest | `AetherUITests/` 7 文件（30 用例） | Xcode 16+ / Swift 5.9+ |
 | GitHub Actions | `.github/workflows/ci.yml` | macos-14 runner / Xcode 16+ |
 | CoreLocation | CLLocationManager + CLGeocoder | LocationTool 定位与反地理编码 | iOS 17.0+ / macOS 14.0+ / CoreLocation.framework |
@@ -1779,7 +1778,7 @@ sequenceDiagram
 | HttpClient | `windows/Aether.Windows/Services/AetherApiClient.cs` | BFF HTTP 客户端 + SSE 流式（`IAsyncEnumerable<string>`） | .NET 8 内置 |
 | Markdig | `windows/Aether.Windows/Services/MarkdownRenderer.cs` | Markdown 解析 → WPF `FlowDocument` | Markdig 0.37.0 |
 | DPAPI（ProtectedData） | `windows/Aether.Windows/Services/BffConfigStore.cs` | UserToken 加密（`CurrentUser` 范围，Base64 存储） | `System.Security.Cryptography.ProtectedData` NuGet |
-| P/Invoke | `windows/Aether.Windows/Native/AetherNativeBridge.cs` | 调用 `aether_core_ffi.dll` C ABI（`aether_sse_parse_chunk` / `aether_cosine_f32` / `aether_redact` / `aether_free_string`） | .NET 8 内置 |
+| P/Invoke | `windows/Aether.Windows/Native/AetherNativeBridge.cs` | 调用 `aether_core_ffi.dll` C ABI（`aether_sse_parse_chunk` / `aether_sse_error_message` / `aether_cosine_f32` / `aether_redact` / `aether_free_string`） | .NET 8 内置 |
 | .resx 多语言资源 | `windows/Aether.Windows/Properties/Strings.Designer.cs` + 8 `.resx` | 8 种语言（zh-Hans / zh-Hant / en / ja / ko / fr / de / es），`LanguageService` 动态切换 | .NET 8 内置 |
 | xUnit | `windows/Aether.Windows.Tests/` | 7 个测试文件 / 102 用例 | xUnit 2.6+ |
 | **Android 端技术栈** | | | |
@@ -1789,10 +1788,10 @@ sequenceDiagram
 | Room | `android/app/src/main/java/com/aether/data/db/AetherDatabase.kt` | 离线缓存层（`ConversationEntity` + `MessageEntity`） | Room 2.6+ |
 | DataStore Preferences | `android/app/src/main/java/com/aether/data/api/BffConfigStore.kt` | 非敏感配置（baseUrl / model / accent / language） | DataStore 1.1+ |
 | EncryptedSharedPreferences | `android/app/src/main/java/com/aether/data/api/BffConfigStore.kt` | UserToken 加密（AES256-GCM + AES256-SIV） | `androidx.security:security-crypto` 1.1+ |
-| JNI | `android/app/src/main/java/com/aether/rust/{SseBridge,VectorMath,Redact}.kt` | 调用 `libaether_core_ffi.so`（4 个 `Java_com_aether_rust_*` 导出函数） | JDK 17+ / `jni = "0.21"`（Rust 侧） |
+| JNI | `android/app/src/main/java/com/aether/rust/{SseBridge,VectorMath,Redact}.kt` | 调用 `libaether_core_ffi.so`（3 个 `Java_com_aether_rust_*` 导出函数） | JDK 17+ / `jni = "0.21"`（Rust 侧） |
 | Markwon / RichText | `android/app/src/main/java/com/aether/ui/chat/MarkdownText.kt` | Markdown 渲染 | Markwon 4.x+ |
 | res/values-* 多语言资源 | `android/app/src/main/res/values-{zh-rCN,zh-rTW,en,ja,ko,fr,de,es}/strings.xml` | 8 种语言资源 | AGP 内置 |
-| JUnit + Robolectric | `android/app/src/test/java/com/aether/` | 12 个测试文件 / 105 用例 | JUnit 4.13+ / Robolectric 4.11+ |
+| JUnit + Robolectric | `android/app/src/test/java/com/aether/` | 12 个测试文件 / 88 用例 | JUnit 4.13+ / Robolectric 4.11+ |
 | **Rust 核心多形态分发** | | | |
 | aether_core_ffi.dll | `rust/aether-core-ffi/` 编译产物 | Windows x64 动态库（cdylib） | Rust 1.75+ / MSVC toolchain |
 | libaether_core_ffi.so | `rust/aether-core-ffi/` 编译产物 | Android arm64-v8a + x86_64 动态库（cdylib + jni 0.21） | Rust 1.75+ / NDK r25+ |
@@ -1804,7 +1803,7 @@ sequenceDiagram
 ### 7.1 单元测试（UT）
 
 - **Target**：`AetherTests`
-- **规模**：203 个测试文件，3559 用例（3559 pass / 0 skip / 0 failures）
+- **规模**：203 个测试文件，3564 用例（3564 pass / 0 skip / 0 failures）
 - **分层覆盖**：
 
 | 层级 | 测试文件 | 文件数 | 核心断言数（约） | skip 原因 |
@@ -1927,7 +1926,7 @@ sequenceDiagram
 ### 7.4 Windows 端测试架构（v1.5.0）
 
 - **Target**：`Aether.Windows.Tests`（xUnit）
-- **规模**：7 个测试文件，72 个用例
+- **规模**：7 个测试文件，102 个用例
 - **位置**：`windows/Aether.Windows.Tests/`
 - **测试框架**：xUnit 2.6+，部分用例使用 `Theory` + `InlineData` 参数化
 
@@ -1944,7 +1943,7 @@ sequenceDiagram
 ### 7.5 Android 端测试架构（v1.5.0）
 
 - **Target**：`android/app/src/test/`（JUnit + Robolectric）
-- **规模**：12 个测试文件，95 个用例
+- **规模**：12 个测试文件，88 个用例
 - **测试框架**：JUnit 4.13+ + Robolectric 4.11+（提供 Android 框架 shadow 实现，无需真机 / 模拟器）
 
 | 文件 | 覆盖范围 | 备注 |
@@ -1953,14 +1952,14 @@ sequenceDiagram
 | `data/model/ModelsTest.kt` | 数据模型：`@Serializable` JSON 编解码 / 字段映射 | 纯 JVM 测试 |
 | `data/repository/ConversationRepositoryTest.kt` | 会话 Repository：先 Room 后网络策略 / 离线缓存 | mock AetherApi + Room |
 | `data/repository/ConversationRepositoryRoomTest.kt` | Room 持久化：ConversationEntity CRUD / 排序 | Robolectric + 内存 Room |
-| `rust/SseBridgeTest.kt` | Rust SSE JNI：parseWithTools / reset（JNI 不可用时回退） | 纯 JVM 测试，验证回退路径 |
+| `rust/SseBridgeTest.kt` | Rust SSE JNI：parseChunk / BFF 流内错误识别（JNI 不可用时回退） | 纯 JVM 测试，验证回退路径 |
 | `rust/VectorMathTest.kt` | Rust 向量 JNI：cosineF64（JNI 不可用时返回 0.0） | 纯 JVM 测试 |
 | `rust/RedactTest.kt` | Rust 脱敏 JNI：redact（JNI 不可用时返回原值） | 纯 JVM 测试 |
 | `ui/chat/ChatViewModelDeleteTest.kt` | 聊天 ViewModel：消息删除 / 流式状态 | mock ChatStreamClient |
 | `ui/chat/MarkdownTextTest.kt` | Markdown 渲染：代码块 / 表格 / 任务列表 | Robolectric |
 | `ui/health/HealthViewModelTest.kt` | 健康 ViewModel：上传 / 查询健康摘要 | mock AetherApi |
 | `ui/rag/KnowledgeBaseViewModelTest.kt` | 知识库 ViewModel：RAG 检索 / 文档列表 | mock AetherApi |
-| `ui/settings/LanguageManagerTest.kt` | 语言管理：8 种语言代码切换 / 资源匹配 | Robolectric |
+| `data/api/AetherApiContractTest.kt` | BFF 契约回归：用服务端真实 envelope / snake_case 响应驱动 AetherApi | MockEngine，防止客户端模型与 Worker 输出漂移 |
 
 **关键说明**：
 - **Robolectric 配置**：`android/app/src/test/resources/robolectric.properties` 配置 SDK 版本与应用包名，使 Shadow 实现匹配生产环境。
@@ -2156,7 +2155,7 @@ CloudflareWorkers/               # BFF 代理网关
 ├── worker.js
 └── wrangler.toml
 
-AetherTests/                  # 203 个 UT 文件 / 3559 用例
+AetherTests/                  # 203 个 UT 文件 / 3564 用例
 ├── APIConfigTests.swift
 ├── AlarmToolTests.swift
 ├── BFFProxyClientTests.swift

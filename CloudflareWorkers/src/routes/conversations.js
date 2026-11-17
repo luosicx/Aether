@@ -6,7 +6,7 @@
  */
 
 import { jsonError } from "../lib/llm.js";
-import { genId, jsonOk } from "../lib/utils.js";
+import { clampInt, jsonOk } from "../lib/utils.js";
 
 /**
  * GET /conversations - 列出当前用户的会话
@@ -18,8 +18,8 @@ export async function handleListConversations(request, env, ctx) {
   if (!db) return jsonError(503, "数据库未配置");
 
   const url = new URL(request.url);
-  const limit = Math.min(parseInt(url.searchParams.get("limit") || "50", 10), 200);
-  const offset = parseInt(url.searchParams.get("offset") || "0", 10);
+  const limit = clampInt(url.searchParams.get("limit"), { min: 1, max: 200, fallback: 50 });
+  const offset = clampInt(url.searchParams.get("offset"), { min: 0, max: 1_000_000, fallback: 0 });
   const pinnedOnly = url.searchParams.get("pinned") === "1";
 
   try {

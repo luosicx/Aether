@@ -171,6 +171,35 @@ final class BFFProxyClientTests: XCTestCase {
         XCTAssertEqual(collected, "Hello", "应累积 SSE content 为 'Hello'")
     }
 
+    // MARK: - 4b. 流内 error 事件（HTTP 200）→ 上报 llmErrorOccurred，不能静默空回复
+
+    func testChatStreamErrorEventPostsLLMError() async {
+        let sse = "data: {\"type\":\"delta\",\"content\":\"部分\"}\n\n"
+            + "data: {\"type\":\"error\",\"message\":\"上游限流\"}\n\n"
+        MockURLProtocol.responseData = sse.data(using: .utf8)
+        MockURLProtocol.statusCode = 200
+
+        let expectation = XCTNSNotificationExpectation(name: .llmErrorOccurred, object: nil)
+        nonisolated(unsafe) var capturedError: LLMError?
+        expectation.handler = { note in
+            if let err = note.userInfo?["error"] as? LLMError {
+                capturedError = err
+                return true
+            }
+            return false
+        }
+
+        let collected = await consume(stream: client.chat(messages: makeMessages(), config: .default, apiKey: ""))
+        XCTAssertEqual(collected, "部分", "错误事件前已收到的内容应保留")
+
+        await fulfillment(of: [expectation], timeout: 2.0)
+        guard case .llmErrorOccurred(let msg) = capturedError else {
+            XCTFail("期望 .llmErrorOccurred，实际：\(String(describing: capturedError))")
+            return
+        }
+        XCTAssertEqual(msg, "上游限流", "应透出 BFF 已脱敏的错误消息")
+    }
+
     // MARK: - 5. 401 → LLMError.llmErrorOccurred("BFF Token 无效")
 
     func testChat401ThrowsLLMError() async {

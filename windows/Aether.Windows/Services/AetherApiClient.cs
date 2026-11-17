@@ -134,6 +134,13 @@ public class AetherApiClient
             if (UseRustSse)
             {
                 if (line.Contains("[DONE]")) yield break;
+                // BFF 出错时 HTTP 已是 200，错误只以流内事件下发；不识别会静默空回复
+                var rustError = AetherNativeBridge.ParseSseError(line);
+                if (rustError != null)
+                {
+                    throw new InvalidOperationException(
+                        string.IsNullOrEmpty(rustError) ? "服务暂时不可用，请稍后再试" : rustError);
+                }
                 var rustContent = AetherNativeBridge.ParseSseChunk(line);
                 if (!string.IsNullOrEmpty(rustContent)) yield return rustContent;
                 continue;
@@ -158,6 +165,14 @@ public class AetherApiClient
                         textToYield = contentEl.GetString();
                     }
                     else if (type == "done") yield break;
+                    else if (type == "error")
+                    {
+                        var message = doc.RootElement.TryGetProperty("message", out var msgEl)
+                            ? msgEl.GetString()
+                            : null;
+                        throw new InvalidOperationException(
+                            string.IsNullOrEmpty(message) ? "服务暂时不可用，请稍后再试" : message);
+                    }
                 }
             }
             catch (JsonException) { /* 忽略解析错误 */ }

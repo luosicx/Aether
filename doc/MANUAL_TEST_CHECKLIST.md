@@ -3830,7 +3830,7 @@
 | Android 端设置 UI（39.5） | Android 真机或模拟器 | 验证 BFF URL / Token 加密存储 / 模型选择 / 主题色 |
 | Android 端 Rust JNI（39.7） | Android 真机或模拟器 | 需 jniLibs/{arm64-v8a,x86_64}/libaether_core_ffi.so（CI 构建） |
 | Android 端 Room 数据库（39.8） | Android 真机或模拟器 | v1.5 起已生产使用，Repository 先 Room 后网络（详见 39.20） |
-| Android 端单测（39.11） | 任意系统（JVM） | `./gradlew testDebugUnitTest`，12 文件 105 用例，JNI 在纯 JVM 不可用测试覆盖回退路径 |
+| Android 端单测（39.11） | 任意系统（JVM） | `./gradlew testDebugUnitTest`，12 文件 88 用例，JNI 在纯 JVM 不可用测试覆盖回退路径 |
 | Windows 端 v1.5 新功能（38.8-38.12） | Windows 10+ 真机或虚拟机 | 会话列表 / 设置页 / Markdown / i18n / 消息气泡；i18n 切换无需重启，DPAPI 加密需 Windows 用户态 |
 | Android 端 v1.5 新功能（39.14-39.20） | Android 真机或模拟器 | RAG / Health / Rust Redact / 消息长按 / Markdown / i18n / Room 生产；JNI 需真机或模拟器 |
 | v3.0 智能平台（40） | iOS / macOS 真机或模拟器 | 服务层骨架，无 UI 入口；通过单元测试（86 用例）+ 调试控制台验证 |

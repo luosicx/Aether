@@ -8,9 +8,9 @@ use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 
 use aether_core::{
-    chunk_document, cosine_similarity_f32, cosine_similarity_f64, estimate_tokens, extract_content,
-    parse_chunk, parse_with_tool_accumulation, ratelimit::TokenBucket, redact, sha256_hex,
-    top_k_f32, AccumulatedToolCall, ParsedChunk, Sha256,
+    chunk_document, cosine_similarity_f32, cosine_similarity_f64, error_message, estimate_tokens,
+    extract_content, parse_chunk, parse_with_tool_accumulation, ratelimit::TokenBucket, redact,
+    sha256_hex, top_k_f32, AccumulatedToolCall, ParsedChunk, Sha256,
 };
 
 /// C 侧持有的解析器状态（跨调用累积 tool_calls）。
@@ -97,6 +97,27 @@ pub unsafe extern "C" fn aether_sse_parse_with_tools(
     let state = &mut *state;
     match parse_with_tool_accumulation(line, &mut state.inner) {
         Some(p) => to_parsed_chunk_json(&p),
+        None => std::ptr::null_mut(),
+    }
+}
+
+/// 提取 BFF 流内错误事件的用户可见消息（`data: {"type":"error","message":"..."}`）。
+/// 返回消息的 JSON 串（`""` 表示消息缺失）；非 error 事件 / 解析失败返回空指针。
+/// # Safety
+/// `line` 必须是合法 NUL 结尾 UTF-8。
+#[no_mangle]
+pub unsafe extern "C" fn aether_sse_error_message(line: *const c_char) -> *mut c_char {
+    if line.is_null() {
+        return std::ptr::null_mut();
+    }
+    let line = match CStr::from_ptr(line).to_str() {
+        Ok(s) => s,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    match error_message(line) {
+        Some(s) => serde_json::to_string(&s)
+            .map(|j| to_cstring(&j))
+            .unwrap_or(std::ptr::null_mut()),
         None => std::ptr::null_mut(),
     }
 }
