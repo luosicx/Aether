@@ -70,9 +70,15 @@ final class AetherUITests: XCTestCase {
     /// 拖拽要在终点停住再抬手（thenHoldForDuration），抬手速度归零才不会带惯性过冲：
     /// swipeUp 和直接抬手的拖拽都会甩过目标节，而 Form 懒渲染，甩过去就再也找不回来；
     /// 过冲后只能反向拖，而在 Form 顶部反向拖等于 sheet 的下滑关闭手势
-    /// （CI 实测连拖 6 次后整个设置 Form 从树上消失）。步长精确等于半屏，不需要反向兜底。
+    /// （CI 实测连拖 6 次后整个设置 Form 从树上消失）。
     /// 注意 withVelocity 是拖拽本身的速度而非抬手速度，调小它只会把拖拽拉长到挂死。
-    private func scrollToElement(_ element: XCUIElement, in app: XCUIApplication, maxAttempts: Int = 8) {
+    ///
+    /// CI 上有两种会让单次拖拽白走的情况，所以固定起点 + 8 次预算不够稳：
+    /// 1. runner 重负载时手势合成变慢，系统只识别到后半程，实际滚动远小于半屏；
+    /// 2. 起点压上 Slider / TextEditor 这类吃手势的行，整次拖拽根本不滚。
+    /// 因此每次重试轮换起点（错开行高，也错开可能吃手势的控件），预算放大到 16 次；
+    /// 全部落空后再用 swipeUp 兜底（距离更大，有过冲风险，但此时已无更稳的手段）。
+    private func scrollToElement(_ element: XCUIElement, in app: XCUIApplication, maxAttempts: Int = 16) {
         // 三个候选都要查 .exists：视图切换瞬间可能一个滚动容器都没有，
         // 直接对不存在的 firstMatch 取坐标会抛「Failed to get matching snapshot」。
         func scroller() -> XCUIElement? {
@@ -83,6 +89,8 @@ final class AetherUITests: XCTestCase {
         }
         var attempts = 0
         var nudges = 0
+        // 轮换拖拽起点：不同 dy 错开行，不同 dx 避开右侧开关与左侧输入框
+        let starts: [(CGFloat, CGFloat)] = [(0.5, 0.75), (0.3, 0.60), (0.7, 0.82), (0.42, 0.68)]
         while attempts < maxAttempts {
             guard let container = scroller() else {
                 attempts += 1
@@ -107,11 +115,19 @@ final class AetherUITests: XCTestCase {
                 }
                 return
             }
-            let from = container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75))
-            let to = container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25))
+            let (dx, dy) = starts[attempts % starts.count]
+            let from = container.coordinate(withNormalizedOffset: CGVector(dx: dx, dy: dy))
+            let to = container.coordinate(withNormalizedOffset: CGVector(dx: dx, dy: max(dy - 0.55, 0.08)))
             from.press(forDuration: 0.05, thenDragTo: to, withVelocity: .default, thenHoldForDuration: 0.3)
             attempts += 1
             _ = pollExists(element, timeout: 1)
+        }
+        // 兜底：press-drag 全部落空（多半是手势一直被吃）时改用系统 swipeUp
+        if !element.exists, let container = scroller() {
+            for _ in 0..<3 where !element.exists {
+                container.swipeUp(velocity: .slow)
+                _ = pollExists(element, timeout: 1)
+            }
         }
     }
 
