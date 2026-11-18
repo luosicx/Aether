@@ -191,6 +191,31 @@ final class MCPServerTests: XCTestCase {
         XCTAssertTrue(text?.contains("3") == true, "1+2 的结果应包含 3")
     }
 
+    /// tools/call 命中敏感工具必须经统一安全门确认：用户拒绝时返回 isError=true，不执行工具
+    func testToolsCallSensitiveToolRequiresConfirmation() async throws {
+        let originalPresenter = ToolAuthorization.shared.presenter
+        let wasEnabled = ToolRegistry.shared.isEnabled(name: "read_clipboard")
+        ToolAuthorization.shared.presenter = StubAuthorizationPresenter(choice: .denied)
+        ToolAuthorization.shared.revokeAuthorization(toolName: "read_clipboard")
+        ToolRegistry.shared.setEnabled(name: "read_clipboard", value: true)
+        defer {
+            ToolAuthorization.shared.presenter = originalPresenter
+            ToolAuthorization.shared.revokeAuthorization(toolName: "read_clipboard")
+            ToolRegistry.shared.setEnabled(name: "read_clipboard", value: wasEnabled)
+        }
+        // 白名单只放行 read_clipboard，避免外部客户端借默认白名单直接触达敏感工具
+        await server.registerTools(["read_clipboard"])
+        try await server.start()
+
+        let params: [String: Any] = ["name": "read_clipboard", "arguments": [:]]
+        let response = await sendRequestAndWait(method: "tools/call", params: params, id: 9)
+
+        let result = response?["result"] as? [String: Any]
+        XCTAssertEqual(result?["isError"] as? Bool, true, "未获授权时 tools/call 应返回 isError=true")
+        let text = (result?["content"] as? [[String: Any]])?.first?["text"] as? String ?? ""
+        XCTAssertTrue(text.contains("拒绝"), "错误内容应说明授权被拒绝，实际：\(text)")
+    }
+
     /// tools/call 调用非白名单工具应返回 isError=true
     func testToolsCallNonWhitelistedToolReturnsError() async throws {
         // 仅注册 calculate 到白名单

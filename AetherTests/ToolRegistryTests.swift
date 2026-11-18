@@ -18,9 +18,12 @@ final class ToolRegistryTests: XCTestCase {
         "run_shortcut"
     ]
     private var originalEnabledStates: [String: Bool] = [:]
+    private var originalPresenter: AuthorizationAlertPresenting?
 
     override func setUp() {
         super.setUp()
+        // 隔离授权弹窗：CI 里没人点模态弹窗，真实 presenter 会让安全门测试挂到超时
+        originalPresenter = ToolAuthorization.shared.presenter
         // 保存所有已注册工具的原始启用状态，便于 tearDown 恢复
         originalEnabledStates = Dictionary(
             uniqueKeysWithValues: registry.allToolDefs.map { ($0.function.name, registry.isEnabled(name: $0.function.name)) }
@@ -36,6 +39,9 @@ final class ToolRegistryTests: XCTestCase {
         // 恢复原始启用状态
         for (name, value) in originalEnabledStates {
             registry.setEnabled(name: name, value: value)
+        }
+        if let originalPresenter {
+            ToolAuthorization.shared.presenter = originalPresenter
         }
         super.tearDown()
     }
@@ -114,6 +120,91 @@ final class ToolRegistryTests: XCTestCase {
             XCTAssertEqual(nserror.domain, "ToolRegistry", "错误 domain 应为 ToolRegistry")
             XCTAssertEqual(nserror.code, 3, "未启用工具错误 code 应为 3")
         }
+    }
+
+    // MARK: - 统一安全门（ToolRegistry.execute）
+
+    /// 敏感工具授权被拒时，execute 抛授权错误且不执行工具本体。
+    func testExecuteDeniedSensitiveToolDoesNotRun() async {
+        ToolAuthorization.shared.presenter = StubAuthorizationPresenter(choice: .denied)
+        ToolAuthorization.shared.revokeAuthorization(toolName: "read_clipboard")
+        let original = registry.getTool(named: "read_clipboard")
+        defer {
+            if let original { registry.register(tool: original) }
+            ToolAuthorization.shared.revokeAuthorization(toolName: "read_clipboard")
+        }
+        registry.register(tool: DummyTool(name: "read_clipboard", result: "EXECUTED"))
+        registry.setEnabled(name: "read_clipboard", value: true)
+
+        do {
+            _ = try await registry.execute(name: "read_clipboard", arguments: [:])
+            XCTFail("拒绝授权时不应执行工具")
+        } catch {
+            let nserror = error as NSError
+            XCTAssertEqual(nserror.domain, "ToolAuthorization", "拒绝授权应抛 ToolAuthorization 错误")
+            XCTAssertEqual(nserror.code, 2)
+        }
+    }
+
+    /// 敏感工具授权通过后，execute 正常执行工具本体。
+    func testExecuteGrantedSensitiveToolRuns() async throws {
+        ToolAuthorization.shared.presenter = StubAuthorizationPresenter(choice: .once)
+        ToolAuthorization.shared.revokeAuthorization(toolName: "read_clipboard")
+        let original = registry.getTool(named: "read_clipboard")
+        defer {
+            if let original { registry.register(tool: original) }
+            ToolAuthorization.shared.revokeAuthorization(toolName: "read_clipboard")
+        }
+        registry.register(tool: DummyTool(name: "read_clipboard", result: "EXECUTED"))
+        registry.setEnabled(name: "read_clipboard", value: true)
+
+        let result = try await registry.execute(name: "read_clipboard", arguments: [:])
+        XCTAssertEqual(result, "EXECUTED", "授权通过后应执行工具本体")
+    }
+
+    /// 插件工具需要授权；注册后默认启用，且不会被当作受信任本地工具静默执行。
+    func testPluginToolRequiresAuthorizationAndIsEnabled() {
+        let name = "plugin_echo"
+        UserDefaults.standard.removeObject(forKey: "aether.tool.enabled.\(name)")
+        defer {
+            registry.unregister(name: name)
+            UserDefaults.standard.removeObject(forKey: "aether.tool.enabled.\(name)")
+        }
+        registry.register(tool: makePluginTool(name: name))
+
+        XCTAssertTrue(registry.isPluginTool(name: name), "PluginToolAdapter 注册的应识别为插件工具")
+        XCTAssertTrue(registry.requiresAuthorization(name: name), "插件工具一律需要授权")
+        XCTAssertTrue(registry.isEnabled(name: name), "插件工具注册后应默认启用")
+    }
+
+    /// 插件工具不得覆盖同名内置工具：注册被拒绝，原有工具与授权策略保持不变。
+    func testPluginToolCannotShadowBuiltin() {
+        let pluginTool = makePluginTool(name: "calculate")
+        registry.register(tool: pluginTool)
+
+        XCTAssertFalse(registry.isPluginTool(name: "calculate"), "内置 calculate 不应被插件工具覆盖")
+        XCTAssertTrue(registry.getTool(named: "calculate") is CalculatorTool, "内置工具实例应保持不变")
+        XCTAssertFalse(registry.requiresAuthorization(name: "calculate"), "内置 calculate 仍不需要授权")
+    }
+
+    /// 构造测试用插件工具适配器
+    private func makePluginTool(name: String) -> PluginToolAdapter {
+        let manifest = PluginManifest(
+            id: "security-test-plugin",
+            name: "安全测试插件",
+            version: "1.0.0",
+            author: "测试",
+            description: "统一安全门测试",
+            tools: [],
+            permissions: [],
+            entryPoint: "main.js"
+        )
+        let toolDef = PluginManifest.PluginToolDef(
+            name: name,
+            description: "插件测试工具",
+            parameters: ["type": "object", "properties": [:]]
+        )
+        return PluginToolAdapter(manifest: manifest, toolDef: toolDef)
     }
 
     /// register 同名工具应覆盖：getTool 返回新工具

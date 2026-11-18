@@ -8,7 +8,8 @@ import os
 ///
 /// 从 ChatViewModel 抽取的 ReAct 工具调用执行职责，承担：
 /// - 编码 toolCalls 持久化 assistant 消息（含 toolCallData）
-/// - 逐个执行工具（启用检查 / 授权确认 / 超时保护 / 审计日志 / 成功通知 / 失败埋点）
+/// - 逐个执行工具（超时保护 / 成功通知 / 失败埋点）；启用检查、授权确认与审计
+///   已收敛到 `ToolRegistry.execute` 的统一安全门
 /// - 追加 tool 结果消息（成功 / 失败均构造 ChatMessage(role: "tool", ...)）
 /// - 在原始 apiMessages 上追加本轮 assistant/tool 消息（保留 system / RAG / 记忆上下文）
 ///
@@ -96,7 +97,7 @@ final class ToolExecutionCoordinator: Coordinator {
     // MARK: - 主入口（ReAct 工具调用阶段）
 
     /// SubTask 6.6 → Task 10: ReAct 工具调用阶段——编码 toolCalls 持久化助手消息（含 toolCallData）、
-    /// 逐个执行工具（启用检查 / 授权确认 / 超时保护 / 审计日志 / 成功通知 / 失败埋点）、
+    /// 逐个执行工具（超时保护 / 成功通知 / 失败埋点）、
     /// 追加 tool 结果消息，并在原始 apiMessages 上追加本轮 assistant/tool 消息。
     ///
     /// - Parameters:
@@ -161,32 +162,9 @@ final class ToolExecutionCoordinator: Coordinator {
             let toolStartTime = Date()
             let argsData = tc.arguments.data(using: .utf8) ?? Data()
             let parsedArgs = (try? JSONSerialization.jsonObject(with: argsData) as? [String: Any]) ?? [:]
-            let argsSummary = parsedArgs.keys.sorted().joined(separator: ", ")
-            var toolAuthorized = false
             do {
-                // Task 4: 调用前检查启用状态与运行时授权
-                guard ToolRegistry.shared.isEnabled(name: tc.name) else {
-                    throw NSError(domain: "ToolRegistry", code: 3, userInfo: [NSLocalizedDescriptionKey: "工具 \(tc.name) 未启用"])
-                }
-                if ToolRegistry.shared.requiresAuthorization(name: tc.name) {
-                    let authResult: ToolAuthorizationResult
-                    // 远程 MCP 工具与高危本地工具一样只提供会话级确认：
-                    // 远端可在重连后替换工具实现，不能持久「始终允许」。
-                    if ToolRegistry.shared.isRemoteTool(name: tc.name)
-                        || ToolRegistry.shared.defaultDisabledTools.contains(tc.name) {
-                        let details = "工具：\(tc.name)\n参数：\(tc.arguments)"
-                        authResult = await ToolAuthorization.shared.presentConfirmation(toolName: tc.name, details: details)
-                    } else {
-                        let purpose = ToolRegistry.shared.getTool(named: tc.name)?.definition.description ?? ""
-                        authResult = await ToolAuthorization.shared.presentSensitiveAccessConfirmation(toolName: tc.name, purpose: purpose)
-                    }
-                    guard case .authorized = authResult else {
-                        throw NSError(domain: "ToolAuthorization", code: 2, userInfo: [NSLocalizedDescriptionKey: "用户拒绝了 \(tc.name) 工具调用"])
-                    }
-                    toolAuthorized = true
-                } else {
-                    toolAuthorized = true
-                }
+                // 启用检查 / 授权确认 / 审计统一在 ToolRegistry.execute 的安全门内完成，
+                // 这里只负责超时保护与 UI 状态迁移。
                 // Day 8: 单工具超时保护，超时抛错不中断循环
                 // 说明：withThrowingTaskGroup + 超时 Task 抛错，第一个完成的 Task 胜出；
                 //       超时后标记 failed 继续下一轮，保证 ReAct 不因单工具卡死而中断。
@@ -207,8 +185,6 @@ final class ToolExecutionCoordinator: Coordinator {
                 let toolDurationMs = Int(Date().timeIntervalSince(toolStartTime) * 1000)
                 let toolName = tc.name
                 Task.detached { await TelemetryService.shared.track(.toolCall(toolName: toolName, success: true, durationMs: toolDurationMs)) }
-                // Task 7: 记录工具调用审计日志（仅记录参数键，不记录完整内容）
-                ToolAuditLogger.shared.log(toolName: tc.name, argumentsSummary: argsSummary, authorized: toolAuthorized, timestamp: toolStartTime)
                 // 补充 D：工具执行成功后发本地通知
                 NotificationService.shared.sendNotification(
                     title: NSLocalizedString("工具调用成功", comment: ""),
@@ -221,8 +197,6 @@ final class ToolExecutionCoordinator: Coordinator {
                 nextMessages.append(toolMsg.toAPIMessage())
                 do { try modelContext.save() } catch { Logger.chat.error("工具结果消息保存失败: \(error.localizedDescription, privacy: .public)") }
             } catch {
-                // Task 7: 工具调用失败/未授权也记录审计日志
-                ToolAuditLogger.shared.log(toolName: tc.name, argumentsSummary: argsSummary, authorized: toolAuthorized, timestamp: toolStartTime)
                 // Day 14: 工具执行失败埋点 + 错误埋点
                 let toolDurationMs = Int(Date().timeIntervalSince(toolStartTime) * 1000)
                 let toolName = tc.name
