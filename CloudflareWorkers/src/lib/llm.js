@@ -28,6 +28,9 @@ export function resolveUpstream(provider, env) {
 // X-Forwarded-* 等）一律剥离；Authorization 由 BFF 注入上游凭证，绝不透传客户端值
 const UPSTREAM_ALLOWED_HEADERS = new Set(["content-type", "accept"]);
 
+// SSE 事件分隔：空行（LF 或 CRLF）。非 global，exec 恒从 0 开始，无 lastIndex 状态
+const SSE_EVENT_SEPARATOR = /\r?\n\r?\n/;
+
 // 永久拒绝清单：即使通过 extraAllowed（env.UPSTREAM_EXTRA_HEADERS）配置也忽略，
 // 防止运维误配置把凭证/代理类敏感头重新放开
 const UPSTREAM_DENIED_HEADERS = new Set([
@@ -209,15 +212,18 @@ export async function* callLLMStream(env, model, messages, opts = {}) {
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
 
-      // 按 SSE 事件分隔（双换行）
-      let idx;
-      while ((idx = buffer.indexOf("\n\n")) !== -1) {
-        const rawEvent = buffer.slice(0, idx);
-        buffer = buffer.slice(idx + 2);
+      // SSE 事件以空行分隔。上游可能用 CRLF（\r\n\r\n），且分隔符可能被 chunk 边界拆开：
+      // 只匹配 \n\n 会让 CRLF 流的增量一直滞留在 buffer，直到流结束才一次性吐出。
+      let match;
+      while ((match = SSE_EVENT_SEPARATOR.exec(buffer)) !== null) {
+        const rawEvent = buffer.slice(0, match.index);
+        buffer = buffer.slice(match.index + match[0].length);
         const delta = await parseSSEEvent(rawEvent);
         if (delta) yield delta;
       }
     }
+    // flush 解码器，避免最后一段多字节字符被留在 TextDecoder 内部
+    buffer += decoder.decode();
     // 处理尾部残余
     if (buffer.trim()) {
       const delta = await parseSSEEvent(buffer);

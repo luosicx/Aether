@@ -128,3 +128,70 @@ describe("callLLMStream 取消传播", () => {
     expect(cancelSpy).not.toHaveBeenCalled();
   });
 });
+
+describe("callLLMStream SSE 分帧", () => {
+  it("CRLF 流（\\r\\n\\r\\n）能正确分帧，不会丢事件", async () => {
+    fetchMock = vi.fn(async () =>
+      upstreamResponse([
+        'data: {"choices":[{"delta":{"content":"A"}}]}\r\n\r\n',
+        'data: {"choices":[{"delta":{"content":"B"}}]}\r\n\r\ndata: [DONE]\r\n\r\n',
+      ])
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const deltas = [];
+    for await (const delta of callLLMStream(env, "deepseek-chat", messages)) {
+      deltas.push(delta);
+    }
+    expect(deltas).toEqual(["A", "B"]);
+  });
+
+  it("分隔符被 chunk 边界拆开（...\\r\\n\\r | \\n）仍能正确分帧", async () => {
+    fetchMock = vi.fn(async () =>
+      upstreamResponse([
+        'data: {"choices":[{"delta":{"content":"A"}}]}\r\n\r',
+        '\ndata: {"choices":[{"delta":{"content":"B"}}]}\r\n\r\n',
+      ])
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const deltas = [];
+    for await (const delta of callLLMStream(env, "deepseek-chat", messages)) {
+      deltas.push(delta);
+    }
+    expect(deltas).toEqual(["A", "B"]);
+  });
+
+  it("CRLF 事件在上游流结束前就产出（增量不被滞留到流尾）", async () => {
+    let releaseSecond;
+    const secondGate = new Promise((resolve) => {
+      releaseSecond = resolve;
+    });
+    let pulls = 0;
+    const stream = new ReadableStream({
+      async pull(controller) {
+        if (pulls++ === 0) {
+          controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"content":"你"}}]}\r\n\r\n'));
+          return;
+        }
+        await secondGate;
+        controller.enqueue(
+          encoder.encode('data: {"choices":[{"delta":{"content":"好"}}]}\r\n\r\ndata: [DONE]\r\n\r\n')
+        );
+        controller.close();
+      },
+    });
+    fetchMock = vi.fn(async () => new Response(stream, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const gen = callLLMStream(env, "deepseek-chat", messages);
+    const first = await gen.next();
+    expect(first.done).toBe(false);
+    expect(first.value).toBe("你");
+
+    releaseSecond();
+    const second = await gen.next();
+    expect(second.value).toBe("好");
+    expect((await gen.next()).done).toBe(true);
+  });
+});

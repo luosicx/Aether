@@ -19,9 +19,10 @@ public class AetherApiClient
 
     /// <summary>
     /// 是否使用 Rust native 实现（aether-core-ffi DLL）解析 SSE。
-    /// 默认 false（托管 JsonDocument 路径），DLL 不可用时自动回退到托管路径。
+    /// 默认跟随 DLL 可用性：随包/CI 产物携带 DLL 时走与 iOS/Android/BFF 一致的 Rust 解析器，
+    /// DLL 缺失（无原生构建的本地开发）时自动回退到托管 JsonDocument 路径。
     /// </summary>
-    public bool UseRustSse { get; set; } = false;
+    public bool UseRustSse { get; set; } = AetherNativeBridge.IsSseAvailable;
 
     public AetherApiClient(string baseUrl, string token)
     {
@@ -130,10 +131,10 @@ public class AetherApiClient
             if (line == null) break;
 
             // Rust 路径：aether_sse_parse_chunk 内部处理 data: 前缀剥离与 [DONE]/ChatChunk 解析。
-            // DLL 不可用时 ParseSseChunk 返回 null（不抛异常）；UseRustSse 默认 false，需确保 DLL 存在再启用。
+            // DLL 不可用时 ParseSseChunk 返回 null（不抛异常）；UseRustSse 默认跟随 DLL 可用性。
             if (UseRustSse)
             {
-                if (line.Contains("[DONE]")) yield break;
+                if (line.Contains("[DONE]") || IsBffDone(line)) yield break;
                 // BFF 出错时 HTTP 已是 200，错误只以流内事件下发；不识别会静默空回复
                 var rustError = AetherNativeBridge.ParseSseError(line);
                 if (rustError != null)
@@ -177,6 +178,29 @@ public class AetherApiClient
             }
             catch (JsonException) { /* 忽略解析错误 */ }
             if (!string.IsNullOrEmpty(textToYield)) yield return textToYield;
+        }
+    }
+
+    /// <summary>
+    /// 判定 BFF 终止事件 `{"type":"done"}`。
+    /// Rust 解析器把 done 与「无 content 的 delta」都映射为 null，无法区分，这里单独补判。
+    /// </summary>
+    private static bool IsBffDone(string line)
+    {
+        if (!line.Contains("done", StringComparison.Ordinal)) return false;
+        var data = line.StartsWith("data:", StringComparison.Ordinal)
+            ? line.Substring(5).Trim()
+            : line.Trim();
+        try
+        {
+            using var doc = JsonDocument.Parse(data);
+            return doc.RootElement.ValueKind == JsonValueKind.Object
+                && doc.RootElement.TryGetProperty("type", out var typeEl)
+                && typeEl.GetString() == "done";
+        }
+        catch (JsonException)
+        {
+            return false;
         }
     }
 

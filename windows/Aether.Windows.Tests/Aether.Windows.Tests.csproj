@@ -23,4 +23,13 @@
     <ProjectReference Include="..\Aether.Windows\Aether.Windows.csproj" />
   </ItemGroup>
 
+  <!-- 把 CI 已 stage 的 Rust DLL 复制到测试输出目录，让 Rust SSE 路径的用例真正执行；
+       本地无 native 产物时条件不成立，测试按可用性自动跳过。 -->
+  <ItemGroup>
+    <None Include="..\Aether.Windows\Native\aether_core_ffi.dll" Condition="Exists('..\Aether.Windows\Native\aether_core_ffi.dll')">
+      <Link>aether_core_ffi.dll</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

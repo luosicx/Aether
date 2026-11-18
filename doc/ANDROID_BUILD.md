@@ -89,7 +89,7 @@ android/app/src/main/java/com/aether/
         └── Theme.kt
 ```
 
-单元测试位于 `android/app/src/test/java/com/aether/`，共 12 个测试文件、88 个测试用例（JUnit + Robolectric）。
+单元测试位于 `android/app/src/test/java/com/aether/`，共 13 个测试文件、89 个测试用例（JUnit + Robolectric）。
 
 ---
 
@@ -267,7 +267,7 @@ Android 端通过 JNI 调用 Rust core，桥接代码位于 `com.aether.rust` �
   - `.so` 产物由 CI `rust` job 通过 `cargo-ndk` 构建（`aarch64-linux-android` + `x86_64-linux-android`），上传为 artifact `aether-core-android-so`。
   - `android-build` CI job 下载 `.so` 并放入 `android/app/src/main/jniLibs/{arm64-v8a,x86_64}/`，通过 Gradle jniLibs 打包进 APK。
   - `ChatStreamClient` SSE 解析统一走 Rust JNI（支持 OpenAI 与 BFF 两种 envelope），JNI 不可用时返回 null 不崩溃。
-- **基础单元测试已覆盖**：Android 端已新增 12 个测试文件、88 个测试用例，CI 执行 `testDebugUnitTest`：
+- **基础单元测试已覆盖**：Android 端已新增 13 个测试文件、89 个测试用例，CI 执行 `testDebugUnitTest`：
   - `ModelsTest`：Conversation / ChatMessage / Memory JSON 序列化与默认值。
   - `BffConfigTest`：BffConfig 默认值 + BffConfigStore 读写（Robolectric + DataStore）。
   - `ConversationRepositoryTest` / `ConversationRepositoryRoomTest`：Room DAO CRUD + 排序 + 级联删除（Room in-memory database）。
@@ -288,7 +288,7 @@ Android 端通过 JNI 调用 Rust core，桥接代码位于 `com.aether.rust` �
 | Rust Redact JNI | ✅ | Redact.kt + jni.rs，redactSafe 回退 |
 | 消息长按菜单 | ✅ | 复制 / 重发 / 删除 DropdownMenu |
 | Rust JNI 集成 | ✅ | 4 个 JNI 函数（SSE 解析 + 向量数学 + 脱敏） |
-| 单元测试 | ✅ | testDebugUnitTest，12 文件 88 用例 |
+| 单元测试 | ✅ | testDebugUnitTest，13 文件 89 用例 |
 
 ---
 

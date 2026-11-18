@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using Aether.Windows.Models;
+using Aether.Windows.Native;
 using Aether.Windows.Services;
 using Xunit;
 
@@ -29,10 +30,10 @@ public class AetherApiClientTest
     }
 
     [Fact]
-    public void UseRustSse_DefaultValue_IsFalse()
+    public void UseRustSse_DefaultValue_FollowsNativeAvailability()
     {
         var client = new AetherApiClient(SampleBaseUrl, SampleToken);
-        Assert.False(client.UseRustSse);
+        Assert.Equal(AetherNativeBridge.IsSseAvailable, client.UseRustSse);
     }
 
     [Fact]
@@ -310,6 +311,84 @@ public class AetherApiClientTest
 
         Assert.Single(chunks);
         Assert.Equal("OK", chunks[0]);
+    }
+
+    // 以下 Rust 路径用例依赖 aether_core_ffi.dll（CI 会先构建并 stage 到 Native/）；
+    // 本地无 native 产物时跳过（xUnit 2.x 无动态 skip，直接 return）。
+    [Fact]
+    public async Task StreamChatAsync_RustPath_ParsesBffDeltaAndDone()
+    {
+        if (!AetherNativeBridge.IsSseAvailable) return;
+
+        var sseBuilder = new StringBuilder();
+        sseBuilder.AppendLine("data: {\"type\":\"delta\",\"content\":\"你好\"}");
+        sseBuilder.AppendLine("data: {\"type\":\"delta\",\"content\":\"世界\"}");
+        sseBuilder.AppendLine("data: {\"type\":\"done\"}");
+        sseBuilder.AppendLine("data: {\"type\":\"delta\",\"content\":\"不应出现\"}");
+        sseBuilder.AppendLine();
+
+        var client = CreateClientWithStubHttp(
+            new HttpClient(new StubStreamHandler(sseBuilder.ToString())), SampleBaseUrl, SampleToken);
+        client.UseRustSse = true;
+
+        var chunks = new List<string>();
+        await foreach (var chunk in client.StreamChatAsync(new ChatRequest { Message = "hi", ConversationId = "c1" }))
+        {
+            chunks.Add(chunk);
+        }
+
+        Assert.Equal(new[] { "你好", "世界" }, chunks);
+    }
+
+    [Fact]
+    public async Task StreamChatAsync_RustPath_ParsesOpenAIChoicesDelta()
+    {
+        if (!AetherNativeBridge.IsSseAvailable) return;
+
+        var sseBuilder = new StringBuilder();
+        sseBuilder.AppendLine("data: {\"id\":\"x\",\"choices\":[{\"delta\":{\"content\":\"A\"}}]}");
+        sseBuilder.AppendLine("data: {\"choices\":[{\"delta\":{\"content\":\"B\"}}]}");
+        sseBuilder.AppendLine("data: [DONE]");
+        sseBuilder.AppendLine();
+
+        var client = CreateClientWithStubHttp(
+            new HttpClient(new StubStreamHandler(sseBuilder.ToString())), SampleBaseUrl, SampleToken);
+        client.UseRustSse = true;
+
+        var chunks = new List<string>();
+        await foreach (var chunk in client.StreamChatAsync(new ChatRequest { Message = "hi" }))
+        {
+            chunks.Add(chunk);
+        }
+
+        Assert.Equal(new[] { "A", "B" }, chunks);
+    }
+
+    [Fact]
+    public async Task StreamChatAsync_RustPath_ErrorEvent_ThrowsWithMessage()
+    {
+        if (!AetherNativeBridge.IsSseAvailable) return;
+
+        var sseBuilder = new StringBuilder();
+        sseBuilder.AppendLine("data: {\"type\":\"delta\",\"content\":\"部分\"}");
+        sseBuilder.AppendLine("data: {\"type\":\"error\",\"message\":\"上游限流\"}");
+        sseBuilder.AppendLine();
+
+        var client = CreateClientWithStubHttp(
+            new HttpClient(new StubStreamHandler(sseBuilder.ToString())), SampleBaseUrl, SampleToken);
+        client.UseRustSse = true;
+
+        var chunks = new List<string>();
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+        {
+            await foreach (var chunk in client.StreamChatAsync(new ChatRequest { Message = "hi" }))
+            {
+                chunks.Add(chunk);
+            }
+        });
+
+        Assert.Equal("上游限流", ex.Message);
+        Assert.Equal(new[] { "部分" }, chunks);
     }
 
     /// <summary>
