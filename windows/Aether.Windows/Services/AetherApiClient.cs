@@ -19,9 +19,10 @@ public class AetherApiClient
 
     /// <summary>
     /// 是否使用 Rust native 实现（aether-core-ffi DLL）解析 SSE。
-    /// 默认 false（托管 JsonDocument 路径），DLL 不可用时自动回退到托管路径。
+    /// 默认跟随 DLL 可用性：随包/CI 产物携带 DLL 时走与 iOS/Android/BFF 一致的 Rust 解析器，
+    /// DLL 缺失（无原生构建的本地开发）时自动回退到托管 JsonDocument 路径。
     /// </summary>
-    public bool UseRustSse { get; set; } = false;
+    public bool UseRustSse { get; set; } = AetherNativeBridge.IsSseAvailable;
 
     public AetherApiClient(string baseUrl, string token)
     {
@@ -130,7 +131,7 @@ public class AetherApiClient
             if (line == null) break;
 
             // Rust 路径：aether_sse_parse_chunk 内部处理 data: 前缀剥离与 [DONE]/ChatChunk 解析。
-            // DLL 不可用时 ParseSseChunk 返回 null（不抛异常）；UseRustSse 默认 false，需确保 DLL 存在再启用。
+            // DLL 不可用时 ParseSseChunk 返回 null（不抛异常）；UseRustSse 默认跟随 DLL 可用性。
             if (UseRustSse)
             {
                 if (line.Contains("[DONE]")) yield break;

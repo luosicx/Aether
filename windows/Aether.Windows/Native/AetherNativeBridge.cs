@@ -42,6 +42,35 @@ public static class AetherNativeBridge
     // ===== C# 友好封装 =====
 
     /// <summary>
+    /// SSE 解析 native 实现是否可用（DLL 已加载且导出存在）。首次访问探测一次后缓存。
+    /// DLL 缺失 / 导出缺失 / 位数不符时返回 false，调用方应走托管解析。
+    /// </summary>
+    public static bool IsSseAvailable => _sseAvailable.Value;
+
+    private static readonly Lazy<bool> _sseAvailable = new(ProbeSse);
+
+    private static bool ProbeSse()
+    {
+        try
+        {
+            aether_free_string(aether_sse_parse_chunk("data: [DONE]"));
+            return true;
+        }
+        catch (DllNotFoundException)
+        {
+            return false;
+        }
+        catch (EntryPointNotFoundException)
+        {
+            return false;
+        }
+        catch (BadImageFormatException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
     /// 解析单行 SSE，返回 content 字符串。
     /// 非 data 行 / 解析失败 / content 为 null 返回 null；content 有值时返回该字符串。
     /// DLL 不可用时返回 null（调用方应回退到托管解析）。

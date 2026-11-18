@@ -163,7 +163,7 @@
   ```bash
   cd windows && dotnet test Aether.sln
   ```
-- [ ] 预期输出：`Passed: 102` / `Failed: 0`（7 个测试文件，xUnit + WpfFact）
+- [ ] 预期输出：`Passed: 105` / `Failed: 0`（7 个测试文件，xUnit + WpfFact）
 - [ ] Rust `aether_core_ffi.dll` 构建验证：
   ```bash
   cd rust/aether-core-ffi && cargo build --release --target x86_64-pc-windows-msvc
@@ -182,7 +182,7 @@
   ```bash
   cd android && ./gradlew testDebugUnitTest
   ```
-- [ ] 预期输出：`Tests: 95, Failures: 0`（12 个测试文件，JUnit + Robolectric）
+- [ ] 预期输出：`Tests: 89, Failures: 0`（13 个测试文件，JUnit + Robolectric）
 - [ ] Rust `libaether_core_ffi.so` 构建（双架构）：
   ```bash
   cd rust/aether-core-ffi
@@ -239,7 +239,7 @@
 
 ### Windows 单元测试（v1.5）
 
-- [ ] Windows 测试用例数 = 102（102 pass / 0 skip / 0 failures）
+- [ ] Windows 测试用例数 = 105（105 pass / 0 skip / 0 failures）
 - [ ] Windows 测试文件数 = 7（xUnit + WpfFact）
 - [ ] 验证命令：
   ```bash
@@ -262,7 +262,7 @@
 ### 跨平台测试汇总
 
 - [ ] iOS / macOS Swift UT = 3502（覆盖率 84.25%）
-- [ ] Windows xUnit UT = 102
+- [ ] Windows xUnit UT = 105
 - [ ] Android JUnit UT = 105
 - [ ] iOS UIT = 30
 - [ ] 总 Coverage = 84.25%（iOS Swift + Rust core，SonarCloud 度量）
