@@ -1780,7 +1780,7 @@ sequenceDiagram
 | DPAPI（ProtectedData） | `windows/Aether.Windows/Services/BffConfigStore.cs` | UserToken 加密（`CurrentUser` 范围，Base64 存储） | `System.Security.Cryptography.ProtectedData` NuGet |
 | P/Invoke | `windows/Aether.Windows/Native/AetherNativeBridge.cs` | 调用 `aether_core_ffi.dll` C ABI（`aether_sse_parse_chunk` / `aether_sse_error_message` / `aether_cosine_f32` / `aether_redact` / `aether_free_string`） | .NET 8 内置 |
 | .resx 多语言资源 | `windows/Aether.Windows/Properties/Strings.Designer.cs` + 8 `.resx` | 8 种语言（zh-Hans / zh-Hant / en / ja / ko / fr / de / es），`LanguageService` 动态切换 | .NET 8 内置 |
-| xUnit | `windows/Aether.Windows.Tests/` | 7 个测试文件 / 105 用例 | xUnit 2.6+ |
+| xUnit | `windows/Aether.Windows.Tests/` | 8 个测试文件 / 110 用例 | xUnit 2.6+ |
 | **Android 端技术栈** | | | |
 | Kotlin + Jetpack Compose | `android/app/build.gradle.kts` | 现代 UI 工具包 + 协程 + StateFlow | Kotlin 1.9+ / Compose BOM 2024+ / AGP 8+ |
 | Ktor Client | `android/app/src/main/java/com/aether/data/api/{AetherApi,ChatStreamClient,HttpClientFactory}.kt` | BFF HTTP + SSE 流式（`Flow<String>`） | Ktor 2.3+ |
@@ -1791,7 +1791,7 @@ sequenceDiagram
 | JNI | `android/app/src/main/java/com/aether/rust/{SseBridge,VectorMath,Redact}.kt` | 调用 `libaether_core_ffi.so`（3 个 `Java_com_aether_rust_*` 导出函数） | JDK 17+ / `jni = "0.21"`（Rust 侧） |
 | Markwon / RichText | `android/app/src/main/java/com/aether/ui/chat/MarkdownText.kt` | Markdown 渲染 | Markwon 4.x+ |
 | res/values-* 多语言资源 | `android/app/src/main/res/values-{zh-rCN,zh-rTW,en,ja,ko,fr,de,es}/strings.xml` | 8 种语言资源 | AGP 内置 |
-| JUnit + Robolectric | `android/app/src/test/java/com/aether/` | 13 个测试文件 / 89 用例 | JUnit 4.13+ / Robolectric 4.11+ |
+| JUnit + Robolectric | `android/app/src/test/java/com/aether/` | 14 个测试文件 / 94 用例 | JUnit 4.13+ / Robolectric 4.11+ |
 | **Rust 核心多形态分发** | | | |
 | aether_core_ffi.dll | `rust/aether-core-ffi/` 编译产物 | Windows x64 动态库（cdylib） | Rust 1.75+ / MSVC toolchain |
 | libaether_core_ffi.so | `rust/aether-core-ffi/` 编译产物 | Android arm64-v8a + x86_64 动态库（cdylib + jni 0.21） | Rust 1.75+ / NDK r25+ |
@@ -1926,7 +1926,7 @@ sequenceDiagram
 ### 7.4 Windows 端测试架构（v1.5.0）
 
 - **Target**：`Aether.Windows.Tests`（xUnit）
-- **规模**：7 个测试文件，105 个用例
+- **规模**：8 个测试文件，110 个用例
 - **位置**：`windows/Aether.Windows.Tests/`
 - **测试框架**：xUnit 2.6+，部分用例使用 `Theory` + `InlineData` 参数化
 
@@ -1939,16 +1939,18 @@ sequenceDiagram
 | `MarkdownRendererTest.cs` | Markdown → FlowDocument：代码块 / 表格 / 任务列表 / 标题 | 验证 Markdig 解析结果 |
 | `ModelsTest.cs` | 数据模型：JSON 序列化反序列化 / 字段映射 | 与 BFF DTO 一致性校验 |
 | `SettingsViewModelTest.cs` | 设置 ViewModel：BFF 配置读写 / 语言切换 / 主题色 | mock BffConfigStore |
+| `StreamingTextThrottlerTest.cs` | 流式文本节流：窗口内合并 / 窗口外累计快照 / Flush 补齐尾部 | 注入 fake clock |
 
 ### 7.5 Android 端测试架构（v1.5.0）
 
 - **Target**：`android/app/src/test/`（JUnit + Robolectric）
-- **规模**：12 个测试文件，88 个用例
+- **规模**：14 个测试文件，94 个用例
 - **测试框架**：JUnit 4.13+ + Robolectric 4.11+（提供 Android 框架 shadow 实现，无需真机 / 模拟器）
 
 | 文件 | 覆盖范围 | 备注 |
 |------|---------|------|
 | `data/api/BffConfigTest.kt` | BFF 配置数据类：默认值 / BuildConfig 注入 | 纯 JVM 测试 |
+| `data/api/HttpClientFactoryTest.kt` | Ktor 客户端构建：超时 / JSON 配置 / 插桩 | 纯 JVM 测试 |
 | `data/model/ModelsTest.kt` | 数据模型：`@Serializable` JSON 编解码 / 字段映射 | 纯 JVM 测试 |
 | `data/repository/ConversationRepositoryTest.kt` | 会话 Repository：先 Room 后网络策略 / 离线缓存 | mock AetherApi + Room |
 | `data/repository/ConversationRepositoryRoomTest.kt` | Room 持久化：ConversationEntity CRUD / 排序 | Robolectric + 内存 Room |
@@ -1956,6 +1958,7 @@ sequenceDiagram
 | `rust/VectorMathTest.kt` | Rust 向量 JNI：cosineF64（JNI 不可用时返回 0.0） | 纯 JVM 测试 |
 | `rust/RedactTest.kt` | Rust 脱敏 JNI：redact（JNI 不可用时返回原值） | 纯 JVM 测试 |
 | `ui/chat/ChatViewModelDeleteTest.kt` | 聊天 ViewModel：消息删除 / 流式状态 | mock ChatStreamClient |
+| `ui/chat/ChatViewModelStreamingTest.kt` | 流式节流：独立 Throttler 时序 + 完整内容落消息 | fake clock，纯 JVM 用例 |
 | `ui/chat/MarkdownTextTest.kt` | Markdown 渲染：代码块 / 表格 / 任务列表 | Robolectric |
 | `ui/health/HealthViewModelTest.kt` | 健康 ViewModel：上传 / 查询健康摘要 | mock AetherApi |
 | `ui/rag/KnowledgeBaseViewModelTest.kt` | 知识库 ViewModel：RAG 检索 / 文档列表 | mock AetherApi |

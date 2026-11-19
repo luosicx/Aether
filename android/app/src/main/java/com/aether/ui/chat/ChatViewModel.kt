@@ -2,7 +2,7 @@ package com.aether.ui.chat
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.aether.data.api.ChatStreamClient
+import com.aether.data.api.ChatStreamSource
 import com.aether.data.model.ChatMessage
 import com.aether.data.model.ChatRequest
 import com.aether.data.repository.MessageRepository
@@ -11,8 +11,9 @@ import kotlinx.coroutines.launch
 import java.util.UUID
 
 class ChatViewModel(
-    private val chatClient: ChatStreamClient,
-    private val messageRepo: MessageRepository
+    private val chatClient: ChatStreamSource,
+    private val messageRepo: MessageRepository,
+    private val nowNanos: () -> Long = { System.nanoTime() }
 ) : ViewModel() {
     private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
     val messages: StateFlow<List<ChatMessage>> = _messages.asStateFlow()
@@ -69,17 +70,17 @@ class ChatViewModel(
                     message = userMessage.content,
                     conversationId = conversationId
                 )
-                val fullResponse = StringBuilder()
+                val throttler = StreamingTextThrottler(nowNanos = nowNanos)
                 chatClient.streamChat(request).collect { chunk ->
-                    fullResponse.append(chunk)
-                    _streamingText.update { it + chunk }
+                    // 节流：窗口内的 token 只累加，避免每个 token 都触发一次整屏重组
+                    throttler.append(chunk)?.let { _streamingText.value = it }
                 }
                 // 流式结束，将完整响应转为消息
                 val assistantMessage = ChatMessage(
                     id = UUID.randomUUID().toString(),
                     conversationId = conversationId,
                     role = "assistant",
-                    content = fullResponse.toString(),
+                    content = throttler.flush(),
                     createdAt = System.currentTimeMillis()
                 )
                 _messages.update { it + assistantMessage }
