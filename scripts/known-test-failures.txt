@@ -538,7 +538,7 @@
 #   runner 上真去调 NSAppleScript 等自动化授权，7 条用例各挂满 60s（#71 run 43741607797）。
 #   改为 osascript 子进程 + 5s 有界执行（SystemControlTool.executeAppleScript），测试补
 #   runner 用户名判据（NSUserName()=="runner"）；`delay 30` 回归用例验证窗口生效。
-macOS:AgentOrchestratorTests/*~crash
+# Agent 编排子系统已在工程清理中整体移除，原 `AgentOrchestratorTests/*~crash` 豁免一并删除。
 
 # ---- iOS（unit-tests job）----
 # 形态豁免的轮次会导出 `iOS-crash-diagnostics` artifact（崩溃日志 + 线程栈）。
@@ -547,5 +547,4 @@ macOS:AgentOrchestratorTests/*~crash
 # `IOFormatsChanged: RPC timeout. Apparently deadlocked. Aborting now.` 把进程 abort，
 # 栈落在系统符号里（failureText 就是 `Crash: Aether at <external symbol>`）。
 # 本机同参数单跑该用例 10 轮、整类 80 tests 全过，复现不了；真栈要看诊断包。
-iOS:AgentOrchestratorTests/*~crash
 iOS:VoiceServiceTests/*~crash

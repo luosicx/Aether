@@ -96,7 +96,7 @@
 
 ### 3.1 测试覆盖率
 
-- **现状**：UT 3570 / UIT 30，0 skip。AetherCore SPM 包含 Rust FFI 包装器单元测试。SonarCloud 整体覆盖率 v1.0 已达 **83.79%**（PR #30 修复后由 76.0% 提升，超过原 80% 目标）。
+- **现状**：UT 3163 / UIT 30，0 skip。AetherCore SPM 包含 Rust FFI 包装器单元测试。历史口径的 83.79% 由旧脚本按文件总量缩放推算（行覆盖率数据不真实），工程清理后改为 `xcrun xccov view --archive --json` 逐行真实数据，基线待 CI 首轮产出后回填。
 - **优化**：
   - 对齐 `sonar-project.properties` 覆盖率排除配置与 CI `EXCLUDE_PATTERNS`（新增 11 项排除：Health / Connectivity / Crash / Search / AppIntents / AetherDesign / AetherUI + 4 个 macOS-only 工具文件）
   - 为 0% 覆盖率模块补充测试：MCPErrorTests（21 用例）/ SSETransportTests（8 用例）/ StdioTransportTests（8 用例，macOS only）

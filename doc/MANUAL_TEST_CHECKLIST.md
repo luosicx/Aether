@@ -3833,11 +3833,11 @@
 | Android 端单测（39.11） | 任意系统（JVM） | `./gradlew testDebugUnitTest`，14 文件 94 用例，JNI 在纯 JVM 不可用测试覆盖回退路径 |
 | Windows 端 v1.5 新功能（38.8-38.12） | Windows 10+ 真机或虚拟机 | 会话列表 / 设置页 / Markdown / i18n / 消息气泡；i18n 切换无需重启，DPAPI 加密需 Windows 用户态 |
 | Android 端 v1.5 新功能（39.14-39.20） | Android 真机或模拟器 | RAG / Health / Rust Redact / 消息长按 / Markdown / i18n / Room 生产；JNI 需真机或模拟器 |
-| v3.0 智能平台（40） | iOS / macOS 真机或模拟器 | 服务层骨架，无 UI 入口；通过单元测试（86 用例）+ 调试控制台验证 |
+| v3.0 智能平台（40） | iOS / macOS 真机或模拟器 | 服务层骨架，无 UI 入口；通过单元测试（66 用例）+ 调试控制台验证 |
 
 ## 40. v3.0 智能平台（服务层骨架）
 
-> v3.0 交付 Apple Intelligence Provider / 混合 RAG / 多 Agent 仲裁 / AI Workflow 四个服务层模块，均为骨架或占位实现（无 UI 入口），主要通过单元测试验证。真机验证用于确认运行时检测与降级链路。
+> v3.0 交付 Apple Intelligence Provider / 混合 RAG / AI Workflow 三个服务层模块，均为骨架或占位实现（无 UI 入口），主要通过单元测试验证。真机验证用于确认运行时检测与降级链路。原多 Agent 仲裁（ArbiterAgent / AgentTeam）随未接通的 Agent 编排栈在工程清理中移除。
 
 - [ ] Apple Intelligence 可用性检测
   - **前置条件**：iOS 18+ / macOS 15+ 设备（或任意版本验证降级）
@@ -3857,23 +3857,6 @@
   - **预期结果**：含该精确关键词的文档排名靠前（优于纯向量检索的同义改写场景）
   - **失败排查**：检查分词是否按空白切分；确认 documentFrequency 已更新
 
-- [ ] ArbiterAgent 多数表决仲裁
-  - **前置条件**：构造 5 个 `AgentResult`，其中 3 个结果文本一致
-  - **操作步骤**：调用 `arbitrate(results:)`
-  - **预期结果**：返回 `strategy == .majority`，winner 为一致组中置信度最高者，reason 含 "3/5（60%）一致"
-  - **失败排查**：一致率 <60% 时应降级到 priority 策略；检查结果文本 trim 后是否真正一致
-
-- [ ] ArbiterAgent 用户介入兜底
-  - **前置条件**：构造互不相同且优先级并列冲突的结果，连续调用超过 `maxRounds`（5）次
-  - **操作步骤**：第 6 次调用 `arbitrate(results:)`
-  - **预期结果**：返回 `strategy == .userIntervention`
-  - **失败排查**：检查 `currentRound` 计数是否递增；确认 `resolveByMajority` / `resolveByPriority` 均返回 nil
-
-- [ ] AgentTeam 预设模板加载
-  - **操作步骤**：读取 `AgentTeam.templates["research"]`
-  - **预期结果**：3 成员（researcher / reviewer / coordinator），coordinator `isLead == true`，`enableArbitration == true`
-  - **失败排查**：检查模板静态字典键（research / coding / critique）
-
 - [ ] WorkflowEngine 验证与执行
   - **前置条件**：构造含 1 触发器 + 3 动作节点 + 连线的 `Workflow`
   - **操作步骤**：先 `validate(_:)` 再 `execute(_:input: "测试")`
@@ -3886,14 +3869,14 @@
   - **失败排查**：检查 CodingKeys 完整性
 
 - [ ] v3.0 单元测试回归
-  - **操作步骤**：运行 4 个新测试文件（AppleIntelligenceProviderTests 14 + HybridRAGServiceTests 24 + ArbiterAgentTests 20 + WorkflowEngineTests 28）
-  - **预期结果**：86 用例全部通过，0 failures
+  - **操作步骤**：运行 3 个新测试文件（AppleIntelligenceProviderTests 14 + HybridRAGServiceTests 24 + WorkflowEngineTests 28）
+  - **预期结果**：66 用例全部通过，0 failures
   - **失败排查**：CI 日志定位具体断言；本地 `xcodebuild test -only-testing:AetherTests/WorkflowEngineTests` 复现
 
 ## 手测执行优先级
 
 **P0（核心路径，必须验证）**：1, 2, 3, 9, 10, 11, 16, 21（多平台适配，发布前必须验证三端启动与基础功能），23（macOS 设置导航修复，核心交互修复），27（国际化与无障碍，发布前必须验证 String Catalog 注册与 VoiceOver 基础朗读），35（v1.2 设计升级，三端视觉一致性，发布前必验证 Starfield 呼吸 / AetherIcons 渲染 / 响应式布局），37（v1.4 Native 引擎，端侧多模态真实功能，发布前必验证 describe_image / transcribe_audio 真实调用与权限授权），38.1（Windows 端构建与启动，发布前必验证 Windows 客户端可构建启动），39.1（Android 端构建与启动，发布前必验证 APK 可构建安装）
-**P1（重要功能，应验证）**：4, 5, 6, 7, 8, 12, 14, 15, 17, 18, 19, 20, 22（工具能力增强，重要新增功能，建议每次发布前验证），24（macOS markdown 视觉修复），25（macOS 语音朗读 UI 修复），26（预设系统提示词），36（v1.3 端侧多模态 Phase 1，Facade 门面 + 占位工具 + 跨平台 OCR + MemoryBudget，作为 v1.4 Native 引擎的对照基线），38.2-38.6（Windows 端基础对话 + Rust P/Invoke + 设计令牌 + 单测，thin client 核心路径），38.8-38.12（Windows v1.5 新功能：会话列表 UI / 设置页 / Markdown / i18n / 消息气泡 + TypingIndicator），39.2-39.11（Android 端 3 屏 UI + Rust JNI + Room + BFF 配置 + 设计令牌 + 单测，thin client 完整功能路径），39.14-39.20（Android v1.5 新功能：RAG / Health / Rust Redact / 消息长按 / Markdown / i18n / Room 生产），40（v3.0 智能平台服务层，含 Apple Intelligence 检测 / 混合 RAG / Arbiter 仲裁 / Workflow 引擎，86 单测回归 + 调试控制台验证）
+**P1（重要功能，应验证）**：4, 5, 6, 7, 8, 12, 14, 15, 17, 18, 19, 20, 22（工具能力增强，重要新增功能，建议每次发布前验证），24（macOS markdown 视觉修复），25（macOS 语音朗读 UI 修复），26（预设系统提示词），36（v1.3 端侧多模态 Phase 1，Facade 门面 + 占位工具 + 跨平台 OCR + MemoryBudget，作为 v1.4 Native 引擎的对照基线），38.2-38.6（Windows 端基础对话 + Rust P/Invoke + 设计令牌 + 单测，thin client 核心路径），38.8-38.12（Windows v1.5 新功能：会话列表 UI / 设置页 / Markdown / i18n / 消息气泡 + TypingIndicator），39.2-39.11（Android 端 3 屏 UI + Rust JNI + Room + BFF 配置 + 设计令牌 + 单测，thin client 完整功能路径），39.14-39.20（Android v1.5 新功能：RAG / Health / Rust Redact / 消息长按 / Markdown / i18n / Room 生产），40（v3.0 智能平台服务层，含 Apple Intelligence 检测 / 混合 RAG / Workflow 引擎，66 单测回归 + 调试控制台验证）
 **P2（增强功能，可选验证）**：13（需 watchOS 硬件），14.3（需 iPhone + iPad），38.7（Windows 已知限制盘点，9 项 ❌），39.12-39.13（Android 权限与已知限制盘点，8 项 ❌）
 
 | 手测模块 | 优先级 | 说明 |
@@ -3918,7 +3901,7 @@
 | Android 端核心功能（39.2-39.11） | P1 | 3 屏 UI（会话列表 / 聊天 / 设置）+ Rust JNI + Room + BFF 配置 + 设计令牌 + 单测，thin client 完整功能路径 |
 | Android 端 v1.5 新功能（39.14-39.20） | P1 | RAG UI + Health UI + Rust Redact JNI + 消息长按菜单 + Markdown（Markwon 4.6.2）+ i18n（8 种语言 strings.xml）+ Room 生产使用 |
 | Android 端已知限制盘点（39.12-39.13） | P2 | 8 项 ❌ 未开放功能盘点（工具 / 多模态 / Health Connect / 端侧 MLX 推理 / 离线模式 / watchOS-Widget / UI 自动化测试 / RECORD_AUDIO） |
-| v3.0 智能平台（40） | P1 | Apple Intelligence 检测 / 混合 RAG 四路分数 / Arbiter 三策略 / Workflow 验证执行与 JSON 往返，86 单测 + 调试控制台 |
+| v3.0 智能平台（40） | P1 | Apple Intelligence 检测 / 混合 RAG 四路分数 / Workflow 验证执行与 JSON 往返，66 单测 + 调试控制台 |
 | 其他现有模块 | 保持原优先级 | 见上方分级说明 |
 
 ## 手测执行记录表

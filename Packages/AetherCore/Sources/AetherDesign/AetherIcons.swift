@@ -68,7 +68,7 @@ public enum AetherIcon: String, CaseIterable {
 
     /// 端侧模型下载（OnDeviceModelDownloader）
     case modelDownload = "aether-model-download"
-    /// Agent 协作图（DAGVisualizationView）
+    /// Agent 协作图
     case agentCollaboration = "aether-agent-collaboration"
     /// 插件市场（PluginMarketplaceView）
     case marketplace = "aether-marketplace"

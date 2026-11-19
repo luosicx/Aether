@@ -417,14 +417,12 @@ flowchart LR
 | Voice | `Services/Voice/TTSConfig.swift` | Day 19 TTS 配置：voiceID / rate / pitch / volume，Codable + Sendable，UserDefaults 持久化。 |
 | Voice | `Services/Voice/TTSVoiceCatalog.swift` | Day 19 TTS 音色目录：枚举 `AVSpeechSynthesisVoice` 系统音色，按语言分组供 Picker 展示。 |
 
-#### v3.0 新增：Agent 域扩展与 Workflow 子模块（智能平台）
+#### v3.0 新增：Workflow 子模块（智能平台）
 
-> v3.0 在既有 Agent 域（v1.1 引入的 10 文件：AgentInstance / AgentMessageBus / AgentOrchestrator / DAGExecutionEngine 等）基础上扩展冲突仲裁与团队编排，并新增 Workflow 子模块。
+> v3.0 曾同时交付 Agent 域扩展（ArbiterAgent / AgentTeam）与 Workflow 子模块；Agent 编排栈未接入生产入口，已在工程清理中整体移除，本节只保留 Workflow。
 
 | 子模块 | 文件 | 职责 |
 |--------|------|------|
-| Agent | `Services/Agent/ArbiterAgent.swift` | v3.0 冲突仲裁 Agent：多 Agent 结果冲突时决策最终结果。三种策略：`majority`（≥60% 多数表决，平票取置信度最高）/ `priority`（角色优先级 reviewer > researcher > coordinator > executor > planner）/ `userIntervention`（用户介入）；`maxRounds` 默认 5 轮，超限强制人工介入。 |
-| Agent | `Services/Agent/AgentTeam.swift` | v3.0 Agent 团队数据模型：`TeamMember`（role / isLead / delegates）+ 3 预设模板（research / coding / critique）+ `TeamOrchestrationResult` 编排结果（finalResult / agentResults / arbitrationResult / tokenConsumed）。 |
 | Workflow | `Services/Workflow/WorkflowEngine.swift` | v3.0 AI Workflow 执行引擎：`validate(_:)` 验证（触发器存在 + DFS 循环检测 + 节点数上限）、`execute(_:input:)` 线性遍历执行；`WorkflowNode` 9 种节点类型（3 触发器 + 3 动作 + 1 条件分支 + 2 I/O）；`Workflow` 支持 `toJSON()` / `fromJSON(_:)` 序列化；`WorkflowError` 6 种错误类型。 |
 
 ```mermaid
@@ -435,14 +433,6 @@ flowchart LR
         RRF --> TOP10["TopK=10"]
         TOP10 --> CE["Cross-Encoder<br/>重排序"]
         CE --> OUT["TopK=5 结果"]
-    end
-
-    subgraph AgentArb["v3.0 多 Agent 仲裁"]
-        A1["Agent 结果 ×N"] --> MAJ{多数表决<br/>≥60%?}
-        MAJ -- 是 --> WIN["胜出结果"]
-        MAJ -- 否 --> PRIO{角色优先级}
-        PRIO -- 决出 --> WIN
-        PRIO -- 未决 --> USER["用户介入"]
     end
 
     subgraph WF["v3.0 AI Workflow"]
@@ -749,7 +739,7 @@ ViewModels 文件数无新增（仍为 4 个），但内部字段与编排逻辑
 | `ViewModels/KnowledgeBaseVM.swift` | 知识库 ViewModel，管理文档索引与删除。 |
 | `ViewModels/SettingsViewModel.swift` | 设置 ViewModel，管理 API Key 保存/删除（按 provider 隔离）、用户偏好读写、TTS 配置 / BFF 配置 / OnDevice 配置 / Health 授权状态读写。 |
 
-> **Agent 模块说明**：Agent 模块（AgentOrchestrator / GoalDecomposer / AgentRole）为完整实现但尚未接入生产 ChatViewModel，保留以备未来接入。
+> **Agent 模块说明**：原 Agent 编排栈（AgentOrchestrator / DAGExecutionEngine / GoalDecomposer 等）未接入生产 ChatViewModel，已在工程清理中整体移除；`AgentTask` 模型与 `AgentRole` 枚举保留用于历史数据解码，重新接线时再引入编排实现。
 
 ### 3.4b Coordinators 层（P2-6 ChatViewModel 拆分）
 
@@ -1758,7 +1748,7 @@ sequenceDiagram
 | PerformanceMonitor | `Services/Performance/PerformanceMonitor.swift` | iOS 17.0+ / macOS 14.0+ |
 | PrivacyInfo.xcprivacy | `Resources/PrivacyInfo.xcprivacy` | iOS 17.0+ / macOS 14.0+ / Xcode 16+（App Store 审核要求） |
 | AttributedString（Markdown） | `Views/Chat/Markdown*.swift` / `CodeSyntaxHighlighter.swift` | iOS 17.0+ / macOS 14.0+ / Foundation |
-| XCTest | `AetherTests/` 203 文件（3570 用例） | Xcode 16+ / Swift 5.9+ |
+| XCTest | `AetherTests/` 186 文件（3163 用例） | Xcode 16+ / Swift 5.9+ |
 | XCUITest | `AetherUITests/` 7 文件（30 用例） | Xcode 16+ / Swift 5.9+ |
 | GitHub Actions | `.github/workflows/ci.yml` | macos-14 runner / Xcode 16+ |
 | CoreLocation | CLLocationManager + CLGeocoder | LocationTool 定位与反地理编码 | iOS 17.0+ / macOS 14.0+ / CoreLocation.framework |
@@ -1803,7 +1793,7 @@ sequenceDiagram
 ### 7.1 单元测试（UT）
 
 - **Target**：`AetherTests`
-- **规模**：203 个测试文件，3570 用例（3570 pass / 0 skip / 0 failures）
+- **规模**：186 个测试文件，3163 用例（3163 pass / 0 skip / 0 failures）
 - **分层覆盖**：
 
 | 层级 | 测试文件 | 文件数 | 核心断言数（约） | skip 原因 |
@@ -2158,7 +2148,7 @@ CloudflareWorkers/               # BFF 代理网关
 ├── worker.js
 └── wrangler.toml
 
-AetherTests/                  # 203 个 UT 文件 / 3570 用例
+AetherTests/                  # 186 个 UT 文件 / 3163 用例
 ├── APIConfigTests.swift
 ├── AlarmToolTests.swift
 ├── BFFProxyClientTests.swift
@@ -2461,12 +2451,11 @@ struct PluginManifest: Codable, Sendable {
 - 复用现有 `OnDeviceModelDownloader` 的断点续传机制
 - 安装前 SHA256 校验完整性，失败自动回退到上一版本
 
-#### 9.3.4 多 Agent 协作消息总线
+#### 9.3.4 多 Agent 协作消息总线（待重新引入）
 
-扩展现有 `AgentOrchestrator`（位于 `Services/Agent/AgentOrchestrator.swift`）支持多 Agent 协作：
+原 `AgentOrchestrator` / `AgentMessageBus` 编排栈已在工程清理中整体移除。若未来重新引入多 Agent 协作，可按原设计恢复：
 
-- 引入 `AgentMessageBus`（`actor`）作为 Agent 间通信通道
-- 每个 Agent 通过订阅 topic 接收消息，通过 publish 发布消息
+- 以 actor 作为 Agent 间通信通道，按 topic 订阅 / 发布
 - 支持串行 / 并行协作模式，可通过配置切换
 - 与 `ToolRegistry` 集成，Agent 可调用工具执行实际操作
 

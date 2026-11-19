@@ -22,11 +22,6 @@ import os
 ///   TelemetryService 均使用 shared 单例，与原 ChatViewModel.handleToolCalling 实现一致。
 /// - 并发隔离：本类标注 `@MainActor`，所有闭包在主 actor 上调用；
 ///   超时保护通过 `withThrowingTaskGroup` 实现，超时不中断 ReAct 主循环。
-///
-/// 与 Agent 模块 `AgentToolExecutionCoordinator`（actor，DAG 串行化）的区别：
-/// - 本类是 ChatViewModel ReAct 循环的子模块，每轮 LLM 输出 toolCalls 时被调用一次
-/// - Agent 版本是 DAGExecutionEngine 的工具调用串行化器，跨节点共享
-/// - 两者职责不同，命名已分离以避免同模块同名冲突
 @MainActor
 final class ToolExecutionCoordinator: Coordinator {
 

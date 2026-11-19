@@ -287,7 +287,7 @@
 | v1.6 ✅ | 端侧多模态 Phase 2 | MLX-VLM / Whisper.cpp / MLX-Voice / OpenVoice / SD Mobile 五引擎骨架 + `createWithAutoFallback()` 自动降级链（真实推理依赖待 SPM 集成） | 2026-07-29 已发布 |
 | v2.0 ✅ | 跨端协作 | CloudKit 同步、Handoff 连续对话、visionOS 适配骨架、Web 伴侣（BFF）、macOS 多窗口 | 2026-07-30 已发布 |
 | v2.5 | 生态扩展 | 社区插件市场、Android 深化（端侧 MLX/NNAPI 推理） | 2028 Q1 |
-| v3.0 ✅ | 智能平台 | Apple Intelligence 集成、本地 RAG 增强（BM25 + Cross-Encoder + RRF）、多 Agent 协作（ArbiterAgent + AgentTeam）、AI Workflow 自动化 | 2026-07-31 已发布 |
+| v3.0 ✅ | 智能平台 | Apple Intelligence 集成、本地 RAG 增强（BM25 + Cross-Encoder + RRF）、多 Agent 协作（ArbiterAgent + AgentTeam，已于后续工程清理移除）、AI Workflow 自动化 | 2026-07-31 已发布 |
 | v3.0+ | 远期探索 | 隐私计算、实时协作、多模态记忆 | 2028 下半年 |
 
 ---
@@ -307,7 +307,7 @@
 | Windows 仅 x64 / 无 ARM64 | Windows on ARM 设备不可用 | v2.5 评估 ARM64 工具链与发布 |
 | Android 无端侧 MLX 推理 | Android 端侧多模态能力缺失 | v2.5 评估 MLX Android / NNAPI 路径 |
 | ~~RAGService 纯向量检索~~ | ~~检索准确率受限~~ | ✅ v3.0 已交付混合检索（BM25 + RRF 融合 + Cross-Encoder 重排序） |
-| ~~多 Agent 结果冲突无仲裁~~ | ~~多 Agent 协作结果不一致~~ | ✅ v3.0 已交付 ArbiterAgent（多数表决 / 优先级 / 用户介入） |
+| ~~多 Agent 结果冲突无仲裁~~ | ~~多 Agent 协作结果不一致~~ | ✅ v3.0 已交付 ArbiterAgent（多数表决 / 优先级 / 用户介入）；该栈未接入生产入口，已于后续工程清理移除 |
 | JNI 累积器 thread_local 兜底 | 多线程 JNI 调用存在状态隔离风险 | v2.5 重构为显式上下文句柄 |
 | Cross-Encoder 为启发式占位评分 | 重排序精度有限 | v3.x 集成 ONNX Runtime 后替换 |
 | AppleIntelligenceProvider 为骨架实现 | FoundationModels 真实调用未接入 | v3.x 待 Xcode 正式支持 FoundationModels 框架后替换 |
