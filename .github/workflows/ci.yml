@@ -830,9 +830,22 @@ jobs:
           path: coverage-sdk
 
       - name: Merge coverage reports
+        id: merge
         # 合并 iOS + macOS 分片（Swift, lineToCover 格式）+ Rust + AetherSDK（cobertura <line hits>）
         # merge-coverage.py 支持传入任意数量的 macOS 分片文件（union 策略）
+        # 任一测试 job 被取消/跳过时对应覆盖率产物会缺失；此时不能用残缺数据发布
+        # Sonar 分析，否则 Aether 会整体显示为 0% 覆盖率并把质量门误判为失败。
         run: |
+          MISSING=""
+          [ -f coverage-ios/coverage.xml ] || MISSING="$MISSING iOS"
+          compgen -G "coverage-macos/*/coverage.xml" > /dev/null || MISSING="$MISSING macOS"
+          [ -f coverage-rust/coverage.xml ] || MISSING="$MISSING Rust"
+          [ -f coverage-sdk/coverage.xml ] || MISSING="$MISSING AetherSDK"
+          if [ -n "$MISSING" ]; then
+            echo "coverage_ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::覆盖率产物缺失:$MISSING；跳过 Sonar 分析，避免用不完整数据误判质量门"
+            exit 0
+          fi
           mkdir -p coverage-report
           python3 scripts/merge-coverage.py \
             coverage-ios/coverage.xml \
@@ -840,8 +853,11 @@ jobs:
             coverage-rust/coverage.xml \
             coverage-sdk/coverage.xml \
             coverage-report/coverage.xml
+          echo "coverage_ready=true" >> "$GITHUB_OUTPUT"
 
       - name: Verify merged coverage report
+        id: verify
+        if: steps.merge.outputs.coverage_ready == 'true'
         run: |
           if [ ! -f "coverage-report/coverage.xml" ]; then
             echo "ERROR: merged coverage.xml not found"
@@ -850,8 +866,10 @@ jobs:
           LINE_RATE=$(python3 -c "import xml.etree.ElementTree as ET; r=ET.parse('coverage-report/coverage.xml').getroot(); covered=sum(1 for f in r.findall('file') for l in f.findall('lineToCover') if l.get('covered')=='true'); total=sum(1 for f in r.findall('file') for l in f.findall('lineToCover')); print(f'{covered/total:.4f}' if total else '0')")
           echo "Merged coverage.xml line-rate: $LINE_RATE"
           if [ "$LINE_RATE" = "0" ] || [ -z "$LINE_RATE" ]; then
-            echo "WARNING: coverage.xml has line-rate=0 (xccov unavailable on Xcode 26.3), continuing without coverage data"
+            echo "coverage_ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::coverage.xml has line-rate=0；跳过 Sonar 分析，避免用空覆盖率误判质量门"
           else
+            echo "coverage_ready=true" >> "$GITHUB_OUTPUT"
             echo "Merged coverage.xml verified successfully"
           fi
 
@@ -863,6 +881,7 @@ jobs:
           java-version: '21'
 
       - name: SonarQube Scan
+        if: steps.verify.outputs.coverage_ready == 'true'
         uses: SonarSource/sonarqube-scan-action@v8
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -873,8 +892,6 @@ jobs:
           # 注意：若 SonarCloud 开启了 Automatic Analysis，CI 扫描会报错
           # 解决：登录 SonarCloud → Project Settings → Analysis Method → 选择 GitHub Actions CI
           # qualitygate.wait 不在 args 中覆盖，使用 sonar-project.properties 中的设置（false）。
-          # 原因：iOS xccov 在 Xcode 26.3 上不稳定，导致 new_coverage 指标波动；
-          # 待 xccov 稳定或迁移到 xcresulttool 后可在 properties 中恢复为 true。
           # 用上一步装好的 JDK 21（skipJreProvisioning），避免扫描器再下载 JRE
           args: >
             -Dsonar.scanner.skipJreProvisioning=true
@@ -886,7 +903,7 @@ jobs:
         # 若同一 PR 已有报告评论，则删除旧评论后创建新评论，确保 PR 上始终只有一条最新报告。
         # 调用 scripts/sonar-pr-comment.py 完成轮询质量门 → 拉取度量 → 生成 Markdown →
         # 删除旧评论 → 创建新评论的完整流程。
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && steps.verify.outputs.coverage_ready == 'true'
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
