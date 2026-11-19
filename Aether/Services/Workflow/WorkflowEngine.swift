@@ -8,7 +8,7 @@ import Foundation
 /// - 定义可视化工作流数据模型（节点 + 连接 + 触发器）
 /// - 支持节点类型：触发器 / 条件 / 循环 / 动作 / 输入输出
 /// - 工作流序列化为 JSON，可导入导出
-/// - 执行引擎复用 DAGExecutionEngine，扩展支持循环与条件分支
+/// - 执行引擎预留扩展点，当前按线性节点执行
 ///
 /// MVP 范围：
 /// - 线性 + 条件分支（循环后置）
@@ -300,7 +300,7 @@ public final class WorkflowEngine {
     }
 
     /// 执行工作流（骨架实现）
-    /// v3.0 骨架：实际执行复用 DAGExecutionEngine，当前为线性模拟
+    /// v3.0 骨架：当前为线性模拟，后续接入真实执行引擎
     public func execute(_ workflow: Workflow, input: String = "") async -> WorkflowExecutionResult {
         let startTime = Date()
         var results: [NodeExecutionResult] = []

@@ -56,7 +56,7 @@
   - **端侧 MLX 模型下载**：进入 设置 → 端侧推理，选择模型（如 Qwen2.5-0.5B-Instruct）开始下载，验证下载进度条更新、中断后重启可断点续传、下载完成自动执行 SHA256 校验；关闭网络后发起对话，验证自动切换为端侧推理并在 UI 标识
   - **HealthKit 授权**：首次进入 设置 → 健康洞察，验证系统弹出 HealthKit 授权弹窗并请求心率 / 睡眠 / 步数读取权限；授权后下拉刷新健康洞察，验证数据读取成功；在对话中验证健康上下文已注入 system prompt（助手可引用近 7 天健康数据）
   - **端侧多模态 v1.4**（v1.4 新增）：在对话中让助手调用 `describe_image` 工具分析含文字 / 二维码的图片，验证 NativeVisionEngine 返回 OCR 文字与条码 payload；调用 `transcribe_audio` 工具转写中文录音，验证 NativeASREngine 返回识别文字；首次使用 `transcribe_audio` 时系统会弹出语音识别授权对话框；底层 3 个 Native 引擎基于 Apple Vision / Speech / AVSpeechSynthesizer 框架，无需下载外部模型
-  - **智能平台 v3.0**（v3.0 新增，服务层骨架无 UI 入口）：v3.0 交付 Apple Intelligence Provider / 混合 RAG（BM25 + RRF + Cross-Encoder）/ 多 Agent 仲裁（ArbiterAgent）/ AI Workflow 引擎四个服务层模块，均由 86 个单元测试覆盖（AppleIntelligenceProviderTests 14 + HybridRAGServiceTests 24 + ArbiterAgentTests 20 + WorkflowEngineTests 28）；Apple Intelligence 在 FoundationModels 不可用的环境自动返回占位提示并降级到 MLX / 云端 Provider，无新增权限请求与网络行为变化
+  - **智能平台 v3.0**（v3.0 新增，服务层骨架无 UI 入口）：v3.0 交付 Apple Intelligence Provider / 混合 RAG（BM25 + RRF + Cross-Encoder）/ AI Workflow 引擎三个服务层模块，均由 66 个单元测试覆盖（AppleIntelligenceProviderTests 14 + HybridRAGServiceTests 24 + WorkflowEngineTests 28）；Apple Intelligence 在 FoundationModels 不可用的环境自动返回占位提示并降级到 MLX / 云端 Provider，无新增权限请求与网络行为变化。多 Agent 仲裁（ArbiterAgent）随未接通的 Agent 编排栈在工程清理中移除
 
 ### 4.1 构建验证
 - [ ] iOS 构建：`xcodebuild build -destination 'platform=iOS Simulator,name=iPhone 17'` 成功
@@ -211,7 +211,7 @@
 
 ### 单元测试（UT）
 - [ ] UT 用例数 = 3502（3502 pass / 0 skip / 0 failures）
-- [ ] UT 文件数 = 195
+- [ ] UT 文件数 = 186
 - [ ] 验证命令：
   ```bash
   xcodebuild test \
@@ -221,7 +221,7 @@
     -only-testing:AetherTests \
     CODE_SIGNING_ALLOWED=NO 2>&1 | tail -5
   ```
-- [ ] 预期输出包含：`Executed 3502 tests, with 0 failures, 0 skipped`
+- [ ] 预期输出包含：`0 failures, 0 skipped`（执行条数随平台目标不同，静态统计 3163 用例）
 
 ### UI 测试（UIT）
 - [ ] UIT 用例数 = 30（30 pass / 0 skip / 0 failures）
@@ -245,7 +245,7 @@
   ```bash
   cd windows && dotnet test Aether.sln --logger:"console;verbosity=normal"
   ```
-- [ ] 预期输出包含：`Passed: 72, Failed: 0, Skipped: 0`
+- [ ] 预期输出包含：`Passed: 110, Failed: 0, Skipped: 0`
 - [ ] 覆盖范围：MarkdownRenderer / BffConfigStore（DPAPI 加密）/ LanguageService（8 种 .resx 切换）/ ChatViewModel（SSE 流式）
 
 ### Android 单元测试（v1.5）
@@ -256,7 +256,7 @@
   ```bash
   cd android && ./gradlew testDebugUnitTest
   ```
-- [ ] 预期输出包含：`Tests: 95, Failures: 0, Errors: 0, Skipped: 0`
+- [ ] 预期输出包含：`Tests: 94, Failures: 0`（其中 2 条跳过）
 - [ ] 覆盖范围：ConversationDao / MessageDao（Room）/ MarkdownRenderer（Markwon）/ Rust JNI（4 个 native 函数 + *Safe 回退）/ LanguageManager（8 种 strings.xml 切换）
 
 ### 跨平台测试汇总

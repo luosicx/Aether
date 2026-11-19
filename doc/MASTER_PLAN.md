@@ -1303,6 +1303,8 @@ finalScore = 0.6 × cosineSimilarity
 
 ### 3.5 Agent 任务规划（2026-07-17，✅ 已实施）
 
+> **2026-11-19 更新**：该子系统从未接入生产入口，已在工程清理中整体移除（`Aether/Services/Agent/`、对应测试与 DAG/干预视图）。本节保留为历史规划；`AgentTask` 模型与 `AgentRole` 枚举仍保留以解码历史数据，未来重新接线时再按本节方案实现。
+
 > **统合来源**：原 `doc/plans/2026-07-17-agent-task-planning.md`（已统合到本文档）
 
 #### 3.5.1 背景与目标

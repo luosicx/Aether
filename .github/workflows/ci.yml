@@ -283,14 +283,13 @@ jobs:
           mkdir -p coverage-report
           # 创建空 coverage.xml 作为 fallback（xccov 在 Xcode 26.3 上不可用）
           echo '<coverage version="1"></coverage>' > coverage-report/coverage.xml
-          # 使用 xcrun xccov view --report 的文本输出，调用 scripts/xccov-to-cobertura.py 转换
-          # 脚本默认排除 Views/DesignSystem/App/Protocols/AetherTests 等无法单测的目录
-          xcrun xccov view --report TestResults.xcresult > /tmp/coverage_report.txt 2>/tmp/xccov_err.txt || {
-            echo "WARNING: xccov view --report failed, using empty coverage.xml"
+          # 只有 archive 格式带逐行 isExecutable/executionCount，report 只有文件级汇总
+          xcrun xccov view --archive --json TestResults.xcresult > /tmp/xccov_archive.json 2>/tmp/xccov_err.txt || {
+            echo "WARNING: xccov view --archive failed, using empty coverage.xml"
             cat /tmp/xccov_err.txt
             exit 0
           }
-          python3 scripts/xccov-to-cobertura.py /tmp/coverage_report.txt coverage-report/coverage.xml
+          python3 scripts/xccov-to-cobertura.py /tmp/xccov_archive.json coverage-report/coverage.xml
           LINE_RATE=$(python3 -c "import xml.etree.ElementTree as ET; r=ET.parse('coverage-report/coverage.xml').getroot(); covered=sum(1 for f in r.findall('file') for l in f.findall('lineToCover') if l.get('covered')=='true'); total=sum(1 for f in r.findall('file') for l in f.findall('lineToCover')); print(f'{covered/total:.4f}' if total else '0')")
           echo "coverage.xml line-rate: $LINE_RATE"
 
@@ -667,13 +666,13 @@ jobs:
           mkdir -p coverage-report-macos
           # 创建空 coverage.xml 作为 fallback（xccov 在某些 Xcode 版本对 macOS 结果不支持）
           echo '<coverage version="1"></coverage>' > coverage-report-macos/coverage.xml
-          xcrun xccov view --report TestResultsMacOS.xcresult > /tmp/coverage_report_macos.txt 2>/tmp/xccov_err.txt || {
-            echo "WARNING: xccov view --report failed for macOS, using empty coverage.xml"
+          xcrun xccov view --archive --json TestResultsMacOS.xcresult > /tmp/xccov_archive_macos.json 2>/tmp/xccov_err.txt || {
+            echo "WARNING: xccov view --archive failed for macOS, using empty coverage.xml"
             cat /tmp/xccov_err.txt
             exit 0
           }
-          # 调用 scripts/xccov-to-cobertura.py 完成 xccov 文本 → cobertura XML 转换
-          python3 scripts/xccov-to-cobertura.py /tmp/coverage_report_macos.txt coverage-report-macos/coverage.xml
+          # 使用真实逐行执行数据转换（非文件级汇总缩放）
+          python3 scripts/xccov-to-cobertura.py /tmp/xccov_archive_macos.json coverage-report-macos/coverage.xml
 
       - name: Upload macOS coverage report artifact
         if: always()

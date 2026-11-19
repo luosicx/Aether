@@ -782,7 +782,7 @@ print("利用率：\(snapshot.utilizationPercentage)%")
 
 ### 4.30 智能平台（v3.0）
 
-> v3.0 交付四大智能能力：Apple Intelligence 端侧 Provider、本地 RAG 混合检索增强、多 Agent 冲突仲裁、AI Workflow 自动化。当前 Apple Intelligence 与 Cross-Encoder 为骨架/占位实现，架构接入点已就绪。
+> v3.0 交付三大智能能力：Apple Intelligence 端侧 Provider、本地 RAG 混合检索增强、AI Workflow 自动化。当前 Apple Intelligence 与 Cross-Encoder 为骨架/占位实现，架构接入点已就绪。原多 Agent 冲突仲裁（ArbiterAgent / AgentTeam）随未接通的 Agent 编排栈在工程清理中整体移除。
 
 #### 4.30.1 Apple Intelligence 端侧 Provider
 
@@ -800,14 +800,10 @@ print("利用率：\(snapshot.utilizationPercentage)%")
 - **查询改写**：`rewriteQuery(_:)` 占位实现（去问号变体），待 LLM 集成后扩展同义词 / HyDE。
 - **Cross-Encoder 重排序**：当前为启发式占位评分（精确匹配率 80% + 长度归一化 20%），待 ONNX Runtime 集成后替换为真实模型评分。
 
-#### 4.30.3 多 Agent 冲突仲裁（ArbiterAgent）
+#### 4.30.3 多 Agent 冲突仲裁（已移除）
 
-- **三种决策策略**：
-  - `majority`（多数表决）：≥60% Agent 结果一致时通过，平票取置信度最高者；
-  - `priority`（角色优先级）：reviewer > researcher > coordinator > executor > planner；
-  - `userIntervention`（用户介入）：多数表决与优先级均无法决出，或超过 `maxRounds`（默认 5）轮次时强制人工介入。
-- **AgentTeam 预设模板**：`research`（researcher + reviewer + coordinator）、`coding`（编码团队）、`critique`（批判团队），支持 `tokenBudget` 预算控制与 `enableArbitration` 开关。
-- **编排结果**：`TeamOrchestrationResult` 记录最终结果、各 Agent 执行记录（`AgentResultRecord`）、仲裁结果与 token 消耗。
+- v3.0 曾交付 `ArbiterAgent`（majority / priority / userIntervention 三种策略）与 `AgentTeam` 预设模板（research / coding / critique）。
+- 该能力依赖的 Agent 编排栈从未接入生产入口（`AgentOrchestrator` 全仓无实例化），已在工程清理中整体移除；`AgentTask` 模型与 `AgentRole` 枚举保留用于历史数据解码。
 
 #### 4.30.4 AI Workflow 自动化
 
@@ -824,9 +820,8 @@ print("利用率：\(snapshot.utilizationPercentage)%")
 
 - `Aether/Services/LLM/AppleIntelligenceProvider.swift`：Apple Intelligence Provider
 - `Aether/Services/RAG/BM25Retriever.swift` / `CrossEncoderReranker.swift` / `HybridRAGService.swift`：混合检索三件套
-- `Aether/Services/Agent/ArbiterAgent.swift` / `AgentTeam.swift`：多 Agent 仲裁与团队编排
 - `Aether/Services/Workflow/WorkflowEngine.swift`：AI Workflow 执行引擎
-- 测试：`AetherTests/LLM/AppleIntelligenceProviderTests.swift`（14 用例）/ `AetherTests/RAG/HybridRAGServiceTests.swift`（24 用例）/ `AetherTests/Agent/ArbiterAgentTests.swift`（20 用例）/ `AetherTests/Workflow/WorkflowEngineTests.swift`（28 用例）
+- 测试：`AetherTests/LLM/AppleIntelligenceProviderTests.swift`（14 用例）/ `AetherTests/RAG/HybridRAGServiceTests.swift`（24 用例）/ `AetherTests/Workflow/WorkflowEngineTests.swift`（28 用例）
 
 ---
 

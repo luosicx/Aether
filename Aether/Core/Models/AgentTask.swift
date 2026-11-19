@@ -24,7 +24,7 @@ final class AgentTask {
     var updatedAt: Date
     /// 关联的会话 ID（可选）
     var conversationID: UUID?
-    /// Task 20: 最近一次检查点时间戳（CheckpointManager 写入）
+    /// 最近一次检查点时间戳（历史编排器写入；字段随模型保留以兼容旧数据）
     var checkpointAt: Date?
     /// Task 20: 检查点中已完成的子任务 ID 集合（JSON 编码存储，幂等恢复用）
     var completedNodeIDs: [UUID]
@@ -113,8 +113,8 @@ final class AgentTask {
 
     /// Task 20: 返回所有当前可执行的子任务（pending 且依赖全部为 completed/skipped）。
     ///
-    /// 用于 DAGExecutionEngine 并行调度：一次返回所有依赖已就绪的 pending 节点，
-    /// 上层可并行提交执行。`skipped` 节点视作"已完成"以放行后续依赖。
+    /// 供上层并行调度：一次返回所有依赖已就绪的 pending 节点。
+    /// `skipped` 节点视作"已完成"以放行后续依赖。
     /// - Returns: 可执行子任务数组（按 order 升序），可能为空
     func nextExecutableSubTasks() -> [SubTask] {
         let unblockedStatuses: Set<SubTaskStatus> = [.completed, .skipped]
@@ -181,15 +181,11 @@ struct SubTask: Codable, Identifiable, Hashable {
     /// `parallel: true` 表示同层兄弟节点之间无相互依赖，可并行调度；
     /// `parallel: false`（默认）表示同层兄弟节点默认串行依赖前一个。
     var parallel: Bool
-    /// Task 20: 节点深度（由 HierarchicalDecomposer 写入，根任务分解得到的为 1，再分解为 2，以此类推）
+    /// 节点深度（由目标分解器写入，根任务分解得到的为 1，再分解为 2，以此类推）
     var depth: Int
-    /// v1.1 Phase B: 节点级角色路由。
-    /// 非空时，DAG 引擎将此子任务路由到具有该角色的 AgentInstance 执行；
-    /// 为 nil 时回退到默认 executor 角色（保持单 Agent 流程向后兼容）。
+    /// 节点级角色路由。保留字段：当前无编排器消费，仅用于解码历史数据。
     var assignedRole: AgentRole?
-    /// v1.1 Phase B: 委派目标 Agent 实例 ID。
-    /// 非空时，DAG 引擎通过 AgentMessageBus 将子任务委派给指定 Agent 执行，
-    /// 等待结果返回后继续；为 nil 时由本机执行（保持向后兼容）。
+    /// 委派目标实例 ID。保留字段：当前无编排器消费，仅用于解码历史数据。
     var delegatedTo: UUID?
 
     /// 创建 SubTask 实例
@@ -219,7 +215,6 @@ struct SubTask: Codable, Identifiable, Hashable {
     }
 
     /// 用于 LLM 返回的 JSON 解码：id 可选以便 LLM 不返回 id 时自动生成
-    /// - SeeAlso: `GoalDecomposer.parseSubTasks(from:)`
     enum CodingKeys: String, CodingKey {
         case id, title, description, status, dependencies, toolName, result, order, parallel, depth, assignedRole, delegatedTo
     }
@@ -290,4 +285,16 @@ enum SubTaskStatus: String, Codable {
     case failed
     /// 已跳过（依赖失败或被用户跳过）
     case skipped
+}
+
+// MARK: - AgentRole
+
+/// 子任务指派角色。随 `SubTask.assignedRole` 一同持久化；编排器移除后保留用于解码历史数据。
+enum AgentRole: String, Codable {
+    case planner
+    case executor
+    case reviewer
+    case researcher
+    case critic
+    case coordinator
 }

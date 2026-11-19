@@ -20,6 +20,4 @@ extension Logger {
     static let memory = Logger(subsystem: "com.aether.app", category: "memory")
     /// MCP 模块：MCPClient、MCPClientManager、MCPSecurity 等
     static let mcp = Logger(subsystem: "com.aether.app", category: "mcp")
-    /// Agent 模块：AgentOrchestrator、DAGExecutionEngine、CheckpointManager 等
-    static let agent = Logger(subsystem: "com.aether.app", category: "agent")
 }
