@@ -99,6 +99,7 @@ public final class PluginManager {
     }
 
     /// 卸载插件工具：从 ToolRegistry 中注销插件声明的所有工具。
+    /// 同名内置/远程工具不在此列——插件注册时就被拒绝遮蔽，这里若按名注销会把原名工具删掉。
     /// - Parameter pluginID: 插件 ID
     /// - Throws: 插件未安装时抛出错误
     public func unloadPluginTools(pluginID: String) throws {
@@ -111,6 +112,10 @@ public final class PluginManager {
             return
         }
         for toolDef in manifest.tools {
+            if let registered = registry.getTool(named: toolDef.name),
+               !(registered is PluginToolAdapter) {
+                continue
+            }
             registry.unregister(name: toolDef.name)
         }
     }

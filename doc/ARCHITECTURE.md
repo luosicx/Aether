@@ -410,7 +410,7 @@ flowchart LR
 | Storage | `Services/Storage/ChatStorage.swift` | `@MainActor` SwiftData 持久化服务，封装 Conversation / ChatMessage / UserPreference 的 CRUD，含 `fetchPreference` / `savePreference` / `cleanupEmptyConversations`（批量清理空会话）。 |
 | Telemetry | `Services/Telemetry/TelemetryService.swift` | Day 14 遥测采集：收集 Provider 选择 / 路由决策 / Fallback 触发 / 缓存命中等事件，脱敏后批量上报。 |
 | Telemetry | `Services/Telemetry/LogUploader.swift` | Day 14 日志上传：脱敏后压缩上传到服务端，配合 CrashReportService 在下次启动时上报崩溃日志。 |
-| Tools | `Services/Tools/ToolRegistry.swift` | `@MainActor` 单例工具注册中心，注册 18 跨平台 + 11 macOS 独有工具（共 29 个），含 `NotificationService`（UNUserNotificationCenter 本地通知）。 |
+| Tools | `Services/Tools/ToolRegistry.swift` | `@MainActor` 单例工具注册中心，注册 18 跨平台 + 11 macOS 独有工具（共 29 个），含 `NotificationService`（UNUserNotificationCenter 本地通知）。`execute` 是唯一安全门：启用检查 + 授权判定（本地敏感 / 远程 MCP / 插件）+ `ToolAuditLogger` 审计；插件工具不得覆盖同名内置工具。 |
 | Tools | `Services/Tools/AlarmTool.swift` | 基于 `EventKit EKAlarm` 的闹钟工具。 |
 | Tools | `Services/Tools/ReminderTool.swift` | 基于 `EventKit EKReminder` 的提醒工具。 |
 | Voice | `Services/Voice/VoiceService.swift` | 语音服务，`AVAudioSession` + `SFSpeechRecognizer` 录音识别 + `AVSpeechSynthesizer` 朗读合成，朗读前应用 `TTSConfig`。 |
@@ -766,7 +766,7 @@ P2-6 重构将 ChatViewModel 中职责清晰的子模块抽取为 10 个 Coordin
 | `RetrievalCoordinator` | `Aether/Coordinators/RetrievalCoordinator.swift` | RAG 检索（`handleRAGRetrieving`）+ 语义缓存读写（`checkCache` / `writeCache`，仅非工具模式）+ embedding 降级（DeepSeek 不支持 embedding 时设置错误并清空 citations）+ `ragService` / `ragEmbeddingProvider` 按 `selectedProvider` 懒加载缓存（provider 变化时自动失效重建） | `RAGService` / `SemanticCache`（构造器注入）/ `EmbeddingService` / `KeychainManager.shared` / `DeepSeekClient`（兜底） | `@MainActor` |
 | `PromptBuilder` | `Aether/Coordinators/PromptBuilder.swift` | systemPrompt 构建（base + 【用户偏好】 + 【AI人设】）+ token 截断（`limitTokens`，按完整对话轮次分组，从尾部整组保留，避免拆散 assistant(tool_calls) 与 tool 结果） | 纯值类型（struct），无 Service 依赖 | 纯值类型（struct），无并发隔离标注（纯函数式逻辑） |
 | `InjectionGuard` | `Aether/Coordinators/InjectionGuard.swift` | 提示注入检测弹窗（`detect` 调用 `PromptInjectionDetector.isSuspicious`）+ 决策回调（`setDecisionHandler` / `proceed` / `cancel` 三态机，包装闭包路由到 proceed/cancel） | `PromptInjectionDetector`（静态调用） | `@MainActor` |
-| `ToolExecutionCoordinator` | `Aether/Coordinators/ToolExecutionCoordinator.swift` | ReAct 工具执行循环：编码 toolCalls 持久化 assistant 消息（含 toolCallData）、逐个执行工具（启用检查 / 授权确认 / 超时保护 `withThrowingTaskGroup` / 审计日志 / 成功通知 / 失败埋点）、在传入的原始 `apiMessages` 上追加 assistant + tool 结果（保留 system / RAG / 记忆上下文）；`ToolStep` / `ToolStepStatus` 类型迁移至此，ChatViewModel 通过 typealias 兼容 | `ToolRegistry.shared` / `ToolAuthorization.shared` / `ToolAuditLogger.shared` / `NotificationService.shared` / `TelemetryService.shared` | `@MainActor` |
+| `ToolExecutionCoordinator` | `Aether/Coordinators/ToolExecutionCoordinator.swift` | ReAct 工具执行循环：编码 toolCalls 持久化 assistant 消息（含 toolCallData）、逐个执行工具（超时保护 `withThrowingTaskGroup` / 成功通知 / 失败埋点；启用检查、授权确认与审计由 `ToolRegistry.execute` 统一处理）、在传入的原始 `apiMessages` 上追加 assistant + tool 结果（保留 system / RAG / 记忆上下文）；`ToolStep` / `ToolStepStatus` 类型迁移至此，ChatViewModel 通过 typealias 兼容 | `ToolRegistry.shared` / `NotificationService.shared` / `TelemetryService.shared` | `@MainActor` |
 
 **关键设计要点**：
 
@@ -1758,7 +1758,7 @@ sequenceDiagram
 | PerformanceMonitor | `Services/Performance/PerformanceMonitor.swift` | iOS 17.0+ / macOS 14.0+ |
 | PrivacyInfo.xcprivacy | `Resources/PrivacyInfo.xcprivacy` | iOS 17.0+ / macOS 14.0+ / Xcode 16+（App Store 审核要求） |
 | AttributedString（Markdown） | `Views/Chat/Markdown*.swift` / `CodeSyntaxHighlighter.swift` | iOS 17.0+ / macOS 14.0+ / Foundation |
-| XCTest | `AetherTests/` 203 文件（3564 用例） | Xcode 16+ / Swift 5.9+ |
+| XCTest | `AetherTests/` 203 文件（3570 用例） | Xcode 16+ / Swift 5.9+ |
 | XCUITest | `AetherUITests/` 7 文件（30 用例） | Xcode 16+ / Swift 5.9+ |
 | GitHub Actions | `.github/workflows/ci.yml` | macos-14 runner / Xcode 16+ |
 | CoreLocation | CLLocationManager + CLGeocoder | LocationTool 定位与反地理编码 | iOS 17.0+ / macOS 14.0+ / CoreLocation.framework |
@@ -1803,7 +1803,7 @@ sequenceDiagram
 ### 7.1 单元测试（UT）
 
 - **Target**：`AetherTests`
-- **规模**：203 个测试文件，3564 用例（3564 pass / 0 skip / 0 failures）
+- **规模**：203 个测试文件，3570 用例（3570 pass / 0 skip / 0 failures）
 - **分层覆盖**：
 
 | 层级 | 测试文件 | 文件数 | 核心断言数（约） | skip 原因 |
@@ -2155,7 +2155,7 @@ CloudflareWorkers/               # BFF 代理网关
 ├── worker.js
 └── wrangler.toml
 
-AetherTests/                  # 203 个 UT 文件 / 3564 用例
+AetherTests/                  # 203 个 UT 文件 / 3570 用例
 ├── APIConfigTests.swift
 ├── AlarmToolTests.swift
 ├── BFFProxyClientTests.swift

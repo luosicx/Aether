@@ -8,7 +8,9 @@
 import Foundation
 import EventKit
 import UserNotifications
+import os
 import AetherFoundation
+import AetherServices
 
 /// 工具注册中心，单例。默认注册 4 个工具：AlarmTool / ReminderTool / DateTimeTool / CalculatorTool。@MainActor 隔离。
 @MainActor
@@ -85,9 +87,26 @@ final class ToolRegistry {
         restoreEnabledStates()
     }
 
-    /// 注册工具，同名覆盖
+    /// 注册工具，同名覆盖。
+    /// 插件工具不得覆盖同名内置/远程工具（插件内容可被热更新，不能借此劫持既有工具）。
+    /// 插件工具注册晚于初始化，这里同时补齐启用状态（无持久化记录时默认启用）。
     func register(tool: ToolProtocol) {
-        tools[tool.definition.name] = tool
+        let name = tool.definition.name
+        if tool is PluginToolAdapter, let existing = tools[name], !(existing is PluginToolAdapter) {
+            Logger.tools.error("插件工具 \(name, privacy: .public) 与已注册工具同名，拒绝注册")
+            return
+        }
+        tools[name] = tool
+        guard tool is PluginToolAdapter else { return }
+        let key = userDefaultsKey(for: name)
+        if UserDefaults.standard.object(forKey: key) == nil {
+            enabledTools.insert(name)
+            UserDefaults.standard.set(true, forKey: key)
+        } else if UserDefaults.standard.bool(forKey: key) {
+            enabledTools.insert(name)
+        } else {
+            enabledTools.remove(name)
+        }
     }
 
     /// 按名注销工具。工具不存在时不报错（no-op）。
@@ -120,15 +139,54 @@ final class ToolRegistry {
         tools.count
     }
 
-    /// 执行工具。未注册或已禁用抛 NSError。返回工具执行结果字符串。
+    /// 执行工具：未注册 / 未启用 / 未授权均抛 NSError。返回工具执行结果字符串。
+    ///
+    /// 本方法是所有工具调用路径的唯一安全门：ReAct 循环、Agent DAG、MCP Server 入站
+    /// `tools/call` 都经过这里，授权判定与审计不再由各调用方各自实现。
     func execute(name: String, arguments: [String: Any]) async throws -> String {
+        let argumentsSummary = arguments.keys.sorted().joined(separator: ", ")
+        let startTime = Date()
+
         guard let tool = tools[name] else {
+            ToolAuditLogger.shared.log(toolName: name, argumentsSummary: argumentsSummary,
+                                       authorized: false, timestamp: startTime)
             throw NSError(domain: "ToolRegistry", code: 1, userInfo: [NSLocalizedDescriptionKey: "工具 \(name) 未注册"])
         }
         guard isEnabled(name: name) else {
+            ToolAuditLogger.shared.log(toolName: name, argumentsSummary: argumentsSummary,
+                                       authorized: false, timestamp: startTime)
             throw NSError(domain: "ToolRegistry", code: 3, userInfo: [NSLocalizedDescriptionKey: "工具 \(name) 未启用"])
         }
+
+        let authorized: Bool
+        if requiresAuthorization(name: name) {
+            authorized = await requestAuthorization(name: name, arguments: arguments)
+        } else {
+            authorized = true
+        }
+        // 审计写在执行前：超时/取消的任务不保证回到这里，但「谁在什么时候调用了什么」不能丢
+        ToolAuditLogger.shared.log(toolName: name, argumentsSummary: argumentsSummary,
+                                   authorized: authorized, timestamp: startTime)
+        guard authorized else {
+            throw NSError(domain: "ToolAuthorization", code: 2,
+                          userInfo: [NSLocalizedDescriptionKey: "用户拒绝了 \(name) 工具调用"])
+        }
         return try await tool.execute(arguments: arguments)
+    }
+
+    /// 请求运行时授权。远程 MCP 工具与插件工具只给会话级确认：
+    /// 二者内容都可能在重连/热更新后被替换，不能持久「始终允许」。
+    private func requestAuthorization(name: String, arguments: [String: Any]) async -> Bool {
+        let authResult: ToolAuthorizationResult
+        if isRemoteTool(name: name) || isPluginTool(name: name) || defaultDisabledTools.contains(name) {
+            let details = "工具：\(name)\n参数：\(arguments)"
+            authResult = await ToolAuthorization.shared.presentConfirmation(toolName: name, details: details)
+        } else {
+            let purpose = tools[name]?.definition.description ?? ""
+            authResult = await ToolAuthorization.shared.presentSensitiveAccessConfirmation(toolName: name, purpose: purpose)
+        }
+        guard case .authorized = authResult else { return false }
+        return true
     }
 
     /// 所有工具的 ToolDef 数组，用于告知 LLM 可调用工具
@@ -199,8 +257,10 @@ final class ToolRegistry {
     /// 指定工具是否需要显式授权（敏感工具）。
     /// 支持父工具名匹配其敏感子操作（如 `control_safari` 匹配 `control_safari.run_js`）。
     /// 远程 MCP 工具一律需要授权：Server 提供的工具定义不可信，且调用会越过本机边界。
+    /// 插件工具同样一律需要授权：插件代码与清单可热更新，且签名未校验。
     func requiresAuthorization(name: String) -> Bool {
         if isRemoteTool(name: name) { return true }
+        if isPluginTool(name: name) { return true }
         if sensitiveTools.contains(name) { return true }
         return sensitiveTools.contains { $0.hasPrefix("\(name).") }
     }
@@ -209,6 +269,12 @@ final class ToolRegistry {
     /// 远程工具定义可被 Server 随时替换，因此只提供会话级授权，不提供持久「始终允许」。
     func isRemoteTool(name: String) -> Bool {
         tools[name] is MCPToolAdapter
+    }
+
+    /// 是否为插件工具（由 PluginToolAdapter 注册）。
+    /// 插件工具默认启用，但每次会话首次调用都要用户确认。
+    func isPluginTool(name: String) -> Bool {
+        tools[name] is PluginToolAdapter
     }
 
     // MARK: - Private Helpers
