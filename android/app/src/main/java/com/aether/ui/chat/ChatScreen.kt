@@ -34,6 +34,8 @@ import com.aether.data.model.ChatMessage
 import com.aether.ui.theme.AetherColors
 import com.aether.ui.theme.AetherCornerRadius
 import com.aether.ui.theme.AetherSpacing
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collect
 
 /**
  * 聊天界面：消息列表 + 流式打字光标 + 输入栏 + 顶部栏。
@@ -53,7 +55,6 @@ fun ChatScreen(
     }
 
     val messages by viewModel.messages.collectAsStateWithLifecycle()
-    val streamingText by viewModel.streamingText.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
 
@@ -62,9 +63,20 @@ fun ChatScreen(
     val context = LocalContext.current
 
     // 新消息到达时滚动到底部
-    LaunchedEffect(messages.size, streamingText) {
+    LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.size - 1)
+        }
+    }
+
+    // 流式期间跟随底部。streamingText 只在副作用里订阅、不在组合作用域读取，
+    // 否则每个节流快照都会重组整屏（顶栏、输入栏也在内）。
+    val messageCount by rememberUpdatedState(messages.size)
+    LaunchedEffect(viewModel) {
+        viewModel.streamingText.collect { text ->
+            if (text.isNotEmpty()) {
+                listState.animateScrollToItem(messageCount)
+            }
         }
     }
 
@@ -123,13 +135,8 @@ fun ChatScreen(
                         onDelete = viewModel::deleteMessage
                     )
                 }
-                if (isLoading && streamingText.isEmpty()) {
-                    item { TypingIndicator() }
-                }
-                if (streamingText.isNotEmpty()) {
-                    item {
-                        StreamingBubble(streamingText)
-                    }
+                item(key = "streaming") {
+                    StreamingArea(viewModel.streamingText, isLoading)
                 }
             }
 
@@ -234,6 +241,15 @@ private fun MessageBubble(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun StreamingArea(streamingTextFlow: StateFlow<String>, isLoading: Boolean) {
+    val text by streamingTextFlow.collectAsStateWithLifecycle()
+    when {
+        text.isNotEmpty() -> StreamingBubble(text)
+        isLoading -> TypingIndicator()
     }
 }
 

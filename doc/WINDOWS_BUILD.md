@@ -69,7 +69,7 @@ windows/Aether.Windows/
     └── Strings.zh-Hant.resx
 ```
 
-单元测试项目 `windows/Aether.Windows.Tests/` 包含 7 个测试文件，共 105 个测试用例（xUnit）。
+单元测试项目 `windows/Aether.Windows.Tests/` 包含 8 个测试文件，共 110 个测试用例（xUnit）。
 
 ---
 
@@ -201,7 +201,7 @@ pwsh scripts/build-windows.ps1 -Command publish -Configuration Release -Runtime 
 - **i18n 国际化（8 种语言 .resx）**：8 种语言 `.resx` 文件（zh-Hans / en / ja / ko / fr / de / es / zh-Hant），`LanguageService` 管理语言切换。
 - **已集成 Rust DLL（SSE 解析 + 向量数学 + 脱敏）**：通过 `windows/Aether.Windows/Native/` 目录引用 `aether_core_ffi.dll`，CI 在 `windows-build` job 中自动构建并复制到该目录；`AetherNativeBridge` 提供 P/Invoke 桥接（DLL 不存在时安全降级），`AetherApiClient.UseRustSse` 可切换 SSE 解析路径。
 - **流式聊天（SSE）**：`AetherApiClient` 通过 SSE 接收 BFF 流式响应，支持 Rust DLL 与纯 C# 双路径。
-- **已新增 Aether.Windows.Tests xUnit 项目**：`windows/Aether.Windows.Tests/` 提供 7 个测试文件、105 个测试用例，CI 在 `windows-build` job 中执行 `dotnet test`，`scripts/build-windows.ps1 -Command test` 同样会扫描并运行测试项目。
+- **已新增 Aether.Windows.Tests xUnit 项目**：`windows/Aether.Windows.Tests/` 提供 8 个测试文件、110 个测试用例，CI 在 `windows-build` job 中执行 `dotnet test`，`scripts/build-windows.ps1 -Command test` 同样会扫描并运行测试项目。
 
 ### 7.1 功能清单
 
@@ -216,7 +216,7 @@ pwsh scripts/build-windows.ps1 -Command publish -Configuration Release -Runtime 
 | TypingIndicator | ✅ | 流式响应三圆点闪烁 |
 | 流式聊天（SSE） | ✅ | Rust DLL + 纯 C# 双路径 |
 | Rust FFI 集成 | ✅ | SSE 解析 + 向量数学 + 脱敏 |
-| 单元测试 | ✅ | Aether.Windows.Tests xUnit，7 文件 105 用例 |
+| 单元测试 | ✅ | Aether.Windows.Tests xUnit，8 文件 110 用例 |
 
 ---
 

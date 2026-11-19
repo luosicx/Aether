@@ -11,7 +11,15 @@ import kotlinx.coroutines.flow.*
 import kotlinx.serialization.json.*
 import java.io.IOException
 
-class ChatStreamClient(private val client: HttpClient, private val config: BffConfig) {
+/**
+ * 流式对话来源。抽出接口是为了让 ViewModel 能在纯 JVM 测试中替换实现：
+ * 真实 SSE 解析依赖 Rust JNI，测试环境没有 .so。
+ */
+fun interface ChatStreamSource {
+    fun streamChat(request: ChatRequest): Flow<String>
+}
+
+class ChatStreamClient(private val client: HttpClient, private val config: BffConfig) : ChatStreamSource {
 
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -22,7 +30,7 @@ class ChatStreamClient(private val client: HttpClient, private val config: BffCo
      *
      * SSE 解析统一走 Rust JNI（无状态单行解析，同时支持 OpenAI choices 与 BFF type/content 两种 envelope）。
      */
-    fun streamChat(request: ChatRequest): Flow<String> = channelFlow {
+    override fun streamChat(request: ChatRequest): Flow<String> = channelFlow {
         val response = client.post("${config.baseUrl}/chat/stream") {
             header("X-BFF-Token", config.userToken)
             accept(ContentType.Text.EventStream)

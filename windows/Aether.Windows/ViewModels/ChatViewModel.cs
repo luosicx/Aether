@@ -1,7 +1,6 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using System.Text;
 using System.Windows.Input;
 using Aether.Windows.Models;
 using Aether.Windows.Services;
@@ -109,12 +108,13 @@ public class ChatViewModel : INotifyPropertyChanged
                 ConversationId = ConversationId,
                 Model = _configStore?.DefaultModel ?? "deepseek-chat"
             };
-            var fullResponse = new StringBuilder();
+            // 100ms 节流：窗口内的 token 只累积，避免每个 token 都整段 ToString + 触发绑定
+            var throttler = new StreamingTextThrottler();
             await foreach (var chunk in _api.StreamChatAsync(request))
             {
-                fullResponse.Append(chunk);
-                StreamingText = fullResponse.ToString();
+                throttler.Append(chunk, text => StreamingText = text);
             }
+            var fullResponse = throttler.Flush();
 
             // 流式结束后将完整 assistant 内容渲染为 Markdown FlowDocument
             var assistantMessage = new ChatMessage
@@ -122,7 +122,7 @@ public class ChatViewModel : INotifyPropertyChanged
                 Id = Guid.NewGuid().ToString(),
                 ConversationId = ConversationId,
                 Role = "assistant",
-                Content = fullResponse.ToString(),
+                Content = fullResponse,
                 CreatedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
             };
             assistantMessage.MarkdownDocument = MarkdownRenderer.RenderToFlowDocument(assistantMessage.Content);

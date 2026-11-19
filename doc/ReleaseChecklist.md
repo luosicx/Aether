@@ -163,7 +163,7 @@
   ```bash
   cd windows && dotnet test Aether.sln
   ```
-- [ ] 预期输出：`Passed: 105` / `Failed: 0`（7 个测试文件，xUnit + WpfFact）
+- [ ] 预期输出：`Passed: 110` / `Failed: 0`（8 个测试文件，xUnit + WpfFact）
 - [ ] Rust `aether_core_ffi.dll` 构建验证：
   ```bash
   cd rust/aether-core-ffi && cargo build --release --target x86_64-pc-windows-msvc
@@ -182,7 +182,7 @@
   ```bash
   cd android && ./gradlew testDebugUnitTest
   ```
-- [ ] 预期输出：`Tests: 89, Failures: 0`（13 个测试文件，JUnit + Robolectric）
+- [ ] 预期输出：`Tests: 94, Failures: 0`（14 个测试文件，JUnit + Robolectric）
 - [ ] Rust `libaether_core_ffi.so` 构建（双架构）：
   ```bash
   cd rust/aether-core-ffi
@@ -239,8 +239,8 @@
 
 ### Windows 单元测试（v1.5）
 
-- [ ] Windows 测试用例数 = 105（105 pass / 0 skip / 0 failures）
-- [ ] Windows 测试文件数 = 7（xUnit + WpfFact）
+- [ ] Windows 测试用例数 = 110（110 pass / 0 skip / 0 failures）
+- [ ] Windows 测试文件数 = 8（xUnit + WpfFact）
 - [ ] 验证命令：
   ```bash
   cd windows && dotnet test Aether.sln --logger:"console;verbosity=normal"
@@ -250,8 +250,8 @@
 
 ### Android 单元测试（v1.5）
 
-- [ ] Android 测试用例数 = 105（105 pass / 0 skip / 0 failures）
-- [ ] Android 测试文件数 = 12（JUnit + Robolectric）
+- [ ] Android 测试用例数 = 94（0 failures，2 skipped）
+- [ ] Android 测试文件数 = 14（JUnit + Robolectric）
 - [ ] 验证命令：
   ```bash
   cd android && ./gradlew testDebugUnitTest

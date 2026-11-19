@@ -9,12 +9,10 @@
  * 流程：
  *   1. 鉴权 + 限流
  *   2. 加载会话（若 conversationId 为空则自动创建）
- *   3. 拉取历史消息（最近 N 条）
- *   4. 若 memoryEnabled，检索相关长期记忆
- *   5. RAG：检索相关文档分块
- *   6. buildContext 构建 messages
- *   7. 调用 LLM 流式接口，SSE 透传增量
- *   8. 后台持久化用户消息 + 助手完整响应（ctx.waitUntil）
+ *   3. 并行拉取历史消息（最近 N 条）+ 长期记忆检索 + RAG 文档分块检索
+ *   4. buildContext 构建 messages
+ *   5. 调用 LLM 流式接口，SSE 透传增量
+ *   6. 后台持久化用户消息 + 助手完整响应（ctx.waitUntil）
  *
  * SSE 格式：
  *   data: {"type":"delta","content":"xxx"}\n\n
@@ -90,18 +88,16 @@ export async function handleChatStream(request, env, ctx) {
     conversationId = newId();
   }
 
-  // 3. 拉取历史消息（DB 可用时）
-  let history = [];
-  if (db && body.conversationId) {
-    try {
-      history = await db.loadHistory(conversationId, HISTORY_LIMIT);
-    } catch (err) {
-      console.error("load history error:", err && err.message);
-    }
-  }
-
-  // 4 & 5. 并行检索记忆 + RAG 文档
-  const [memories, relevantDocs] = await Promise.all([
+  // 3-5. 历史消息、记忆、RAG 文档互不依赖，并行查询：首字前少一次串行 D1 往返。
+  const historyPromise =
+    db && body.conversationId
+      ? db.loadHistory(conversationId, HISTORY_LIMIT).catch((err) => {
+          console.error("load history error:", err && err.message);
+          return [];
+        })
+      : Promise.resolve([]);
+  const [history, memories, relevantDocs] = await Promise.all([
+    historyPromise,
     db && memoryEnabled ? db.searchMemories(body.message, 5) : Promise.resolve([]),
     db ? db.searchChunks(body.message, 3) : Promise.resolve([]),
   ]);
