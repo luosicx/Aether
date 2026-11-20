@@ -12,7 +12,7 @@ android {
     defaultConfig {
         applicationId = "com.aether.app"
         minSdk = 29
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 100
         versionName = "1.0.0"
         // BFF 端点配置（可在 build.gradle 中覆盖）
