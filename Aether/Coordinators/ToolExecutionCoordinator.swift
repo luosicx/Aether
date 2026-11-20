@@ -155,8 +155,13 @@ final class ToolExecutionCoordinator: Coordinator {
             onToolStepAppend(step)
             // Day 14: 记录工具执行开始时间，用于计算 duration
             let toolStartTime = Date()
-            let argsData = tc.arguments.data(using: .utf8) ?? Data()
-            let parsedArgs = (try? JSONSerialization.jsonObject(with: argsData) as? [String: Any]) ?? [:]
+            // 子任务闭包只捕获 Sendable 值：`[String: Any]` 不是 Sendable，在主 actor 上解析后
+            // 传进任务组会触发「sending 值可能导致数据竞争」诊断（Swift 6 语言模式下是错误），
+            // 所以把解析挪进子任务，用可跨域的 JSON 字符串（tc.arguments）传参。
+            let argsJSON = tc.arguments
+            let toolCallName = tc.name
+            // 超时闭包同样不能直接读 @MainActor 的 self.toolTimeout，先取本地常量。
+            let timeout = toolTimeout
             do {
                 // 启用检查 / 授权确认 / 审计统一在 ToolRegistry.execute 的安全门内完成，
                 // 这里只负责超时保护与 UI 状态迁移。
@@ -165,11 +170,13 @@ final class ToolExecutionCoordinator: Coordinator {
                 //       超时后标记 failed 继续下一轮，保证 ReAct 不因单工具卡死而中断。
                 let result = try await withThrowingTaskGroup(of: String.self) { group in
                     group.addTask {
-                        try await ToolRegistry.shared.execute(name: tc.name, arguments: parsedArgs)
+                        let argsData = argsJSON.data(using: .utf8) ?? Data()
+                        let parsedArgs = (try? JSONSerialization.jsonObject(with: argsData) as? [String: Any]) ?? [:]
+                        return try await ToolRegistry.shared.execute(name: toolCallName, arguments: parsedArgs)
                     }
                     group.addTask {
-                        try await Task.sleep(nanoseconds: UInt64(self.toolTimeout * 1_000_000_000))
-                        throw NSError(domain: "ToolTimeout", code: -1, userInfo: [NSLocalizedDescriptionKey: String(format: NSLocalizedString("工具执行超时（%ds）", comment: ""), Int(self.toolTimeout))])
+                        try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                        throw NSError(domain: "ToolTimeout", code: -1, userInfo: [NSLocalizedDescriptionKey: String(format: NSLocalizedString("工具执行超时（%ds）", comment: ""), Int(timeout))])
                     }
                     let first = try await group.next() ?? ""
                     group.cancelAll()
