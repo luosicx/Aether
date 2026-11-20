@@ -51,6 +51,21 @@ configurations.all {
     exclude(group = "org.jetbrains", module = "annotations-java5")
 }
 
+// Robolectric 运行时默认用 MavenArtifactFetcher 现场访问 Maven Central 下载 android-all jar，
+// CI 上偶发 404 会让全部 Robolectric 用例一起失败。改由 Gradle 解析（带重试和构建缓存）
+// 预置到本地目录，测试进程只读本地文件，不再触网。
+// 每个 SDK 版本一个 configuration：同一 module 无法同时解析两个版本。
+val robolectricSdkJars = listOf(
+    "14-robolectric-10818077-i7",  // sdk=34（robolectric.properties）
+    "15-robolectric-12650502-i7",  // targetSdk=35
+).mapIndexed { index, version ->
+    configurations.create("robolectricSdk$index") {
+        isCanBeConsumed = false
+        isCanBeResolved = true
+        isTransitive = false
+    }.also { dependencies.add(it.name, "org.robolectric:android-all-instrumented:$version") }
+}
+
 dependencies {
     // Compose BOM
     val composeBom = platform("androidx.compose:compose-bom:2026.09.00")
@@ -103,10 +118,19 @@ dependencies {
     testImplementation("androidx.test:core:1.5.0")
 }
 
+val robolectricJarsDir = layout.buildDirectory.dir("robolectric-jars")
+
+val syncRobolectricJars by tasks.registering(Sync::class) {
+    robolectricSdkJars.forEach { from(it) }
+    into(robolectricJarsDir)
+}
+
 // Robolectric 需要在 user.home 创建 .robolectric-download-lock 锁文件，
 // TRAE IDE 沙箱可能阻止在真实 home 目录写入，重定向到 build 目录
 tasks.withType<Test> {
+    dependsOn(syncRobolectricJars)
     val robolectricHome = layout.buildDirectory.dir("robolectric-home").get().asFile
     doFirst { robolectricHome.mkdirs() }
     systemProperty("user.home", robolectricHome.absolutePath)
+    systemProperty("robolectric.dependency.dir", robolectricJarsDir.get().asFile.absolutePath)
 }
