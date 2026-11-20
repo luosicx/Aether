@@ -47,9 +47,17 @@ final class PluginSettingsUITests: XCTestCase {
     /// 停止条件不能用 isHittable：元素只露出几 pt 时它也为真，而中心仍在屏外，tap 会落空。
     /// 拖拽要在终点停住再抬手（thenHoldForDuration），抬手速度归零才不会带惯性过冲：
     /// swipeUp 和直接抬手的拖拽都会甩过目标节，而 Form 懒渲染，甩过去就再也找不回来
-    /// （CI 实测四条用例 3 次滑动即命中，失败那条滑满 10 次仍未命中）；
+    /// （CI 实测连拖 6 次后整个设置 Form 从树上消失）；
     /// 过冲后只能反向拖，而在 Form 顶部反向拖等于 sheet 的下滑关闭手势。
-    private func scrollToElement(_ element: XCUIElement, in app: XCUIApplication, maxAttempts: Int = 10) {
+    /// 注意 withVelocity 是拖拽本身的速度而非抬手速度，调小它只会把拖拽拉长到挂死。
+    ///
+    /// CI 上有两种会让单次拖拽白走的情况，固定起点 + 10 次预算不够稳
+    /// （#80 两轮红在 pluginManagementLink 上）：
+    /// 1. runner 重负载时手势合成变慢，系统只识别到后半程，实际滚动远小于半屏；
+    /// 2. 起点压上 Slider / TextEditor 这类吃手势的行，整次拖拽根本不滚。
+    /// 因此每次重试轮换起点（错开行高，也错开可能吃手势的控件），预算放大到 16 次；
+    /// 全部落空后再用 swipeUp 兜底（距离更大，有过冲风险，但此时已无更稳的手段）。
+    private func scrollToElement(_ element: XCUIElement, in app: XCUIApplication, maxAttempts: Int = 16) {
         // 三个候选都要查 .exists：视图切换瞬间可能一个滚动容器都没有，
         // 直接对不存在的 firstMatch 取坐标会抛「Failed to get matching snapshot」。
         func scroller() -> XCUIElement? {
@@ -60,34 +68,58 @@ final class PluginSettingsUITests: XCTestCase {
         }
         var attempts = 0
         var nudges = 0
+        // 轮换拖拽起点：不同 dy 错开行，不同 dx 避开右侧开关与左侧输入框
+        let starts: [(CGFloat, CGFloat)] = [(0.5, 0.75), (0.3, 0.60), (0.7, 0.82), (0.42, 0.68)]
         while attempts < maxAttempts {
             guard let container = scroller() else {
                 attempts += 1
-                _ = element.waitForExistence(timeout: 1)
+                _ = pollExists(element, timeout: 1)
                 continue
             }
-            // 元素已渲染但只露出一部分时，再整屏拖一次会把它推出懒渲染窗口、再也找不回来
-            // （CI 上 testUninstallPlugin 就是这样滑满 10 次仍未命中）。改为约 1/6 屏的小步微调。
-            // 向下微调只在目标已渲染且位于可视区上方时发生，此时 Form 不在顶部，不会触发下滑关闭。
-            if element.exists, element.isHittable, nudges < 4 {
+            if element.exists, element.isHittable {
                 let visible = container.frame
                 let frame = element.frame
                 if frame.minY >= visible.minY, frame.maxY <= visible.maxY { return }
-                let above = frame.minY < visible.minY
-                let from = container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: above ? 0.42 : 0.58))
-                let to = container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: above ? 0.58 : 0.42))
-                from.press(forDuration: 0.05, thenDragTo: to, withVelocity: .default, thenHoldForDuration: 0.3)
-                nudges += 1
-                _ = element.waitForExistence(timeout: 1)
-                continue
+                // 元素已渲染但只露出一部分时，再整屏拖一次会把它推出懒渲染窗口、再也找不回来
+                // （CI 上 testUninstallPlugin 就是这样滑满 10 次仍未命中）。改为约 1/6 屏的小步微调。
+                // 向下微调只在目标已渲染且位于可视区上方时发生，此时 Form 不在顶部，不会触发下滑关闭。
+                if nudges < 4 {
+                    let above = frame.minY < visible.minY
+                    let from = container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: above ? 0.42 : 0.58))
+                    let to = container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: above ? 0.58 : 0.42))
+                    from.press(forDuration: 0.05, thenDragTo: to, withVelocity: .default, thenHoldForDuration: 0.3)
+                    nudges += 1
+                    _ = pollExists(element, timeout: 1)
+                    continue
+                }
+                return
             }
-            if element.exists, element.isHittable { return }
-            let from = container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.75))
-            let to = container.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25))
+            let (dx, dy) = starts[attempts % starts.count]
+            let from = container.coordinate(withNormalizedOffset: CGVector(dx: dx, dy: dy))
+            let to = container.coordinate(withNormalizedOffset: CGVector(dx: dx, dy: max(dy - 0.55, 0.08)))
             from.press(forDuration: 0.05, thenDragTo: to, withVelocity: .default, thenHoldForDuration: 0.3)
             attempts += 1
-            _ = element.waitForExistence(timeout: 1)
+            _ = pollExists(element, timeout: 1)
         }
+        // 兜底：press-drag 全部落空（多半是手势一直被吃）时改用系统 swipeUp
+        if !element.exists, let container = scroller() {
+            for _ in 0..<3 where !element.exists {
+                container.swipeUp(velocity: .slow)
+                _ = pollExists(element, timeout: 1)
+            }
+        }
+    }
+
+    /// 轮询元素是否出现，替代 `waitForExistence` 的超时等待。
+    /// XCTest 在 waitForExistence 超时时会抓 accessibility 全树快照做失败分诊，
+    /// 滚动循环里每次落空都要付 1s 等待 + 快照开销；轮询 exists 只查一次树、不留分诊记录。
+    private func pollExists(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if element.exists { return true }
+            Thread.sleep(forTimeInterval: 0.1)
+        }
+        return element.exists
     }
 
     // MARK: - 流 1：进入插件管理页
