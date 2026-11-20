@@ -2,16 +2,13 @@
     <string name="app_name">Aether</string>
 
     <!-- Gesprächsliste -->
-    <string name="conversation_list_title">Gespräche</string>
     <string name="conversation_list_new">Neues Gespräch</string>
-    <string name="conversation_list_empty">Keine Gespräche</string>
     <string name="conversation_list_empty_hint">Noch keine Gespräche. Tippen Sie unten rechts auf die Schaltfläche, um zu beginnen.</string>
     <string name="conversation_list_delete">Löschen</string>
     <string name="conversation_list_pin">Anheften</string>
     <string name="conversation_list_unpin">Lösen</string>
     <string name="conversation_list_pinned">Angeheftet</string>
     <string name="conversation_list_start_chat">Tippen, um Gespräch zu starten</string>
-    <string name="conversation_list_new_conversation">Neues Gespräch %1$d</string>
 
     <!-- Chat -->
     <string name="chat_send">Senden</string>
@@ -19,12 +16,8 @@
     <string name="chat_thinking">Denke nach…</string>
     <string name="chat_copy">Kopieren</string>
     <string name="chat_retry">Erneut senden</string>
-    <string name="chat_delete_message">Nachricht löschen</string>
     <string name="chat_delete">Löschen</string>
     <string name="chat_close">Schließen</string>
-    <string name="chat_load_messages_failed">Nachrichten konnten nicht geladen werden: %1$s</string>
-    <string name="chat_send_failed">Senden fehlgeschlagen: %1$s</string>
-    <string name="chat_delete_message_failed">Nachricht konnte nicht gelöscht werden: %1$s</string>
     <string name="chat_knowledge_base">Wissensbasis</string>
     <string name="chat_settings">Einstellungen</string>
     <string name="chat_back">Zurück</string>
@@ -34,7 +27,6 @@
     <string name="settings_bff_gateway">BFF-Gateway</string>
     <string name="settings_bff_url">BFF-Endpunkt-URL</string>
     <string name="settings_bff_token">X-BFF-Token</string>
-    <string name="settings_bff_token_label">BFF-Token</string>
     <string name="settings_default_model">Standardmodell</string>
     <string name="settings_model">Modell</string>
     <string name="settings_show_token">Anzeigen</string>
@@ -87,16 +79,7 @@
     <string name="health_close">Schließen</string>
 
     <!-- Allgemein -->
-    <string name="common_loading">Lädt…</string>
-    <string name="common_error">Ein Fehler ist aufgetreten</string>
-    <string name="common_retry">Erneut versuchen</string>
-    <string name="common_confirm">Bestätigen</string>
-    <string name="common_cancel">Abbrechen</string>
     <string name="common_close">Schließen</string>
 
     <!-- ViewModel-Fehlermeldungen -->
-    <string name="error_load_conversations_failed">Gespräche konnten nicht geladen werden: %1$s</string>
-    <string name="error_create_conversation_failed">Gespräch konnte nicht erstellt werden: %1$s</string>
-    <string name="error_update_failed">Aktualisierung fehlgeschlagen: %1$s</string>
-    <string name="error_delete_failed">Löschen fehlgeschlagen: %1$s</string>
 </resources>

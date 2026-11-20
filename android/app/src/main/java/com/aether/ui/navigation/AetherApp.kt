@@ -1,5 +1,6 @@
 package com.aether.ui.navigation
 
+import android.annotation.SuppressLint
 import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -40,7 +41,11 @@ import java.net.URLEncoder
  * 简易服务定位器：持有 HttpClient 单例与可变 BFF 配置，
  * 在应用启动时由 MainActivity.init(context) 初始化并从 DataStore 同步配置。
  * ViewModel 通过此对象获取 API 客户端与 Repository。
+ *
+ * init 只接受 applicationContext（随进程存活，不随 Activity 销毁），
+ * 因此这里的静态持有不构成泄漏；lint 看不到这层约束，按误报抑制。
  */
+@SuppressLint("StaticFieldLeak")
 object ServiceLocator {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var store: BffConfigStore? = null
