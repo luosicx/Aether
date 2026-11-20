@@ -443,6 +443,28 @@ jobs:
           fi
           exit $status
 
+      - name: Warm up simulator
+        # 失败几乎总是落在整轮第一个用例上（例如 testConversationContextMenuActions 的
+        # 「Failed to launch ... Timed out while launching application via Xcode」）：
+        # 模拟器冷启动 + testmanagerd 首次自动化会话建立超过 60s launch 上限，之后同一轮
+        # 里的 launch 只需 2-7s。先在可重试的步骤里把冒烟用例跑一遍，让正式轮的第一次
+        # launch 变成热启动；冷启动若真的卡死，这里两次尝试都失败即红，和原来一样。
+        uses: nick-fields/retry@v4
+        with:
+          timeout_minutes: 10
+          max_attempts: 2
+          retry_on: error
+          command: |
+            xcodebuild test-without-building \
+              -project Aether.xcodeproj \
+              -scheme Aether-iOS \
+              -destination 'platform=iOS Simulator,name=${{ env.IOS_SIMULATOR_NAME }},arch=arm64' \
+              -configuration Debug \
+              -derivedDataPath build \
+              -only-testing:AetherUITests/AetherUITestsLaunchUITests \
+              -parallel-testing-enabled NO \
+              CODE_SIGNING_ALLOWED=NO ARCHS=arm64 SWIFT_STRICT_CONCURRENCY=complete
+
       - name: Run UI Tests
         id: test
         # 见 unit-tests：xcodebuild 的 65 交给 xcresult 闸门判定，避免 error 注释
