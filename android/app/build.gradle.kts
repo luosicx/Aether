@@ -88,7 +88,7 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.1.0")
 
     // Jetpack Security (加密存储敏感数据，如 BFF Token)
-    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    implementation("androidx.security:security-crypto:1.1.0")
 
     // Room (本地持久化)；2.7+ 才完整支持 KSP2
     implementation("androidx.room:room-runtime:2.8.5")
