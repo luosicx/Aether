@@ -2,16 +2,13 @@
     <string name="app_name">Aether</string>
 
     <!-- Lista de conversaciones -->
-    <string name="conversation_list_title">Conversaciones</string>
     <string name="conversation_list_new">Nueva conversación</string>
-    <string name="conversation_list_empty">No hay conversaciones</string>
     <string name="conversation_list_empty_hint">No hay conversaciones. Toca el botón de la parte inferior derecha para empezar.</string>
     <string name="conversation_list_delete">Eliminar</string>
     <string name="conversation_list_pin">Fijar</string>
     <string name="conversation_list_unpin">Desfijar</string>
     <string name="conversation_list_pinned">Fijado</string>
     <string name="conversation_list_start_chat">Toca para iniciar una conversación</string>
-    <string name="conversation_list_new_conversation">Nueva conversación %1$d</string>
 
     <!-- Chat -->
     <string name="chat_send">Enviar</string>
@@ -19,12 +16,8 @@
     <string name="chat_thinking">Pensando…</string>
     <string name="chat_copy">Copiar</string>
     <string name="chat_retry">Reenviar</string>
-    <string name="chat_delete_message">Eliminar mensaje</string>
     <string name="chat_delete">Eliminar</string>
     <string name="chat_close">Cerrar</string>
-    <string name="chat_load_messages_failed">Error al cargar mensajes: %1$s</string>
-    <string name="chat_send_failed">Error al enviar: %1$s</string>
-    <string name="chat_delete_message_failed">Error al eliminar el mensaje: %1$s</string>
     <string name="chat_knowledge_base">Base de conocimiento</string>
     <string name="chat_settings">Ajustes</string>
     <string name="chat_back">Atrás</string>
@@ -34,7 +27,6 @@
     <string name="settings_bff_gateway">Pasarela BFF</string>
     <string name="settings_bff_url">URL del endpoint BFF</string>
     <string name="settings_bff_token">X-BFF-Token</string>
-    <string name="settings_bff_token_label">Token BFF</string>
     <string name="settings_default_model">Modelo predeterminado</string>
     <string name="settings_model">Modelo</string>
     <string name="settings_show_token">Mostrar</string>
@@ -87,16 +79,7 @@
     <string name="health_close">Cerrar</string>
 
     <!-- Común -->
-    <string name="common_loading">Cargando…</string>
-    <string name="common_error">Algo salió mal</string>
-    <string name="common_retry">Reintentar</string>
-    <string name="common_confirm">Confirmar</string>
-    <string name="common_cancel">Cancelar</string>
     <string name="common_close">Cerrar</string>
 
     <!-- Mensajes de error del ViewModel -->
-    <string name="error_load_conversations_failed">Error al cargar conversaciones: %1$s</string>
-    <string name="error_create_conversation_failed">Error al crear conversación: %1$s</string>
-    <string name="error_update_failed">Error al actualizar: %1$s</string>
-    <string name="error_delete_failed">Error al eliminar: %1$s</string>
 </resources>

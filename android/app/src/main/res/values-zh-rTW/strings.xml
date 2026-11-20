@@ -2,16 +2,13 @@
     <string name="app_name">以太</string>
 
     <!-- 會話列表 -->
-    <string name="conversation_list_title">會話列表</string>
     <string name="conversation_list_new">新建會話</string>
-    <string name="conversation_list_empty">暫無會話</string>
     <string name="conversation_list_empty_hint">暫無會話，點擊右下角開始對話</string>
     <string name="conversation_list_delete">刪除</string>
     <string name="conversation_list_pin">置頂</string>
     <string name="conversation_list_unpin">取消置頂</string>
     <string name="conversation_list_pinned">已置頂</string>
     <string name="conversation_list_start_chat">點擊開始對話</string>
-    <string name="conversation_list_new_conversation">新會話 %1$d</string>
 
     <!-- 聊天 -->
     <string name="chat_send">傳送</string>
@@ -19,12 +16,8 @@
     <string name="chat_thinking">思考中…</string>
     <string name="chat_copy">複製</string>
     <string name="chat_retry">重發</string>
-    <string name="chat_delete_message">刪除訊息</string>
     <string name="chat_delete">刪除</string>
     <string name="chat_close">關閉</string>
-    <string name="chat_load_messages_failed">載入訊息失敗：%1$s</string>
-    <string name="chat_send_failed">傳送失敗：%1$s</string>
-    <string name="chat_delete_message_failed">刪除訊息失敗：%1$s</string>
     <string name="chat_knowledge_base">知識庫</string>
     <string name="chat_settings">設定</string>
     <string name="chat_back">返回</string>
@@ -34,7 +27,6 @@
     <string name="settings_bff_gateway">BFF 閘道</string>
     <string name="settings_bff_url">BFF 端點 URL</string>
     <string name="settings_bff_token">X-BFF-Token</string>
-    <string name="settings_bff_token_label">BFF 權杖</string>
     <string name="settings_default_model">預設模型</string>
     <string name="settings_model">模型</string>
     <string name="settings_show_token">顯示</string>
@@ -87,16 +79,7 @@
     <string name="health_close">關閉</string>
 
     <!-- 通用 -->
-    <string name="common_loading">載入中…</string>
-    <string name="common_error">發生錯誤</string>
-    <string name="common_retry">重試</string>
-    <string name="common_confirm">確認</string>
-    <string name="common_cancel">取消</string>
     <string name="common_close">關閉</string>
 
     <!-- ViewModel 錯誤訊息 -->
-    <string name="error_load_conversations_failed">載入會話失敗：%1$s</string>
-    <string name="error_create_conversation_failed">建立會話失敗：%1$s</string>
-    <string name="error_update_failed">更新失敗：%1$s</string>
-    <string name="error_delete_failed">刪除失敗：%1$s</string>
 </resources>
