@@ -57,7 +57,6 @@ configurations.all {
 // 每个 SDK 版本一个 configuration：同一 module 无法同时解析两个版本。
 val robolectricSdkJars = listOf(
     "14-robolectric-10818077-i7",  // sdk=34（robolectric.properties）
-    "15-robolectric-12650502-i7",  // targetSdk=35
 ).mapIndexed { index, version ->
     configurations.create("robolectricSdk$index") {
         isCanBeConsumed = false
@@ -112,7 +111,7 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
     testImplementation("androidx.room:room-testing:2.8.5")
-    testImplementation("org.robolectric:robolectric:4.14.1")
+    testImplementation("org.robolectric:robolectric:4.18.1")
     testImplementation("io.ktor:ktor-client-mock:3.6.1")
     testImplementation("io.ktor:ktor-http:3.6.1")
     testImplementation("androidx.test:core:1.7.0")
