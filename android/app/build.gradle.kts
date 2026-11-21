@@ -97,7 +97,7 @@ dependencies {
 
     // Kotlinx Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.13.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 
     // Markwon (Markdown 渲染：core + 表格 + 任务列表 + 删除线 + 链接 + 语法高亮)
     implementation("io.noties.markwon:core:4.6.2")
@@ -110,7 +110,7 @@ dependencies {
 
     // ===== 单元测试依赖 =====
     testImplementation("junit:junit:4.13.2")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
     testImplementation("androidx.room:room-testing:2.8.5")
     testImplementation("org.robolectric:robolectric:4.14.1")
     testImplementation("io.ktor:ktor-client-mock:3.6.1")
