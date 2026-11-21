@@ -58,6 +58,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-xcode-ios-unit-
 
+      - name: 清掉与当前镜像不兼容的 clang 模块缓存
+        # DerivedData 缓存可能来自旧 runner 镜像：镜像滚动更新后 SDK 里 modulemap 的
+        # mtime 变了，缓存中的 pcm 会被判过期，报 "has been modified since the module
+        # file ... was built: mtime changed" 直接让构建失败（2026-11-21 两次踩到）。
+        # DerivedData 的其余产物继续复用，只让 clang 重建模块缓存与 stat 缓存。
+        run: rm -rf build/DerivedData/ModuleCache.noindex build/DerivedData/SDKStatCaches.noindex
+
       - name: Download xcframework
         uses: actions/download-artifact@v7
         with:
@@ -410,6 +417,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-xcode-ios-ui-
 
+      - name: 清掉与当前镜像不兼容的 clang 模块缓存
+        # DerivedData 缓存可能来自旧 runner 镜像：镜像滚动更新后 SDK 里 modulemap 的
+        # mtime 变了，缓存中的 pcm 会被判过期，报 "has been modified since the module
+        # file ... was built: mtime changed" 直接让构建失败（2026-11-21 两次踩到）。
+        # DerivedData 的其余产物继续复用，只让 clang 重建模块缓存与 stat 缓存。
+        run: rm -rf build/DerivedData/ModuleCache.noindex build/DerivedData/SDKStatCaches.noindex
+
       - name: Download xcframework
         uses: actions/download-artifact@v7
         with:
@@ -544,6 +558,13 @@ jobs:
           key: ${{ runner.os }}-xcode-${{ steps.setup-xcode.outputs.xcode-version }}-macos-unit-${{ hashFiles('Packages/AetherCore/Package.resolved', 'Aether.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
           restore-keys: |
             ${{ runner.os }}-xcode-macos-unit-
+
+      - name: 清掉与当前镜像不兼容的 clang 模块缓存
+        # DerivedData 缓存可能来自旧 runner 镜像：镜像滚动更新后 SDK 里 modulemap 的
+        # mtime 变了，缓存中的 pcm 会被判过期，报 "has been modified since the module
+        # file ... was built: mtime changed" 直接让构建失败（2026-11-21 两次踩到）。
+        # DerivedData 的其余产物继续复用，只让 clang 重建模块缓存与 stat 缓存。
+        run: rm -rf build/DerivedData/ModuleCache.noindex build/DerivedData/SDKStatCaches.noindex
 
       - name: Download xcframework
         uses: actions/download-artifact@v7
@@ -1267,6 +1288,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-xcode-watch-widget-
 
+      - name: 清掉与当前镜像不兼容的 clang 模块缓存
+        # DerivedData 缓存可能来自旧 runner 镜像：镜像滚动更新后 SDK 里 modulemap 的
+        # mtime 变了，缓存中的 pcm 会被判过期，报 "has been modified since the module
+        # file ... was built: mtime changed" 直接让构建失败（2026-11-21 两次踩到）。
+        # DerivedData 的其余产物继续复用，只让 clang 重建模块缓存与 stat 缓存。
+        run: rm -rf build/DerivedData/ModuleCache.noindex build/DerivedData/SDKStatCaches.noindex
+
       - name: Download xcframework
         uses: actions/download-artifact@v7
         with:
@@ -1318,6 +1346,13 @@ jobs:
           key: ${{ runner.os }}-xcode-${{ steps.setup-xcode.outputs.xcode-version }}-duo-${{ hashFiles('Packages/AetherCore/Package.resolved', 'Aether.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
           restore-keys: |
             ${{ runner.os }}-xcode-duo-
+
+      - name: 清掉与当前镜像不兼容的 clang 模块缓存
+        # DerivedData 缓存可能来自旧 runner 镜像：镜像滚动更新后 SDK 里 modulemap 的
+        # mtime 变了，缓存中的 pcm 会被判过期，报 "has been modified since the module
+        # file ... was built: mtime changed" 直接让构建失败（2026-11-21 两次踩到）。
+        # DerivedData 的其余产物继续复用，只让 clang 重建模块缓存与 stat 缓存。
+        run: rm -rf build/DerivedData/ModuleCache.noindex build/DerivedData/SDKStatCaches.noindex
 
       - name: Download xcframework
         uses: actions/download-artifact@v7
