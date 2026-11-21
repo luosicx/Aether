@@ -57,7 +57,7 @@ final class ChatViewModel {
     var bffConfig: BFFConfig = .default                 // Day 15: BFF 代理配置（启用后请求经服务端中转）
     var onDeviceConfig: OnDeviceConfig = .default       // Day 16: 端侧推理配置（开关 / 模型路径 / 采样参数）
     private(set) var currentNetworkStatus: NetworkStatus = .online  // P2-6 Task 6: NetworkFallbackCoordinator 写入
-    private let rateLimiter = RateLimiter()             // Day 15: 客户端令牌桶限流器（BFF 模式下 chat 前申请令牌）
+    private let rateLimiter: RateLimiter                // Day 15: 客户端令牌桶限流器（BFF 模式下 chat 前申请令牌）
     private(set) var lastUsedProvider: ModelProvider?   // Day 13: 最近一次请求实际命中的 provider
     private(set) var didFallbackLastRequest: Bool = false  // Day 13: 最近一次请求是否触发了降级
     private let injectedClientUsed: Bool                // Day 13: 标记 init 时是否注入了测试 client
@@ -140,10 +140,11 @@ final class ChatViewModel {
     typealias ToolStep = ToolExecutionCoordinator.ToolStep
     typealias ToolStepStatus = ToolExecutionCoordinator.ToolStepStatus
 
-    /// 初始化。client / cache 可注入为测试可替换，生产默认 DeepSeekClient() / SemanticCache() 兜底。
-    init(client: LLMProvider? = nil, cache: SemanticCache? = nil) {
+    /// 初始化。client / cache / rateLimiter 可注入为测试可替换，生产默认 DeepSeekClient() / SemanticCache() / RateLimiter() 兜底。
+    init(client: LLMProvider? = nil, cache: SemanticCache? = nil, rateLimiter: RateLimiter = RateLimiter()) {
         self.client = client ?? DeepSeekClient()
         self.cache = cache ?? SemanticCache()
+        self.rateLimiter = rateLimiter
         self.injectedClientUsed = client != nil
         #if os(iOS)
         self.liveActivityCoordinator = LiveActivityCoordinator()
