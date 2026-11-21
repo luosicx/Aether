@@ -73,10 +73,10 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
-    implementation("androidx.activity:activity-compose:1.9.0")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.0")
-    implementation("androidx.navigation:navigation-compose:2.7.7")
+    implementation("androidx.activity:activity-compose:1.13.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.11.1")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.1")
+    implementation("androidx.navigation:navigation-compose:2.10.2")
 
     // Ktor (网络 + SSE)
     implementation("io.ktor:ktor-client-okhttp:3.6.1")
@@ -85,7 +85,7 @@ dependencies {
     implementation("io.ktor:ktor-client-logging:3.6.1")
 
     // DataStore (偏好设置)
-    implementation("androidx.datastore:datastore-preferences:1.1.0")
+    implementation("androidx.datastore:datastore-preferences:1.3.0")
 
     // Jetpack Security (加密存储敏感数据，如 BFF Token)
     implementation("androidx.security:security-crypto:1.1.0")
@@ -115,7 +115,7 @@ dependencies {
     testImplementation("org.robolectric:robolectric:4.14.1")
     testImplementation("io.ktor:ktor-client-mock:3.6.1")
     testImplementation("io.ktor:ktor-http:3.6.1")
-    testImplementation("androidx.test:core:1.5.0")
+    testImplementation("androidx.test:core:1.7.0")
 }
 
 val robolectricJarsDir = layout.buildDirectory.dir("robolectric-jars")
