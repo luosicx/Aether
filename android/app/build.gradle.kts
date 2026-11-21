@@ -79,10 +79,10 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.7.7")
 
     // Ktor (网络 + SSE)
-    implementation("io.ktor:ktor-client-okhttp:2.3.12")
-    implementation("io.ktor:ktor-client-content-negotiation:2.3.12")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.12")
-    implementation("io.ktor:ktor-client-logging:2.3.12")
+    implementation("io.ktor:ktor-client-okhttp:3.6.1")
+    implementation("io.ktor:ktor-client-content-negotiation:3.6.1")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:3.6.1")
+    implementation("io.ktor:ktor-client-logging:3.6.1")
 
     // DataStore (偏好设置)
     implementation("androidx.datastore:datastore-preferences:1.1.0")
@@ -113,8 +113,8 @@ dependencies {
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
     testImplementation("androidx.room:room-testing:2.8.5")
     testImplementation("org.robolectric:robolectric:4.14.1")
-    testImplementation("io.ktor:ktor-client-mock:2.3.12")
-    testImplementation("io.ktor:ktor-http:2.3.12")
+    testImplementation("io.ktor:ktor-client-mock:3.6.1")
+    testImplementation("io.ktor:ktor-http:3.6.1")
     testImplementation("androidx.test:core:1.5.0")
 }
 
