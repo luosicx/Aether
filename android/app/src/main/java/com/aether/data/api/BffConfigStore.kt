@@ -40,6 +40,9 @@ class BffConfigStore(private val context: Context) {
     }
 
     // EncryptedSharedPreferences 实例（懒加载）
+    // 1.1.0 起 Google 弃用 EncryptedSharedPreferences/MasterKey（建议自行接 Tink/Keystore）。
+    // 迁移要连带处理存量 token 的解密读取，单独排期；此轮先把依赖从 alpha 换到稳定版。
+    @Suppress("DEPRECATION")
     private val encryptedPrefs by lazy {
         val masterKey = MasterKey.Builder(context)
             .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
