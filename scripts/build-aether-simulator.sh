@@ -45,13 +45,16 @@ open -a Simulator.app
 # 4. Build
 echo ""
 echo "[4/5] 开始构建 (Build for Testing)..."
+# 不要加 CODE_SIGNING_ALLOWED=NO：模拟器包靠 "Sign to Run Locally" 的 Simulated
+# Entitlements 才能拿到 application-identifier/keychain-access-groups，未签名包
+# 保存 API Key 会得到 errSecMissingEntitlement (-34018)，表现为「点保存没反应」。
 xcodebuild build-for-testing \
   -project "$PROJECT" \
   -scheme "$SCHEME" \
   -destination "platform=iOS Simulator,name=$SIM_NAME,arch=arm64" \
   -configuration Debug \
   -derivedDataPath "$PROJECT_DIR/build" \
-  CODE_SIGNING_ALLOWED=NO ARCHS=arm64 2>&1 | tee "$PROJECT_DIR/build/build.log"
+  ARCHS=arm64 2>&1 | tee "$PROJECT_DIR/build/build.log"
 
 BUILD_STATUS=${PIPESTATUS[0]}
 if [ $BUILD_STATUS -ne 0 ]; then

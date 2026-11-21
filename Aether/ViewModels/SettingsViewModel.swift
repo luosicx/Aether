@@ -37,6 +37,8 @@ final class SettingsViewModel {
     var isSaving = false
     /// 保存结果消息（成功/失败提示）
     var saveMessage: String?
+    /// 与 saveMessage 配套：本次保存/删除是否失败，供 UI 选择提示样式
+    var saveMessageIsError: Bool = false
     /// 已启用的危险/敏感工具名集合（与 ToolRegistry 同步，供设置页 Toggle 绑定）
     var enabledTools: Set<String> = []
     /// 本运行周期内已授权过的敏感工具名集合，避免重复弹 Alert
@@ -215,8 +217,10 @@ final class SettingsViewModel {
         do {
             let key = provider == .deepseek ? deepseekAPIKey : qwenAPIKey
             try KeychainManager.shared.saveAPIKey(key, for: provider)
+            saveMessageIsError = false
             saveMessage = String(format: NSLocalizedString("%@ API Key 已保存", comment: ""), provider.displayName)
         } catch {
+            saveMessageIsError = true
             saveMessage = String(format: NSLocalizedString("保存失败：%@", comment: ""), error.localizedDescription)
         }
     }
@@ -229,6 +233,7 @@ final class SettingsViewModel {
         } else {
             qwenAPIKey = ""
         }
+        saveMessageIsError = false
         saveMessage = String(format: NSLocalizedString("%@ API Key 已删除", comment: ""), provider.displayName)
     }
 

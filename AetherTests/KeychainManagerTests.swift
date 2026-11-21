@@ -1,4 +1,5 @@
 import XCTest
+import Security
 import AetherFoundation
 import AetherServices
 import AetherDesign
@@ -236,6 +237,21 @@ final class KeychainManagerTests: XCTestCase {
         XCTAssertNotNil(error.errorDescription)
         XCTAssertTrue(error.errorDescription?.contains("网络中断") == true,
                       "networkError 描述应含底层消息")
+    }
+
+    /// describeKeychainStatus：常见错误码应翻译成可执行提示，未知码保留原始值
+    func testDescribeKeychainStatusMessages() {
+        let missingEntitlement = KeychainManager.describeKeychainStatus(errSecMissingEntitlement)
+        XCTAssertTrue(missingEntitlement.contains("-34018"), "缺签名权限提示应保留错误码，实际：\(missingEntitlement)")
+        XCTAssertTrue(missingEntitlement.contains("签名"), "缺签名权限提示应说明签名问题，实际：\(missingEntitlement)")
+
+        XCTAssertTrue(KeychainManager.describeKeychainStatus(errSecInteractionNotAllowed).contains("解锁"),
+                      "设备锁定提示应给出解锁动作")
+        XCTAssertTrue(KeychainManager.describeKeychainStatus(errSecNotAvailable).contains("稍后"),
+                      "服务不可用提示应建议稍后重试")
+
+        let unknown = KeychainManager.describeKeychainStatus(-99999)
+        XCTAssertTrue(unknown.contains("-99999"), "未知错误码应保留原始值便于排查，实际：\(unknown)")
     }
 
     // MARK: - Keychain 迁移逻辑测试
