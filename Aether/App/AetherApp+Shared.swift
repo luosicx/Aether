@@ -66,11 +66,14 @@ extension AetherApp {
         }
 
         // 默认本地存储：App Group 共享（iOS / watchOS / Widget 三端读写同一 SQLite）
+        // 必须显式 cloudKitDatabase: .none——ModelConfiguration 默认是 .automatic，
+        // 一旦二进制带 iCloud entitlement（签名/真机构建），SwiftData 会自动启用 CloudKit
+        // 并用 CloudKit 规则校验 schema（属性必须可选/有默认值），导致启动即崩溃。
         if let groupURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: groupIdentifier) {
             let storeURL = groupURL.appendingPathComponent("Aether.sqlite")
-            return ModelConfiguration(url: storeURL)
+            return ModelConfiguration(url: storeURL, cloudKitDatabase: .none)
         }
-        return ModelConfiguration(isStoredInMemoryOnly: false)
+        return ModelConfiguration(isStoredInMemoryOnly: false, cloudKitDatabase: .none)
     }()
 
     /// 预构建的 ModelContainer，使用 sharedModelConfiguration。
@@ -97,7 +100,7 @@ extension AetherApp {
                 return try ModelContainer(
                     for: Conversation.self, ChatMessage.self, DocumentChunk.self,
                         MessageFeedback.self, HealthInsight.self, UserPreference.self, AgentTask.self, Memory.self,
-                    configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+                    configurations: ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
                 )
             } catch {
                 // 双重故障：持久化 + in-memory 均失败，SwiftData 系统级故障

@@ -101,6 +101,22 @@ final class KeychainManager {
 
     // MARK: - 通用字符串/数据存取
 
+    /// 把 Keychain OSStatus 转成用户能看懂的原因；未知码保留原始值便于排查。
+    /// -34018 在未签名/无 entitlement 的构建（模拟器手动跑、测试包）里最常见，
+    /// 只说「-34018」用户无法判断该做什么，这里直接给出下一步动作。
+    static func describeKeychainStatus(_ status: OSStatus) -> String {
+        switch status {
+        case errSecMissingEntitlement:
+            return NSLocalizedString("App 缺少签名权限（-34018），请从 Xcode 以正常签名的配置运行后重试", comment: "")
+        case errSecInteractionNotAllowed:
+            return NSLocalizedString("设备处于锁定状态，无法访问钥匙串，请解锁后重试", comment: "")
+        case errSecNotAvailable:
+            return NSLocalizedString("钥匙串服务暂不可用，请稍后重试", comment: "")
+        default:
+            return String(format: NSLocalizedString("保存失败: %@", comment: ""), String(status))
+        }
+    }
+
     /// 通用：将字符串保存到 Keychain（account = key，service = secretsService）。
     /// 先删后加保证幂等，失败抛出 keychainError。
     func save(key: String, value: String) throws {
@@ -121,7 +137,7 @@ final class KeychainManager {
         _ = backend.secItemDelete(query as CFDictionary)
         let status = backend.secItemAdd(query as CFDictionary)
         guard status == errSecSuccess else {
-            throw AppError.keychainError(String(format: NSLocalizedString("保存失败: %@", comment: ""), String(status)))
+            throw AppError.keychainError(Self.describeKeychainStatus(status))
         }
     }
 
@@ -226,7 +242,7 @@ final class KeychainManager {
         _ = backend.secItemDelete(query as CFDictionary)
         let status = backend.secItemAdd(query as CFDictionary)
         guard status == errSecSuccess else {
-            throw AppError.keychainError(String(format: NSLocalizedString("保存失败: %@", comment: ""), String(status)))
+            throw AppError.keychainError(Self.describeKeychainStatus(status))
         }
     }
 

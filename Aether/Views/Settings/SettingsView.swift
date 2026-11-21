@@ -71,6 +71,10 @@ struct SettingsView: View {
     @State private var iCloudSyncStatusText: String = String(localized: "未启用")
     @State private var lastICloudSyncText: String = String(localized: "从未")
     @State private var showICloudRestartAlert: Bool = false
+    // API Key 保存/删除的 Toast 反馈：放在根视图，不依赖 Form 的滚动位置与布局模式
+    @State private var showSaveToast = false
+    @State private var saveToastMessage = ""
+    @State private var saveToastIsError = false
 
     var body: some View {
         Group {
@@ -88,6 +92,22 @@ struct SettingsView: View {
         }
         // v1.1 Phase D: 动态星空背景叠加
         .background(StarfieldBackgroundView().opacity(0.4).allowsHitTesting(false))
+        .toast(
+            isPresented: $showSaveToast,
+            message: saveToastMessage,
+            systemImage: saveToastIsError ? "exclamationmark.triangle.fill" : "checkmark.circle.fill",
+            tint: saveToastIsError ? .orange : .green,
+            accessibilityID: "saveAPIKeyToast",
+            duration: 3.0
+        )
+        .onChange(of: settingsVM.saveMessage) { _, message in
+            guard let message else { return }
+            saveToastMessage = message
+            saveToastIsError = settingsVM.saveMessageIsError
+            showSaveToast = true
+            // 消费后清空：下一次保存即使文案相同，也能构成 nil → 新值 的变化重新弹出提示
+            settingsVM.saveMessage = nil
+        }
         .onAppear { handleAppear() }
         .onDisappear { handleDisappear() }
         .alert("语言", isPresented: $showRestartAlert) {
@@ -149,9 +169,6 @@ struct SettingsView: View {
                 featuresSection
                 dangerousToolsSection
                 systemPromptSection
-                if let msg = settingsVM.saveMessage {
-                    saveMessageSection(msg)
-                }
                 preferenceSection
                 themeSection
                 aiPersonaSection
@@ -274,9 +291,6 @@ struct SettingsView: View {
         case .icloud:
             icloudSection
         case .about:
-            if let msg = settingsVM.saveMessage {
-                saveMessageSection(msg)
-            }
             debugSection
             aboutSection
         }
@@ -794,17 +808,6 @@ struct SettingsView: View {
         } footer: {
             Text("当前会话生效。新建对话沿用此值。", comment: "")
                 .font(.captionAI)
-        }
-    }
-
-    // MARK: - Section: 保存消息
-
-    @ViewBuilder
-    private func saveMessageSection(_ msg: String) -> some View {
-        Section {
-            Text(msg)
-                .foregroundStyle(.green)
-                .font(.footnote)
         }
     }
 

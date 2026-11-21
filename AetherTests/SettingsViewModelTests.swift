@@ -1,5 +1,6 @@
 import XCTest
 import SwiftData
+import Security
 import AetherFoundation
 import AetherServices
 import AetherDesign
@@ -62,6 +63,7 @@ final class SettingsViewModelTests: XCTestCase {
         XCTAssertNotNil(vm.saveMessage, "saveAPIKey 后 saveMessage 应非 nil")
         XCTAssertTrue(vm.saveMessage?.contains(String(format: NSLocalizedString("%@ API Key 已保存", comment: ""), ModelProvider.deepseek.displayName)) == true,
                        "saveMessage 应含「已保存」，实际：\(vm.saveMessage ?? "nil")")
+        XCTAssertFalse(vm.saveMessageIsError, "保存成功时 saveMessageIsError 应为 false")
         // 验证确实写入 Keychain
         XCTAssertEqual(KeychainManager.shared.getAPIKey(), "new-key-123")
     }
@@ -80,6 +82,21 @@ final class SettingsViewModelTests: XCTestCase {
                        "saveMessage 应含「已删除」，实际：\(vm.saveMessage ?? "nil")")
         XCTAssertNil(KeychainManager.shared.getAPIKey(),
                      "Keychain 中应已删除该 key")
+        XCTAssertFalse(vm.saveMessageIsError, "删除成功时 saveMessageIsError 应为 false")
+    }
+
+    /// Keychain 写入失败时 saveMessageIsError 应为 true，且文案解释缺签名权限而不是只给 OSStatus
+    func testSaveAPIKeyFailureSetsErrorFlagAndFriendlyMessage() {
+        KeychainManager.shared.backend = FailingKeychainBackend(addStatus: errSecMissingEntitlement)
+        defer { KeychainManager.shared.backend = InMemoryKeychainBackend() }
+
+        vm.deepseekAPIKey = "sk-fail"
+        vm.saveAPIKey(for: .deepseek)
+
+        XCTAssertTrue(vm.saveMessageIsError, "保存失败后 saveMessageIsError 应为 true")
+        let message = vm.saveMessage ?? ""
+        XCTAssertTrue(message.contains("签名"), "失败文案应解释缺少签名权限，实际：\(message)")
+        XCTAssertTrue(message.contains("-34018"), "失败文案应保留错误码便于排查，实际：\(message)")
     }
 
     /// loadSystemPrompt(nil) 应使用 defaultSystemPrompt
@@ -467,6 +484,7 @@ final class SettingsViewModelTests: XCTestCase {
     func testIsSavingAndSaveMessageDefaults() {
         XCTAssertFalse(vm.isSaving, "isSaving 默认应为 false")
         XCTAssertNil(vm.saveMessage, "saveMessage 默认应为 nil")
+        XCTAssertFalse(vm.saveMessageIsError, "saveMessageIsError 默认应为 false")
     }
 
     /// defaultSystemPrompt 静态常量应为固定字符串
@@ -736,5 +754,22 @@ final class SettingsViewModelTests: XCTestCase {
 
         // 恢复
         ToolRegistry.shared.setEnabled(name: toolName, value: originalEnabled)
+    }
+}
+
+/// 写入固定失败的 Keychain 后端，用于覆盖保存失败分支
+private final class FailingKeychainBackend: KeychainBackend {
+    private let addStatus: OSStatus
+
+    init(addStatus: OSStatus) {
+        self.addStatus = addStatus
+    }
+
+    func secItemAdd(_ query: CFDictionary) -> OSStatus { addStatus }
+
+    func secItemDelete(_ query: CFDictionary) -> OSStatus { errSecSuccess }
+
+    func secItemCopyMatching(_ query: CFDictionary, _ result: UnsafeMutablePointer<CFTypeRef?>) -> OSStatus {
+        errSecItemNotFound
     }
 }

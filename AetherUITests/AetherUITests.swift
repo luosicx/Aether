@@ -245,8 +245,10 @@ final class AetherUITests: XCTestCase {
         }
         XCTAssertTrue(saveButton.waitForExistence(timeout: 5), "保存按钮应存在")
         saveButton.tap()
-        // UIT 中 Keychain 可能因 entitlement 不可用，saveMessage 不一定出现
-        // 验证保存按钮点击不 crash + 仍在设置页（用导航栏标题验证，比按钮 exists 更稳定）
+        // 保存结果必须立即可见：成功/失败都通过根视图 Toast 反馈，与 Form 滚动位置无关。
+        // CI 的测试包未签名，Keychain 会返回 -34018，因此这里只断言「有反馈」，不断言成功文案。
+        let toast = app.descendants(matching: .any).matching(identifier: "saveAPIKeyToast").firstMatch
+        XCTAssertTrue(toast.waitForExistence(timeout: 5), "点击保存后应出现可见反馈（成功或失败提示）")
         XCTAssertTrue(app.buttons["saveAPIKeyButton"].waitForExistence(timeout: 3),
                       "保存后应仍在设置页")
     }
