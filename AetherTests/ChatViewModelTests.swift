@@ -620,27 +620,27 @@ final class ChatViewModelTests: XCTestCase {
         XCTAssertEqual(assistantMsgs.first?.content, "BFF 回复")
     }
 
-    /// BFF 模式令牌桶耗尽后抛 rateLimited，errorMessage 设为限流提示
+    /// BFF 模式令牌桶耗尽后抛 rateLimited，errorMessage 设为限流提示。
+    /// 注入 chatPerMin=1 的限流器：唯一的令牌用掉后要等 60 秒才补 1 个，
+    /// 两次调用即可确定性触发限流。不能用默认 20 次的写法——桶每 3 秒补一个令牌，
+    /// CI 慢轮下 20 次循环耗时超过 3 秒，第 21 次就不再限流（main 上真实红过）。
     func testBFFModeRateLimitExhaustionSetsErrorMessage() async throws {
         let mock = MockLLMProvider()
-        let vm = ChatViewModel(client: mock)
+        let vm = ChatViewModel(client: mock, rateLimiter: RateLimiter(chatPerMin: 1, embedPerMin: 1))
         vm.selectedProvider = .onDevice  // 跳过 apiKey 检查，仅依赖 BFF 限流器
         vm.bffConfig.enabled = true
-        // chatRateLimitPerMin 默认 20，消耗 20 次后第 21 次应触发限流
         let conv = Conversation(title: "测试", systemPrompt: "你是助手")
         context.insert(conv)
         let userMsg = ChatMessage(role: "user", content: "你好")
         userMsg.conversation = conv
         conv.messages.append(userMsg)
 
-        for i in 0..<20 {
-            vm.errorMessage = nil
-            await vm.processMessage("你好", conversation: conv, modelContext: context)
-            XCTAssertNil(vm.errorMessage, "第 \(i + 1) 次调用不应触发限流")
-        }
-        // 第 21 次应触发限流
         await vm.processMessage("你好", conversation: conv, modelContext: context)
-        // retryAfter 由令牌桶按墙上时钟计算，循环耗时会使秒数在 1~3 间浮动，只校验提示语义
+        XCTAssertNil(vm.errorMessage, "第 1 次调用消耗唯一的令牌，不应触发限流")
+
+        // 令牌已耗尽，立即再申请应被限流
+        await vm.processMessage("你好", conversation: conv, modelContext: context)
+        // retryAfter 按剩余令牌与补充速率计算，此处固定为 60 秒，只校验提示语义
         XCTAssertTrue(
             vm.errorMessage?.hasPrefix(NSLocalizedString("请求过于频繁，请", comment: "")) == true,
             "令牌耗尽后应设置限流 errorMessage，实际：\(vm.errorMessage ?? "nil")"
