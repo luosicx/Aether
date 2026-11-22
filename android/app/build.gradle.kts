@@ -119,7 +119,7 @@ dependencies {
 
 val robolectricJarsDir = layout.buildDirectory.dir("robolectric-jars")
 
-val syncRobolectricJars by tasks.registering(Sync::class) {
+val syncRobolectricJars = tasks.register<Sync>("syncRobolectricJars") {
     robolectricSdkJars.forEach { from(it) }
     into(robolectricJarsDir)
 }
