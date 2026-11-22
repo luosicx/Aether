@@ -49,7 +49,7 @@ public final class AppleIntelligenceProvider: LLMProvider, @unchecked Sendable {
 
     // MARK: - LLMProvider 协议实现
 
-    public func chat(messages: [APIMessage], config: ChatConfig, apiKey: String) -> AsyncStream<String> {
+    public func chat(messages: [APIMessage], config: ChatConfig, apiKey _: String) -> AsyncStream<String> {
         AsyncStream { continuation in
             Task { [self] in
                 if !self.enabled {
@@ -68,7 +68,7 @@ public final class AppleIntelligenceProvider: LLMProvider, @unchecked Sendable {
         }
     }
 
-    public func chat(messages: [APIMessage], config: ChatConfig, tools: [ToolDef], apiKey: String) -> AsyncStream<ParsedChunk> {
+    public func chat(messages: [APIMessage], config: ChatConfig, tools _: [ToolDef], apiKey _: String) -> AsyncStream<ParsedChunk> {
         AsyncStream { continuation in
             Task { [self] in
                 if !self.enabled {
@@ -88,7 +88,7 @@ public final class AppleIntelligenceProvider: LLMProvider, @unchecked Sendable {
         }
     }
 
-    public func embed(texts: [String], apiKey: String) async throws -> [[Float]] {
+    public func embed(texts: [String], apiKey _: String) async throws -> [[Float]] {
         // Apple Intelligence 未公开嵌入 API，返回占位 384 维向量（与 EmbeddingService 占位一致）
         // 实际使用时由 EmbeddingService 兜底
         return texts.map { _ in

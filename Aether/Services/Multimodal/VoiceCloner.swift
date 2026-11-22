@@ -74,7 +74,7 @@ public final class PlaceholderVoiceCloner: VoiceCloner, @unchecked Sendable {
     public private(set) var isLoaded = false
     public private(set) var clonedVoices: [ClonedVoice] = []
 
-    public func loadModel(at modelPath: URL) async throws {
+    public func loadModel(at _: URL) async throws {
         isLoaded = true
     }
 

@@ -28,7 +28,7 @@ public final class NativeVisionEngine: VisionInferenceEngine, @unchecked Sendabl
         // 存储属性均有默认值，构造器无需额外装配
     }
 
-    public func loadModel(at modelPath: URL, modelName: String) async throws {
+    public func loadModel(at _: URL, modelName _: String) async throws {
         // Vision 框架无需加载模型，保持兼容（no-op）
         // 真实 MLX-VLM 集成后将调用 ModelContainer.load
     }

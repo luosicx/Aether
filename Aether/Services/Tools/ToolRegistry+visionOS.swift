@@ -51,7 +51,7 @@ final class SpatialTool: ToolProtocol, @unchecked Sendable {
     }
 
     /// 占位实现：返回未实现提示，不执行具体逻辑
-    func execute(arguments: [String: Any]) async throws -> String {
+    func execute(arguments _: [String: Any]) async throws -> String {
         "spatial_action 占位：具体逻辑待 v2.0 后续实现"
     }
 }
@@ -74,7 +74,7 @@ final class PinchTool: ToolProtocol, @unchecked Sendable {
     }
 
     /// 占位实现：返回未实现提示，不执行具体逻辑
-    func execute(arguments: [String: Any]) async throws -> String {
+    func execute(arguments _: [String: Any]) async throws -> String {
         "pinch_gesture 占位：具体逻辑待 v2.0 后续实现"
     }
 }
@@ -97,7 +97,7 @@ final class GazeTool: ToolProtocol, @unchecked Sendable {
     }
 
     /// 占位实现：返回未实现提示，不执行具体逻辑
-    func execute(arguments: [String: Any]) async throws -> String {
+    func execute(arguments _: [String: Any]) async throws -> String {
         "gaze_focus 占位：具体逻辑待 v2.0 后续实现"
     }
 }

@@ -52,7 +52,7 @@ public final class PlaceholderImageGenerationEngine: ImageGenerationEngine, @unc
     public let name = "PlaceholderImageGen"
     public let isLoaded = false
 
-    public func loadModel(at modelPath: URL) async throws {
+    public func loadModel(at _: URL) async throws {
         // 占位实现：实际不加载模型
     }
 
@@ -61,12 +61,12 @@ public final class PlaceholderImageGenerationEngine: ImageGenerationEngine, @unc
     }
 
     public func generate(
-        prompt: String,
-        negativePrompt: String?,
-        width: Int,
-        height: Int,
-        steps: Int,
-        seed: UInt64?
+        prompt _: String,
+        negativePrompt _: String?,
+        width _: Int,
+        height _: Int,
+        steps _: Int,
+        seed _: UInt64?
     ) async throws -> CGImage {
         // v1.3 占位实现：图像生成待 v1.5 SD Mobile 集成
         throw MultimodalError.platformUnsupported

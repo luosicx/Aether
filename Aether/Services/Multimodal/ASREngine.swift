@@ -45,7 +45,7 @@ public final class PlaceholderASREngine: ASREngine, @unchecked Sendable {
     public let requiresNetwork = false
     public private(set) var isLoaded = false
 
-    public func loadModel(at modelPath: URL) async throws {
+    public func loadModel(at _: URL) async throws {
         isLoaded = true
     }
 

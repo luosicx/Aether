@@ -22,7 +22,7 @@ public final class NativeTTSEngine: TTSEngine, @unchecked Sendable {
         // 存储属性均有默认值，构造器无需额外装配
     }
 
-    public func loadModel(at modelPath: URL) async throws {
+    public func loadModel(at _: URL) async throws {
         // AVSpeechSynthesizer 无需加载模型文件，保持兼容（no-op）
     }
 

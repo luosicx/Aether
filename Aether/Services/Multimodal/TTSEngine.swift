@@ -41,11 +41,11 @@ public final class PlaceholderTTSEngine: TTSEngine, @unchecked Sendable {
     public let name = "PlaceholderTTS"
     public private(set) var isLoaded = false
 
-    public func loadModel(at modelPath: URL) async throws {
+    public func loadModel(at _: URL) async throws {
         isLoaded = true
     }
 
-    public func synthesize(text: String, voiceId: String?) async throws -> Data {
+    public func synthesize(text: String, voiceId _: String?) async throws -> Data {
         guard isLoaded else {
             throw MultimodalError.engineNotLoaded
         }
