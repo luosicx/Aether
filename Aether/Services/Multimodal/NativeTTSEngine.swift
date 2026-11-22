@@ -158,7 +158,6 @@ public final class NativeTTSEngine: TTSEngine, @unchecked Sendable {
         let channels = format.channelCount
         let bitsPerChannel = format.settings[AVLinearPCMBitDepthKey] as? Int ?? 16
         let isFloat = format.settings[AVLinearPCMIsFloatKey] as? Bool ?? false
-        let isBigEndian = format.settings[AVLinearPCMIsBigEndianKey] as? Bool ?? false
 
         // 计算总帧数与字节数
         let totalFrames = buffers.reduce(0) { $0 + Int($1.frameLength) }
