@@ -67,7 +67,9 @@ public struct ClonedVoice: Sendable, Equatable, Identifiable {
 /// 在 OpenVoice v2 集成前作为默认引擎，`clone` 返回占位音色。
 /// 集成后将由 `OpenVoiceCloner` 接管真实克隆。
 public final class PlaceholderVoiceCloner: VoiceCloner, @unchecked Sendable {
-    public init() {}
+    public init() {
+        // 存储属性均有默认值，构造器无需额外装配
+    }
 
     public private(set) var isLoaded = false
     public private(set) var clonedVoices: [ClonedVoice] = []

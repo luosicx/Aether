@@ -13,7 +13,9 @@ import Security
 /// - 存储：音色嵌入向量存 Keychain
 /// - 状态：端侧蒸馏模型待转换，当前走桩实现
 public final class OpenVoiceCloner: VoiceCloner, @unchecked Sendable {
-    public init() {}
+    public init() {
+        // 存储属性均有默认值，构造器无需额外装配
+    }
 
     public var name: String { "OpenVoiceCloner (OpenVoice v2)" }
     public var requiresNetwork: Bool { false }

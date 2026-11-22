@@ -19,7 +19,9 @@ public final class MLXVisionEngine: VisionInferenceEngine, @unchecked Sendable {
     private let fallback = NativeVisionEngine()
     #endif
 
-    public init() {}
+    public init() {
+        // 存储属性均有默认值，构造器无需额外装配
+    }
 
     public var isLoaded: Bool {
         #if canImport(MLXLLM) && canImport(MLXLMCommon)

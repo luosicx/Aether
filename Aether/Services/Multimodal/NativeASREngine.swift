@@ -17,7 +17,9 @@ public final class NativeASREngine: ASREngine, @unchecked Sendable {
     public let requiresNetwork = true
     public let isLoaded = true
 
-    public init() {}
+    public init() {
+        // 存储属性均有默认值，构造器无需额外装配
+    }
 
     public func loadModel(at modelPath: URL) async throws {
         // SFSpeechRecognizer 无需加载模型文件，保持兼容（no-op）

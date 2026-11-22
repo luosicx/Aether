@@ -34,7 +34,9 @@ public protocol TTSEngine: Sendable {
 /// 在 MLX-Voice 集成前作为默认引擎，`synthesize` 返回空 Data。
 /// 集成后将由 `MLXVoiceTTSEngine` 接管真实合成。
 public final class PlaceholderTTSEngine: TTSEngine, @unchecked Sendable {
-    public init() {}
+    public init() {
+        // 存储属性均有默认值，构造器无需额外装配
+    }
 
     public let name = "PlaceholderTTS"
     public private(set) var isLoaded = false

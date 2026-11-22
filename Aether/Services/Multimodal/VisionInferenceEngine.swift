@@ -47,7 +47,9 @@ public protocol VisionInferenceEngine: Sendable {
 /// 在 MLX-VLM 集成前作为默认引擎，所有方法返回 `engineNotLoaded` 错误。
 /// 集成 MLX-VLM 后，将 `MLXVisionEngine` 注册到 `MultimodalFacade` 即可替换。
 public final class PlaceholderVisionEngine: VisionInferenceEngine, @unchecked Sendable {
-    public init() {}
+    public init() {
+        // 存储属性均有默认值，构造器无需额外装配
+    }
 
     public private(set) var isLoaded = false
     public private(set) var loadedModelName: String?

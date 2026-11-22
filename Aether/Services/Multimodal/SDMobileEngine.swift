@@ -17,7 +17,9 @@ public final class SDMobileEngine: ImageGenerationEngine, @unchecked Sendable {
     private let coreMLModel: Any? = nil  // CoreML SD 模型占位
     #endif
 
-    public init() {}
+    public init() {
+        // 存储属性均有默认值，构造器无需额外装配
+    }
 
     public var name: String { "SDMobile (Stable Diffusion CoreML)" }
     public var isLoaded: Bool { false }

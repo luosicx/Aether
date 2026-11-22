@@ -45,7 +45,9 @@ public protocol ImageGenerationEngine: Sendable {
 /// 在 SD Mobile 集成前作为默认引擎，`generate` 返回 `platformUnsupported` 错误。
 /// v1.5 集成后将由 `SDMobileEngine` 接管真实推理。
 public final class PlaceholderImageGenerationEngine: ImageGenerationEngine, @unchecked Sendable {
-    public init() {}
+    public init() {
+        // 存储属性均有默认值，构造器无需额外装配
+    }
 
     public let name = "PlaceholderImageGen"
     public let isLoaded = false

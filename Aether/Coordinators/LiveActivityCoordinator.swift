@@ -19,7 +19,9 @@ final class LiveActivityCoordinator: Coordinator {
     internal var isStarted: Bool { activity != nil }
 
     /// 构造器（无依赖，状态由各方法显式管理）
-    init() {} // 无需初始化逻辑：activity 属性默认 nil，由 start(query:) 按需创建
+    init() {
+        // 无依赖：activity 默认 nil，由 start / update / end 按需维护
+    }
 
     /// 启动灵动岛（iOS 16.1+ 可用，低版本静默降级）。
     /// 已启动时再次调用为 no-op，不替换现有 activity。
