@@ -368,7 +368,6 @@ final class CalculatorTool: ToolProtocol, @unchecked Sendable {
             return "错误：表达式无效"
         }
         // 提前拦截除零：检测 / 0
-        // NOSONAR: "/ 0" 和 "/0" 为除零检测的字符串模式，非硬编码 URI
         if expression.contains("/ 0") || expression.contains("/0") {
             return "错误：除零"
         }
