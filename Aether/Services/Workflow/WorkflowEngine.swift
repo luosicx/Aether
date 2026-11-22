@@ -324,7 +324,7 @@ public final class WorkflowEngine {
             var error: String? = nil
 
             switch node.type {
-            case .triggerTimer, .triggerManual, .triggerEvent:
+            case .triggerTimer, .triggerManual, .triggerEvent, .output, .input:
                 output = currentInput
                 success = true
             case .actionLLM:
@@ -345,12 +345,6 @@ public final class WorkflowEngine {
                 } else {
                     output = "条件不满足"
                 }
-                success = true
-            case .output:
-                output = currentInput
-                success = true
-            case .input:
-                output = currentInput
                 success = true
             }
 
@@ -418,10 +412,8 @@ public final class WorkflowEngine {
             return false
         }
 
-        for node in workflow.nodes {
-            if !visited.contains(node.id) {
-                if dfs(node.id) { return true }
-            }
+        for node in workflow.nodes where !visited.contains(node.id) {
+            if dfs(node.id) { return true }
         }
         return false
     }
