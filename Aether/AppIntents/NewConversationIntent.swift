@@ -11,9 +11,9 @@ import SwiftData
 /// 既满足 SwiftData 隔离规则，也避免与主 App 的 ModelContext 跨 actor 共享。
 struct NewConversationIntent: AppIntent {
     /// Siri / 快捷指令中显示的标题
-    static var title: LocalizedStringResource = "新建对话"
+    static var title: LocalizedStringResource { "新建对话" }
     /// 描述（用于快捷指令详情页）
-    static var description = IntentDescription("在以太中创建新对话")
+    static var description: IntentDescription { IntentDescription("在以太中创建新对话") }
 
     /// 执行 intent：创建新 Conversation 写入 SwiftData，返回会话 ID。
     func perform() async throws -> some IntentResult & ReturnsValue<String> {

@@ -106,20 +106,18 @@ final class SSETransport: @unchecked Sendable, MCPTransport {
     /// 断开 SSE 连接
     func disconnect() async {
         // 持锁清理 readTask 与 continuation，与 connect() / messages() / send() 串行化
-        lock.lock()
-        readTask?.cancel()
-        readTask = nil
-        continuation?.finish()
-        continuation = nil
-        lock.unlock()
+        withStateLock {
+            readTask?.cancel()
+            readTask = nil
+            continuation?.finish()
+            continuation = nil
+        }
     }
 
     /// POST 发送 JSON-RPC 请求到 postEndpoint
     func send(_ data: Data) async throws {
         // 持锁读取 postEndpoint 快照，避免与 handleSSEEvent() 写入竞争
-        lock.lock()
-        let endpoint = postEndpoint
-        lock.unlock()
+        let endpoint = withStateLock { postEndpoint }
         guard let endpoint = endpoint else {
             throw MCPError.connectionFailed("SSE POST 端点未就绪")
         }
@@ -158,6 +156,14 @@ final class SSETransport: @unchecked Sendable, MCPTransport {
     }
 
     // MARK: - 私有方法（锁内访问的辅助方法）
+
+    /// async 上下文中不能直接调 `NSLock.lock()/unlock()`（Swift 6 报错），
+    /// 统一走这个同步作用域方法。
+    private func withStateLock<T>(_ body: () -> T) -> T {
+        lock.lock()
+        defer { lock.unlock() }
+        return body()
+    }
 
     /// 持锁设置 readTask（同时取消旧 task）
     private func setReadTask(_ task: Task<Void, Never>) {

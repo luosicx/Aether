@@ -98,7 +98,7 @@ actor SQLiteVecStore: VectorStore {
         let blobData = blobFromVector(query)
         let blobSize = Int32(blobData.count)
         blobData.withUnsafeBytes { rawBuffer in
-            sqlite3_bind_blob(stmt, 1, rawBuffer.baseAddress, blobSize, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+            _ = sqlite3_bind_blob(stmt, 1, rawBuffer.baseAddress, blobSize, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
         }
         sqlite3_bind_int64(stmt, 2, sqlite3_int64(limit))
 
@@ -183,12 +183,12 @@ actor SQLiteVecStore: VectorStore {
         var uuid = id.uuid
         let uuidSize = Int32(MemoryLayout<uuid_t>.size)
         withUnsafePointer(to: &uuid) { ptr in
-            sqlite3_bind_blob(stmt, 1, ptr, uuidSize, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+            _ = sqlite3_bind_blob(stmt, 1, ptr, uuidSize, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
         }
         let blobData = blobFromVector(embedding)
         let blobSize = Int32(blobData.count)
         blobData.withUnsafeBytes { rawBuffer in
-            sqlite3_bind_blob(stmt, 2, rawBuffer.baseAddress, blobSize, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+            _ = sqlite3_bind_blob(stmt, 2, rawBuffer.baseAddress, blobSize, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
         }
         guard sqlite3_step(stmt) == SQLITE_DONE else {
             throw VectorStoreError.upsertFailed("insert step failed")
@@ -208,7 +208,7 @@ actor SQLiteVecStore: VectorStore {
         var uuid = id.uuid
         let uuidSize = Int32(MemoryLayout<uuid_t>.size)
         withUnsafePointer(to: &uuid) { ptr in
-            sqlite3_bind_blob(stmt, 1, ptr, uuidSize, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+            _ = sqlite3_bind_blob(stmt, 1, ptr, uuidSize, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
         }
         sqlite3_bind_text(stmt, 2, metadata["category"], -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
         let importance = Double(metadata["importance"] ?? "0.5") ?? 0.5
@@ -232,7 +232,7 @@ actor SQLiteVecStore: VectorStore {
         var uuid = id.uuid
         let uuidSize = Int32(MemoryLayout<uuid_t>.size)
         withUnsafePointer(to: &uuid) { ptr in
-            sqlite3_bind_blob(stmt, 1, ptr, uuidSize, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+            _ = sqlite3_bind_blob(stmt, 1, ptr, uuidSize, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
         }
         if sqlite3_step(stmt) == SQLITE_ROW, let cString = sqlite3_column_text(stmt, 0) {
             let jsonString = String(cString: cString)
@@ -252,7 +252,7 @@ actor SQLiteVecStore: VectorStore {
             var uuidVal = uuid.uuid
             let uuidSize = Int32(MemoryLayout<uuid_t>.size)
             withUnsafePointer(to: &uuidVal) { ptr in
-                sqlite3_bind_blob(stmt, 1, ptr, uuidSize, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+                _ = sqlite3_bind_blob(stmt, 1, ptr, uuidSize, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
             }
         }
         guard sqlite3_step(stmt) == SQLITE_DONE else {
