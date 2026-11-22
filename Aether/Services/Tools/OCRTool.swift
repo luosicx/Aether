@@ -74,21 +74,13 @@ final class OCRTool: ToolProtocol, @unchecked Sendable {
         // 用 continuation 将 Vision 的回调式 API 包装为 async 调用
         // Vision API 三端共享，无需平台条件编译
         return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
-            // NOSONAR: VNRecognizeTextRequest 回调由 Vision API 设计要求，嵌套不可避免
             let once = ResumeOnceContinuation(continuation)
             let request = VNRecognizeTextRequest { request, error in
                 if let error = error {
                     once.resume(throwing: error)
                     return
                 }
-                // 取每个观测结果中置信度最高的候选文本
-                let observations = request.results as? [VNRecognizedTextObservation] ?? []
-                let texts = observations.compactMap { $0.topCandidates(1).first?.string }
-                if texts.isEmpty {
-                    once.resume(returning: "未识别到文字")
-                } else {
-                    once.resume(returning: texts.joined(separator: "\n"))
-                }
+                once.resume(returning: Self.recognizedText(request))
             }
             request.recognitionLevel = .accurate
             request.recognitionLanguages = ["zh-Hans", "en"]
@@ -99,6 +91,13 @@ final class OCRTool: ToolProtocol, @unchecked Sendable {
                 once.resume(throwing: error)
             }
         }
+    }
+
+    /// 取每个观测结果中置信度最高的候选文本，多行用换行符分隔；无文字时返回提示。
+    private static func recognizedText(_ request: VNRequest) -> String {
+        let observations = request.results as? [VNRecognizedTextObservation] ?? []
+        let texts = observations.compactMap { $0.topCandidates(1).first?.string }
+        return texts.isEmpty ? "未识别到文字" : texts.joined(separator: "\n")
     }
 
     /// 跨平台加载图片为 CGImage

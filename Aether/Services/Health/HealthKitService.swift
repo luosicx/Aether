@@ -96,17 +96,27 @@ final class HealthKitService: HealthDataSource, @unchecked Sendable {
                     continuation.resume(throwing: error)
                     return
                 }
-                var result: [Date: Double] = [:]
-                // NOSONAR: HKStatisticsCollectionQuery API 要求 enumerateStatistics 闭包嵌套于 initialResultsHandler 内
-                results?.enumerateStatistics(from: startDate, to: now, with: { stat, _ in
-                    if let quantity = stat.averageQuantity()?.doubleValue(for: unit) {
-                        result[calendar.startOfDay(for: stat.startDate)] = quantity
-                    }
-                })
-                continuation.resume(returning: result)
+                continuation.resume(returning: Self.averageByDay(results, from: startDate, to: now, unit: unit, calendar: calendar))
             }
             healthStore.execute(query)
         }
+    }
+
+    /// 统计集合按天取均值，无数据日期不出现。
+    private static func averageByDay(
+        _ statistics: HKStatisticsCollection?,
+        from startDate: Date,
+        to endDate: Date,
+        unit: HKUnit,
+        calendar: Calendar
+    ) -> [Date: Double] {
+        var result: [Date: Double] = [:]
+        statistics?.enumerateStatistics(from: startDate, to: endDate) { stat, _ in
+            if let quantity = stat.averageQuantity()?.doubleValue(for: unit) {
+                result[calendar.startOfDay(for: stat.startDate)] = quantity
+            }
+        }
+        return result
     }
 
     /// 按天聚合睡眠时长（小时）。未授权返回空字典。
@@ -121,38 +131,40 @@ final class HealthKitService: HealthDataSource, @unchecked Sendable {
         let sleepType = HKCategoryType(.sleepAnalysis)
 
         return try await withCheckedThrowingContinuation { continuation in
-            // NOSONAR: HKSampleQuery 完成回调内构建结果，仅一层闭包
             let query = HKSampleQuery(sampleType: sleepType, predicate: predicate, limit: HKObjectQueryNoLimit, sortDescriptors: nil) { _, samples, error in
                 if let error = error {
                     continuation.resume(throwing: error)
                     return
                 }
-                var dailySeconds: [Date: TimeInterval] = [:]
-                // 睡眠类别样本：仅累计 asleep 类别（HKCategoryValueSleepAnalysis.asleep / .asleepDeep / .asleepCore / .asleepREM / .asleepUnspecified）
-                if let categorySamples = samples as? [HKCategorySample] {
-                    for sample in categorySamples {
-                        let isAsleep: Bool
-                        if let value = HKCategoryValueSleepAnalysis(rawValue: sample.value) {
-                            switch value {
-                            case .asleep, .asleepDeep, .asleepCore, .asleepREM, .asleepUnspecified:
-                                isAsleep = true
-                            default:
-                                isAsleep = false
-                            }
-                        } else {
-                            isAsleep = false
-                        }
-                        guard isAsleep else { continue }
-                        let day = calendar.startOfDay(for: sample.startDate)
-                        dailySeconds[day, default: 0] += sample.endDate.timeIntervalSince(sample.startDate)
-                    }
-                }
-                // 秒 → 小时
-                let result = dailySeconds.mapValues { $0 / 3600.0 }
-                continuation.resume(returning: result)
+                continuation.resume(returning: Self.sleepHoursByDay(samples, calendar: calendar))
             }
             healthStore.execute(query)
         }
+    }
+
+    /// 累计每天的 asleep 类别样本时长（秒 → 小时）。
+    private static func sleepHoursByDay(_ samples: [HKSample]?, calendar: Calendar) -> [Date: Double] {
+        var dailySeconds: [Date: TimeInterval] = [:]
+        // 只累计 asleep 类别的样本（asleep / asleepDeep / asleepCore / asleepREM / asleepUnspecified）
+        if let categorySamples = samples as? [HKCategorySample] {
+            for sample in categorySamples {
+                let isAsleep: Bool
+                if let value = HKCategoryValueSleepAnalysis(rawValue: sample.value) {
+                    switch value {
+                    case .asleep, .asleepDeep, .asleepCore, .asleepREM, .asleepUnspecified:
+                        isAsleep = true
+                    default:
+                        isAsleep = false
+                    }
+                } else {
+                    isAsleep = false
+                }
+                guard isAsleep else { continue }
+                let day = calendar.startOfDay(for: sample.startDate)
+                dailySeconds[day, default: 0] += sample.endDate.timeIntervalSince(sample.startDate)
+            }
+        }
+        return dailySeconds.mapValues { $0 / 3600.0 }
     }
 
     /// 按天聚合步数总和。未授权返回空字典。
@@ -183,17 +195,27 @@ final class HealthKitService: HealthDataSource, @unchecked Sendable {
                     continuation.resume(throwing: error)
                     return
                 }
-                var result: [Date: Int] = [:]
-                // NOSONAR: HKStatisticsCollectionQuery API 要求 enumerateStatistics 闭包嵌套于 initialResultsHandler 内
-                results?.enumerateStatistics(from: startDate, to: now, with: { stat, _ in
-                    if let quantity = stat.sumQuantity()?.doubleValue(for: unit) {
-                        result[calendar.startOfDay(for: stat.startDate)] = Int(quantity)
-                    }
-                })
-                continuation.resume(returning: result)
+                continuation.resume(returning: Self.sumByDay(results, from: startDate, to: now, unit: unit, calendar: calendar))
             }
             healthStore.execute(query)
         }
+    }
+
+    /// 统计集合按天求和，无数据日期不出现。
+    private static func sumByDay(
+        _ statistics: HKStatisticsCollection?,
+        from startDate: Date,
+        to endDate: Date,
+        unit: HKUnit,
+        calendar: Calendar
+    ) -> [Date: Int] {
+        var result: [Date: Int] = [:]
+        statistics?.enumerateStatistics(from: startDate, to: endDate) { stat, _ in
+            if let quantity = stat.sumQuantity()?.doubleValue(for: unit) {
+                result[calendar.startOfDay(for: stat.startDate)] = Int(quantity)
+            }
+        }
+        return result
     }
 
     /// 聚合最近 1 天的健康数据为 HealthDailySummary。未授权或无数据时返回全零摘要。
