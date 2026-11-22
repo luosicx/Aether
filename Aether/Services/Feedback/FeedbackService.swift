@@ -6,7 +6,7 @@ import UIKit
 #endif
 
 /// Day 20: 投诉反馈服务，调用系统邮件 composer 预填反馈邮件。
-final class FeedbackService {
+final class FeedbackService: Sendable {
     /// 单例
     static let shared = FeedbackService()
     private init() {

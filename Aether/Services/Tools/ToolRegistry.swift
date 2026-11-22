@@ -398,7 +398,7 @@ final class CalculatorTool: ToolProtocol, @unchecked Sendable {
 
 // MARK: - Day 11: 本地通知服务
 /// 封装 UNUserNotificationCenter，用于在 AI 回复完成等场景推送本地通知
-final class NotificationService {
+final class NotificationService: Sendable {
     static let shared = NotificationService()
 
     private init() {
