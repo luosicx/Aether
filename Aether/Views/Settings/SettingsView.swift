@@ -1130,11 +1130,22 @@ struct SettingsView: View {
             .accessibilityHint("开启后跨设备同步对话数据，需重启 App 生效")
             .accessibilityIdentifier("iCloudSyncToggle")
 
+            if AetherApp.isICloudSyncFallingBackToLocal {
+                Label {
+                    Text("iCloud 同步暂不可用：当前数据模型尚未兼容 CloudKit，已回退到本地存储，对话不会同步。", comment: "")
+                        .font(.captionAI)
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                }
+                .accessibilityIdentifier("iCloudFallbackWarning")
+            }
+
             HStack {
                 Text("同步状态", comment: "")
                 Spacer()
                 Text(iCloudSyncStatusText)
-                    .foregroundStyle(iCloudSyncEnabled ? .green : .secondary)
+                    .foregroundStyle(iCloudSyncStatusColor)
                     .font(.captionAI)
             }
             .accessibilityLabel("同步状态")
@@ -1352,9 +1363,16 @@ struct SettingsView: View {
     /// 刷新 iCloud 同步状态文案与上次同步时间显示。
     /// SwiftData + CloudKit 未公开同步事件回调，此处仅根据 UserDefaults 开关状态
     /// 与占位的「上次同步时间」生成展示文案，不读取 CloudKit 实时同步状态。
+    private var iCloudSyncStatusColor: Color {
+        guard iCloudSyncEnabled else { return .secondary }
+        return AetherApp.isICloudSyncFallingBackToLocal ? .orange : .green
+    }
+
     private func refreshICloudSyncStatus() {
         if iCloudSyncEnabled {
-            iCloudSyncStatusText = String(localized: "已启用，等待同步")
+            iCloudSyncStatusText = AetherApp.isICloudSyncFallingBackToLocal
+                ? String(localized: "已回退本地存储（未同步）")
+                : String(localized: "已启用，等待同步")
         } else {
             iCloudSyncStatusText = String(localized: "未启用")
         }

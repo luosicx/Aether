@@ -93,6 +93,11 @@ final class CloudKitSyncManager: ObservableObject {
             Logger.sync.notice("triggerSync: 同步进行中，跳过重复触发")
             return
         }
+        guard !AetherApp.isICloudSyncFallingBackToLocal else {
+            // 开启 iCloud 但容器回退本地存储时，不能谎报同步时间
+            Logger.sync.notice("triggerSync: 当前存储已回退本地，跳过 CloudKit 同步")
+            return
+        }
         beginSync()
         Logger.sync.notice("triggerSync: 手动触发 CloudKit 同步")
         NotificationCenter.default.post(name: .cloudKitSyncRequested, object: nil)

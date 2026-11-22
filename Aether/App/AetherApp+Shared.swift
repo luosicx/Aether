@@ -39,36 +39,31 @@ extension AetherApp {
         set { UserDefaults.standard.set(newValue, forKey: lastICloudSyncDateKey) }
     }
 
-    /// Task 4/5: 创建使用 App Group 共享存储的 ModelConfiguration。
-    /// 使 iOS / watchOS / Widget 三端读写同一 SQLite store。
-    /// App Group 未配置时回退到默认存储（开发/测试兜底）。
-    /// Task 14: 受 UserDefaults `aether.icloud.enabled` 控制：
-    /// - 开关关闭（默认）：使用 App Group 本地 SQLite 存储
-    /// - 开关开启：使用 CloudKit 自动同步（需重启 App 生效）
-    static let sharedModelConfiguration: ModelConfiguration = {
+    /// 本进程实际生效的存储后端，供 UI 提示与诊断使用。
+    enum StoreBackend: Equatable {
+        /// SwiftData + CloudKit 同步生效
+        case cloudKit
+        /// 本地持久化（App Group SQLite，不同步）
+        case local
+        /// 兜底内存存储（数据不持久化）
+        case inMemory
+    }
+
+    private static func makeModelContainer(configuration: ModelConfiguration) throws -> ModelContainer {
+        try ModelContainer(
+            for: Conversation.self, ChatMessage.self, DocumentChunk.self,
+                MessageFeedback.self, HealthInsight.self, UserPreference.self, AgentTask.self, Memory.self,
+            configurations: configuration
+        )
+    }
+
+    /// 本地存储配置：App Group 共享 SQLite（iOS / watchOS / Widget 三端读写同一 store）。
+    ///
+    /// 必须显式 cloudKitDatabase: .none——ModelConfiguration 默认是 .automatic，
+    /// 一旦二进制带 iCloud entitlement（签名/真机构建），SwiftData 会自动启用 CloudKit
+    /// 并用 CloudKit 规则校验 schema（属性必须可选/有默认值），导致启动即崩溃。
+    static let localModelConfiguration: ModelConfiguration = {
         let groupIdentifier = "group.com.aether.app"
-
-        // Task 14.1: 检查 iCloud 同步开关（默认关闭，避免开发环境触发 CloudKit 错误）
-        if UserDefaults.standard.bool(forKey: AetherApp.iCloudSyncEnabledKey) {
-            // Task 14.3: SwiftData + CloudKit 冲突解决策略说明
-            // ---------------------------------------------------------------
-            // 默认采用 "last writer wins" (LWW) 策略：
-            // - 多设备并发修改同一记录时，以最后一次写入为准
-            // - 关键模型（Conversation / ChatMessage）暂不实现复杂合并逻辑
-            // - SwiftData 当前未公开 beforeSave 钩子，无法在保存前介入合并
-            // - 若需字段级合并（例如累加消息计数），应在 ViewModel 层显式实现
-            // - 如启用后出现 CKError 冲突，由 CloudKit 内部自动处理
-            //
-            // Task 14.1: CloudKit 不支持自定义 URL，使用默认存储位置
-            // .automatic 启用 CloudKit 自动同步，container identifier 由 entitlements
-            // 中的 com.apple.developer.icloud-container-identifiers 指定（iCloud.com.aether.app）
-            return ModelConfiguration(cloudKitDatabase: .automatic)
-        }
-
-        // 默认本地存储：App Group 共享（iOS / watchOS / Widget 三端读写同一 SQLite）
-        // 必须显式 cloudKitDatabase: .none——ModelConfiguration 默认是 .automatic，
-        // 一旦二进制带 iCloud entitlement（签名/真机构建），SwiftData 会自动启用 CloudKit
-        // 并用 CloudKit 规则校验 schema（属性必须可选/有默认值），导致启动即崩溃。
         if let groupURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: groupIdentifier) {
             let storeURL = groupURL.appendingPathComponent("Aether.sqlite")
             return ModelConfiguration(url: storeURL, cloudKitDatabase: .none)
@@ -76,54 +71,96 @@ extension AetherApp {
         return ModelConfiguration(isStoredInMemoryOnly: false, cloudKitDatabase: .none)
     }()
 
-    /// 预构建的 ModelContainer，使用 sharedModelConfiguration。
+    /// iCloud 同步配置：CloudKit 自动同步，container identifier 由 entitlements
+    /// 中的 com.apple.developer.icloud-container-identifiers 指定（iCloud.com.aether.app）。
     ///
-    /// P1-7: 双重故障兜底策略——
-    /// 1. 优先用 sharedModelConfiguration（持久化到 SQLite）
-    /// 2. 失败时降级到 in-memory 模式（App 可运行但数据不持久化）
-    /// 3. in-memory 也失败时（系统级 SwiftData 故障，几乎不可能发生），
-    ///    上报到 CrashReportService 后 fatalError——
-    ///    因为 SwiftUI App 启动必须返回 ModelContainer，没有 ModelContainer 时 ChatView
-    ///    通过 @Environment(\.modelContext) 访问会立即崩溃，无法显示任何降级 UI。
-    ///    此 fatalError 是「无可恢复的最后一道防线」，符合 Swift fatalError 语义。
-    static let sharedModelContainer: ModelContainer = {
-        do {
-            return try ModelContainer(
-                for: Conversation.self, ChatMessage.self, DocumentChunk.self,
-                    MessageFeedback.self, HealthInsight.self, UserPreference.self, AgentTask.self, Memory.self,
-                configurations: AetherApp.sharedModelConfiguration
-            )
-        } catch {
-            // Fallback：内存模式容器，避免 throw 中断 App 启动
-            Logger.app.error("持久化 ModelContainer 创建失败，降级到 in-memory 模式: \(error.localizedDescription, privacy: .public)")
+    /// Task 14.3: 冲突解决采用 "last writer wins"（多设备并发写同一记录时以最后一次写入为准）；
+    /// SwiftData 未公开 beforeSave 钩子，字段级合并需在 ViewModel 层显式实现。
+    static let iCloudModelConfiguration = ModelConfiguration(cloudKitDatabase: .automatic)
+
+    struct StoreResolution {
+        let container: ModelContainer
+        let configuration: ModelConfiguration
+        let backend: StoreBackend
+    }
+
+    /// 解析实际存储后端：iCloud 开关开启时先验证 CloudKit 容器是否可用；
+    /// 失败则回退**本地持久化**（而非内存），避免用户以为正在同步、实际数据不落盘。
+    ///
+    /// 当前 SwiftData schema 尚未满足 CloudKit 约束（属性需可选/有默认值、关系需可选），
+    /// 因此开启 iCloud 后会走到本地回退分支；UI 通过 `isICloudSyncFallingBackToLocal` 提示。
+    ///
+    /// 最终兜底：本地持久化也失败时降级 in-memory（App 可运行但数据不持久化）；
+    /// in-memory 也失败（系统级 SwiftData 故障）则上报 CrashReportService 后 fatalError——
+    /// SwiftUI App 启动必须返回 ModelContainer，没有它 ChatView 通过 @Environment(\.modelContext)
+    /// 会立即崩溃，无法展示任何降级 UI。
+    static func resolveStore(
+        iCloudEnabled: Bool,
+        makeContainer: (ModelConfiguration) throws -> ModelContainer
+    ) -> StoreResolution {
+        if iCloudEnabled {
             do {
-                return try ModelContainer(
-                    for: Conversation.self, ChatMessage.self, DocumentChunk.self,
-                        MessageFeedback.self, HealthInsight.self, UserPreference.self, AgentTask.self, Memory.self,
-                    configurations: ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
+                return StoreResolution(
+                    container: try makeContainer(iCloudModelConfiguration),
+                    configuration: iCloudModelConfiguration,
+                    backend: .cloudKit
                 )
             } catch {
-                // 双重故障：持久化 + in-memory 均失败，SwiftData 系统级故障
-                // 上报到崩溃监控便于后续定位，然后 fatalError（无法继续）
-                CrashReportService.shared.reportException(
-                    NSError(domain: "AetherApp", code: -1, userInfo: [
-                        NSLocalizedDescriptionKey: "Failed to create in-memory ModelContainer: \(error)"
-                    ])
-                )
-                fatalError("Failed to create in-memory ModelContainer (SwiftData 系统级故障): \(error)")
+                Logger.app.error("CloudKit 容器创建失败（SwiftData schema 尚未兼容 CloudKit），回退本地存储: \(error.localizedDescription, privacy: .public)")
             }
         }
-    }()
 
-    /// UITest 数据重置：创建独立的 ModelContainer（使用与主 App 相同的默认 store URL），
+        do {
+            return StoreResolution(
+                container: try makeContainer(localModelConfiguration),
+                configuration: localModelConfiguration,
+                backend: .local
+            )
+        } catch {
+            Logger.app.error("持久化 ModelContainer 创建失败，降级到 in-memory 模式: \(error.localizedDescription, privacy: .public)")
+        }
+
+        do {
+            let configuration = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
+            return StoreResolution(
+                container: try makeContainer(configuration),
+                configuration: configuration,
+                backend: .inMemory
+            )
+        } catch {
+            CrashReportService.shared.reportException(
+                NSError(domain: "AetherApp", code: -1, userInfo: [
+                    NSLocalizedDescriptionKey: "Failed to create in-memory ModelContainer: \(error)"
+                ])
+            )
+            fatalError("Failed to create in-memory ModelContainer (SwiftData 系统级故障): \(error)")
+        }
+    }
+
+    /// 本进程的存储解析结果（首次访问时创建，App 生命周期内复用）。
+    private static let resolvedStore = resolveStore(iCloudEnabled: isICloudSyncEnabled) {
+        try makeModelContainer(configuration: $0)
+    }
+
+    /// 预构建的 ModelContainer（见 `resolvedStore` 的解析策略）。
+    static var sharedModelContainer: ModelContainer { resolvedStore.container }
+
+    /// 本进程实际生效的存储配置。iCloud 不可用时为本地配置。
+    static var activeModelConfiguration: ModelConfiguration { resolvedStore.configuration }
+
+    /// 本进程实际生效的存储后端。
+    static var storeBackend: StoreBackend { resolvedStore.backend }
+
+    /// 用户开启了 iCloud 同步，但本次启动已回退本地存储（数据不会同步）。
+    static var isICloudSyncFallingBackToLocal: Bool {
+        isICloudSyncEnabled && resolvedStore.backend == .local
+    }
+
+    /// UITest 数据重置：创建独立的 ModelContainer（使用本进程实际生效的存储配置），
     /// 调用 ChatStorage.wipeAllData() 清空所有 SwiftData 数据。
     func wipeAllDataForUITest() {
         do {
-            let container = try ModelContainer(
-                for: Conversation.self, ChatMessage.self, DocumentChunk.self,
-                    MessageFeedback.self, HealthInsight.self, UserPreference.self, AgentTask.self, Memory.self,
-                configurations: AetherApp.sharedModelConfiguration
-            )
+            let container = try AetherApp.makeModelContainer(configuration: AetherApp.activeModelConfiguration)
             let context = ModelContext(container)
             ChatStorage(modelContext: context).wipeAllData()
             try context.save()
