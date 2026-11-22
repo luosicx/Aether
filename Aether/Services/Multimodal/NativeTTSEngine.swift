@@ -18,7 +18,9 @@ public final class NativeTTSEngine: TTSEngine, @unchecked Sendable {
     /// 实际通过 actor 串行化调用）
     private let synthesizer = AVSpeechSynthesizer()
 
-    public init() {}
+    public init() {
+        // 存储属性均有默认值，构造器无需额外装配
+    }
 
     public func loadModel(at modelPath: URL) async throws {
         // AVSpeechSynthesizer 无需加载模型文件，保持兼容（no-op）

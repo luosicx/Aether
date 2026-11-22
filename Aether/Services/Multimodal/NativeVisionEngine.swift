@@ -24,7 +24,9 @@ public final class NativeVisionEngine: VisionInferenceEngine, @unchecked Sendabl
     /// 模型名称（用于 UI 展示）
     public let loadedModelName: String? = "Apple Vision (Native)"
 
-    public init() {}
+    public init() {
+        // 存储属性均有默认值，构造器无需额外装配
+    }
 
     public func loadModel(at modelPath: URL, modelName: String) async throws {
         // Vision 框架无需加载模型，保持兼容（no-op）

@@ -15,7 +15,9 @@ public final class MLXVoiceTTSEngine: TTSEngine, @unchecked Sendable {
     #endif
     private let fallback = NativeTTSEngine()
 
-    public init() {}
+    public init() {
+        // 存储属性均有默认值，构造器无需额外装配
+    }
 
     public var name: String { "MLXVoiceTTS (Kokoro/Matcha-TTS)" }
     public var isLoaded: Bool { fallback.isLoaded }

@@ -37,7 +37,9 @@ public protocol ASREngine: Sendable {
 /// 在 Whisper.cpp 集成前作为默认引擎，`transcribe` 返回提示信息。
 /// 集成后将由 `WhisperASREngine` 接管真实推理。
 public final class PlaceholderASREngine: ASREngine, @unchecked Sendable {
-    public init() {}
+    public init() {
+        // 存储属性均有默认值，构造器无需额外装配
+    }
 
     public let name = "PlaceholderASR"
     public let requiresNetwork = false

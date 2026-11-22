@@ -42,7 +42,9 @@ final class HandoffManager {
     private(set) var currentActivity: NSUserActivity?
 
     /// 私有初始化，强制使用单例
-    private init() {}
+    private init() {
+        // 无状态可装配：currentActivity 由 becomeCurrent / invalidate 维护
+    }
 
     /// 创建并广播 NSUserActivity，记录当前会话的连续对话状态。
     /// - Parameters:

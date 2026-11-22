@@ -16,7 +16,9 @@ public final class WhisperASREngine: ASREngine, @unchecked Sendable {
     /// Rust FFI 是否可用（当前 false，待 Rust 侧 whisper 集成后改为 true）
     private let rustFFIAvailable = false
 
-    public init() {}
+    public init() {
+        // 存储属性均有默认值，构造器无需额外装配
+    }
 
     public var name: String { "WhisperASR (whisper.cpp)" }
     public var requiresNetwork: Bool { false }  // whisper.cpp 完全离线
