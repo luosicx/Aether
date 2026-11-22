@@ -52,8 +52,8 @@ struct QuickChatTimelineProvider: AppIntentTimelineProvider {
 
 /// 快速对话 Widget 的配置 Intent（让用户选择预设问题组）
 struct QuickChatWidgetConfigurationIntent: AppIntent, WidgetConfigurationIntent {
-    static var title: LocalizedStringResource = "快速对话设置"
-    static var description = IntentDescription("选择快速对话的预设问题")
+    static var title: LocalizedStringResource { "快速对话设置" }
+    static var description: IntentDescription { IntentDescription("选择快速对话的预设问题") }
 
     /// 默认预设问题
     static let defaultPresets = [

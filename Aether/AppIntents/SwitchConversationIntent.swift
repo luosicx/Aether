@@ -10,9 +10,9 @@ import SwiftData
 /// 既满足 SwiftData 隔离规则，也避免与主 App 的 ModelContext 跨 actor 共享。
 struct SwitchConversationIntent: AppIntent {
     /// Siri / 快捷指令中显示的标题
-    static var title: LocalizedStringResource = "切换会话"
+    static var title: LocalizedStringResource { "切换会话" }
     /// 描述（用于快捷指令详情页）
-    static var description = IntentDescription("按关键词切换到最近匹配的会话")
+    static var description: IntentDescription { IntentDescription("按关键词切换到最近匹配的会话") }
 
     /// 用户输入的搜索关键词
     @Parameter(title: "关键词")

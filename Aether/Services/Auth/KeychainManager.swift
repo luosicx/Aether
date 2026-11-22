@@ -66,7 +66,7 @@ final class InMemoryKeychainBackend: KeychainBackend, @unchecked Sendable {
 
     func secItemDelete(_ query: CFDictionary) -> OSStatus {
         guard let key = key(for: query) else { return errSecParam }
-        storageLock.withLock { $0.removeValue(forKey: key) }
+        storageLock.withLock { _ = $0.removeValue(forKey: key) }
         return errSecSuccess
     }
 

@@ -62,7 +62,7 @@ actor OnDeviceModelDownloader {
                 isDownloading = true
                 progress = 0.0
                 lastError = nil
-                await performDownload(url: mirrorURL, to: destinationURL, expectedSHA256: expectedSHA256)
+                _ = await performDownload(url: mirrorURL, to: destinationURL, expectedSHA256: expectedSHA256)
             }
         }
     }
@@ -145,7 +145,7 @@ actor OnDeviceModelDownloader {
                     isDownloading = false
                     return
                 }
-                await performDownload(url: msURL, to: modelDestURL, expectedSHA256: expectedSHA256)
+                _ = await performDownload(url: msURL, to: modelDestURL, expectedSHA256: expectedSHA256)
             }
         }
 

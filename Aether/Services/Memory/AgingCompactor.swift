@@ -109,7 +109,7 @@ final class AgingCompactor {
             task.setTaskCompleted(success: false)
         }
         do {
-            try await runCycle(now: now)
+            _ = try await runCycle(now: now)
             task.setTaskCompleted(success: true)
         } catch {
             task.setTaskCompleted(success: false)

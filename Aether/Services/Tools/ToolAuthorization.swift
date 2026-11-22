@@ -190,7 +190,7 @@ final class ToolAuthorization: @unchecked Sendable {
 
     /// 授予指定工具本次启动内有效授权
     func grantSessionAuthorization(toolName: String) {
-        sessionAuthorizationsLock.withLock { $0.insert(toolName) }
+        sessionAuthorizationsLock.withLock { _ = $0.insert(toolName) }
     }
 
     /// 授予指定工具持久化授权，并写入 UserDefaults
@@ -200,8 +200,8 @@ final class ToolAuthorization: @unchecked Sendable {
 
     /// 撤销指定工具的所有授权（本次启动 + 持久化），并清理 UserDefaults
     func revokeAuthorization(toolName: String) {
-        sessionAuthorizationsLock.withLock { $0.remove(toolName) }
-        alwaysAuthorizedLock.withLock { $0.remove(toolName) }
+        sessionAuthorizationsLock.withLock { _ = $0.remove(toolName) }
+        alwaysAuthorizedLock.withLock { _ = $0.remove(toolName) }
         UserDefaults.standard.removeObject(forKey: "\(alwaysAuthorizedKeyPrefix)\(toolName)")
     }
 }
@@ -216,7 +216,7 @@ private extension ToolAuthorization {
                     UserDefaults.standard.removeObject(forKey: key)
                     continue
                 }
-                alwaysAuthorizedLock.withLock { $0.insert(toolName) }
+                alwaysAuthorizedLock.withLock { _ = $0.insert(toolName) }
             }
         }
     }
@@ -224,7 +224,7 @@ private extension ToolAuthorization {
     func grantAlways(_ toolName: String) {
         // 高危工具禁止持久化授权，每次调用都必须用户确认
         guard !neverAlwaysAllow.contains(toolName) else { return }
-        alwaysAuthorizedLock.withLock { $0.insert(toolName) }
+        alwaysAuthorizedLock.withLock { _ = $0.insert(toolName) }
         UserDefaults.standard.set(true, forKey: "\(alwaysAuthorizedKeyPrefix)\(toolName)")
     }
 
