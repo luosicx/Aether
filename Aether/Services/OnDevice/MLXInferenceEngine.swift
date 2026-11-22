@@ -132,6 +132,30 @@ actor MLXInferenceEngine {
         #endif
     }
 
+    #if canImport(MLXLLM)
+    /// 把 MLX 的流式生成桥接到 AsyncStream：逐 token 写入 continuation。
+    /// 独立成方法是为了不让 `perform` 闭包再嵌进流的闭包层级里。
+    private func streamTokens(
+        from model: ModelContainer,
+        prompt: String,
+        temperature: Double,
+        maxTokens: Int,
+        into continuation: AsyncStream<String>.Continuation
+    ) async throws {
+        try await model.perform { context in
+            let input = try await context.processor.prepare(input: UserInput(prompt: prompt))
+            let params = GenerateParameters(temperature: Float(temperature), maxTokens: maxTokens)
+            let tokenStream = try generate(input: input, parameters: params, context: context)
+            for await part in tokenStream {
+                if Task.isCancelled { break }
+                if let chunk = part.chunk, !chunk.isEmpty {
+                    continuation.yield(chunk)
+                }
+            }
+        }
+    }
+    #endif
+
     /// 流式生成文本。逐 token yield 生成内容。
     /// 若模型未加载且传入了 modelPath，会先自动调用 `loadModel()` 加载模型再生成。
     /// - Parameters:
@@ -199,19 +223,14 @@ actor MLXInferenceEngine {
                     return
                 }
                 do {
-                    // 使用 MLX 原生流式生成：通过 perform 获取 ModelContext，
-                    // 调用 MLXLMCommon.generate 获取 AsyncStream<Generation>，逐 token yield
-                    try await model.perform { context in // NOSONAR: MLXLMCommon API 要求 model.perform 闭包内调用 generate 流式 API，嵌套层级由第三方 API 决定
-                        let input = try await context.processor.prepare(input: UserInput(prompt: prompt))
-                        let params = GenerateParameters(temperature: Float(temperature), maxTokens: maxTokens)
-                        let tokenStream = try generate(input: input, parameters: params, context: context)
-                        for await part in tokenStream {
-                            if Task.isCancelled { break }
-                            if let chunk = part.chunk, !chunk.isEmpty {
-                                continuation.yield(chunk)
-                            }
-                        }
-                    }
+                    // 使用 MLX 原生流式生成：perform 获取 ModelContext 后逐 token 写入
+                    try await streamTokens(
+                        from: model,
+                        prompt: prompt,
+                        temperature: temperature,
+                        maxTokens: maxTokens,
+                        into: continuation
+                    )
                 } catch {
                     continuation.yield(String(format: NSLocalizedString("[生成失败：%@]", comment: ""), error.localizedDescription))
                 }

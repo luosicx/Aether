@@ -157,18 +157,19 @@ public final class NativeVisionEngine: VisionInferenceEngine, @unchecked Sendabl
     private func classifyImage(_ image: CGImage) async -> String {
         await performWithDeadline(image, fallback: "") { once in
             VNClassifyImageRequest { request, error in
-                if error != nil {
-                    once.resume(returning: "")
-                    return
-                }
-                let observations = request.results as? [VNClassificationObservation] ?? []
-                // 取前 3 个置信度最高的分类
-                let top = observations.prefix(3).map { obs in
-                    "\(obs.identifier)（\(Int(obs.confidence * 100))%）"
-                }
-                once.resume(returning: top.joined(separator: " / "))
+                once.resume(returning: Self.classificationSummary(request, error: error))
             }
         }
+    }
+
+    /// 取前 3 个置信度最高的分类，格式化为 "名称（百分比） / ..."。
+    private static func classificationSummary(_ request: VNRequest, error: Error?) -> String {
+        guard error == nil else { return "" }
+        let observations = request.results as? [VNClassificationObservation] ?? []
+        let top = observations.prefix(3).map { obs in
+            "\(obs.identifier)（\(Int(obs.confidence * 100))%）"
+        }
+        return top.joined(separator: " / ")
     }
 
     /// 人脸检测（VNDetectFaceRectanglesRequest）
@@ -195,13 +196,7 @@ public final class NativeVisionEngine: VisionInferenceEngine, @unchecked Sendabl
     private func recognizeTexts(_ image: CGImage) async -> [String] {
         await performWithDeadline(image, fallback: []) { once in
             let request = VNRecognizeTextRequest { request, error in
-                if error != nil {
-                    once.resume(returning: [])
-                    return
-                }
-                let observations = request.results as? [VNRecognizedTextObservation] ?? []
-                let texts = observations.compactMap { $0.topCandidates(1).first?.string }
-                once.resume(returning: texts)
+                once.resume(returning: Self.recognizedTexts(request, error: error))
             }
             request.recognitionLevel = .accurate
             request.recognitionLanguages = ["zh-Hans", "en"]
@@ -209,15 +204,26 @@ public final class NativeVisionEngine: VisionInferenceEngine, @unchecked Sendabl
         }
     }
 
+    /// 每条观测取置信度最高的候选文本。
+    private static func recognizedTexts(_ request: VNRequest, error: Error?) -> [String] {
+        guard error == nil else { return [] }
+        let observations = request.results as? [VNRecognizedTextObservation] ?? []
+        return observations.compactMap { $0.topCandidates(1).first?.string }
+    }
+
     /// 条码检测（VNDetectBarcodesRequest）
     private func detectBarcodes(_ image: CGImage) async -> [String] {
         await performWithDeadline(image, fallback: []) { once in
             VNDetectBarcodesRequest { request, _ in
-                let observations = request.results as? [VNBarcodeObservation] ?? []
-                let payloads = observations.compactMap { $0.payloadStringValue }
-                once.resume(returning: payloads)
+                once.resume(returning: Self.barcodePayloads(request))
             }
         }
+    }
+
+    /// 取每个条码观测的载荷字符串。
+    private static func barcodePayloads(_ request: VNRequest) -> [String] {
+        let observations = request.results as? [VNBarcodeObservation] ?? []
+        return observations.compactMap { $0.payloadStringValue }
     }
 }
 
