@@ -87,24 +87,31 @@ final class UserPreference {
     /// Task 6: 行距倍数
     var lineHeight: Double = 1.5
 
-    /// 创建 UserPreference 实例，所有字段均初始化为默认值
+    /// 创建全字段默认值的 UserPreference 实例
+    init() {}
+
+    /// 提示词偏好：语气、偏好工具与自定义事实
     /// - Parameters:
     ///   - preferredTone: 偏好语气，默认 "默认"
     ///   - preferredTools: 偏好工具名数组，默认 []
     ///   - customFact: 自定义事实，默认 ""
-    ///   - aiPersona: AI 人设名称，默认 ""
+    init(preferredTone: String, preferredTools: [String] = [], customFact: String = "") {
+        self.preferredTone = preferredTone
+        self.preferredTools = preferredTools
+        self.customFact = customFact
+    }
+
+    /// 个性化偏好：AI 人设与界面外观
+    /// - Parameters:
+    ///   - aiPersona: AI 人设名称
     ///   - aiPersonaDescription: AI 性格描述，默认 ""
     ///   - avatarData: 自定义头像数据，默认 nil
     ///   - themeName: 主题名称，默认 "deepSpace"
     ///   - bubbleStyle: 气泡样式，默认 "liquidGlass"
     ///   - fontSize: 字体大小，默认 16.0
     ///   - lineHeight: 行距倍数，默认 1.5
-    // NOSONAR 注释需放在 init( 同一行才能生效
-    init( // NOSONAR: Swift @Model 需显式 init；10 个字段均有默认值，调用方多用默认值或部分参数
-        preferredTone: String = "默认",
-        preferredTools: [String] = [],
-        customFact: String = "",
-        aiPersona: String = "",
+    init(
+        aiPersona: String,
         aiPersonaDescription: String = "",
         avatarData: Data? = nil,
         themeName: String = "deepSpace",
@@ -112,9 +119,6 @@ final class UserPreference {
         fontSize: Double = 16.0,
         lineHeight: Double = 1.5
     ) {
-        self.preferredTone = preferredTone
-        self.preferredTools = preferredTools
-        self.customFact = customFact
         self.aiPersona = aiPersona
         self.aiPersonaDescription = aiPersonaDescription
         self.avatarData = avatarData

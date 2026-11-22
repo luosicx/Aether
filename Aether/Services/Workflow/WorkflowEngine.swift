@@ -226,19 +226,16 @@ public struct NodeExecutionResult: Sendable, Identifiable {
     public let error: String?
 
     public init(
-        id: UUID = UUID(),
-        nodeId: UUID,
-        nodeName: String,
-        nodeType: WorkflowNode.NodeType,
+        node: WorkflowNode,
         output: String,
         durationSeconds: Double,
         success: Bool,
         error: String? = nil
     ) {
-        self.id = id
-        self.nodeId = nodeId
-        self.nodeName = nodeName
-        self.nodeType = nodeType
+        self.id = UUID()
+        self.nodeId = node.id
+        self.nodeName = node.name
+        self.nodeType = node.type
         self.output = output
         self.durationSeconds = durationSeconds
         self.success = success
@@ -350,9 +347,7 @@ public final class WorkflowEngine {
 
             let duration = Date().timeIntervalSince(nodeStart)
             let result = NodeExecutionResult(
-                nodeId: node.id,
-                nodeName: node.name,
-                nodeType: node.type,
+                node: node,
                 output: output,
                 durationSeconds: duration,
                 success: success,

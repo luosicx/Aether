@@ -103,13 +103,10 @@ final class PreferenceExtractorTests: XCTestCase {
         XCTAssertEqual(pref.lineHeight, 1.5, accuracy: 0.001, "默认 lineHeight 应为 1.5")
     }
 
-    /// UserPreference 全参数初始化：应正确设置所有字段
+    /// UserPreference 全字段初始化：应正确设置所有字段
     func testUserPreferenceFullInit() {
         let avatarBytes = Data([0x89, 0x50, 0x4E, 0x47])
         let pref = UserPreference(
-            preferredTone: "轻松",
-            preferredTools: ["calculate", "web_search"],
-            customFact: "我在北京工作",
             aiPersona: "小以太",
             aiPersonaDescription: "温柔且专业的助手",
             avatarData: avatarBytes,
@@ -118,6 +115,9 @@ final class PreferenceExtractorTests: XCTestCase {
             fontSize: 18.0,
             lineHeight: 1.8
         )
+        pref.preferredTone = "轻松"
+        pref.preferredTools = ["calculate", "web_search"]
+        pref.customFact = "我在北京工作"
 
         XCTAssertEqual(pref.preferredTone, "轻松")
         XCTAssertEqual(pref.preferredTools, ["calculate", "web_search"])

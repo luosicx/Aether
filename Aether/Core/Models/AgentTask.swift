@@ -188,32 +188,6 @@ struct SubTask: Codable, Identifiable, Hashable {
     /// 委派目标实例 ID。保留字段：当前无编排器消费，仅用于解码历史数据。
     var delegatedTo: UUID?
 
-    /// 创建 SubTask 实例
-    /// - Parameters:
-    ///   - title: 子任务标题
-    ///   - description: 子任务描述，默认空字符串
-    ///   - dependencies: 依赖的子任务 ID 列表，默认空数组
-    ///   - toolName: 使用的工具名，默认 nil
-    ///   - order: 执行顺序，默认 0
-    ///   - parallel: 是否可并行执行，默认 false
-    ///   - depth: 节点深度，默认 1
-    ///   - assignedRole: 节点级角色路由，默认 nil
-    ///   - delegatedTo: 委派目标 Agent ID，默认 nil
-    init(title: String, description: String = "", dependencies: [UUID] = [], toolName: String? = nil, order: Int = 0, parallel: Bool = false, depth: Int = 1, assignedRole: AgentRole? = nil, delegatedTo: UUID? = nil) {
-        self.id = UUID()
-        self.title = title
-        self.description = description
-        self.status = .pending
-        self.dependencies = dependencies
-        self.toolName = toolName
-        self.result = nil
-        self.order = order
-        self.parallel = parallel
-        self.depth = depth
-        self.assignedRole = assignedRole
-        self.delegatedTo = delegatedTo
-    }
-
     /// 用于 LLM 返回的 JSON 解码：id 可选以便 LLM 不返回 id 时自动生成
     enum CodingKeys: String, CodingKey {
         case id, title, description, status, dependencies, toolName, result, order, parallel, depth, assignedRole, delegatedTo
