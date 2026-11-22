@@ -51,8 +51,8 @@ final class TerminalCommandTool: ToolProtocol, @unchecked Sendable {
     /// 拒绝的 shell 元字符集合。
     private static let forbiddenCharacters = CharacterSet(charactersIn: "|><;&\\`$*?(){}[]!#\n\r")
 
-    /// 最小环境变量 PATH（系统标准目录，非硬编码 URI）。
-    private static let path = "/usr/bin:/bin:/usr/sbin:/sbin" // NOSONAR: 系统标准 PATH 目录，安全可控
+    /// 最小环境变量 PATH（系统标准目录；S1075 在 sonar-project.properties e10 豁免）。
+    private static let path = "/usr/bin:/bin:/usr/sbin:/sbin"
 
     /// 解析后的命令描述
     internal struct ParsedCommand: Equatable {
