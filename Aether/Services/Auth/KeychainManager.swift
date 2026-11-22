@@ -82,7 +82,10 @@ final class InMemoryKeychainBackend: KeychainBackend, @unchecked Sendable {
 }
 
 /// Keychain 单例管理 API Key 的增删改查
-final class KeychainManager {
+///
+/// 唯一可变属性 backend 仅在测试 setUp 中被替换，生产路径只读；
+/// 各 secItem 调用本身无共享状态，可安全跨线程使用。
+final class KeychainManager: @unchecked Sendable {
     /// 单例
     static let shared = KeychainManager()
     /// Keychain service 标识 "com.aether.apikey"
