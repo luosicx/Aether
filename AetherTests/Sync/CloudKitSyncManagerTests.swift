@@ -1,5 +1,6 @@
 #if os(iOS) || os(macOS)
 import XCTest
+import SwiftData
 @testable import Aether
 
 /// v2.0: CloudKitSyncManager 状态管理逻辑单元测试。
@@ -130,6 +131,67 @@ final class CloudKitSyncManagerTests: XCTestCase {
         let initial = manager.conflictCount
         manager.recordConflict()
         XCTAssertEqual(manager.conflictCount, initial + 1, "recordConflict 应使冲突数 +1")
+    }
+}
+
+// MARK: - 存储后端解析
+
+/// 覆盖 `AetherApp.resolveStore`：iCloud 开启但 CloudKit 容器不可用时
+/// 必须回退本地持久化而不是内存存储（否则数据静默不落盘）。
+final class AetherStoreResolutionTests: XCTestCase {
+    private enum TestError: Error {
+        case cloudKitSchemaIncompatible
+        case persistentStoreUnavailable
+    }
+
+    private func makeInMemoryContainer() throws -> ModelContainer {
+        try ModelContainer(
+            for: Conversation.self, ChatMessage.self, DocumentChunk.self,
+                MessageFeedback.self, HealthInsight.self, UserPreference.self, AgentTask.self, Memory.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
+        )
+    }
+
+    func testCloudKitFailureFallsBackToLocalPersistentStore() throws {
+        var attempts = 0
+        let resolution = AetherApp.resolveStore(iCloudEnabled: true) { _ in
+            attempts += 1
+            // 第一次尝试即 CloudKit 配置（schema 校验失败），之后本地 store 创建成功
+            if attempts == 1 { throw TestError.cloudKitSchemaIncompatible }
+            return try self.makeInMemoryContainer()
+        }
+        XCTAssertEqual(attempts, 2, "CloudKit 失败后应只重试一次本地 store")
+        XCTAssertEqual(resolution.backend, .local, "CloudKit 不可用时应回退本地持久化，而不是内存存储")
+    }
+
+    func testCloudKitSuccessKeepsCloudKitBackend() throws {
+        var attempts = 0
+        let resolution = AetherApp.resolveStore(iCloudEnabled: true) { _ in
+            attempts += 1
+            return try self.makeInMemoryContainer()
+        }
+        XCTAssertEqual(attempts, 1, "CloudKit 创建成功时不应尝试其它存储")
+        XCTAssertEqual(resolution.backend, .cloudKit)
+    }
+
+    func testICloudDisabledUsesLocalStore() throws {
+        var attempts = 0
+        let resolution = AetherApp.resolveStore(iCloudEnabled: false) { _ in
+            attempts += 1
+            return try self.makeInMemoryContainer()
+        }
+        XCTAssertEqual(attempts, 1, "iCloud 关闭时不应尝试 CloudKit 配置")
+        XCTAssertEqual(resolution.backend, .local)
+    }
+
+    func testPersistentStoreFailureFallsBackToInMemory() throws {
+        let resolution = AetherApp.resolveStore(iCloudEnabled: true) { configuration in
+            guard configuration.isStoredInMemoryOnly else {
+                throw TestError.persistentStoreUnavailable
+            }
+            return try self.makeInMemoryContainer()
+        }
+        XCTAssertEqual(resolution.backend, .inMemory)
     }
 }
 #endif

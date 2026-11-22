@@ -157,7 +157,7 @@ struct AetherApp: App {
             do {
                 let container = try ModelContainer(
                     for: Conversation.self, ChatMessage.self, DocumentChunk.self, MessageFeedback.self, HealthInsight.self, UserPreference.self, AgentTask.self, Memory.self,
-                    configurations: AetherApp.sharedModelConfiguration
+                    configurations: AetherApp.activeModelConfiguration
                 )
                 let context = ModelContext(container)
                 let generator = HealthInsightGenerator.make(modelContext: context)
