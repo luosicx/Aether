@@ -249,7 +249,7 @@ final class SystemAlertPresenter: AuthorizationAlertPresenting {
     }
     #endif
 
-    func present(toolName: String, title: String, message: String, isSensitive: Bool,
+    func present(toolName _: String, title: String, message: String, isSensitive: Bool,
                  completion: @escaping (ToolAuthorizationChoice) -> Void) {
         #if os(iOS)
         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)

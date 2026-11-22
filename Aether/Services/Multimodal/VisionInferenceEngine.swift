@@ -54,7 +54,7 @@ public final class PlaceholderVisionEngine: VisionInferenceEngine, @unchecked Se
     public private(set) var isLoaded = false
     public private(set) var loadedModelName: String?
 
-    public func loadModel(at modelPath: URL, modelName: String) async throws {
+    public func loadModel(at _: URL, modelName: String) async throws {
         // 占位实现：标记为已加载但实际不调用 MLX
         // 真实 MLX-VLM 集成后将调用 ModelContainer.load
         isLoaded = true

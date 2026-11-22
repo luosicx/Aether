@@ -24,7 +24,7 @@ public final class SDMobileEngine: ImageGenerationEngine, @unchecked Sendable {
     public var name: String { "SDMobile (Stable Diffusion CoreML)" }
     public var isLoaded: Bool { false }
 
-    public func loadModel(at modelPath: URL) async throws {
+    public func loadModel(at _: URL) async throws {
         // CoreML SD 模型加载
         // 当前桩实现
     }
@@ -34,12 +34,12 @@ public final class SDMobileEngine: ImageGenerationEngine, @unchecked Sendable {
     }
 
     public func generate(
-        prompt: String,
-        negativePrompt: String? = nil,
-        width: Int = 512,
-        height: Int = 512,
-        steps: Int = 20,
-        seed: UInt64? = nil
+        prompt _: String,
+        negativePrompt _: String? = nil,
+        width _: Int = 512,
+        height _: Int = 512,
+        steps _: Int = 20,
+        seed _: UInt64? = nil
     ) async throws -> CGImage {
         // CoreML SD 推理
         // 当前未集成 CoreML SD 包，抛出 platformUnsupported

@@ -23,7 +23,7 @@ public final class OpenVoiceCloner: VoiceCloner, @unchecked Sendable {
 
     public private(set) var clonedVoices: [ClonedVoice] = []
 
-    public func loadModel(at modelPath: URL) async throws {
+    public func loadModel(at _: URL) async throws {
         // OpenVoice v2 模型加载
         // 当前桩实现：不实际加载
     }
