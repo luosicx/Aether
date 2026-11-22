@@ -64,6 +64,25 @@ final class AetherUITests: XCTestCase {
         XCTAssertTrue(doneButton.waitForExistence(timeout: 10), "应打开设置页")
     }
 
+    /// 关闭设置页。iOS 27 的导航栏随 Form 下滚一起藏掉（「完成」连可视带 AX 树一起消失），
+    /// 必须先反向滚回顶部让它重新出现，不能直接 tap。
+    private func closeSettings(in app: XCUIApplication) {
+        let doneButton = app.buttons["settingsDoneButton"]
+        let form = app.collectionViews.firstMatch.exists
+            ? app.collectionViews.firstMatch
+            : app.tables.firstMatch
+        var attempts = 0
+        while !doneButton.exists && attempts < 8 {
+            form.swipeDown()
+            attempts += 1
+        }
+        if doneButton.waitForExistence(timeout: 3) {
+            doneButton.tap()
+        }
+        XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(timeout: 5),
+                      "设置 sheet 应已关闭")
+    }
+
     /// 在 Form 中向下滚动到目标元素整块进入可视区（Form 底部的 Section 可能需要滚动才可见）。
     /// 停止条件不能用 isHittable：元素只露出几 pt 时它也为真，而中心仍在屏外，
     /// tap 合成不到键盘焦点（CI 实测 editor 落在 y=865.7、窗高 874）。
@@ -154,14 +173,37 @@ final class AetherUITests: XCTestCase {
         return (toggle.value as? String) == expected
     }
 
-    /// 轮询 Toggle 值变化（用于翻转验证，不关心目标值）
-    private func waitForToggleChange(_ toggle: XCUIElement, from oldValue: String?, timeout: TimeInterval = 0.5) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
-            if (toggle.value as? String) != oldValue { return true }
-            Thread.sleep(forTimeInterval: 0.1)
+    /// 翻转设置页 Form 里的 Toggle，返回最终值。
+    /// 两条实测约束（iOS 27 模拟器，AX 树有内层 Switch 子元素）：
+    /// 1. `toggle.tap()` 落在整行中心（标签区，x≈203），不会翻转开关；必须命中右侧把手
+    ///    （内层 Switch 63x28，中心 x≈332）。
+    /// 2. 点击后立刻连续读 `value` 会触发整棵 Form 的无障碍快照（单次数秒），
+    ///    期间合成的触摸会被丢弃，表现为「事件已合成但值不变」；因此每次只点一次、
+    ///    静置 1s 后只读一次值，未变化原地重点，不在重试里滚动或轮询 isHittable。
+    @discardableResult
+    private func flipSwitch(_ toggle: XCUIElement, in app: XCUIApplication, maxAttempts: Int = 6) -> String? {
+        let window = app.windows.firstMatch.frame
+        let knob = toggle.switches.firstMatch
+        let knobFrame = knob.exists ? knob.frame : toggle.frame
+        let points = [
+            CGPoint(x: knobFrame.midX, y: knobFrame.midY),
+            CGPoint(x: knobFrame.midX + 12, y: knobFrame.midY),
+            CGPoint(x: knobFrame.midX - 12, y: knobFrame.midY)
+        ]
+        let before = toggle.value as? String
+        var current = before
+        var attempt = 0
+        while current == before && attempt < maxAttempts {
+            let point = points[attempt % points.count]
+            app.coordinate(withNormalizedOffset: CGVector(
+                dx: (point.x - window.minX) / window.width,
+                dy: (point.y - window.minY) / window.height
+            )).tap()
+            Thread.sleep(forTimeInterval: 1.0)
+            current = toggle.value as? String
+            attempt += 1
         }
-        return (toggle.value as? String) != oldValue
+        return current
     }
 
     /// 轮询输入框文本包含子串，替代 typeText 后的固定等待
@@ -316,58 +358,16 @@ final class AetherUITests: XCTestCase {
         scrollToElement(ragToggle, in: app)
         XCTAssertTrue(ragToggle.waitForExistence(timeout: 5), "应存在 RAG 开关")
         let ragBefore = ragToggle.value as? String
-        // 在 Form 中 Toggle 的 tap 可能被 cell 拦截或打到 label 区域，
-        // 交替使用直接 tap 和坐标点 tap；失败时重试
-        var ragAfter = ragBefore
-        var ragTapAttempts = 0
-        while ragAfter == ragBefore && ragTapAttempts < 5 {
-            switch ragTapAttempts {
-            case 0: ragToggle.tap()
-            case 1: ragToggle.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
-            case 2: ragToggle.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5)).tap()
-            default: ragToggle.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
-            }
-            // 轮询 Toggle 值变化，替代固定 sleep
-            _ = waitForToggleChange(ragToggle, from: ragBefore)
-            ragAfter = ragToggle.value as? String
-            ragTapAttempts += 1
-        }
+        let ragAfter = flipSwitch(ragToggle, in: app)
         XCTAssertNotEqual(ragBefore, ragAfter, "RAG 开关值应翻转")
 
         // Day 13: RAG tap 后 Form 可能自动滚动导致 Tools Toggle 位置漂移，
-        // 先滚动 Form 让 Tools Toggle 完全可见，再读取 frame 后用 coordinate.tap() 命中把手
+        // 先滚动 Form 让 Tools Toggle 完全可见，再读取把手位置翻转
         let toolsToggle = app.switches["toolsToggle"]
         scrollToElement(toolsToggle, in: app)
         XCTAssertTrue(toolsToggle.waitForExistence(timeout: 5), "应存在工具调用开关")
-        // 轮询 isHittable，等待滚动惯性结束
-        let toolsHitDeadline = Date().addingTimeInterval(2)
-        while !toolsToggle.isHittable && Date() < toolsHitDeadline {
-            Thread.sleep(forTimeInterval: 0.1)
-        }
         let toolsBefore = toolsToggle.value as? String
-        var toolsAfter = toolsBefore
-        var tapAttempts = 0
-        while toolsAfter == toolsBefore && tapAttempts < 5 {
-            // 交替使用直接 tap 和不同坐标点 tap
-            switch tapAttempts {
-            case 0: toolsToggle.tap()
-            case 1: toolsToggle.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
-            case 2: toolsToggle.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5)).tap()
-            default: toolsToggle.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
-            }
-            // 轮询 Toggle 值变化，替代固定 sleep
-            _ = waitForToggleChange(toolsToggle, from: toolsBefore)
-            toolsAfter = toolsToggle.value as? String
-            tapAttempts += 1
-            if toolsAfter == toolsBefore {
-                scrollToElement(toolsToggle, in: app)
-                // 轮询 isHittable，等待滚动动画完成
-                let d = Date().addingTimeInterval(2)
-                while !toolsToggle.isHittable && Date() < d {
-                    Thread.sleep(forTimeInterval: 0.1)
-                }
-            }
-        }
+        let toolsAfter = flipSwitch(toolsToggle, in: app)
         XCTAssertNotEqual(toolsBefore, toolsAfter, "工具调用开关值应翻转")
     }
 
@@ -599,20 +599,12 @@ final class AetherUITests: XCTestCase {
         let calcToggle = app.switches["toolToggle_calculate"]
         scrollToElement(calcToggle, in: app, maxAttempts: 12)
         XCTAssertTrue(calcToggle.waitForExistence(timeout: 5), "应存在 calculate 工具开关")
-        // coordinate.tap() 偶发落空（同 testToggleRAGAndTools），重试确保开关翻转为开启
-        var enableAttempts = 0
-        while (calcToggle.value as? String) == "0" && enableAttempts < 4 {
-            calcToggle.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
-            // 轮询 Toggle 值，替代固定 sleep
-            _ = waitForToggleValue(calcToggle, equals: "1")
-            enableAttempts += 1
-        }
+        // 翻转开关时只点把手、点后静置（同 testToggleRAGAndTools 的 flipSwitch）
+        _ = flipSwitch(calcToggle, in: app)
         XCTAssertEqual(calcToggle.value as? String, "1", "calculate 工具应被开启")
 
         // 完成 → 触发 onDisappear 持久化到 SwiftData
-        app.buttons["settingsDoneButton"].tap()
-        XCTAssertTrue(app.buttons["settingsButton"].waitForExistence(timeout: 5),
-                      "设置 sheet 应已关闭")
+        closeSettings(in: app)
         let persistDeadline = Date().addingTimeInterval(1)
         while Date() < persistDeadline {
             Thread.sleep(forTimeInterval: 0.2)
