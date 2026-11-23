@@ -21,7 +21,7 @@ final class PreferenceExtractorTests: XCTestCase {
 
     /// 可配置返回内容的 Mock LLMProvider，用于测试 PreferenceExtractor.extract。
     /// chat 流将依次 yield `chatContents` 中的内容片段；记录调用次数与最后一次 user 消息。
-    final class MockLLMProvider: LLMProvider {
+    final class MockLLMProvider: LLMProvider, @unchecked Sendable {
         /// chat 流将依次 yield 的内容片段
         var chatContents: [String] = []
         /// 记录 chat 被调用次数

@@ -20,13 +20,13 @@ final class SSETransportTests: XCTestCase {
     /// POST 请求返回一次性响应（支持 session.data(for:)）。
     private final class SSEMockURLProtocol: URLProtocol {
         /// GET（SSE 流）响应体
-        static var sseData: Data = Data()
+        static nonisolated(unsafe) var sseData: Data = Data()
         /// GET（SSE 流）状态码
-        static var sseStatusCode: Int = 200
+        static nonisolated(unsafe) var sseStatusCode: Int = 200
         /// POST 响应体
-        static var postData: Data = Data()
+        static nonisolated(unsafe) var postData: Data = Data()
         /// POST 状态码
-        static var postStatusCode: Int = 200
+        static nonisolated(unsafe) var postStatusCode: Int = 200
 
         override class func canInit(with request: URLRequest) -> Bool { true }
         override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }

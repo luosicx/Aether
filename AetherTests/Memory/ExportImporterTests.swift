@@ -48,7 +48,7 @@ final class ExportImporterTests: XCTestCase {
 
     // MARK: - 桩 EmbeddingService
 
-    final class StubEmbeddingService: EmbeddingService {
+    final class StubEmbeddingService: EmbeddingService, @unchecked Sendable {
         var embeddingMap: [String: [Float]] = [:]
         var defaultEmbedding: [Float] = [0, 0, 0]
 

@@ -632,23 +632,19 @@ final class ServerMockTransport: @unchecked Sendable, MCPTransport {
     private var isConnected = false
 
     func connect() async throws {
-        lock.lock()
-        isConnected = true
-        lock.unlock()
+        lock.withLock { isConnected = true }
     }
 
     func disconnect() async {
-        lock.lock()
-        isConnected = false
-        continuation?.finish()
-        continuation = nil
-        lock.unlock()
+        lock.withLock {
+            isConnected = false
+            continuation?.finish()
+            continuation = nil
+        }
     }
 
     func send(_ data: Data) async throws {
-        lock.lock()
-        sentData.append(data)
-        lock.unlock()
+        lock.withLock { sentData.append(data) }
     }
 
     func messages() -> AsyncStream<Data> {

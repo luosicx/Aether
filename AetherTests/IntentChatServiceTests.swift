@@ -11,7 +11,7 @@ import AetherUI
 final class IntentChatServiceTests: XCTestCase {
 
     /// 可配置 chunk 序列的 LLMProvider 桩，用于验证流式累积
-    final class StubStreamingProvider: LLMProvider {
+    final class StubStreamingProvider: LLMProvider, @unchecked Sendable {
         /// chat 流式返回的 chunk 序列
         var chunks: [String] = []
 

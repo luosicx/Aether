@@ -17,7 +17,7 @@ final class HealthInsightGeneratorTests: XCTestCase {
     // MARK: - Stub LLMProvider
 
     /// 可记录调用次数的 StubLLMProvider
-    final class StubLLMProvider: LLMProvider {
+    final class StubLLMProvider: LLMProvider, @unchecked Sendable {
         /// chat 返回的内容片段
         var chatContents: [String] = ["test insight"]
         /// chat 被调用次数

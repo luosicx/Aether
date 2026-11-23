@@ -18,7 +18,7 @@ final class ContextWindowManagerTests: XCTestCase {
     // MARK: - Mock LLMProvider
 
     /// 可配置返回内容的 Mock LLMProvider，用于测试 summarize 与 compress。
-    final class MockLLMProvider: LLMProvider {
+    final class MockLLMProvider: LLMProvider, @unchecked Sendable {
         /// chat 流将依次 yield 的内容片段
         var chatContents: [String] = []
         /// 记录 chat 被调用次数

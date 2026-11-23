@@ -10,7 +10,7 @@ final class FallbackLLMProviderTests: XCTestCase {
 
     // MARK: - Stub
 
-    final class StubLLMProvider: LLMProvider {
+    final class StubLLMProvider: LLMProvider, @unchecked Sendable {
         var chatContents: [String] = []
         var shouldFail: Bool = false
         var embedResult: [[Float]] = []

@@ -133,7 +133,7 @@ final class MCPResourceServiceTests: XCTestCase {
 
     // MARK: - 测试桩
 
-    private final class StubMCPClient: MCPClientProtocol {
+    private final class StubMCPClient: MCPClientProtocol, @unchecked Sendable {
         var config: MCPConfig {
             MCPConfig(id: "stub", name: "Stub", transport: .sse(url: "http://stub", headers: nil), enabled: true)
         }

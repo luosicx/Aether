@@ -45,7 +45,7 @@ final class MemoryServiceTests: XCTestCase {
 
     /// 桩子类：按文本查表返回预设向量；未配置的文本返回 defaultEmbedding。
     /// 用于 recall 测试中控制查询与记忆的相似度排序。
-    final class StubEmbeddingService: EmbeddingService {
+    final class StubEmbeddingService: EmbeddingService, @unchecked Sendable {
         var embeddingMap: [String: [Float]] = [:]
         var defaultEmbedding: [Float] = [0, 0, 0]
 

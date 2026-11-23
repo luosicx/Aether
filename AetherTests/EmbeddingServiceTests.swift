@@ -20,7 +20,7 @@ final class EmbeddingServiceTests: XCTestCase {
     // MARK: - 桩 EmbeddingService
 
     /// 桩子类：override `embed` 返回固定向量，记录每批输入以便验证分片顺序
-    final class StubEmbeddingService: EmbeddingService {
+    final class StubEmbeddingService: EmbeddingService, @unchecked Sendable {
         var recordedBatches: [[String]] = []
         var returnEmpty = false
         private var counter: Float = 0
@@ -132,7 +132,7 @@ final class EmbeddingServiceTests: XCTestCase {
 
     /// stub 抛错时 embedBatch 应传播错误
     func testEmbedBatchPropagatesError() async {
-        final class ThrowingStub: EmbeddingService {
+        final class ThrowingStub: EmbeddingService, @unchecked Sendable {
             var callCount = 0
             override func embed(texts: [String], apiKey: String) async throws -> [[Float]] {
                 callCount += 1
