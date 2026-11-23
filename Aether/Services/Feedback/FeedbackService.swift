@@ -19,8 +19,9 @@ final class FeedbackService: Sendable {
     /// 邮件主题
     private var subject: String { NSLocalizedString("以太用户反馈", comment: "") }
 
-    /// 收集设备信息用于反馈邮件正文
+    /// 收集设备信息用于反馈邮件正文（UIDevice 受主 actor 隔离）
     /// - Returns: 包含设备型号、系统版本、App 版本与构建号的字符串
+    @MainActor
     func collectDeviceInfo() -> String {
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "unknown"
@@ -43,6 +44,7 @@ final class FeedbackService: Sendable {
 
     /// 构造邮件内容字典（收件人 / 主题 / 正文）
     /// - Returns: 包含 to / subject / body 三个键的字典
+    @MainActor
     func mailContent() -> [String: String] {
         [
             "to": recipient,
@@ -53,6 +55,7 @@ final class FeedbackService: Sendable {
 
     /// 构造 mailto: URL，用于在没有 MFMailComposeViewController 的设备上打开邮件 App。
     /// - Returns: mailto: URL，nil 表示构造失败
+    @MainActor
     func mailtoURL() -> URL? {
         let body = mailContent()["body"] ?? ""
         let subject = mailContent()["subject"] ?? ""
@@ -94,8 +97,8 @@ struct MailComposerView: UIViewControllerRepresentable {
         Coordinator(onFinish: onFinish)
     }
 
-    /// MailCompose delegate
-    final class Coordinator: NSObject, MFMailComposeViewControllerDelegate {
+    /// MailCompose delegate（仅由 UIKit 在主线程回调）
+    final class Coordinator: NSObject, MFMailComposeViewControllerDelegate, @unchecked Sendable {
         let onFinish: ((MFMailComposeResult) -> Void)?
 
         init(onFinish: ((MFMailComposeResult) -> Void)?) {
@@ -105,8 +108,11 @@ struct MailComposerView: UIViewControllerRepresentable {
         func mailComposeController(_ controller: MFMailComposeViewController,
                                    didFinishWith result: MFMailComposeResult,
                                    error _: Error?) {
-            controller.dismiss(animated: true)
-            onFinish?(result)
+            // UIKit 的 delegate 回调保证在主线程到达，但协议本身是 nonisolated
+            MainActor.assumeIsolated {
+                controller.dismiss(animated: true)
+                onFinish?(result)
+            }
         }
     }
 }

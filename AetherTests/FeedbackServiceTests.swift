@@ -5,6 +5,7 @@ import MessageUI
 #endif
 
 /// Day 20: FeedbackService 单元测试
+@MainActor
 final class FeedbackServiceTests: XCTestCase {
     private let service = FeedbackService.shared
 
