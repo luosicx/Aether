@@ -147,18 +147,13 @@ final class SemanticCacheEdgeTests: XCTestCase {
             v[i % dim] = 1.0
             return v
         }
-        // 并发写入 50 条 + 读取
-        await withTaskGroup(of: Void.self) { group in
-            for i in 0..<50 {
-                group.addTask { @MainActor in
-                    cache.set(query: "q\(i)", embedding: makeEmb(i), response: "r\(i)")
-                }
-            }
-            for i in 0..<50 {
-                group.addTask { @MainActor in
-                    _ = cache.get(query: "q\(i)", embedding: makeEmb(i))
-                }
-            }
+        // 交替写入/读取 50 条：SemanticCache 无内部锁，仅在 MainActor 上使用，
+        // 因此用 Task.yield 制造重入点来覆盖交错访问，而不是发到多个任务里
+        for i in 0..<50 {
+            cache.set(query: "q\(i)", embedding: makeEmb(i), response: "r\(i)")
+            await Task.yield()
+            _ = cache.get(query: "q\(i)", embedding: makeEmb(i))
+            await Task.yield()
         }
         // 验证写入的数据可被读出
         // 注：并发操作后部分条目可能因容量驱逐或时序返回不同值，仅验证不 crash + q0 可读

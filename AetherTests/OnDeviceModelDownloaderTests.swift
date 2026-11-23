@@ -646,7 +646,8 @@ final class OnDeviceModelDownloaderTests: XCTestCase {
         try content.write(to: testFile)
         let expected = SHA256.hash(data: content).map { String(format: "%02x", $0) }.joined()
 
-        // 并发发起多个 verifySHA256 调用
+        // 并发发起多个 verifySHA256 调用（先绑定局部引用，避免子任务捕获 self）
+        let downloader = self.downloader
         async let r1 = downloader.verifySHA256(filePath: testFile, expected: expected)
         async let r2 = downloader.verifySHA256(filePath: testFile, expected: expected)
         async let r3 = downloader.verifySHA256(filePath: testFile, expected: "wrong")
@@ -665,7 +666,8 @@ final class OnDeviceModelDownloaderTests: XCTestCase {
         try "data1".data(using: .utf8)!.write(to: testFile1)
         try "data2".data(using: .utf8)!.write(to: testFile2)
 
-        // 并发删除不同文件
+        // 并发删除不同文件（先绑定局部引用，避免子任务捕获 self）
+        let downloader = self.downloader
         async let r1: Void = try downloader.deleteModel(at: testFile1)
         async let r2: Void = try downloader.deleteModel(at: testFile2)
         _ = try await (r1, r2)
@@ -741,7 +743,12 @@ final class OnDeviceModelDownloaderTests: XCTestCase {
 
     /// 本地 HTTP 测试服务器：使用 Network.framework 的 NWListener 提供静态文件，
     /// 避免 URLProtocol 与 URLSessionDownloadTask 不兼容导致测试挂起。
-    private final class LocalHTTPTestServer {
+    /// NW 回调跨队列执行，缓冲数据需要引用语义 + Sendable 包装
+    private final class DataBox: @unchecked Sendable {
+        var data = Data()
+    }
+
+    private final class LocalHTTPTestServer: @unchecked Sendable {
         private var listener: NWListener?
         private var tempDir: URL?
         private let readyContinuation = ReadyContinuation()
@@ -791,9 +798,9 @@ final class OnDeviceModelDownloaderTests: XCTestCase {
         }
 
         private func handleConnection(_ connection: NWConnection) {
-            var buffer = Data()
+            let buffer = DataBox()
 
-            func receive() {
+            @Sendable func receive() {
                 connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, isComplete, error in
                     guard let self = self else { return }
 
@@ -803,12 +810,12 @@ final class OnDeviceModelDownloaderTests: XCTestCase {
                     }
 
                     if let data = data {
-                        buffer.append(data)
+                        buffer.data.append(data)
                     }
 
                     // 解析 HTTP 请求头结束位置
-                    if let range = buffer.range(of: Data("\r\n\r\n".utf8)) {
-                        let headerData = buffer.subdata(in: 0..<range.upperBound)
+                    if let range = buffer.data.range(of: Data("\r\n\r\n".utf8)) {
+                        let headerData = buffer.data.subdata(in: 0..<range.upperBound)
                         guard let requestLine = String(data: headerData, encoding: .utf8)?
                             .split(separator: "\r\n").first else {
                             self.sendResponse(connection: connection, status: "400 Bad Request", body: Data())
@@ -916,7 +923,7 @@ final class OnDeviceModelDownloaderTests: XCTestCase {
                 return
             }
 
-            func sendChunk(from offset: Int) {
+            @Sendable func sendChunk(from offset: Int) {
                 let end = min(offset + chunkSize, data.count)
                 let chunk = data.subdata(in: offset..<end)
                 let isLast = end >= data.count
