@@ -10,7 +10,7 @@ final class RAGServiceTests: XCTestCase {
 
     /// 桩子类：默认返回固定向量 [1,0,0]（保证 cosine 相似度=1，topK 截断生效）；
     /// 可配置 returnEmpty 模拟空 embedding。
-    final class StubEmbeddingService: EmbeddingService {
+    final class StubEmbeddingService: EmbeddingService, @unchecked Sendable {
         var returnEmpty = false
 
         override func embed(texts: [String], apiKey: String) async throws -> [[Float]] {

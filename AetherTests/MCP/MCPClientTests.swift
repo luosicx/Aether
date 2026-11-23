@@ -600,11 +600,11 @@ final class MCPClientTests: XCTestCase {
     /// 避免真实网络请求，确保测试稳定。
     private final class MockSSEURLProtocol: URLProtocol {
         /// 预设 SSE 响应体
-        static var responseData: Data = Data()
+        static nonisolated(unsafe) var responseData: Data = Data()
         /// 预设 HTTP 状态码
-        static var statusCode: Int = 200
+        static nonisolated(unsafe) var statusCode: Int = 200
         /// 预设响应头
-        static var responseHeaders: [String: String] = [
+        static nonisolated(unsafe) var responseHeaders: [String: String] = [
             "Content-Type": "text/event-stream",
             "Cache-Control": "no-cache"
         ]
@@ -850,10 +850,10 @@ final class MockTransport: @unchecked Sendable, MCPTransport {
     }
 
     func send(_ data: Data) async throws {
-        lock.lock()
-        sentData.append(data)
-        let handler = responseHandler
-        lock.unlock()
+        let handler = lock.withLock {
+            sentData.append(data)
+            return responseHandler
+        }
 
         // 调用 responseHandler 生成响应并 yield 到消息流
         if let handler = handler, let response = handler(data) {

@@ -752,13 +752,13 @@ final class PluginMarketplaceServiceTests: XCTestCase {
 /// 用于 mock 网络请求的 URLProtocol 实现。
 final class PluginMockURLProtocol: URLProtocol {
     /// mock 响应数据，key 为请求 URL
-    static var mockData: [URL: Data] = [:]
+    static nonisolated(unsafe) var mockData: [URL: Data] = [:]
     /// mock 错误，key 为请求 URL
-    static var mockError: [URL: Error] = [:]
+    static nonisolated(unsafe) var mockError: [URL: Error] = [:]
     /// mock HTTP 状态码，key 为请求 URL（默认 200）
-    static var mockStatusCode: [URL: Int] = [:]
+    static nonisolated(unsafe) var mockStatusCode: [URL: Int] = [:]
     /// mock 响应延迟（秒），key 为请求 URL（默认 0，同步响应）
-    static var mockDelay: [URL: TimeInterval] = [:]
+    static nonisolated(unsafe) var mockDelay: [URL: TimeInterval] = [:]
 
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
@@ -780,10 +780,11 @@ final class PluginMockURLProtocol: URLProtocol {
         }
 
         if let delay = Self.mockDelay[url], delay > 0 {
-            DispatchQueue.global().asyncAfter(deadline: .now() + delay, execute: sendResponse)
-        } else {
-            sendResponse()
+            // 阻塞本 URLProtocol 线程模拟慢响应：需要 @Sendable 闭包才能派发到全局队列，
+            // 而 URLProtocol 及其 client 都不是 Sendable，改为就地等待更简单
+            Thread.sleep(forTimeInterval: delay)
         }
+        sendResponse()
     }
 
     override func stopLoading() {}

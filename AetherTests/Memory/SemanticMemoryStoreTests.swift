@@ -54,7 +54,7 @@ final class SemanticMemoryStoreTests: XCTestCase {
     // MARK: - 桩 EmbeddingService
 
     /// 桩子类：按文本查表返回预设向量；未配置的文本返回 defaultEmbedding。
-    final class StubEmbeddingService: EmbeddingService {
+    final class StubEmbeddingService: EmbeddingService, @unchecked Sendable {
         var embeddingMap: [String: [Float]] = [:]
         var defaultEmbedding: [Float] = [0, 0, 0]
 

@@ -13,15 +13,15 @@ final class BFFProxyClientTests: XCTestCase {
     // MARK: - Mock URLProtocol（支持自定义响应头，用于 Retry-After 等场景）
 
     private final class MockURLProtocol: URLProtocol {
-        static var responseData: Data?
-        static var statusCode: Int = 200
-        static var error: Error?
-        static var lastRequest: URLRequest?
+        static nonisolated(unsafe) var responseData: Data?
+        static nonisolated(unsafe) var statusCode: Int = 200
+        static nonisolated(unsafe) var error: Error?
+        static nonisolated(unsafe) var lastRequest: URLRequest?
         /// 保存请求 body 副本（URLSession 可能将 body 转为 httpBodyStream，
         /// 导致 lastRequest.httpBody 为 nil，此处显式保存避免测试 flaky）
-        static var lastBody: Data?
+        static nonisolated(unsafe) var lastBody: Data?
         /// 响应头（含 Content-Type / Retry-After 等）
-        static var responseHeaders: [String: String] = ["Content-Type": "text/event-stream"]
+        static nonisolated(unsafe) var responseHeaders: [String: String] = ["Content-Type": "text/event-stream"]
 
         override class func canInit(with request: URLRequest) -> Bool { true }
         override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }

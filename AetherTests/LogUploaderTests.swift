@@ -15,16 +15,16 @@ final class LogUploaderTests: XCTestCase {
 
     private final class MockURLProtocol: URLProtocol {
         /// 响应队列：按请求顺序消费；队列空时使用 fallbackStatusCode
-        static var responseQueue: [Int] = []
-        static var fallbackStatusCode: Int = 200
-        static var responseData: Data?
-        static var error: Error?
-        static var lastRequest: URLRequest?
+        static nonisolated(unsafe) var responseQueue: [Int] = []
+        static nonisolated(unsafe) var fallbackStatusCode: Int = 200
+        static nonisolated(unsafe) var responseData: Data?
+        static nonisolated(unsafe) var error: Error?
+        static nonisolated(unsafe) var lastRequest: URLRequest?
         /// 保存请求 body 副本（URLSession 可能将 body 转为 httpBodyStream，
         /// 导致 lastRequest.httpBody 为 nil，此处显式保存避免测试 flaky）
-        static var lastBody: Data?
-        static var requestCount: Int = 0
-        static var headers: [String: String] = ["Content-Type": "application/json"]
+        static nonisolated(unsafe) var lastBody: Data?
+        static nonisolated(unsafe) var requestCount: Int = 0
+        static nonisolated(unsafe) var headers: [String: String] = ["Content-Type": "application/json"]
 
         override class func canInit(with request: URLRequest) -> Bool { true }
         override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }

@@ -5,7 +5,7 @@ import XCTest
 /// 通过 URLProtocol.registerClass 全局注册后即可拦截 WeatherTool 内部的网络请求。
 final class MockURLProtocol: URLProtocol {
     /// 请求处理器：接收 URL，返回 (Data, HTTPURLResponse)
-    static var requestHandler: ((URL) -> (Data, HTTPURLResponse))?
+    static nonisolated(unsafe) var requestHandler: ((URL) -> (Data, HTTPURLResponse))?
 
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }

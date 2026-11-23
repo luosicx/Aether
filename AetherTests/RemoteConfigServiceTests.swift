@@ -13,11 +13,11 @@ final class RemoteConfigServiceTests: XCTestCase {
     // MARK: - Mock URLProtocol
 
     private final class MockURLProtocol: URLProtocol {
-        static var responseData: Data?
-        static var statusCode: Int = 200
-        static var error: Error?
-        static var lastRequest: URLRequest?
-        static var headers: [String: String] = ["Content-Type": "application/json"]
+        static nonisolated(unsafe) var responseData: Data?
+        static nonisolated(unsafe) var statusCode: Int = 200
+        static nonisolated(unsafe) var error: Error?
+        static nonisolated(unsafe) var lastRequest: URLRequest?
+        static nonisolated(unsafe) var headers: [String: String] = ["Content-Type": "application/json"]
 
         override class func canInit(with request: URLRequest) -> Bool { true }
         override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
