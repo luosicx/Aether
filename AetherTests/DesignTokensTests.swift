@@ -6,6 +6,7 @@ import AetherDesign
 import AetherUI
 @testable import Aether
 
+@MainActor
 final class DesignTokensTests: XCTestCase {
 
     func testSpacingTokensFollowFourPointGrid() {

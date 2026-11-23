@@ -8,6 +8,7 @@ import AetherUI
 
 /// Task 25: 主题管理器单元测试
 /// 验证 AetherTheme 枚举、ThemeManager 初始化/切换/持久化
+@MainActor
 final class ThemeManagerTests: XCTestCase {
 
     // MARK: - AetherTheme 枚举验证

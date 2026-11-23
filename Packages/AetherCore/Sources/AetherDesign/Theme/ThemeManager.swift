@@ -4,6 +4,7 @@ import Observation
 
 /// Task 25: 主题管理器，单例 + @Observable，负责当前主题的内存状态与 UserDefaults 持久化
 /// 切换主题后，所有读取 ThemeManager.shared.currentTheme 的视图（含 Color 语义色扩展）会自动重新渲染
+@MainActor
 @Observable
 public final class ThemeManager {
     /// 单例，全局共享
