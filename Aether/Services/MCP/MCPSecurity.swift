@@ -171,7 +171,9 @@ enum MCPPromptSanitizer {
 /// 1. OSLog（统一日志系统）
 /// 2. 缓存目录的 `aether.mcp.audit.log` 文件
 /// 3. 底层 `ToolAuditLogger`（保持与本地工具审计一致）
-final class MCPAuditLogger {
+///
+/// 全部属性在 init 后不可变，文件写入已在串行队列上串行化，可跨线程共享。
+final class MCPAuditLogger: @unchecked Sendable {
 
     static let shared = MCPAuditLogger()
 
