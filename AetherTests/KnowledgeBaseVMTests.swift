@@ -9,7 +9,7 @@ final class KnowledgeBaseVMTests: XCTestCase {
     private var context: ModelContext!
     private var vm: KnowledgeBaseVM!
 
-    override func setUpWithError() throws {
+    override func setUp() async throws {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         container = try ModelContainer(
             for: Conversation.self, ChatMessage.self, UserPreference.self, DocumentChunk.self,
@@ -19,7 +19,7 @@ final class KnowledgeBaseVMTests: XCTestCase {
         vm = KnowledgeBaseVM()
     }
 
-    override func tearDownWithError() throws {
+    override func tearDown() async throws {
         vm = nil
         context = nil
         container = nil

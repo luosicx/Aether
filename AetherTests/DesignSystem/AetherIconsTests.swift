@@ -2,6 +2,7 @@ import XCTest
 import SwiftUI
 import AetherDesign
 
+@MainActor
 final class AetherIconsTests: XCTestCase {
 
     // MARK: - AetherIcon 表驱动测试

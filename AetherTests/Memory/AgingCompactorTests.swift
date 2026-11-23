@@ -15,7 +15,7 @@ final class AgingCompactorTests: XCTestCase {
     private var factory: VectorStoreFactory!
     private var compactor: AgingCompactor!
 
-    override func setUpWithError() throws {
+    override func setUp() async throws {
         // 隔离 Keychain
         KeychainManager.shared.backend = InMemoryKeychainBackend()
         try KeychainManager.shared.saveAPIKey("test-key", for: .qwen)
@@ -34,7 +34,7 @@ final class AgingCompactorTests: XCTestCase {
         compactor = AgingCompactor(memoryService: service, vectorStoreFactory: factory)
     }
 
-    override func tearDownWithError() throws {
+    override func tearDown() async throws {
         compactor.cancelScheduling()
         factory.reset()
         service = nil

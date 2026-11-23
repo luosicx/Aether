@@ -7,6 +7,7 @@ import AetherUI
 @testable import Aether
 
 /// Task 17-19 设计系统测试：AnimationTokens、AetherIcon、DeviceType
+@MainActor
 final class DesignSystemTests: XCTestCase {
 
     // MARK: - AnimationTokens 值验证

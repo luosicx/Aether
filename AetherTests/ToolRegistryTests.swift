@@ -20,8 +20,7 @@ final class ToolRegistryTests: XCTestCase {
     private var originalEnabledStates: [String: Bool] = [:]
     private var originalPresenter: AuthorizationAlertPresenting?
 
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
         // 隔离授权弹窗：CI 里没人点模态弹窗，真实 presenter 会让安全门测试挂到超时
         originalPresenter = ToolAuthorization.shared.presenter
         // 保存所有已注册工具的原始启用状态，便于 tearDown 恢复
@@ -35,7 +34,7 @@ final class ToolRegistryTests: XCTestCase {
         }
     }
 
-    override func tearDown() {
+    override func tearDown() async throws {
         // 恢复原始启用状态
         for (name, value) in originalEnabledStates {
             registry.setEnabled(name: name, value: value)
@@ -43,7 +42,6 @@ final class ToolRegistryTests: XCTestCase {
         if let originalPresenter {
             ToolAuthorization.shared.presenter = originalPresenter
         }
-        super.tearDown()
     }
 
     // MARK: - 安全相关测试

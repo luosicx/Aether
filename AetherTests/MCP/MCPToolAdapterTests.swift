@@ -17,17 +17,15 @@ final class MCPToolAdapterTests: XCTestCase {
     /// 本次测试授予的运行时授权，tearDown 时撤销，避免单例状态污染其他用例
     private var grantedToolNames: [String] = []
 
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
         grantedToolNames = []
     }
 
-    override func tearDown() {
+    override func tearDown() async throws {
         for name in grantedToolNames {
             ToolAuthorization.shared.revokeAuthorization(toolName: name)
         }
         grantedToolNames = []
-        super.tearDown()
     }
 
     /// 为适配器注册名授予本次启动内有效授权

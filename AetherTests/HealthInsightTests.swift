@@ -10,13 +10,13 @@ final class HealthInsightTests: XCTestCase {
     private var container: ModelContainer!
     private var context: ModelContext!
 
-    override func setUpWithError() throws {
+    override func setUp() async throws {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         container = try ModelContainer(for: HealthInsight.self, configurations: config)
         context = ModelContext(container)
     }
 
-    override func tearDownWithError() throws {
+    override func tearDown() async throws {
         context = nil
         container = nil
     }

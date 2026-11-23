@@ -14,7 +14,7 @@ final class ExportImporterTests: XCTestCase {
     private var factory: VectorStoreFactory!
     private var exporter: ExportImporter!
 
-    override func setUpWithError() throws {
+    override func setUp() async throws {
         // 隔离 Keychain
         KeychainManager.shared.backend = InMemoryKeychainBackend()
         try KeychainManager.shared.saveAPIKey("test-key", for: .qwen)
@@ -35,7 +35,7 @@ final class ExportImporterTests: XCTestCase {
         EncryptionLayer.shared.clearKey()
     }
 
-    override func tearDownWithError() throws {
+    override func tearDown() async throws {
         EncryptionLayer.shared.clearKey()
         factory.reset()
         exporter = nil

@@ -14,7 +14,7 @@ final class ChatViewModelTests: XCTestCase {
     private var container: ModelContainer!
     private var context: ModelContext!
 
-    override func setUpWithError() throws {
+    override func setUp() async throws {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         container = try ModelContainer(
             for: Conversation.self, ChatMessage.self, UserPreference.self, DocumentChunk.self,
@@ -26,7 +26,7 @@ final class ChatViewModelTests: XCTestCase {
         KeychainManager.shared.backend = InMemoryKeychainBackend()
     }
 
-    override func tearDownWithError() throws {
+    override func tearDown() async throws {
         context = nil
         container = nil
         // 恢复真实 Keychain 后端，避免影响其他测试类

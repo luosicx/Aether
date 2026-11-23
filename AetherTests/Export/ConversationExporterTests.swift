@@ -16,7 +16,7 @@ final class ConversationExporterTests: XCTestCase {
         let arguments: String
     }
 
-    override func setUpWithError() throws {
+    override func setUp() async throws {
         exporter = ConversationExporter()
     }
 

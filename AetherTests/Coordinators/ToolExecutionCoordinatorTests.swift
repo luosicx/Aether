@@ -31,7 +31,7 @@ final class ToolExecutionCoordinatorTests: XCTestCase {
         .first?
         .appendingPathComponent("aether.tool.audit.log")
 
-    override func setUpWithError() throws {
+    override func setUp() async throws {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         container = try ModelContainer(
             for: Conversation.self, ChatMessage.self, UserPreference.self, DocumentChunk.self,
@@ -53,7 +53,7 @@ final class ToolExecutionCoordinatorTests: XCTestCase {
         }
     }
 
-    override func tearDownWithError() throws {
+    override func tearDown() async throws {
         ToolRegistry.shared.setEnabled(name: "read_clipboard", value: originalClipboardEnabled)
         ToolAuthorization.shared.revokeAuthorization(toolName: "read_clipboard")
         if let originalPresenter {

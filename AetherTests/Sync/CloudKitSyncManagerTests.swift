@@ -138,6 +138,7 @@ final class CloudKitSyncManagerTests: XCTestCase {
 
 /// 覆盖 `AetherApp.resolveStore`：iCloud 开启但 CloudKit 容器不可用时
 /// 必须回退本地持久化而不是内存存储（否则数据静默不落盘）。
+@MainActor
 final class AetherStoreResolutionTests: XCTestCase {
     private enum TestError: Error {
         case cloudKitSchemaIncompatible

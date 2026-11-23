@@ -15,19 +15,17 @@ final class LanguageManagerTests: XCTestCase {
     /// 系统语言偏好数组 key
     private let appleLanguagesKey = "AppleLanguages"
 
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
         // 测试前清理 UserDefaults，模拟无偏好状态
         UserDefaults.standard.removeObject(forKey: storageKey)
         UserDefaults.standard.removeObject(forKey: appleLanguagesKey)
     }
 
-    override func tearDown() {
+    override func tearDown() async throws {
         // 测试后恢复默认状态并清理 UserDefaults，避免污染其他测试
         LanguageManager.shared.current = .system
         UserDefaults.standard.removeObject(forKey: storageKey)
         UserDefaults.standard.removeObject(forKey: appleLanguagesKey)
-        super.tearDown()
     }
 
     // MARK: - AppLanguage(rawValue:) 双向映射

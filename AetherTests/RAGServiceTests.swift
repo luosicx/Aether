@@ -35,12 +35,11 @@ final class RAGServiceTests: XCTestCase {
         service = RAGService(embeddingService: stub)
     }
 
-    override func tearDown() {
+    override func tearDown() async throws {
         container = nil
         context = nil
         stub = nil
         service = nil
-        super.tearDown()
     }
 
     // MARK: - indexDocument

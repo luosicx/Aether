@@ -20,7 +20,7 @@ final class SettingsViewModelTests: XCTestCase {
         TTSConfig.userDefaultsKey
     ]
 
-    override func setUpWithError() throws {
+    override func setUp() async throws {
         // 注入内存 Keychain 后端，避免依赖真实系统 Keychain
         KeychainManager.shared.backend = InMemoryKeychainBackend()
         vm = SettingsViewModel()
@@ -33,7 +33,7 @@ final class SettingsViewModelTests: XCTestCase {
         }
     }
 
-    override func tearDownWithError() throws {
+    override func tearDown() async throws {
         KeychainManager.shared.deleteAPIKey(for: .deepseek)
         KeychainManager.shared.deleteAPIKey(for: .qwen)
         for key in userDefaultsKeysToClean {
