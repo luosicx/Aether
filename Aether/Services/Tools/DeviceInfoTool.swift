@@ -29,9 +29,10 @@ final class DeviceInfoTool: ToolProtocol, @unchecked Sendable {
     /// - macOS：ProcessInfo 读取 OS 版本，电量返回 "不适用"，存储同上
     /// - Note: `arguments` 由协议要求，本工具不读取参数（无入参），故忽略。
     func execute(arguments _: [String: Any]) async throws -> String {
-        let model = deviceModel()
-        let osVersion = systemVersion()
-        let battery = batteryPercentage()
+        // UIDevice 在 Swift 6 SDK 中受主 actor 隔离，读取需 hop 到主线程
+        let model = await deviceModel()
+        let osVersion = await systemVersion()
+        let battery = await batteryPercentage()
         let storage = availableStorageGB()
 
         return """
@@ -43,6 +44,7 @@ final class DeviceInfoTool: ToolProtocol, @unchecked Sendable {
     }
 
     /// 设备型号：iOS 用 UIDevice.current.model；macOS 固定 "Mac"
+    @MainActor
     private func deviceModel() -> String {
         #if os(iOS)
         return UIDevice.current.model
@@ -52,6 +54,7 @@ final class DeviceInfoTool: ToolProtocol, @unchecked Sendable {
     }
 
     /// 系统版本：iOS "iOS <systemVersion>"；macOS "macOS x.y.z"
+    @MainActor
     private func systemVersion() -> String {
         #if os(iOS)
         return "iOS \(UIDevice.current.systemVersion)"
@@ -62,6 +65,7 @@ final class DeviceInfoTool: ToolProtocol, @unchecked Sendable {
     }
 
     /// 电量百分比：iOS 开启电池监听后读取 batteryLevel；macOS 返回 "不适用"
+    @MainActor
     private func batteryPercentage() -> String {
         #if os(iOS)
         UIDevice.current.isBatteryMonitoringEnabled = true
