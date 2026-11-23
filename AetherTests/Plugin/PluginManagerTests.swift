@@ -17,8 +17,7 @@ import AetherUI
 final class PluginManagerTests: XCTestCase {
     private let registry = ToolRegistry.shared
 
-    override func setUp() {
-        super.setUp()
+    override func setUp() async throws {
         // v1.1 Phase C: 注入 ToolRegistry 到 PluginManager，使 loadPluginTools 可注册工具
         PluginManager.toolRegistry = ToolRegistry.shared
     }

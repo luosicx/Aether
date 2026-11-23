@@ -95,12 +95,7 @@ final class NetworkMonitorTests: XCTestCase {
         var iterator = stream.makeAsyncIterator()
         _ = await iterator.next() // 可能还有缓冲值，多取一次
         // 流最终会 finish，再取应返回 nil（允许短暂等待）
-        let after = await withTaskGroup(of: NetworkStatus?.self) { group in
-            group.addTask { await iterator.next() }
-            let result = await group.next()
-            group.cancelAll()
-            return result ?? nil
-        }
+        let after = await iterator.next()
         XCTAssertNil(after, "stop 后流应结束，next 最终返回 nil")
     }
 
