@@ -5,7 +5,8 @@ import Foundation
 
 /// MCP 客户端契约，抽象连接与 MCP 方法调用。
 /// MCPClient actor 遵循此协议，测试可注入 Mock 实现。
-protocol MCPClientProtocol {
+/// 客户端会从 @MainActor 的 MCPClientManager 传入 actor 隔离方法，故要求 Sendable。
+protocol MCPClientProtocol: Sendable {
     /// 关联的配置
     var config: MCPConfig { get }
     /// 连接并完成 MCP 握手
