@@ -44,9 +44,9 @@ final class MCPToolAdapter: ToolProtocol, @unchecked Sendable {
     /// 执行 MCP 工具：委托 mcpClient.callTool，拼接返回的文本内容块。
     /// 多个 text 块以换行连接；若无 text 块则返回空字符串。
     /// 执行前校验运行时授权（默认拒绝），执行前后记录真实授权状态的审计日志。
-    /// - Parameter arguments: 工具参数
+    /// - Parameter arguments: 工具参数（所有权转移给远端客户端）
     /// - Returns: 拼接后的文本结果
-    func execute(arguments: [String: Any]) async throws -> String {
+    func execute(arguments: sending [String: Any]) async throws -> String {
         // 参数摘要（仅记录键名，不记录敏感值）
         let argSummary = arguments.keys.sorted().joined(separator: ",")
 

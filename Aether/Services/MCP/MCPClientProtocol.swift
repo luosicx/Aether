@@ -19,10 +19,10 @@ protocol MCPClientProtocol: Sendable {
     func listResources() async throws -> [MCPResource]
     /// 列出提示模板
     func listPrompts() async throws -> [MCPPrompt]
-    /// 调用工具
-    func callTool(name: String, arguments: [String: Any]) async throws -> MCPToolCallResult
+    /// 调用工具（arguments 所有权转移给客户端）
+    func callTool(name: String, arguments: sending [String: Any]) async throws -> MCPToolCallResult
     /// 读取资源
     func readResource(uri: String) async throws -> [MCPResourceContent]
-    /// 获取提示模板内容
-    func getPrompt(name: String, arguments: [String: Any]) async throws -> MCPPromptResult
+    /// 获取提示模板内容（arguments 所有权转移给客户端）
+    func getPrompt(name: String, arguments: sending [String: Any]) async throws -> MCPPromptResult
 }
