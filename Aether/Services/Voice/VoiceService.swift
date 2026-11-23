@@ -338,15 +338,12 @@ final class VoiceService: NSObject {
     /// AVAudioEngine 的 deinit 可能非主线程触发，而 deinit 是非 isolated 上下文：这里只读 let 属性，
     /// 识别请求/识别任务这两个 var 留给 stopRecording（deinit 阶段读它们既是数据竞争，也已经在
     /// stopRecording 里 nil 掉）。
-    /// synthesizer.delegate 的清理仍在主 actor 上做——它只是断开引用，不向守护进程发请求。
+    /// AVSpeechSynthesizer.delegate 是 weak 引用，随 synthesizer 一起释放即可，
+    /// deinit 不再触碰它——非隔离 deinit 访问非 Sendable 的 synthesizer 违反 Swift 6 隔离规则。
     deinit {
         let audioEngine = self.audioEngine
-        let synthesizer = self.synthesizer
         let box = VoiceAudioTeardownBox(engine: audioEngine, request: nil, task: nil, removeTap: false)
         Self.audioWorkQueue.async { box.run() }
-        Task { @MainActor [synthesizer] in
-            synthesizer.delegate = nil
-        }
     }
 
     #if os(macOS)
