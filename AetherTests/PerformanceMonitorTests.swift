@@ -94,17 +94,17 @@ final class PerformanceMonitorTests: XCTestCase {
         let monitor = PerformanceMonitor.shared
         await monitor.clear()
         // 测试 String 返回值
-        let strResult = try await monitor.measure("string_op") {
+        let strResult = await monitor.measure("string_op") {
             return "hello"
         }
         XCTAssertEqual(strResult, "hello")
         // 测试 Int 返回值
-        let intResult = try await monitor.measure("int_op") {
+        let intResult = await monitor.measure("int_op") {
             return 100
         }
         XCTAssertEqual(intResult, 100)
         // 测试 Optional 返回值
-        let optResult = try await monitor.measure("opt_op") {
+        let optResult = await monitor.measure("opt_op") {
             return Optional<String>.none
         }
         XCTAssertNil(optResult)

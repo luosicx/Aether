@@ -195,17 +195,17 @@ final class RustFFIBoundaryTests: XCTestCase {
     func testSSEIncompleteStreamNoNewlineSeparator() {
         let parser = AetherRustSSEParser()
         // 无 data: 前缀的纯文本应返回 nil（非 data 行）
-        XCTAssertNil(parser.parseChunk("incomplete chunk without data prefix"),
+        XCTAssertTrue(parser.parseChunk("incomplete chunk without data prefix") == nil,
                      "无 data: 前缀的输入应返回 nil")
         // 无换行分隔的多个事件拼接：FFI 一次性解析整行，无 data: 前缀（行首是 event:）则返回 nil
-        XCTAssertNil(parser.parseChunk("event: ping data: {\"x\":1}"),
+        XCTAssertTrue(parser.parseChunk("event: ping data: {\"x\":1}") == nil,
                      "拼接行无合法 data: 前缀（被当作非 data 行）应返回 nil")
         // 空 data: 行：payload 为空字符串，serde_json 解析失败 → 返回 nil（外层）
         // 说明：与 `data: [DONE]` 不同，[DONE] 显式返回 Some(None)，空 payload 直接解析失败。
-        XCTAssertNil(parser.parseChunk("data:"),
+        XCTAssertTrue(parser.parseChunk("data:") == nil,
                      "空 data: 行 payload 为空串，JSON 解析失败应返回 nil")
         // 仅有前缀空白也应同样返回 nil
-        XCTAssertNil(parser.parseChunk("data:   "),
+        XCTAssertTrue(parser.parseChunk("data:   ") == nil,
                      "仅有空白的 data: 行 payload 为空串，应返回 nil")
     }
 
@@ -234,7 +234,7 @@ final class RustFFIBoundaryTests: XCTestCase {
         // data: data: foo → 剥离一次前缀后 payload = "data: foo"，
         // serde_json 解析失败（不是合法 JSON 对象）→ parseChunk 返回 nil
         let nested = "data: data: foo"
-        XCTAssertNil(parser.parseChunk(nested),
+        XCTAssertTrue(parser.parseChunk(nested) == nil,
                      "嵌套 data: 前缀的 payload 'data: foo' 非 JSON，应返回 nil")
         // extractContent 同样返回 nil
         XCTAssertNil(parser.extractContent(nested),

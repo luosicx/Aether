@@ -262,7 +262,7 @@ final class MCPClientTests: XCTestCase {
         let mock = MockTransport()
         let client = try MCPClient(config: config, transport: mock)
 
-        let clientConfig = await client.config
+        let clientConfig = client.config
         XCTAssertEqual(clientConfig.id, config.id, "config.id 应一致")
         XCTAssertEqual(clientConfig.name, config.name, "config.name 应一致")
 

@@ -336,7 +336,7 @@ final class MemoryServiceTests: XCTestCase {
         let m1 = try await service.remember(content: "第一条")
         // 确保时间差异（createdAt 同秒可能无法区分顺序）
         try? await Task.sleep(nanoseconds: 10_000_000)
-        let m2 = try await service.remember(content: "第二条")
+        _ = try await service.remember(content: "第二条")
 
         let all = try service.getAllMemories()
         XCTAssertEqual(all.count, 2, "应返回 2 条记忆")

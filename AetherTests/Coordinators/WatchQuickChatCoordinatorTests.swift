@@ -32,6 +32,7 @@ final class WatchQuickChatCoordinatorTests: XCTestCase {
 
         XCTAssertEqual(receivedBox.value, "hello from watch",
                        "收到 Watch 快速对话消息应通过闭包回调通知上层")
+        _ = coordinator // 持有到断言之后再释放，避免观察者提前注销
     }
 
     // MARK: - testWatchQuickChatReceivedWithEmptyPayloadNoOp
@@ -60,6 +61,7 @@ final class WatchQuickChatCoordinatorTests: XCTestCase {
 
         XCTAssertNil(receivedBox.value,
                      "object 非 String 时应静默忽略，不触发闭包回调")
+        _ = coordinator // 持有到断言之后再释放，避免观察者提前注销
     }
 
     // MARK: - testWatchQuickChatObserverRegisteredOnInit

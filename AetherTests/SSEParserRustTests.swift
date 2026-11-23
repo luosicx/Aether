@@ -18,14 +18,14 @@ final class SSEParserRustTests: XCTestCase {
         let p = AetherRustSSEParser()
         // [DONE] 在 parseChunk 语义里是 Some(None)：外层命中 data 行，内层 content 为 nil
         let result = p.parseChunk("data: [DONE]")
-        XCTAssertNotNil(result)
+        XCTAssertTrue(result != nil)
         XCTAssertNil(result ?? nil)
     }
 
     func testNonDataLineReturnsNil() {
         let p = AetherRustSSEParser()
-        XCTAssertNil(p.parseChunk(": keepalive"))
-        XCTAssertNil(p.parseChunk("event: ping"))
+        XCTAssertTrue(p.parseChunk(": keepalive") == nil)
+        XCTAssertTrue(p.parseChunk("event: ping") == nil)
     }
 
     func testToolCallAccumulation() {

@@ -94,7 +94,6 @@ final class MCPServerGroupingTests: XCTestCase {
 
     /// 已拒绝 Server 应出现在 rejected 列表
     func testClassifyRejectedServers() async throws {
-        let manager = MCPClientManager()
         let config = MCPConfig(id: "r1", name: "RejectedServer", transport: .sse(url: "http://localhost:1", headers: nil), enabled: true)
         // 直接触发拒绝路径：通过 connect 时使用一个会失败的工厂
         let factory: (MCPConfig) -> any MCPClientProtocol = { _ in

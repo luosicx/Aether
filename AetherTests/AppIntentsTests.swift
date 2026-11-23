@@ -33,7 +33,7 @@ final class AppIntentsTests: XCTestCase {
     /// 无 API Key 时返回用户友好提示文本（不抛错），有 API Key 时返回 LLM 回复。
     /// 注意：IntentChatService.shared 依赖真实 Keychain，此处只验证 perform 不 crash 且返回非空。
     func testAskAetherIntentPerformReturnsNonEmptyString() async {
-        var intent = AskAetherIntent()
+        let intent = AskAetherIntent()
         intent.query = "你好"
         do {
             let result = try await intent.perform()
@@ -81,7 +81,7 @@ final class AppIntentsTests: XCTestCase {
     @MainActor
     func testIntentPerformKeepsFullStoreSchemaUsable() async throws {
         let sharedContainer = AetherApp.sharedModelContainer
-        var switchIntent = SwitchConversationIntent()
+        let switchIntent = SwitchConversationIntent()
         switchIntent.keyword = "zzz_no_such_conversation_zzz"
         _ = try await switchIntent.perform()
         _ = try await NewConversationIntent().perform()
@@ -114,7 +114,7 @@ final class AppIntentsTests: XCTestCase {
     /// 验证 SwitchConversationIntent.perform() 未匹配时返回非空提示文本
     /// 注意：NSLocalizedString 在 CI 英文环境返回英文翻译，不断言中文关键词。
     func testSwitchConversationIntentPerformReturnsNonEmptyWhenNoMatch() async {
-        var intent = SwitchConversationIntent()
+        let intent = SwitchConversationIntent()
         intent.keyword = "zzz_no_such_conversation_zzz"
         do {
             let result = try await intent.perform()
@@ -141,7 +141,7 @@ final class AppIntentsTests: XCTestCase {
         guard created else { return }
 
         // 用「对话」关键词查询，应能匹配到刚创建的「新对话」
-        var switchIntent = SwitchConversationIntent()
+        let switchIntent = SwitchConversationIntent()
         switchIntent.keyword = "对话"
         do {
             let result = try await switchIntent.perform()

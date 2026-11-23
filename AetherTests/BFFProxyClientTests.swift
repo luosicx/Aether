@@ -449,13 +449,8 @@ final class BFFProxyClientTests: XCTestCase {
         MockURLProtocol.statusCode = 401
 
         let expectation = XCTNSNotificationExpectation(name: .llmErrorOccurred, object: nil)
-        nonisolated(unsafe) var capturedError: LLMError?
         expectation.handler = { note in
-            if let err = note.userInfo?["error"] as? LLMError {
-                capturedError = err
-                return true
-            }
-            return false
+            note.userInfo?["error"] is LLMError
         }
 
         do {
@@ -762,13 +757,8 @@ final class BFFProxyClientTests: XCTestCase {
         MockURLProtocol.statusCode = 200
 
         let expectation = XCTNSNotificationExpectation(name: .llmErrorOccurred, object: nil)
-        nonisolated(unsafe) var capturedError: LLMError?
         expectation.handler = { note in
-            if let err = note.userInfo?["error"] as? LLMError {
-                capturedError = err
-                return true
-            }
-            return false
+            note.userInfo?["error"] is LLMError
         }
 
         do {

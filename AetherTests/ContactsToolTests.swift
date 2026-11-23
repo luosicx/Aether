@@ -71,7 +71,7 @@ final class ContactsToolTests: XCTestCase {
     /// 真实 CNContactStore 搜索应返回字符串（未授权时返回权限提示，同样是非空字符串）
     func testExecuteRealSearchReturnsString() async throws {
         let result = try await tool.execute(arguments: ["query": "张"])
-        XCTAssertTrue(result is String, "执行结果应为字符串类型")
+        XCTAssertFalse(result.isEmpty, "执行结果应为非空字符串")
     }
 
     // MARK: - definition 描述内容验证
@@ -130,7 +130,7 @@ final class ContactsToolTests: XCTestCase {
     func testExecuteLongQueryPassesGuard() async throws {
         let longQuery = String(repeating: "张", count: 200)
         let result = try await tool.execute(arguments: ["query": longQuery])
-        XCTAssertTrue(result is String, "长 query 应通过 guard 并返回字符串")
+        XCTAssertFalse(result.isEmpty, "长 query 应通过 guard 并返回非空字符串")
     }
 
     // MARK: - definition query 属性深度验证

@@ -47,8 +47,8 @@ final class ConversationListTests: XCTestCase {
 
     /// 有会话时 View 可正常构造并访问 VM 数据
     func testViewInitWithConversations() {
-        vm.createConversation(title: "测试会话A")
-        vm.createConversation(title: "测试会话B")
+        _ = vm.createConversation(title: "测试会话A")
+        _ = vm.createConversation(title: "测试会话B")
 
         let view = ConversationList(
             conversationListVM: vm,
@@ -64,7 +64,7 @@ final class ConversationListTests: XCTestCase {
         var selectedConv: Conversation?
         var created = false
 
-        vm.createConversation(title: "可选中会话")
+        _ = vm.createConversation(title: "可选中会话")
 
         let view = ConversationList(
             conversationListVM: vm,
@@ -82,9 +82,9 @@ final class ConversationListTests: XCTestCase {
 
     /// VM 的 conversations 列表标题可被正确读取，为搜索过滤提供数据基础
     func testVMConversationTitlesAccessible() {
-        vm.createConversation(title: "Hello World")
-        vm.createConversation(title: "SwiftUI")
-        vm.createConversation(title: "hello SWIFT")
+        _ = vm.createConversation(title: "Hello World")
+        _ = vm.createConversation(title: "SwiftUI")
+        _ = vm.createConversation(title: "hello SWIFT")
 
         let titles = vm.conversations.map(\.title)
         XCTAssertEqual(titles.count, 3)
