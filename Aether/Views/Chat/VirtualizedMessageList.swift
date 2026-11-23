@@ -128,8 +128,10 @@ private struct _MacVirtualizedList<Message: Identifiable & Hashable, Content: Vi
 // MARK: - iOS 实现
 
 #if os(iOS)
-/// iOS Diffable Data Source 项类型：消息或底部 Footer
-private enum _ListItem<Message: Hashable>: Hashable {
+/// iOS Diffable Data Source 项类型：消息或底部 Footer。
+/// Message 为含 SwiftData 模型引用的视图条目，但快照只在主线程构建与应用，
+/// 新版 SDK 的 diffable data source API 要求 ItemIdentifier 为 Sendable，故此处声明。
+private enum _ListItem<Message: Hashable>: Hashable, @unchecked Sendable {
     case message(Message)
     case footer
 }
