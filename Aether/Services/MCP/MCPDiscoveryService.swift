@@ -22,7 +22,7 @@ protocol MCPServiceBrowsing: AnyObject {
     /// - Parameters:
     ///   - type: Bonjour 服务类型（如 `_aether_mcp._tcp.`）
     ///   - handler: 发现服务时的回调（在主线程调用）
-    func startDiscovery(type: String, handler: @escaping (DiscoveredService) -> Void)
+    func startDiscovery(type: String, handler: @escaping @Sendable (DiscoveredService) -> Void)
     /// 停止服务浏览
     func stopDiscovery()
 }
@@ -131,7 +131,10 @@ final class MCPDiscoveryService {
         // 创建新 browser 并启动
         let newBrowser = browserFactory()
         newBrowser.startDiscovery(type: serviceType) { [weak self] service in
-            self?.handleDiscoveredService(service)
+            // handler 是 @Sendable，显式 hop 回 MainActor 处理发现结果
+            Task { @MainActor [weak self] in
+                self?.handleDiscoveredService(service)
+            }
         }
         browser = newBrowser
     }
@@ -205,7 +208,7 @@ final class BonjourServiceBrowser: NSObject, MCPServiceBrowsing, @unchecked Send
     /// NetService 浏览器
     private var browser: NetServiceBrowser?
     /// 发现回调
-    private var discoveryHandler: ((DiscoveredService) -> Void)?
+    private var discoveryHandler: (@Sendable (DiscoveredService) -> Void)?
     /// 已解析的服务缓存（避免重复解析）
     private var resolvingServices: Set<String> = []
     /// 线程安全锁
@@ -215,7 +218,7 @@ final class BonjourServiceBrowser: NSObject, MCPServiceBrowsing, @unchecked Send
     /// - Parameters:
     ///   - type: Bonjour 服务类型
     ///   - handler: 发现回调
-    func startDiscovery(type: String, handler: @escaping (DiscoveredService) -> Void) {
+    func startDiscovery(type: String, handler: @escaping @Sendable (DiscoveredService) -> Void) {
         stopDiscovery()
         lock.lock()
         discoveryHandler = handler

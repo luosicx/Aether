@@ -60,7 +60,8 @@ final class InMemoryKeychainBackend: KeychainBackend, @unchecked Sendable {
     func secItemAdd(_ query: CFDictionary) -> OSStatus {
         guard let key = key(for: query) else { return errSecParam }
         guard let dict = query as? [String: Any] else { return errSecParam }
-        storageLock.withLock { $0[key] = dict[kSecValueData as String] as? Data }
+        let data = dict[kSecValueData as String] as? Data
+        storageLock.withLock { $0[key] = data }
         return errSecSuccess
     }
 

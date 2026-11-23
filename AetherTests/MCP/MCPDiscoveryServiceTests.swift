@@ -523,12 +523,12 @@ final class MockServiceBrowser: MCPServiceBrowsing, @unchecked Sendable {
     /// 是否正在搜索
     private(set) var isSearching: Bool = false
     /// 发现回调（由 MCPDiscoveryService 设置）
-    private(set) var discoveryHandler: ((DiscoveredService) -> Void)?
+    private(set) var discoveryHandler: (@Sendable (DiscoveredService) -> Void)?
 
     private let lock = NSLock()
 
     /// 启动搜索
-    func startDiscovery(type: String, handler: @escaping (DiscoveredService) -> Void) {
+    func startDiscovery(type: String, handler: @escaping @Sendable (DiscoveredService) -> Void) {
         lock.lock()
         searchStartedCount += 1
         isSearching = true

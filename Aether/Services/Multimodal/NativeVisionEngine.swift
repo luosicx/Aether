@@ -230,7 +230,7 @@ public final class NativeVisionEngine: VisionInferenceEngine, @unchecked Sendabl
 /// Vision 请求的 completion handler 与 `perform()` 抛错后的 catch 路径可能先后
 /// 触发 resume，CheckedContinuation 重复 resume 会直接 fatalError 使整个进程崩溃
 /// （CI 上表现为测试进程反复崩溃重启、后续用例全部未执行）。用锁保证只 resume 一次。
-final class ResumeOnceContinuation<Value, Failure: Error>: @unchecked Sendable {
+final class ResumeOnceContinuation<Value: Sendable, Failure: Error>: @unchecked Sendable {
     private let continuation: CheckedContinuation<Value, Failure>
     private let lock = NSLock()
     private var resumed = false

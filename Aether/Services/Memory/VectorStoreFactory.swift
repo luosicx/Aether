@@ -55,13 +55,8 @@ final class VectorStoreFactory: @unchecked Sendable {
     ///   多次初始化幂等无副作用，最终通过双重检查锁保证首次写入的实例胜出。
     func store() async -> VectorStore {
         // 快速路径：持锁读取 override / cached
-        var fastPathStore: VectorStore?
-        stateLock.withLock { state in
-            if let override = state.overrideStore {
-                fastPathStore = override
-            } else if let cached = state.cachedStore {
-                fastPathStore = cached
-            }
+        let fastPathStore: VectorStore? = stateLock.withLock { state in
+            state.overrideStore ?? state.cachedStore
         }
         if let store = fastPathStore {
             return store

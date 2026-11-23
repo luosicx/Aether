@@ -28,25 +28,33 @@ final class SpotlightIndexer: ConversationIndexer {
             domainIdentifier: "com.aether.conversations",
             attributeSet: attributes
         )
-        CSSearchableIndex.default().indexSearchableItems([item]) { error in
-            if let error = error { Logger.storage.error("Spotlight index error: \(error.localizedDescription, privacy: .public)") }
+        // CoreSpotlight 的 async 封装在模拟器（CI）上可能永不返回，若直接 await 会把调用方
+        // （含单测）一起挂住 60 秒超时。索引本身是「尽力而为」的旁路操作，改为后台任务发出后即返回。
+        Task {
+            do {
+                try await CSSearchableIndex.default().indexSearchableItems([item])
+            } catch {
+                Logger.storage.error("Spotlight index error: \(error.localizedDescription, privacy: .public)")
+            }
         }
     }
 
     /// 从索引中移除指定会话
     /// - Parameter conversationId: 会话唯一标识
     func remove(conversationId: UUID) async {
-        CSSearchableIndex.default().deleteSearchableItems(
-            withIdentifiers: [conversationId.uuidString]
-        ) { _ in
-            // 删除完成回调，错误可忽略（下次启动会重新索引）
+        // 删除失败可忽略（下次启动会重新索引）；不 await，理由同上（模拟器上 async 封装可能挂死）
+        Task {
+            try? await CSSearchableIndex.default().deleteSearchableItems(
+                withIdentifiers: [conversationId.uuidString]
+            )
         }
     }
 
     /// 清空所有以太会话索引
     func removeAll() async {
-        CSSearchableIndex.default().deleteAllSearchableItems { _ in
-            // 全部删除完成回调，错误可忽略（下次启动会重新索引）
+        // 全部删除失败可忽略（下次启动会重新索引）；不 await，理由同上
+        Task {
+            try? await CSSearchableIndex.default().deleteAllSearchableItems()
         }
     }
 }
