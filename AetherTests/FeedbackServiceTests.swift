@@ -205,8 +205,8 @@ final class FeedbackServiceTests: XCTestCase {
     func testMailContentKeysAndValuesAreStrings() {
         let content = service.mailContent()
         for (key, value) in content {
-            XCTAssertTrue(key is String, "mailContent 键应为 String，实际：\(type(of: key))")
-            XCTAssertTrue(value is String, "mailContent 值应为 String，实际：\(type(of: value))")
+            XCTAssertFalse(key.isEmpty, "mailContent 键不应为空")
+            XCTAssertFalse(value.isEmpty, "mailContent 值不应为空")
         }
     }
 

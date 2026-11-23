@@ -71,7 +71,7 @@ final class ForkTests: XCTestCase {
     /// forkConversation 复制到分叉点为止的所有消息（含分叉点消息）
     func testForkConversationCopiesMessagesUpToForkPoint() throws {
         let parent = storage.createConversation(title: "父对话")
-        let msg1 = storage.addMessage(to: parent, role: "user", content: "第一条消息")
+        _ = storage.addMessage(to: parent, role: "user", content: "第一条消息")
         let msg2 = storage.addMessage(to: parent, role: "assistant", content: "第二条消息")
         _ = storage.addMessage(to: parent, role: "user", content: "第三条消息")
 
@@ -125,8 +125,8 @@ final class ForkTests: XCTestCase {
     /// forkConversation 在最后一条消息处分叉
     func testForkAtLastMessage() throws {
         let parent = storage.createConversation(title: "父对话")
-        let msg1 = storage.addMessage(to: parent, role: "user", content: "消息1")
-        let msg2 = storage.addMessage(to: parent, role: "assistant", content: "消息2")
+        _ = storage.addMessage(to: parent, role: "user", content: "消息1")
+        _ = storage.addMessage(to: parent, role: "assistant", content: "消息2")
         let msg3 = storage.addMessage(to: parent, role: "user", content: "消息3")
 
         let forked = try storage.forkConversation(from: parent, at: msg3.id)

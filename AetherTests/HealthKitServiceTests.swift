@@ -295,19 +295,13 @@ final class HealthKitServiceTests: XCTestCase {
         let error1 = HealthKitError.notAvailable
         let error2 = HealthKitError.notAuthorized
 
-        switch error1 {
-        case .notAvailable:
-            break
-        case .notAuthorized:
-            XCTFail("应为 .notAvailable")
-        }
+        XCTAssertTrue(isNotAvailable(error1), "error1 应为 .notAvailable")
+        XCTAssertFalse(isNotAvailable(error2), "error2 应为 .notAuthorized")
+    }
 
-        switch error2 {
-        case .notAvailable:
-            XCTFail("应为 .notAuthorized")
-        case .notAuthorized:
-            break
-        }
+    private func isNotAvailable(_ error: HealthKitError) -> Bool {
+        if case .notAvailable = error { return true }
+        return false
     }
 
     /// HealthKitError 可在 do-catch 中被捕获并区分

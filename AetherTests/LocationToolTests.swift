@@ -41,7 +41,7 @@ final class LocationToolTests: XCTestCase {
     /// LocationTool 应遵循 ToolProtocol 协议
     func testConformsToToolProtocol() {
         // 编译期即可验证协议遵循，此处仅做运行时 sanity check
-        XCTAssertTrue(tool is ToolProtocol, "LocationTool 应遵循 ToolProtocol")
+        let _: any ToolProtocol = tool
     }
 
     /// execute 无参调用：传空字典应等价于无参调用
