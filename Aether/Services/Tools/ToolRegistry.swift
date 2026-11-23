@@ -143,7 +143,8 @@ final class ToolRegistry {
     ///
     /// 本方法是所有工具调用路径的唯一安全门：ReAct 循环、Agent DAG、MCP Server 入站
     /// `tools/call` 都经过这里，授权判定与审计不再由各调用方各自实现。
-    func execute(name: String, arguments: [String: Any]) async throws -> String {
+    /// `arguments` 以 `sending` 接收并转交工具实现，避免 `[String: Any]` 跨隔离域共享。
+    func execute(name: String, arguments: sending [String: Any]) async throws -> String {
         let argumentsSummary = arguments.keys.sorted().joined(separator: ", ")
         let startTime = Date()
 
@@ -160,7 +161,7 @@ final class ToolRegistry {
 
         let authorized: Bool
         if requiresAuthorization(name: name) {
-            authorized = await requestAuthorization(name: name, arguments: arguments)
+            authorized = await requestAuthorization(name: name, argumentsDescription: "工具：\(name)\n参数：\(arguments)")
         } else {
             authorized = true
         }
@@ -176,11 +177,12 @@ final class ToolRegistry {
 
     /// 请求运行时授权。远程 MCP 工具与插件工具只给会话级确认：
     /// 二者内容都可能在重连/热更新后被替换，不能持久「始终允许」。
-    private func requestAuthorization(name: String, arguments: [String: Any]) async -> Bool {
+    /// - Parameter argumentsDescription: 已格式化的参数描述（避免把 `[String: Any]`
+    ///   共享给非 `sending` 路径，影响后续转交工具实现）
+    private func requestAuthorization(name: String, argumentsDescription: String) async -> Bool {
         let authResult: ToolAuthorizationResult
         if isRemoteTool(name: name) || isPluginTool(name: name) || defaultDisabledTools.contains(name) {
-            let details = "工具：\(name)\n参数：\(arguments)"
-            authResult = await ToolAuthorization.shared.presentConfirmation(toolName: name, details: details)
+            authResult = await ToolAuthorization.shared.presentConfirmation(toolName: name, details: argumentsDescription)
         } else {
             let purpose = tools[name]?.definition.description ?? ""
             authResult = await ToolAuthorization.shared.presentSensitiveAccessConfirmation(toolName: name, purpose: purpose)

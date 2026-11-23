@@ -9,6 +9,12 @@ import os
 // MCPServer 接收外部客户端的 JSON-RPC 请求并返回响应。
 // JSON-RPC 2.0 格式与 MCPClient 一致，只是方向反了。
 
+/// 工具参数跨隔离域传递的 Sendable 包装。
+/// 契约同 `AnyCodable`：仅承载 JSON 兼容值类型，不得放入闭包等引用类型。
+private struct ToolArgumentBox: @unchecked Sendable {
+    let raw: [String: Any]
+}
+
 /// MCPServer 默认暴露的跨平台工具白名单（14 个）。
 /// 排除 macOS 独有工具（AppleScript/Screenshot/OCR/Terminal/Window/App/File/Finder/Safari/SystemControl/InputAutomation），
 /// 这些工具需要桌面环境且权限敏感，默认不对外暴露。
@@ -168,7 +174,7 @@ actor MCPServer: MCPServerProtocol {
 
         // id 可能是 Int / String / Null（通知无 id）
         let id: Any? = json["id"]
-        let params = json["params"] as? [String: Any]
+        let params = json["params"] as? [String: Any] ?? [:]
 
         do {
             let result = try await dispatch(method: method, params: params)
@@ -188,7 +194,7 @@ actor MCPServer: MCPServerProtocol {
     ///   - method: JSON-RPC 方法名
     ///   - params: 请求参数
     /// - Returns: result 字段内容
-    private func dispatch(method: String, params: [String: Any]?) async throws -> [String: Any] {
+    private func dispatch(method: String, params: [String: Any]) async throws -> [String: Any] {
         switch method {
         case "initialize":
             return [
@@ -240,9 +246,8 @@ actor MCPServer: MCPServerProtocol {
     /// 处理 tools/call：执行指定工具，返回 content 数组。
     /// - Parameter params: ["name": 工具名, "arguments": 参数字典]
     /// - Returns: ["content": [["type": "text", "text": 结果]], "isError": Bool]
-    private func handleToolsCall(params: [String: Any]?) async throws -> [String: Any] {
-        guard let params = params,
-              let toolName = params["name"] as? String else {
+    private func handleToolsCall(params: [String: Any]) async throws -> [String: Any] {
+        guard let toolName = params["name"] as? String else {
             throw MCPError.invalidResponse("tools/call 缺少 name 参数")
         }
 
@@ -255,10 +260,12 @@ actor MCPServer: MCPServerProtocol {
         }
 
         let arguments = params["arguments"] as? [String: Any] ?? [:]
+        // 参数以 JSON 值字典跨隔离域转交主 actor（契约同 AnyCodable：仅 JSON 兼容值类型）
+        let argumentBox = ToolArgumentBox(raw: arguments)
 
         // ToolRegistry.shared 是 @MainActor，await 自动 hop 到 MainActor
         do {
-            let result: String = try await ToolRegistry.shared.execute(name: toolName, arguments: arguments)
+            let result: String = try await ToolRegistry.shared.execute(name: toolName, arguments: argumentBox.raw)
             return [
                 "content": [["type": "text", "text": result]],
                 "isError": false

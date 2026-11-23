@@ -1,5 +1,5 @@
 import Foundation
-import AetherFoundation
+@preconcurrency import AetherFoundation
 
 /// `mcp.json` 配置文件根模型。
 ///

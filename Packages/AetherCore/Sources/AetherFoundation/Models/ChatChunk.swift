@@ -198,7 +198,8 @@ public struct ChatRequestBody: Codable {
 }
 
 /// 工具定义（OpenAI function calling 格式），type 固定为 "function"
-public struct ToolDef: Codable {
+/// Swift 6：字段均为 Sendable（JSON Schema 字典由 AnyCodable 承载），可跨隔离域传递。
+public struct ToolDef: Codable, Sendable {
     public let type: String
     public let function: FunctionDef
 
@@ -208,7 +209,7 @@ public struct ToolDef: Codable {
     }
 
     /// 工具定义体：含工具名、描述、parameters JSON Schema
-    public struct FunctionDef: Codable {
+    public struct FunctionDef: Codable, Sendable {
         public let name: String
         public let description: String
         public let parameters: [String: AnyCodable]

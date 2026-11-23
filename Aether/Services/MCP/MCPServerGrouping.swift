@@ -1,5 +1,5 @@
 import Foundation
-import AetherFoundation
+@preconcurrency import AetherFoundation
 
 /// MCP Server 连接状态枚举。
 ///
