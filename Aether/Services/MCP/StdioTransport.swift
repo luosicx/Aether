@@ -66,10 +66,10 @@ final class StdioTransport: @unchecked Sendable, MCPTransport {
             process.terminate()
         }
         // 持锁访问 continuation，与 messages() / processStdoutData() 串行化
-        lock.lock()
-        continuation?.finish()
-        continuation = nil
-        lock.unlock()
+        lock.withLock {
+            continuation?.finish()
+            continuation = nil
+        }
     }
 
     /// 写入 stdin（JSON-RPC 消息 + 换行符）
