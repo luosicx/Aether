@@ -10,15 +10,15 @@ import SwiftData
 @Model
 final class HealthInsight {
     /// 唯一标识
-    var id: UUID
+    var id: UUID = UUID()
     /// 生成时间
-    var timestamp: Date
+    var timestamp: Date = Date()
     /// 洞察类别："sleep" / "heart" / "steps" / "overall"
-    var insightType: String
+    var insightType: String = "overall"
     /// AI 生成的洞察文本，含免责声明
-    var content: String
+    var content: String = ""
     /// JSON 编码的聚合指标，如 ["avgHeartRate": 72, "sleepHours": 6.5]
-    var relatedMetrics: [String: Double]
+    var relatedMetrics: [String: Double] = [:]
 
     /// 创建 HealthInsight 实例
     /// - Parameters:

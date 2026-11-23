@@ -11,23 +11,23 @@ import SwiftData
 @Model
 final class AgentTask {
     /// 任务唯一标识
-    var id: UUID
+    var id: UUID = UUID()
     /// 用户原始目标
-    var goal: String
+    var goal: String = ""
     /// 子任务列表（SwiftData 以 transformable 方式存储 Codable 数组）
-    var subTasks: [SubTask]
+    var subTasks: [SubTask] = []
     /// 任务整体状态
-    var status: AgentTaskStatus
+    var status: AgentTaskStatus = AgentTaskStatus.pending
     /// 创建时间
-    var createdAt: Date
+    var createdAt: Date = Date()
     /// 最近更新时间
-    var updatedAt: Date
+    var updatedAt: Date = Date()
     /// 关联的会话 ID（可选）
     var conversationID: UUID?
     /// 最近一次检查点时间戳（历史编排器写入；字段随模型保留以兼容旧数据）
     var checkpointAt: Date?
     /// Task 20: 检查点中已完成的子任务 ID 集合（JSON 编码存储，幂等恢复用）
-    var completedNodeIDs: [UUID]
+    var completedNodeIDs: [UUID] = []
 
     /// 创建 AgentTask 实例
     /// - Parameters:

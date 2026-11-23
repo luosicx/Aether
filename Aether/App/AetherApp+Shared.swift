@@ -60,8 +60,8 @@ extension AetherApp {
     /// 本地存储配置：App Group 共享 SQLite（iOS / watchOS / Widget 三端读写同一 store）。
     ///
     /// 必须显式 cloudKitDatabase: .none——ModelConfiguration 默认是 .automatic，
-    /// 一旦二进制带 iCloud entitlement（签名/真机构建），SwiftData 会自动启用 CloudKit
-    /// 并用 CloudKit 规则校验 schema（属性必须可选/有默认值），导致启动即崩溃。
+    /// 一旦二进制带 iCloud entitlement（签名/真机构建），SwiftData 会自动为本地 store
+    /// 启用 CloudKit 同步，本地数据被镜像到 iCloud，与 iCloud 开关的语义冲突。
     static let localModelConfiguration: ModelConfiguration = {
         let groupIdentifier = "group.com.aether.app"
         if let groupURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: groupIdentifier) {
@@ -87,8 +87,9 @@ extension AetherApp {
     /// 解析实际存储后端：iCloud 开关开启时先验证 CloudKit 容器是否可用；
     /// 失败则回退**本地持久化**（而非内存），避免用户以为正在同步、实际数据不落盘。
     ///
-    /// 当前 SwiftData schema 尚未满足 CloudKit 约束（属性需可选/有默认值、关系需可选），
-    /// 因此开启 iCloud 后会走到本地回退分支；UI 通过 `isICloudSyncFallingBackToLocal` 提示。
+    /// 当前 SwiftData schema 已按 CloudKit 约束建模（属性可选或有默认值、关系可选且有 inverse、
+    /// 无唯一约束，由 CloudKitSchemaCompatibilityTests 守护），此处的回退分支用于 iCloud 账号
+    /// 未登录、CloudKit 容器不可用等运行时故障；UI 通过 `isICloudSyncFallingBackToLocal` 提示。
     ///
     /// 最终兜底：本地持久化也失败时降级 in-memory（App 可运行但数据不持久化）；
     /// in-memory 也失败（系统级 SwiftData 故障）则上报 CrashReportService 后 fatalError——
@@ -106,7 +107,7 @@ extension AetherApp {
                     backend: .cloudKit
                 )
             } catch {
-                Logger.app.error("CloudKit 容器创建失败（SwiftData schema 尚未兼容 CloudKit），回退本地存储: \(error.localizedDescription, privacy: .public)")
+                Logger.app.error("CloudKit 容器创建失败，回退本地存储: \(error.localizedDescription, privacy: .public)")
             }
         }
 

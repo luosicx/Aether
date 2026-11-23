@@ -1132,7 +1132,7 @@ struct SettingsView: View {
 
             if AetherApp.isICloudSyncFallingBackToLocal {
                 Label {
-                    Text("iCloud 同步暂不可用：当前数据模型尚未兼容 CloudKit，已回退到本地存储，对话不会同步。", comment: "")
+                    Text("iCloud 同步暂不可用：CloudKit 容器无法访问（请确认已登录 iCloud），已回退到本地存储，对话不会同步。", comment: "")
                         .font(.captionAI)
                 } icon: {
                     Image(systemName: "exclamationmark.triangle.fill")
