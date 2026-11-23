@@ -28,7 +28,7 @@ final class PluginMarketplaceService {
     private(set) var lastError: String?
 
     /// 默认注册中心 URL（占位常量，实际请求在测试中 mock）
-    static let defaultRegistryURL = URL(string: "https://raw.githubusercontent.com/luosicx/Aether/main/plugins/registry.json")!
+    nonisolated static let defaultRegistryURL = URL(string: "https://raw.githubusercontent.com/luosicx/Aether/main/plugins/registry.json")!
 
     /// 从 App 的 Info.plist 读取内置信任锚（键 `PluginTrustAnchorEd25519`，Ed25519 公钥 base64）。
     /// 未配置时返回 nil，插件安装会因缺少验签公钥而失败（fail-closed）。
