@@ -170,7 +170,7 @@ public struct AetherRustGeneratedToken: Equatable {
             throw AetherRustInferenceError.invalidJson
         }
         // 先检查是否为错误响应
-        if let err = try? JSONDecoder().decode(ErrorWrapper.self, from: data), let msg = err.error {
+        if let err = try? JSONDecoder().decode(ErrorWrapper.self, from: data), err.error != nil {
             throw AetherRustInferenceError.inferenceFailed
         }
         let views = try JSONDecoder().decode([TokenView].self, from: data)

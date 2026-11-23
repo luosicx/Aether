@@ -88,8 +88,7 @@ public enum DeviceCapability: String, Sendable, Equatable, CaseIterable {
         // macOS：8GB+ 视为 ultra
         return memoryGB >= 8 ? .ultra : .high
         #elseif os(iOS)
-        // iOS：按物理内存与机器型号分级
-        let machine = machineIdentifier
+        // iOS：按物理内存分级
         if memoryGB >= 8 {
             // iPhone 15 Pro / 16 Pro / iPad Pro M4
             return .ultra
