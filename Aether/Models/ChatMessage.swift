@@ -8,13 +8,13 @@ import AetherFoundation
 @Model
 final class ChatMessage {
     /// 消息唯一标识
-    var id: UUID
+    var id: UUID = UUID()
     /// 消息角色：system / user / assistant / tool
-    var role: String
+    var role: String = "user"
     /// 文本内容
-    var content: String
+    var content: String = ""
     /// 消息创建时间
-    var timestamp: Date
+    var timestamp: Date = Date()
     /// Day 5 补充A 之前的图片数据，base64 编码后随请求下发
     var imageData: Data?
     /// Day 5 补充A：用户从相册选择的附带图片（SwiftData @Model 自动迁移）

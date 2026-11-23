@@ -45,6 +45,7 @@
 		11111111111111111111A00B /* PreferenceExtractorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11111111111111111111A00C /* PreferenceExtractorTests.swift */; };
 		11111111111111111111A0D3 /* ContextWindowManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11111111111111111111A0D4 /* ContextWindowManagerTests.swift */; };
 		11111111111111111111A0D7 /* SemanticMemoryStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11111111111111111111A0D8 /* SemanticMemoryStoreTests.swift */; };
+		AABBCC000000000000000302 /* CloudKitSchemaCompatibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCC000000000000000301 /* CloudKitSchemaCompatibilityTests.swift */; };
 		119F3C302AD2D99B3654BF38 /* SwiftDataRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2F02E2D70C1519B594088E1 /* SwiftDataRepositoryTests.swift */; };
 		119FB8FB06360855631FB56D /* AetherApp-iOS.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2318B28DC6BD8174A0D26D1 /* AetherApp-iOS.swift */; };
 		11F93F53B58375E35B0DB358 /* LogUploaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E42EAA429A0EACAC0015EDBF /* LogUploaderTests.swift */; };
@@ -689,6 +690,7 @@
 		11111111111111111111A0D4 /* ContextWindowManagerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ContextWindowManagerTests.swift; sourceTree = "<group>"; };
 		11111111111111111111A0D6 /* SemanticMemoryStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SemanticMemoryStore.swift; sourceTree = "<group>"; };
 		11111111111111111111A0D8 /* SemanticMemoryStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SemanticMemoryStoreTests.swift; sourceTree = "<group>"; };
+		AABBCC000000000000000301 /* CloudKitSchemaCompatibilityTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CloudKitSchemaCompatibilityTests.swift; sourceTree = "<group>"; };
 		125B7F11FDD951BCC8229C40 /* AetherWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AetherWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		12A0EB0900AC70CC80392CA8 /* InputAutomationTool.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InputAutomationTool.swift; sourceTree = "<group>"; };
 		1362189DB8BC590B96012A25 /* WatchApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WatchApp.swift; sourceTree = "<group>"; };
@@ -1787,6 +1789,7 @@
 				97B5B48EFB2E00FFB61C72AA /* SettingsViewModelTests.swift */,
 				C42CB93D5F359C823B79BD26 /* SmartRouterTests.swift */,
 				F936BCEB4EC7376088083678 /* MessageFeedbackTests.swift */,
+				AABBCC000000000000000301 /* CloudKitSchemaCompatibilityTests.swift */,
 				D85D1EEA7BB50448FF2B87CB /* ModelProviderTests.swift */,
 				571F195FF14DB4506B897253 /* QwenClientTests.swift */,
 				A63C4D034F5F96B429597F53 /* FallbackLLMProviderTests.swift */,
@@ -2938,6 +2941,7 @@
 				11111111111111111111A00B /* PreferenceExtractorTests.swift in Sources */,
 				11111111111111111111A0D3 /* ContextWindowManagerTests.swift in Sources */,
 				11111111111111111111A0D7 /* SemanticMemoryStoreTests.swift in Sources */,
+				AABBCC000000000000000302 /* CloudKitSchemaCompatibilityTests.swift in Sources */,
 				AA852636A86F00EE54CEA37B /* BruteForceVectorStoreTests.swift in Sources */,
 				72801F0CC0CBEC92776EBC56 /* SQLiteVecStoreTests.swift in Sources */,
 				5508E431A1922089A29D15CF /* VectorStoreFactoryTests.swift in Sources */,

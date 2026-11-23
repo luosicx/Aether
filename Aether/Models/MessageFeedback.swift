@@ -5,21 +5,18 @@ import SwiftData
 @Model
 final class MessageFeedback {
     /// 唯一标识
-    var id: UUID
+    var id: UUID = UUID()
     /// 关联的 ChatMessage.id
-    var messageId: UUID
+    var messageId: UUID = UUID()
     /// 是否为点赞（true=赞，false=踩）
-    var isPositive: Bool
+    var isPositive: Bool = false
     /// 创建时间
-    var createdAt: Date
-    /// 反向关联所属 Conversation
-    @Relationship(inverse: \Conversation.messages) var conversation: Conversation?
+    var createdAt: Date = Date()
 
     init(messageId: UUID, isPositive: Bool) {
         self.id = UUID()
         self.messageId = messageId
         self.isPositive = isPositive
         self.createdAt = Date()
-        self.conversation = nil
     }
 }

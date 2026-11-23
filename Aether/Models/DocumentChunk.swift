@@ -5,17 +5,17 @@ import SwiftData
 @Model
 final class DocumentChunk {
     /// 分块唯一标识
-    var id: UUID
+    var id: UUID = UUID()
     /// 分块文本
-    var content: String
+    var content: String = ""
     /// 向量嵌入，Float 数组，检索时按 cosine 相似度排序
-    var embedding: [Float]
+    var embedding: [Float] = []
     /// 来源文件名，用于去重和删除
-    var source: String
+    var source: String = ""
     /// 同一 source 中的分块序号，从 0 递增
-    var chunkIndex: Int
+    var chunkIndex: Int = 0
     /// 创建时间，用于排序
-    var createdAt: Date
+    var createdAt: Date = Date()
     /// 文档分块权重，被用户踩时 *= 0.8 衰减，被赞时 /= 0.8 恢复，上限 1.0
     var weight: Float = 1.0
 

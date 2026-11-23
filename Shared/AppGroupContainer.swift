@@ -23,10 +23,15 @@ enum AppGroupContainer {
 
     /// 创建使用 App Group 共享存储的 ModelConfiguration。
     /// App Group 未配置时回退到默认存储（开发/测试兜底）。
+    ///
+    /// 必须显式 cloudKitDatabase: .none——watchOS / Widget target 的 entitlements 同样声明了
+    /// iCloud 容器，ModelConfiguration 默认的 .automatic 会让它们把这份共享本地库也镜像到
+    /// CloudKit；而主 App 的 iCloud 同步用的是另一份 store，两者会向同一容器写入重复数据。
+    /// 共享库只做本地读写，CloudKit 同步由主 App 的 iCloudModelConfiguration 负责。
     static func makeModelConfiguration() -> ModelConfiguration {
         if let url = sharedStoreURL {
-            return ModelConfiguration(url: url)
+            return ModelConfiguration(url: url, cloudKitDatabase: .none)
         }
-        return ModelConfiguration(isStoredInMemoryOnly: false)
+        return ModelConfiguration(isStoredInMemoryOnly: false, cloudKitDatabase: .none)
     }
 }

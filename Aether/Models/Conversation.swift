@@ -5,13 +5,13 @@ import SwiftData
 @Model
 final class Conversation {
     /// 会话唯一标识
-    var id: UUID
+    var id: UUID = UUID()
     /// 会话标题，显示在侧边栏
-    var title: String
+    var title: String = "新对话"
     /// 系统提示词，注入到对话首条 system 消息
-    var systemPrompt: String
+    var systemPrompt: String = "你是一个有帮助的AI助手。"
     /// 会话创建时间
-    var createdAt: Date
+    var createdAt: Date = Date()
     /// Day 9: 是否置顶。置顶会话在侧边栏排在最上方。
     var isPinned: Bool = false
     /// 未读消息数。大于 0 时在会话行末尾显示胶囊徽标。
@@ -23,9 +23,17 @@ final class Conversation {
     var parentConversationID: UUID?
     /// Task 21: 分叉点的消息 ID（在父对话中的哪条消息处分叉），nil 表示非分叉对话
     var parentMessageID: UUID?
-    /// 消息列表；cascade 删除规则，删除 Conversation 时级联删除所有 ChatMessage
-    @Relationship(deleteRule: .cascade, inverse: \ChatMessage.conversation)
-    var messages: [ChatMessage]
+    /// 消息列表；cascade 删除规则，删除 Conversation 时级联删除所有 ChatMessage。
+    /// CloudKit 要求关系必须可选，因此底层存储为可选数组，对外仍通过非可选的 `messages` 暴露；
+    /// `originalName` 指向旧属性名，保证已有本地库轻量迁移时关系不丢。
+    @Relationship(deleteRule: .cascade, originalName: "messages", inverse: \ChatMessage.conversation)
+    private var storedMessages: [ChatMessage]?
+
+    /// 消息列表（`storedMessages` 的非可选视图）
+    var messages: [ChatMessage] {
+        get { storedMessages ?? [] }
+        set { storedMessages = newValue }
+    }
 
     /// 创建 Conversation 实例
     /// - Parameters:
@@ -64,8 +72,8 @@ final class Conversation {
 /// 持久化用户的语气偏好、偏好工具与自定义事实，注入系统提示词以个性化 AI 回复
 @Model
 final class UserPreference {
-    /// 唯一标识
-    @Attribute(.unique) var id: UUID = UUID()
+    /// 唯一标识（CloudKit 不支持唯一约束，去重由 fetchPreference 取首条保证）
+    var id: UUID = UUID()
     /// 偏好语气："正式" / "轻松" / "默认"
     var preferredTone: String = "默认"
     /// 偏好工具名数组（来自 ToolRegistry.allToolDefs 的 function.name）
