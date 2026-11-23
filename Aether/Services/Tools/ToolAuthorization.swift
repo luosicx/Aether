@@ -25,12 +25,12 @@ enum ToolAuthorizationChoice: Equatable {
     case always
 }
 
-/// 授权确认弹窗的呈现器。只在主线程调用，故不要求 Sendable。
+/// 授权确认弹窗的呈现器。只在主线程调用；`present` 主 actor 隔离以直接操作 UIKit/AppKit。
 /// 产品侧用 `SystemAlertPresenter` 弹真实 UI；测试侧可注入即时应答的实现，
 /// 避免「无人点击 → continuation 永不 resume」把调用方整条挂死。
 protocol AuthorizationAlertPresenting {
-    func present(toolName: String, title: String, message: String, isSensitive: Bool,
-                 completion: @escaping (ToolAuthorizationChoice) -> Void)
+    @MainActor func present(toolName: String, title: String, message: String, isSensitive: Bool,
+                            completion: @escaping @Sendable (ToolAuthorizationChoice) -> Void)
 }
 
 /// 敏感/高危工具的运行时授权组件。
@@ -92,7 +92,7 @@ final class ToolAuthorization: @unchecked Sendable {
     ///   - toolName: 工具名
     ///   - details: 展示给用户的详情说明
     ///   - completion: 用户选择后的回调
-    func presentConfirmation(toolName: String, details: String?, completion: @escaping (ToolAuthorizationResult) -> Void) {
+    func presentConfirmation(toolName: String, details: String?, completion: @escaping @Sendable (ToolAuthorizationResult) -> Void) {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else {
                 completion(.denied)
@@ -124,7 +124,7 @@ final class ToolAuthorization: @unchecked Sendable {
     ///   - toolName: 工具名
     ///   - purpose: 访问目的说明
     ///   - completion: 用户选择后的回调
-    func presentSensitiveAccessConfirmation(toolName: String, purpose: String?, completion: @escaping (ToolAuthorizationResult) -> Void) {
+    func presentSensitiveAccessConfirmation(toolName: String, purpose: String?, completion: @escaping @Sendable (ToolAuthorizationResult) -> Void) {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else {
                 completion(.denied)
@@ -153,7 +153,7 @@ final class ToolAuthorization: @unchecked Sendable {
 
     /// 把用户的选择不落成授权状态再回传结果。`neverAlwaysAllow` 的拦截在 `grantAlways` 里。
     private func apply(choice: ToolAuthorizationChoice, toolName: String,
-                       completion: (ToolAuthorizationResult) -> Void) {
+                       completion: @Sendable (ToolAuthorizationResult) -> Void) {
         switch choice {
         case .denied:
             completion(.denied)
@@ -232,7 +232,7 @@ private extension ToolAuthorization {
 
 /// 真实系统的授权确认弹窗：iOS 用 UIAlertController，macOS 用 NSAlert。
 /// 只负责收集用户的选择，授权状态由 `ToolAuthorization.apply(choice:toolName:completion:)` 写入。
-final class SystemAlertPresenter: AuthorizationAlertPresenting {
+final class SystemAlertPresenter: AuthorizationAlertPresenting, @unchecked Sendable {
     #if os(iOS)
     /// 最近激活的 scene。iPhone Duo 分屏/多窗口下可能同时存在多个 foregroundActive scene，
     /// 弹窗优先落在用户最近交互的 scene，避免授权弹窗出现在错误窗口。仅主线程读写。
@@ -249,8 +249,10 @@ final class SystemAlertPresenter: AuthorizationAlertPresenting {
     }
     #endif
 
+    /// 呈现确认弹窗。主 actor 隔离：UIKit/AppKit 的窗口与控件 API 均要求主 actor。
+    @MainActor
     func present(toolName _: String, title: String, message: String, isSensitive: Bool,
-                 completion: @escaping (ToolAuthorizationChoice) -> Void) {
+                 completion: @escaping @Sendable (ToolAuthorizationChoice) -> Void) {
         #if os(iOS)
         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "取消", style: .cancel) { _ in
@@ -290,7 +292,7 @@ final class SystemAlertPresenter: AuthorizationAlertPresenting {
             alert.addButton(withTitle: "确认")
         }
         alert.buttons.first?.keyEquivalent = "\u{1b}"
-        let handler: (NSApplication.ModalResponse) -> Void = { response in
+        let handler: @Sendable (NSApplication.ModalResponse) -> Void = { response in
             switch response {
             case .alertFirstButtonReturn:
                 completion(.denied)
@@ -311,6 +313,7 @@ final class SystemAlertPresenter: AuthorizationAlertPresenting {
     }
 
     #if os(iOS)
+    @MainActor
     private func topViewController() -> UIViewController? {
         let scenes = UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }

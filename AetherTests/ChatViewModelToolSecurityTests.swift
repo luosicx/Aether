@@ -193,8 +193,9 @@ final class StubAuthorizationPresenter: AuthorizationAlertPresenting {
         self.choice = choice
     }
 
+    @MainActor
     func present(toolName: String, title: String, message: String, isSensitive: Bool,
-                 completion: @escaping (ToolAuthorizationChoice) -> Void) {
+                 completion: @escaping @Sendable (ToolAuthorizationChoice) -> Void) {
         completion(choice)
     }
 }
