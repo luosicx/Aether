@@ -40,6 +40,7 @@ public extension Color {
     // MARK: - 背景
     /// 主背景（List / Form 默认背景）
     /// Task 25: 改为从 ThemeManager 读取当前主题的背景色，实现主题切换
+    @MainActor
     static var backgroundPrimary: Color {
         ThemeManager.shared.currentTheme.backgroundGradient.first ?? Color.black
     }
@@ -63,11 +64,13 @@ public extension Color {
     // MARK: - 气泡
     /// 用户气泡背景
     /// Task 25: 从 ThemeManager 读取当前主题的用户气泡色
+    @MainActor
     static var bubbleUser: Color {
         ThemeManager.shared.currentTheme.bubbleUserColor
     }
     /// 助手气泡背景（液态玻璃基底，配合视图中 .ultraThinMaterial 使用）
     /// Task 25: 从 ThemeManager 读取当前主题的 AI 气泡色
+    @MainActor
     static var bubbleAI: Color {
         ThemeManager.shared.currentTheme.bubbleAIColor
     }
@@ -75,16 +78,19 @@ public extension Color {
     // MARK: - 文字
     /// 主要文字
     /// Task 25: 从 ThemeManager 读取当前主题的主要文字色
+    @MainActor
     static var textPrimary: Color {
         ThemeManager.shared.currentTheme.textPrimaryColor
     }
     /// 次要文字
     /// Task 25: 从 ThemeManager 读取当前主题的次要文字色
+    @MainActor
     static var textSecondary: Color {
         ThemeManager.shared.currentTheme.textSecondaryColor
     }
     /// 三级文字（时间戳、占位）
     /// Task 25: 从主题次要色派生，保证主题切换时层次一致
+    @MainActor
     static var textTertiary: Color {
         ThemeManager.shared.currentTheme.textSecondaryColor.opacity(0.6)
     }
