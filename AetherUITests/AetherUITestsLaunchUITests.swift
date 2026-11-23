@@ -1,5 +1,6 @@
 import XCTest
 
+@MainActor
 final class AetherUITestsLaunchUITests: XCTestCase {
 
     func testLaunch() throws {

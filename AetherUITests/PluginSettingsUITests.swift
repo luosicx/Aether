@@ -7,6 +7,7 @@ import XCTest
 /// 2. 验证空状态提示
 /// 3. 安装示例插件 → 验证插件出现
 /// 4. 卸载插件 → 验证插件消失
+@MainActor
 final class PluginSettingsUITests: XCTestCase {
 
     override func setUp() {

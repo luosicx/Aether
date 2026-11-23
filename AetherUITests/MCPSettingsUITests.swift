@@ -8,6 +8,7 @@ import XCTest
 /// 3. 删除 Server
 ///
 /// 复用 AetherUITests 的 launchArguments 约定（UITEST_RESET_DATA + UITEST_DISABLE_SPLASH）。
+@MainActor
 final class MCPSettingsUITests: XCTestCase {
 
     override func setUp() {
