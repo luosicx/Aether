@@ -4,7 +4,7 @@ import XCTest
 /// Task 19 阶段 2: RecallEngine 单元测试。
 ///
 /// 覆盖：复合评分正确性、时间衰减（30 天半衰期）、同类别去重、用户主动记忆不衰减、
-/// top-K 限制、空输入处理、lastAccessedAt 更新、VectorStore 不可用时回退到暴力扫描。
+/// top-K 限制、空输入处理、不修改模型（lastAccessedAt 由调用方更新）、VectorStore 不可用时回退到暴力扫描。
 @MainActor
 final class RecallEngineTests: XCTestCase {
     private var factory: VectorStoreFactory!
@@ -22,13 +22,22 @@ final class RecallEngineTests: XCTestCase {
         try await super.tearDown()
     }
 
+    // MARK: - 辅助
+
+    /// 把引擎返回的 id 列表映射回模型，保持顺序。
+    private func resolve(_ ids: [UUID], in memories: [Memory]) -> [Memory] {
+        let byID = Dictionary(uniqueKeysWithValues: memories.map { ($0.id, $0) })
+        return ids.compactMap { byID[$0] }
+    }
+
     // MARK: - 静态评分函数
 
     /// 相似度=1.0、importance=0.5、recency=1.0 的复合分应为 0.6×1 + 0.3×0.5 + 0.1×1 = 0.85
     func testComputeFinalScoreWithFullSimilarity() {
         let memory = Memory(content: "测试", embedding: [1, 0], category: "context", importance: 0.5)
+        let snapshot = MemoryRecallSnapshot(memory: memory)
         let now = Date()
-        let score = RecallEngine.computeFinalScore(memory: memory, similarity: 1.0, now: now)
+        let score = RecallEngine.computeFinalScore(memory: snapshot, similarity: 1.0, now: now)
         XCTAssertEqual(score, 0.85, accuracy: 0.0001, "0.6×1 + 0.3×0.5 + 0.1×1 应为 0.85")
     }
 
@@ -38,16 +47,18 @@ final class RecallEngineTests: XCTestCase {
         // 让 lastAccessedAt 远在过去使 recency→0（取 1 年前）
         let past = Date().addingTimeInterval(-365 * 24 * 60 * 60)
         memory.lastAccessedAt = past
+        let snapshot = MemoryRecallSnapshot(memory: memory)
         let now = Date()
-        let score = RecallEngine.computeFinalScore(memory: memory, similarity: 0.0, now: now)
+        let score = RecallEngine.computeFinalScore(memory: snapshot, similarity: 0.0, now: now)
         XCTAssertLessThan(score, 0.001, "全 0 输入应接近 0")
     }
 
     /// 用户主动记忆 recency 应恒为 1.0（不随时间衰减）
     func testUserExplicitMemoryNoDecay() {
         let memory = Memory(content: "用户主动", embedding: [1, 0], category: "preference", importance: 0.8, isUserExplicit: true)
+        let snapshot = MemoryRecallSnapshot(memory: memory)
         let now = Date()
-        let score = RecallEngine.computeFinalScore(memory: memory, similarity: 1.0, now: now)
+        let score = RecallEngine.computeFinalScore(memory: snapshot, similarity: 1.0, now: now)
         // 0.6×1 + 0.3×0.8 + 0.1×1 = 0.94
         XCTAssertEqual(score, 0.94, accuracy: 0.0001, "用户主动记忆 importance=0.8、recency=1.0、sim=1.0 应为 0.94")
     }
@@ -61,9 +72,9 @@ final class RecallEngineTests: XCTestCase {
         let memory = Memory(content: "测试", embedding: [1, 0], category: "context", importance: 0.5)
         let now = Date()
         // 30 天前访问（= 时间常数 τ）
-        let past = now.addingTimeInterval(-30 * 24 * 60 * 60)
-        memory.lastAccessedAt = past
-        let recency = RecallEngine.computeRecency(memory: memory, now: now)
+        memory.lastAccessedAt = now.addingTimeInterval(-30 * 24 * 60 * 60)
+        let snapshot = MemoryRecallSnapshot(memory: memory)
+        let recency = RecallEngine.computeRecency(memory: snapshot, now: now)
         // exp(-30/30) = exp(-1) ≈ 0.36787944117144233
         XCTAssertEqual(recency, 1.0 / Foundation.M_E, accuracy: 0.001, "τ=30天，Δt=τ 时 recency 应=exp(-1)≈0.3679")
     }
@@ -73,7 +84,8 @@ final class RecallEngineTests: XCTestCase {
         let memory = Memory(content: "测试", embedding: [1, 0], category: "context", importance: 0.5)
         let now = Date()
         memory.lastAccessedAt = now
-        let recency = RecallEngine.computeRecency(memory: memory, now: now)
+        let snapshot = MemoryRecallSnapshot(memory: memory)
+        let recency = RecallEngine.computeRecency(memory: snapshot, now: now)
         XCTAssertEqual(recency, 1.0, accuracy: 0.0001, "Δt=0 时 recency 应为 1.0")
     }
 
@@ -81,8 +93,9 @@ final class RecallEngineTests: XCTestCase {
     func testTimeDecayFallbackToCreatedAt() {
         let memory = Memory(content: "测试", embedding: [1, 0], category: "context", importance: 0.5)
         // createdAt 在 init 时已设置为 Date()，Δt 接近 0
+        let snapshot = MemoryRecallSnapshot(memory: memory)
         let now = Date()
-        let recency = RecallEngine.computeRecency(memory: memory, now: now)
+        let recency = RecallEngine.computeRecency(memory: snapshot, now: now)
         XCTAssertEqual(recency, 1.0, accuracy: 0.05, "无 lastAccessedAt 时回退到 createdAt，Δt≈0 时 recency≈1.0")
     }
 
@@ -95,6 +108,7 @@ final class RecallEngineTests: XCTestCase {
         // 使用不同 category 避免 dedupeByCategory 去重导致少返回
         let memoryA = Memory(content: "A", embedding: [1, 0], category: "context_a", importance: 0.9)
         let memoryB = Memory(content: "B", embedding: [0, 1], category: "context_b", importance: 0.1)
+        let memories = [memoryA, memoryB]
 
         // 注入预填充 BruteForceVectorStore
         let store = BruteForceVectorStore()
@@ -103,7 +117,8 @@ final class RecallEngineTests: XCTestCase {
         factory.setOverride(store)
 
         let engine = RecallEngine(vectorStoreFactory: factory)
-        let results = await engine.recall(query: [1, 0], memories: [memoryA, memoryB], limit: 2, now: now)
+        let ids = await engine.recall(query: [1, 0], memories: memories.map(MemoryRecallSnapshot.init(memory:)), limit: 2, now: now)
+        let results = resolve(ids, in: memories)
 
         XCTAssertEqual(results.count, 2)
         XCTAssertEqual(results.first?.content, "A", "高相似度高 importance 的记忆应排首位")
@@ -122,8 +137,8 @@ final class RecallEngineTests: XCTestCase {
         factory.setOverride(store)
 
         let engine = RecallEngine(vectorStoreFactory: factory)
-        let results = await engine.recall(query: [1, 0], memories: memories, limit: 2)
-        XCTAssertEqual(results.count, 2, "limit=2 应仅返回 2 条")
+        let ids = await engine.recall(query: [1, 0], memories: memories.map(MemoryRecallSnapshot.init(memory:)), limit: 2)
+        XCTAssertEqual(ids.count, 2, "limit=2 应仅返回 2 条")
     }
 
     /// recall 应按 category 去重，同类别仅保留最高分
@@ -132,15 +147,17 @@ final class RecallEngineTests: XCTestCase {
         let memoryA = Memory(content: "A", embedding: [1, 0], category: "preference", importance: 0.5)
         let memoryB = Memory(content: "B", embedding: [0.9, 0.1], category: "preference", importance: 0.5)
         let memoryC = Memory(content: "C", embedding: [0, 1], category: "fact", importance: 0.5)
+        let memories = [memoryA, memoryB, memoryC]
 
         let store = BruteForceVectorStore()
-        try await store.upsert(id: memoryA.id, embedding: memoryA.embedding, metadata: [:])
-        try await store.upsert(id: memoryB.id, embedding: memoryB.embedding, metadata: [:])
-        try await store.upsert(id: memoryC.id, embedding: memoryC.embedding, metadata: [:])
+        for m in memories {
+            try await store.upsert(id: m.id, embedding: m.embedding, metadata: [:])
+        }
         factory.setOverride(store)
 
         let engine = RecallEngine(vectorStoreFactory: factory)
-        let results = await engine.recall(query: [1, 0], memories: [memoryA, memoryB, memoryC], limit: 3)
+        let ids = await engine.recall(query: [1, 0], memories: memories.map(MemoryRecallSnapshot.init(memory:)), limit: 3)
+        let results = resolve(ids, in: memories)
 
         XCTAssertEqual(results.count, 2, "去重后应剩 2 条（preference + fact）")
         let categories = Set(results.map { $0.category })
@@ -152,20 +169,23 @@ final class RecallEngineTests: XCTestCase {
     func testRecallKeepsUserExplicitMemory() async throws {
         let userExplicit = Memory(content: "用户主动", embedding: [0.5, 0.5], category: "preference", importance: 0.8, isUserExplicit: true)
         let normal = Memory(content: "普通记忆", embedding: [1, 0], category: "context", importance: 0.5)
+        let memories = [userExplicit, normal]
 
         let store = BruteForceVectorStore()
-        try await store.upsert(id: userExplicit.id, embedding: userExplicit.embedding, metadata: [:])
-        try await store.upsert(id: normal.id, embedding: normal.embedding, metadata: [:])
+        for m in memories {
+            try await store.upsert(id: m.id, embedding: m.embedding, metadata: [:])
+        }
         factory.setOverride(store)
 
         let engine = RecallEngine(vectorStoreFactory: factory)
         // 查询与普通记忆更相似，但用户主动记忆有 importance 加成
-        let results = await engine.recall(query: [1, 0], memories: [userExplicit, normal], limit: 2)
+        let ids = await engine.recall(query: [1, 0], memories: memories.map(MemoryRecallSnapshot.init(memory:)), limit: 2)
+        let results = resolve(ids, in: memories)
         XCTAssertTrue(results.contains { $0.content == "用户主动" }, "用户主动记忆应出现在召回结果")
     }
 
-    /// recall 应更新 lastAccessedAt
-    func testRecallUpdatesLastAccessedAt() async throws {
+    /// recall 不得修改模型：lastAccessedAt 由调用方（主 actor 上的 SemanticMemoryStore）更新
+    func testRecallDoesNotMutateLastAccessedAt() async throws {
         let memory = Memory(content: "测试", embedding: [1, 0], category: "context", importance: 0.5)
         XCTAssertNil(memory.lastAccessedAt, "初始 lastAccessedAt 应为 nil")
 
@@ -174,40 +194,39 @@ final class RecallEngineTests: XCTestCase {
         factory.setOverride(store)
 
         let engine = RecallEngine(vectorStoreFactory: factory)
-        let now = Date()
-        _ = await engine.recall(query: [1, 0], memories: [memory], limit: 1, now: now)
+        _ = await engine.recall(query: [1, 0], memories: [MemoryRecallSnapshot(memory: memory)], limit: 1)
 
-        XCTAssertNotNil(memory.lastAccessedAt, "召回后 lastAccessedAt 应被设置")
-        let accessedAt = try XCTUnwrap(memory.lastAccessedAt, "lastAccessedAt 应非 nil")
-        XCTAssertEqual(accessedAt.timeIntervalSince1970, now.timeIntervalSince1970, accuracy: 0.001, "lastAccessedAt 应等于传入的 now")
+        XCTAssertNil(memory.lastAccessedAt, "召回引擎只处理快照，不应写回模型")
     }
 
     /// 空查询应返回空数组
     func testRecallWithEmptyQueryReturnsEmpty() async throws {
         let engine = RecallEngine(vectorStoreFactory: factory)
         let memory = Memory(content: "测试", embedding: [1, 0])
-        let results = await engine.recall(query: [], memories: [memory], limit: 5)
-        XCTAssertEqual(results, [], "空查询应返回空数组")
+        let ids = await engine.recall(query: [], memories: [MemoryRecallSnapshot(memory: memory)], limit: 5)
+        XCTAssertEqual(ids, [], "空查询应返回空数组")
     }
 
     /// 空记忆列表应返回空数组
     func testRecallWithEmptyMemoriesReturnsEmpty() async throws {
         let engine = RecallEngine(vectorStoreFactory: factory)
-        let results = await engine.recall(query: [1, 0], memories: [], limit: 5)
-        XCTAssertEqual(results, [], "空记忆列表应返回空数组")
+        let ids = await engine.recall(query: [1, 0], memories: [], limit: 5)
+        XCTAssertEqual(ids, [], "空记忆列表应返回空数组")
     }
 
     /// 无 embedding 的记忆应被跳过
     func testRecallSkipsMemoriesWithoutEmbedding() async throws {
         let noEmbed = Memory(content: "无向量", embedding: [], category: "context", importance: 0.5)
         let hasEmbed = Memory(content: "有向量", embedding: [1, 0], category: "context", importance: 0.5)
+        let memories = [noEmbed, hasEmbed]
 
         let store = BruteForceVectorStore()
         try await store.upsert(id: hasEmbed.id, embedding: hasEmbed.embedding, metadata: [:])
         factory.setOverride(store)
 
         let engine = RecallEngine(vectorStoreFactory: factory)
-        let results = await engine.recall(query: [1, 0], memories: [noEmbed, hasEmbed], limit: 5)
+        let ids = await engine.recall(query: [1, 0], memories: memories.map(MemoryRecallSnapshot.init(memory:)), limit: 5)
+        let results = resolve(ids, in: memories)
         XCTAssertEqual(results.count, 1, "应仅返回有 embedding 的记忆")
         XCTAssertEqual(results.first?.content, "有向量")
     }
@@ -220,7 +239,8 @@ final class RecallEngineTests: XCTestCase {
 
         let memory = Memory(content: "测试", embedding: [1, 0], category: "context", importance: 0.5)
         let engine = RecallEngine(vectorStoreFactory: factory)
-        let results = await engine.recall(query: [1, 0], memories: [memory], limit: 5)
+        let ids = await engine.recall(query: [1, 0], memories: [MemoryRecallSnapshot(memory: memory)], limit: 5)
+        let results = resolve(ids, in: [memory])
         XCTAssertEqual(results.count, 1, "VectorStore 空时应回退到暴力扫描，返回 1 条")
         XCTAssertEqual(results.first?.content, "测试")
     }

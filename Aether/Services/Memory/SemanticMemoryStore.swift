@@ -9,9 +9,10 @@ import Foundation
 /// Task 19 阶段 2: 对外接口不变，内部 recall 委托从 `MemoryService.recall` 改为 `RecallEngine`。
 /// RecallEngine 通过 VectorStore 取 ANN top-20 候选，再复合评分 + 同 category 去重取 top-5。
 ///
-/// 并发边界：两个依赖均为不可变 `let`（MemoryService 是 @MainActor 类型、RecallEngine 是 actor），
-/// 本类自身无可变状态，因此可安全地跨隔离域传递（Sendable）。
-final class SemanticMemoryStore: Sendable {
+/// 主 actor 隔离：SwiftData `Memory` 只能在所属上下文上访问，这里负责把模型拷贝成
+/// `MemoryRecallSnapshot` 交给 actor 化的 RecallEngine，再把返回的记忆 id 映射回模型并更新 `lastAccessedAt`。
+@MainActor
+final class SemanticMemoryStore {
     /// MemoryService 实例（用于生成 query embedding 与加载 SwiftData Memory）
     private let memoryService: MemoryService
     /// RecallEngine 实例（Task 19 阶段 2 引入）
@@ -37,10 +38,20 @@ final class SemanticMemoryStore: Sendable {
               !queryEmbedding.isEmpty else {
             return []
         }
-        // 2. 加载全部 Memory（活跃、未归档）作为候选
-        let allMemories = try await fetchActiveMemories()
-        // 3. 委托 RecallEngine 复合召回
-        return await recallEngine.recall(query: queryEmbedding, memories: allMemories, limit: limit)
+        // 2. 加载全部 Memory（活跃、未归档）并拷贝成 Sendable 快照
+        let activeMemories = try fetchActiveMemories()
+        guard !activeMemories.isEmpty else { return [] }
+        let snapshots = activeMemories.map(MemoryRecallSnapshot.init(memory:))
+        // 3. 委托 RecallEngine 复合召回（只返回 id，不跨隔离域持有模型）
+        let ids = await recallEngine.recall(query: queryEmbedding, memories: snapshots, limit: limit)
+        // 4. 主 actor 上映射回模型并刷新访问时间
+        let memoriesByID = Dictionary(uniqueKeysWithValues: activeMemories.map { ($0.id, $0) })
+        let now = Date()
+        return ids.compactMap { id in
+            guard let memory = memoriesByID[id] else { return nil }
+            memory.lastAccessedAt = now
+            return memory
+        }
     }
 
     /// 格式化记忆为 systemPrompt 注入文本。
@@ -75,9 +86,8 @@ final class SemanticMemoryStore: Sendable {
     }
 
     /// 加载所有活跃（未归档）的 Memory
-    private func fetchActiveMemories() async throws -> [Memory] {
+    private func fetchActiveMemories() throws -> [Memory] {
         // 仅加载未归档记忆（archivedAt == nil）
-        let active = try await MainActor.run { try memoryService.getAllMemories() }
-        return active.filter { $0.archivedAt == nil }
+        try memoryService.getAllMemories().filter { $0.archivedAt == nil }
     }
 }

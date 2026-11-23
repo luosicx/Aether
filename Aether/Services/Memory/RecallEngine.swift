@@ -1,5 +1,33 @@
 import Foundation
 
+/// 召回引擎的输入快照：把 SwiftData `Memory` 的值拷贝成 Sendable 值类型。
+///
+/// SwiftData 的 `@Model` 对象绑定在创建它的上下文（主 actor）上，跨隔离域读取属性
+/// 或写 `lastAccessedAt` 都可能与主线程访问竞争。RecallEngine 改为只处理快照，
+/// 召回结果返回记忆 id 列表，由调用方在主 actor 上映射回模型并更新访问时间。
+struct MemoryRecallSnapshot: Sendable, Equatable {
+    let id: UUID
+    let content: String
+    let category: String
+    let embedding: [Double]
+    let importance: Double
+    let createdAt: Date
+    let lastAccessedAt: Date?
+    let isUserExplicit: Bool
+
+    /// 从 SwiftData 模型拷贝。应在模型所属上下文（主 actor）上调用。
+    init(memory: Memory) {
+        id = memory.id
+        content = memory.content
+        category = memory.category
+        embedding = memory.embedding
+        importance = memory.importance
+        createdAt = memory.createdAt
+        lastAccessedAt = memory.lastAccessedAt
+        isUserExplicit = memory.isUserExplicit
+    }
+}
+
 /// Task 19 阶段 2: 复合召回引擎。
 ///
 /// 流程：VectorStore ANN top-20 候选 → 复合评分 → top-5 → 同 category 去重（保留最高分）。
@@ -42,19 +70,21 @@ actor RecallEngine {
     }
 
     /// 复合召回：ANN top-K 候选 → 复合评分 → top-5 → 同 category 去重。
+    ///
+    /// 引擎不修改记忆模型：`lastAccessedAt` 的更新由调用方在主 actor 上完成。
     /// - Parameters:
     ///   - query: 查询向量
-    ///   - memories: 所有候选 Memory（用于加载元数据与 importance/createdAt）
+    ///   - memories: 所有候选记忆快照（用于加载元数据与 importance/createdAt）
     ///   - limit: 返回条数上限，默认 5
     ///   - now: 当前时间（默认 Date()），便于测试注入
-    /// - Returns: 排序后的 Memory 数组（已更新 lastAccessedAt）
-    func recall(query: [Double], memories: [Memory], limit: Int = defaultResultLimit, now: Date = Date()) async -> [Memory] {
+    /// - Returns: 按复合评分降序排列的记忆 id 列表
+    func recall(query: [Double], memories: [MemoryRecallSnapshot], limit: Int = defaultResultLimit, now: Date = Date()) async -> [UUID] {
         guard !query.isEmpty, !memories.isEmpty else { return [] }
         // 1. 通过 VectorStore ANN 取 top-20 候选
         let candidates = await fetchCandidates(query: query, limit: Self.candidateLimit, memories: memories)
         if candidates.isEmpty {
             // VectorStore 不可用，回退到内存暴力扫描
-            return await bruteForceRecall(query: query, memories: memories, limit: limit, now: now)
+            return bruteForceRecall(query: query, memories: memories, limit: limit, now: now)
         }
         // 2. 复合评分
         let scored = candidates.map { (memory, sim) in
@@ -63,19 +93,14 @@ actor RecallEngine {
         // 3. 排序 + 同 category 去重（保留最高分）
         let deduped = dedupeByCategory(scored.sorted { $0.1 > $1.1 })
         // 4. 取 top-N
-        let topN = Array(deduped.prefix(limit))
-        // 5. 更新 lastAccessedAt
-        for (memory, _) in topN {
-            memory.lastAccessedAt = now
-        }
-        return topN.map { $0.0 }
+        return deduped.prefix(limit).map { $0.0.id }
     }
 
     // MARK: - 公开静态评分函数（便于单元测试）
 
     /// 计算复合评分：`0.6×sim + 0.3×importance + 0.1×recency`。
     /// 用户主动记忆 `recency` 恒为 1.0（不衰减）。
-    static func computeFinalScore(memory: Memory, similarity: Double, now: Date) -> Double {
+    static func computeFinalScore(memory: MemoryRecallSnapshot, similarity: Double, now: Date) -> Double {
         let importance = memory.importance
         let recency: Double
         if memory.isUserExplicit {
@@ -90,7 +115,7 @@ actor RecallEngine {
 
     /// 计算时间衰减权重：`recency = exp(-Δt/τ)`，半衰期 τ=30 天。
     /// Δt 基于 `lastAccessedAt`（若存在）或 `createdAt`。
-    static func computeRecency(memory: Memory, now: Date) -> Double {
+    static func computeRecency(memory: MemoryRecallSnapshot, now: Date) -> Double {
         let reference = memory.lastAccessedAt ?? memory.createdAt
         let delta = now.timeIntervalSince(reference)
         // Δt ≤ 0（未来时间）按 1.0 处理
@@ -100,9 +125,9 @@ actor RecallEngine {
 
     // MARK: - 内部辅助
 
-    /// 通过 VectorStore 取 top-K 候选，返回与 SwiftData Memory 的对齐列表。
+    /// 通过 VectorStore 取 top-K 候选，返回与快照对齐的列表。
     /// 注意：VectorStore 返回的相似度优先；若 VectorStore 不可用则返回空数组（调用方应回退到暴力扫描）。
-    private func fetchCandidates(query: [Double], limit: Int, memories: [Memory]) async -> [(Memory, Double)] {
+    private func fetchCandidates(query: [Double], limit: Int, memories: [MemoryRecallSnapshot]) async -> [(MemoryRecallSnapshot, Double)] {
         let store = await vectorStore
         do {
             let results = try await store.query(query, limit: limit)
@@ -118,24 +143,20 @@ actor RecallEngine {
     }
 
     /// 内存暴力扫描回退路径：计算每条记忆与查询的余弦相似度。
-    private func bruteForceRecall(query: [Double], memories: [Memory], limit: Int, now: Date) async -> [Memory] {
-        let scored = memories.compactMap { memory -> (Memory, Double)? in
+    private func bruteForceRecall(query: [Double], memories: [MemoryRecallSnapshot], limit: Int, now: Date) -> [UUID] {
+        let scored = memories.compactMap { memory -> (MemoryRecallSnapshot, Double)? in
             guard !memory.embedding.isEmpty else { return nil }
             let sim = BruteForceVectorStore.cosineSimilarity(query, memory.embedding)
             let score = Self.computeFinalScore(memory: memory, similarity: sim, now: now)
             return (memory, score)
         }
         let deduped = dedupeByCategory(scored.sorted { $0.1 > $1.1 })
-        let topN = Array(deduped.prefix(limit))
-        for (memory, _) in topN {
-            memory.lastAccessedAt = now
-        }
-        return topN.map { $0.0 }
+        return deduped.prefix(limit).map { $0.0.id }
     }
 
     /// 同 category 去重：保留每类别得分最高的记忆。
-    private func dedupeByCategory(_ scored: [(Memory, Double)]) -> [(Memory, Double)] {
-        var seen: [String: (Memory, Double)] = [:]
+    private func dedupeByCategory(_ scored: [(MemoryRecallSnapshot, Double)]) -> [(MemoryRecallSnapshot, Double)] {
+        var seen: [String: (MemoryRecallSnapshot, Double)] = [:]
         for (memory, score) in scored {
             if let existing = seen[memory.category], existing.1 >= score {
                 continue
