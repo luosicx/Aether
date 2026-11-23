@@ -10,7 +10,7 @@ final class SwiftDataMessageRepositoryTests: XCTestCase {
     private var context: ModelContext!
     private var repo: SwiftDataMessageRepository!
 
-    override func setUpWithError() throws {
+    override func setUp() async throws {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         container = try ModelContainer(
             for: Conversation.self, ChatMessage.self, UserPreference.self,
@@ -22,7 +22,7 @@ final class SwiftDataMessageRepositoryTests: XCTestCase {
         repo = SwiftDataMessageRepository(context: context)
     }
 
-    override func tearDownWithError() throws {
+    override func tearDown() async throws {
         repo = nil
         context = nil
         container = nil
@@ -232,7 +232,7 @@ final class SwiftDataConversationRepositoryTests: XCTestCase {
     private var context: ModelContext!
     private var repo: SwiftDataConversationRepository!
 
-    override func setUpWithError() throws {
+    override func setUp() async throws {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         container = try ModelContainer(
             for: Conversation.self, ChatMessage.self, UserPreference.self,
@@ -244,7 +244,7 @@ final class SwiftDataConversationRepositoryTests: XCTestCase {
         repo = SwiftDataConversationRepository(context: context)
     }
 
-    override func tearDownWithError() throws {
+    override func tearDown() async throws {
         repo = nil
         context = nil
         container = nil
@@ -387,7 +387,7 @@ final class SwiftDataMemoryRepositoryTests: XCTestCase {
     private var context: ModelContext!
     private var repo: SwiftDataMemoryRepository!
 
-    override func setUpWithError() throws {
+    override func setUp() async throws {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         container = try ModelContainer(
             for: Conversation.self, ChatMessage.self, UserPreference.self,
@@ -399,7 +399,7 @@ final class SwiftDataMemoryRepositoryTests: XCTestCase {
         repo = SwiftDataMemoryRepository(context: context)
     }
 
-    override func tearDownWithError() throws {
+    override func tearDown() async throws {
         repo = nil
         context = nil
         container = nil
@@ -488,7 +488,7 @@ final class SwiftDataDocumentRepositoryTests: XCTestCase {
     private var context: ModelContext!
     private var repo: SwiftDataDocumentRepository!
 
-    override func setUpWithError() throws {
+    override func setUp() async throws {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         container = try ModelContainer(
             for: Conversation.self, ChatMessage.self, UserPreference.self,
@@ -500,7 +500,7 @@ final class SwiftDataDocumentRepositoryTests: XCTestCase {
         repo = SwiftDataDocumentRepository(context: context)
     }
 
-    override func tearDownWithError() throws {
+    override func tearDown() async throws {
         repo = nil
         context = nil
         container = nil

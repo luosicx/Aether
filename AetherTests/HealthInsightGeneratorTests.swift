@@ -62,10 +62,9 @@ final class HealthInsightGeneratorTests: XCTestCase {
         context = ModelContext(container)
     }
 
-    override func tearDown() {
+    override func tearDown() async throws {
         container = nil
         context = nil
-        super.tearDown()
     }
 
     // MARK: - 测试用例

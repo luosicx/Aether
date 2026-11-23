@@ -10,6 +10,7 @@ import SwiftUI
 /// - 粒子位置在 0..<1 范围内
 /// - 粒子亮度/大小范围
 /// - 粒子漂移回绕逻辑（超过 1.0 回绕到 0.0）
+@MainActor
 final class StarfieldBackgroundViewTests: XCTestCase {
 
     // MARK: - 粒子初始化与数量

@@ -12,7 +12,7 @@ final class MemoryServiceTests: XCTestCase {
     private var service: MemoryService!
     private var vectorFactory: VectorStoreFactory!
 
-    override func setUpWithError() throws {
+    override func setUp() async throws {
         // 隔离 Keychain：使用内存后端，避免依赖真实系统 Keychain
         KeychainManager.shared.backend = InMemoryKeychainBackend()
         // 写入 Qwen API Key，使 MemoryService 能进入 embedding 分支
@@ -32,7 +32,7 @@ final class MemoryServiceTests: XCTestCase {
         service = MemoryService(modelContext: context, embeddingService: stub, vectorStoreFactory: vectorFactory)
     }
 
-    override func tearDownWithError() throws {
+    override func tearDown() async throws {
         service = nil
         vectorFactory = nil
         stub = nil

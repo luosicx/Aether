@@ -15,7 +15,7 @@ final class FeedbackCoordinatorTests: XCTestCase {
     private var container: ModelContainer!
     private var context: ModelContext!
 
-    override func setUpWithError() throws {
+    override func setUp() async throws {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         container = try ModelContainer(
             for: Conversation.self, ChatMessage.self, UserPreference.self,
@@ -25,7 +25,7 @@ final class FeedbackCoordinatorTests: XCTestCase {
         context = ModelContext(container)
     }
 
-    override func tearDownWithError() throws {
+    override func tearDown() async throws {
         context = nil
         container = nil
     }

@@ -18,11 +18,10 @@ final class MessageFeedbackTests: XCTestCase {
         storage = ChatStorage(modelContext: context)
     }
 
-    override func tearDown() {
+    override func tearDown() async throws {
         container = nil
         context = nil
         storage = nil
-        super.tearDown()
     }
 
     func testSaveFeedbackPersistsRecord() {

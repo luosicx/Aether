@@ -15,7 +15,7 @@ final class ForkTests: XCTestCase {
     private var context: ModelContext!
     private var storage: ChatStorage!
 
-    override func setUpWithError() throws {
+    override func setUp() async throws {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         container = try ModelContainer(
             for: Conversation.self, ChatMessage.self, UserPreference.self,
@@ -26,7 +26,7 @@ final class ForkTests: XCTestCase {
         storage = ChatStorage(modelContext: context)
     }
 
-    override func tearDownWithError() throws {
+    override func tearDown() async throws {
         storage = nil
         context = nil
         container = nil

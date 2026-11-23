@@ -15,7 +15,7 @@ final class ConversationListTests: XCTestCase {
     private var context: ModelContext!
     private var vm: ConversationListVM!
 
-    override func setUpWithError() throws {
+    override func setUp() async throws {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         container = try ModelContainer(
             for: Conversation.self, ChatMessage.self, UserPreference.self, DocumentChunk.self,
@@ -26,7 +26,7 @@ final class ConversationListTests: XCTestCase {
         vm.load(modelContext: context)
     }
 
-    override func tearDownWithError() throws {
+    override func tearDown() async throws {
         vm = nil
         context = nil
         container = nil

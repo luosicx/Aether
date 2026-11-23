@@ -17,7 +17,7 @@ final class SemanticMemoryStoreTests: XCTestCase {
     private var store: SemanticMemoryStore!
     private var vectorFactory: VectorStoreFactory!
 
-    override func setUpWithError() throws {
+    override func setUp() async throws {
         // 隔离 Keychain：使用内存后端
         KeychainManager.shared.backend = InMemoryKeychainBackend()
         // 写入 Qwen API Key，使 MemoryService 能进入 embedding 分支
@@ -41,7 +41,7 @@ final class SemanticMemoryStoreTests: XCTestCase {
         )
     }
 
-    override func tearDownWithError() throws {
+    override func tearDown() async throws {
         store = nil
         memoryService = nil
         vectorFactory = nil
