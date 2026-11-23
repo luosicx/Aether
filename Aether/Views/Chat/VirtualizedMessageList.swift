@@ -243,13 +243,16 @@ private struct _IOSVirtualizedList<Message: Identifiable & Hashable, Content: Vi
         if shouldScroll {
             let animated = scrollAnimated
             let coordinator = context.coordinator
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 coordinator.scrollToBottom(animated: animated)
             }
         }
     }
 
-    /// Coordinator：持有 content 闭包、footer 视图与 data source 引用
+    /// Coordinator：持有 content 闭包、footer 视图与 data source 引用。
+    /// @MainActor：UICollectionView / Diffable Data Source 均为主 actor 隔离，
+    /// Coordinator 只在 SwiftUI 主线程生命周期内使用。
+    @MainActor
     final class Coordinator {
         // 使用 var 以便 contentRefreshTrigger 变化时替换为最新闭包
         var content: (Message) -> Content

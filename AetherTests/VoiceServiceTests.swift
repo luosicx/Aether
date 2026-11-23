@@ -757,7 +757,7 @@ final class VoiceServiceTests: XCTestCase {
     // MARK: - deinit 资源释放
 
     /// 释放 VoiceService 应执行 deinit 清理且不崩溃。
-    /// 覆盖 deinit 中 synthesizer.delegate = nil 与 AVAudioSession setActive(false) 路径。
+    /// 覆盖 deinit 中音频拆除（含 AVAudioSession setActive(false)）路径。
     func testDeinitDoesNotCrash() {
         var service: VoiceService? = VoiceService()
         service = nil
@@ -784,7 +784,7 @@ final class VoiceServiceTests: XCTestCase {
 
     /// 新代码：deinit 中通过 Task { @MainActor } 异步清理。
     /// 此测试验证 deinit 后异步 Task 能正常执行（等待 Task 完成不崩溃）。
-    /// 覆盖 deinit 中 synthesizer.delegate = nil 与 AVAudioSession setActive(false) 路径。
+    /// 覆盖 deinit 中音频拆除（含 AVAudioSession setActive(false)）路径。
     func testDeinitAsyncTaskCompletesWithoutCrash() async throws {
         var service: VoiceService? = VoiceService()
         service?.speak("测试 deinit 异步清理")
@@ -796,8 +796,7 @@ final class VoiceServiceTests: XCTestCase {
     }
 
     /// 新代码：deinit 中 audioEngine 未运行时也应正常清理。
-    /// 验证 deinit Task 中 if audioEngine.isRunning == false 分支（跳过 stop/removeTap），
-    /// 仍执行 synthesizer.delegate = nil。
+    /// 验证 deinit 中 if audioEngine.isRunning == false 分支（跳过 stop/removeTap）仍正常完成。
     func testDeinitAudioEngineNotRunningAsyncCleanup() async throws {
         var service: VoiceService? = VoiceService()
         // 不调用 startRecording，audioEngine.isRunning == false

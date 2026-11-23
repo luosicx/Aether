@@ -1,5 +1,6 @@
 import AVFoundation
 import Foundation
+import os
 
 /// TTS 音色目录与查询工具。
 ///
@@ -14,7 +15,7 @@ import Foundation
 // MARK: - TTSVoice
 
 /// TTS 音色数据结构,封装 `AVSpeechSynthesisVoice` 的关键属性。
-struct TTSVoice: Identifiable, Hashable {
+struct TTSVoice: Identifiable, Hashable, Sendable {
     /// `AVSpeechSynthesisVoice.identifier`
     let id: String
     /// `AVSpeechSynthesisVoice.name`(如 "Tingting")
@@ -40,19 +41,23 @@ struct TTSVoice: Identifiable, Hashable {
 /// TTS 音色查询目录,提供静态方法访问系统音色。
 enum TTSVoiceCatalog {
 
-    /// 缓存的全部音色列表,首次调用 `allVoices()` 后填充。
-    /// 避免 macOS 上每次访问都同步调用 `AVSpeechSynthesisVoice.speechVoices()` 阻塞主线程。
-    private static var cachedVoices: [TTSVoice]?
+    /// 静态缓存状态。读写经锁保护：VoiceService（非隔离）与主线程 UI 可能并发调用。
+    private struct VoiceCache: Sendable {
+        /// 首次调用 `allVoices()` 后填充。
+        /// 避免 macOS 上每次访问都同步调用 `AVSpeechSynthesisVoice.speechVoices()` 阻塞主线程。
+        var all: [TTSVoice]?
+        /// 首次调用 `groupedByLanguage()` 后填充。
+        var grouped: [(language: String, voices: [TTSVoice])]?
+    }
 
-    /// 缓存的按语言分组结果,首次调用 `groupedByLanguage()` 后填充。
-    private static var cachedGrouped: [(language: String, voices: [TTSVoice])]?
+    private static let cache = OSAllocatedUnfairLock(initialState: VoiceCache())
 
     /// 获取所有可用音色,从 `AVSpeechSynthesisVoice.speechVoices()` 转换。
     /// 过滤掉 identifier 为空的项。
     /// 注:speechVoices() 返回的列表本身即为设备已安装的音色,isDownloaded 默认 true。
     /// 结果会被静态缓存,如需刷新调用 `reloadVoices()`。
     static func allVoices() -> [TTSVoice] {
-        if let cached = cachedVoices {
+        if let cached = cache.withLock({ $0.all }) {
             return cached
         }
         let voices = AVSpeechSynthesisVoice.speechVoices()
@@ -66,7 +71,7 @@ enum TTSVoiceCatalog {
                     isDownloaded: true
                 )
             }
-        cachedVoices = voices
+        cache.withLock { $0.all = voices }
         return voices
     }
 
@@ -80,7 +85,7 @@ enum TTSVoiceCatalog {
     ///
     /// 结果会被静态缓存,如需刷新调用 `reloadVoices()`。
     static func groupedByLanguage() -> [(language: String, voices: [TTSVoice])] {
-        if let cached = cachedGrouped {
+        if let cached = cache.withLock({ $0.grouped }) {
             return cached
         }
         let groups = Dictionary(grouping: allVoices(), by: { $0.language })
@@ -94,15 +99,14 @@ enum TTSVoiceCatalog {
         }.map { language in
             (language: language, voices: groups[language] ?? [])
         }
-        cachedGrouped = grouped
+        cache.withLock { $0.grouped = grouped }
         return grouped
     }
 
     /// 清空 `allVoices()` 与 `groupedByLanguage()` 的静态缓存。
     /// 适用于用户下载/删除系统音色后需要重新加载的场景。
     static func reloadVoices() {
-        cachedVoices = nil
-        cachedGrouped = nil
+        cache.withLock { $0 = VoiceCache() }
     }
 
     /// 根据 identifier 返回可读名称(如 "Tingting(zh-CN)")。

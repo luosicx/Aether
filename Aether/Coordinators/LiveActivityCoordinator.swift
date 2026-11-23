@@ -60,4 +60,9 @@ final class LiveActivityCoordinator: Coordinator {
         self.activity = nil
     }
 }
+
+/// ActivityKit 的 `Activity` 是系统管理的状态句柄，Apple 文档允许在任意线程调用
+/// `update` / `end`；但 SDK 未标注 Sendable，主 actor 上持有并传给 `@concurrent`
+/// 方法时会触发 sending 告警。此处按官方线程安全语义补上 @unchecked Sendable。
+extension Activity: @retroactive @unchecked Sendable {}
 #endif

@@ -405,19 +405,21 @@ actor OnDeviceModelDownloader {
 }
 
 /// 下载代理：非 isolated 类，在 URLSession 后台队列回调，通过 async 闭包 hop 回 actor 更新状态。
-private final class DownloadDelegate: NSObject, URLSessionDownloadDelegate {
+/// Sendable 用 @unchecked：URLSession 用默认 delegateQueue（串行 OperationQueue）回调，
+/// 所有回调与 doneFired 读写都在同一串行队列上，不会并发访问。
+private final class DownloadDelegate: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
     /// 下载完成后的本地保存路径
     private let destinationURL: URL
     /// 进度回调（async，经 Task hop 回 actor）
-    private let onProgress: (Double) async -> Void
+    private let onProgress: @Sendable (Double) async -> Void
     /// 完成回调（success 携带文件路径，failure 携带错误）
-    private let onDone: (Result<URL, Error>) async -> Void
+    private let onDone: @Sendable (Result<URL, Error>) async -> Void
     /// 标记是否已回调过 onDone，避免 didFinish 与 didComplete 双触发
     private var doneFired = false
 
     init(destinationURL: URL,
-         onProgress: @escaping (Double) async -> Void,
-         onDone: @escaping (Result<URL, Error>) async -> Void) {
+         onProgress: @escaping @Sendable (Double) async -> Void,
+         onDone: @escaping @Sendable (Result<URL, Error>) async -> Void) {
         self.destinationURL = destinationURL
         self.onProgress = onProgress
         self.onDone = onDone

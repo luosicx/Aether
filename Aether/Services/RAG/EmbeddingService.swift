@@ -2,8 +2,11 @@ import Foundation
 import AetherFoundation
 import AetherServices
 
-/// 嵌入服务，封装 LLMProvider 的 embed 能力，提供批量分片聚合
-class EmbeddingService {
+/// 嵌入服务，封装 LLMProvider 的 embed 能力，提供批量分片聚合。
+///
+/// Sendable 用 @unchecked：唯一存储属性是不可变且 Sendable 的 client；
+/// 保留非 final 供测试子类化注入 stub（stub 无共享可变状态）。
+class EmbeddingService: @unchecked Sendable {
     /// LLMProvider 实例（注意：class 非 final，允许测试子类化注入 stub）
     private let client: LLMProvider
 
