@@ -354,6 +354,7 @@
 		AABBCC000000000000000122 /* MCPServerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCC000000000000000121 /* MCPServerTests.swift */; };
 		AABBCC000000000000000202 /* KeyPathSendable.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCC000000000000000201 /* KeyPathSendable.swift */; };
 		AABBCC000000000000000203 /* KeyPathSendable.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCC000000000000000201 /* KeyPathSendable.swift */; };
+		AABBCC000000000000000204 /* KeyPathSendable.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCC000000000000000201 /* KeyPathSendable.swift */; };
 		CAFEBABE000000000000B002 /* MCPErrorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFEBABE000000000000B001 /* MCPErrorTests.swift */; };
 		AABBCCDDEEFF001122334457 /* TelemetrySanitizerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDDEEFF001122334458 /* TelemetrySanitizerTests.swift */; };
 		ABCDEF00000000000000000B /* MCPClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF00000000000000000A /* MCPClientTests.swift */; };
@@ -3019,6 +3020,7 @@
 				B1FD28B97E1DFC80DF6D04DA /* DocumentChunk.swift in Sources */,
 				3C9E92BE0322159A79BF0AB2 /* MessageFeedback.swift in Sources */,
 				3FB5DC6E3F012B35C7B139CA /* AppGroupContainer.swift in Sources */,
+				AABBCC000000000000000204 /* KeyPathSendable.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
