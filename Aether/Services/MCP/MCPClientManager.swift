@@ -461,12 +461,12 @@ final class MCPClientManager {
     /// - Parameters:
     ///   - serverID: Server 唯一标识
     ///   - name: 提示模板名
-    ///   - arguments: 模板参数
+    ///   - arguments: 模板参数（`sending`：所有权转交客户端请求，不再保留引用）
     /// - Returns: 过滤结果（sanitized 内容 + blocked 标志 + 命中原因）
     func getSanitizedPrompt(
         serverID: String,
         name: String,
-        arguments: [String: Any]
+        arguments: sending [String: Any]
     ) async -> (sanitized: String, blocked: Bool, reason: String?) {
         guard let client = clients[serverID] else {
             return ("", true, "Server 未连接")
