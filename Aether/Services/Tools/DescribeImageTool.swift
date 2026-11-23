@@ -24,7 +24,7 @@ final class DescribeImageTool: ToolProtocol, @unchecked Sendable {
     }
 
     @MainActor
-    func execute(arguments: [String: Any]) async throws -> String {
+    func execute(arguments: sending [String: Any]) async throws -> String {
         guard let imagePath = arguments["image_path"] as? String, !imagePath.isEmpty else {
             return "错误：请提供 image_path 参数"
         }

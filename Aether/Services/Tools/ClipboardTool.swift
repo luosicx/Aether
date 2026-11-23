@@ -32,7 +32,7 @@ final class ReadClipboardTool: ToolProtocol, @unchecked Sendable {
     /// - Returns: 剪贴板文本内容，为空时返回 "剪贴板为空"
     /// - Throws: 不抛异常
     @MainActor
-    func execute(arguments _: [String: Any]) async throws -> String {
+    func execute(arguments _: sending [String: Any]) async throws -> String {
         #if os(iOS)
         let content = UIPasteboard.general.string ?? ""
         #else
@@ -70,7 +70,7 @@ final class WriteClipboardTool: ToolProtocol, @unchecked Sendable {
     /// - Returns: 成功返回 "已复制到剪贴板"，失败返回错误信息
     /// - Throws: 不抛异常，错误以字符串形式返回
     @MainActor
-    func execute(arguments: [String: Any]) async throws -> String {
+    func execute(arguments: sending [String: Any]) async throws -> String {
         guard let text = arguments["text"] as? String, !text.isEmpty else {
             return "错误：请提供要写入的文本"
         }

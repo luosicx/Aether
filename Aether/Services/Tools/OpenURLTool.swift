@@ -41,7 +41,7 @@ final class OpenURLTool: ToolProtocol, @unchecked Sendable {
     /// - Returns: 成功返回 "已打开"，失败返回错误信息字符串
     /// - Throws: 不抛异常，错误以字符串形式返回
     @MainActor
-    func execute(arguments: [String: Any]) async throws -> String {
+    func execute(arguments: sending [String: Any]) async throws -> String {
         guard let urlString = arguments["url"] as? String, !urlString.isEmpty else {
             return "错误：请提供 URL"
         }

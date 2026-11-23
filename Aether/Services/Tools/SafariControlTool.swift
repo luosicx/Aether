@@ -61,7 +61,7 @@ final class SafariControlTool: ToolProtocol, @unchecked Sendable {
     /// - Returns: 操作结果字符串，或错误信息
     /// - Throws: 不抛异常，错误以字符串形式返回
     @MainActor
-    func execute(arguments: [String: Any]) async throws -> String {
+    func execute(arguments: sending [String: Any]) async throws -> String {
         guard let action = arguments["action"] as? String else {
             return "错误：请提供 action 参数"
         }

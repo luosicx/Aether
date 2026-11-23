@@ -33,7 +33,7 @@ final class ScreenshotTool: ToolProtocol, @unchecked Sendable {
     /// - Returns: 成功返回 PNG 文件路径，失败返回错误信息字符串
     /// - Throws: 不抛异常，错误以字符串形式返回
     @MainActor
-    func execute(arguments: [String: Any]) async throws -> String {
+    func execute(arguments: sending [String: Any]) async throws -> String {
         // 确定目标显示器 ID，未指定时使用主显示器
         let displayID: CGDirectDisplayID
         if let id = arguments["display_id"] as? Int {

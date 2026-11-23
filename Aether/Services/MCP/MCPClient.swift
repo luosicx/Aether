@@ -167,7 +167,7 @@ actor MCPClient: MCPClientProtocol {
     ///   - name: 工具名
     ///   - arguments: 工具参数
     /// - Returns: 工具调用结果（content + isError）
-    func callTool(name: String, arguments: [String: Any]) async throws -> MCPToolCallResult {
+    func callTool(name: String, arguments: sending [String: Any]) async throws -> MCPToolCallResult {
         let params: [String: Any] = [
             "name": name,
             "arguments": arguments
@@ -199,7 +199,7 @@ actor MCPClient: MCPClientProtocol {
     ///   - name: 提示模板名
     ///   - arguments: 参数
     /// - Returns: 提示模板结果（description + messages）
-    func getPrompt(name: String, arguments: [String: Any]) async throws -> MCPPromptResult {
+    func getPrompt(name: String, arguments: sending [String: Any]) async throws -> MCPPromptResult {
         let params: [String: Any] = [
             "name": name,
             "arguments": arguments

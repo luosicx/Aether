@@ -28,7 +28,7 @@ final class GenerateImageTool: ToolProtocol, @unchecked Sendable {
     }
 
     @MainActor
-    func execute(arguments: [String: Any]) async throws -> String {
+    func execute(arguments: sending [String: Any]) async throws -> String {
         guard let prompt = arguments["prompt"] as? String, !prompt.isEmpty else {
             return "错误：请提供 prompt 参数"
         }

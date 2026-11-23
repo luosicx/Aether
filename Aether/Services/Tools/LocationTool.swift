@@ -47,7 +47,7 @@ final class LocationTool: ToolProtocol, @unchecked Sendable {
     /// 2) 未授权返回提示；3) 成功后用 CLGeocoder 反查地址；
     /// 4) 拼装格式化字符串返回。用户可见错误以字符串返回而非抛错。
     @MainActor
-    func execute(arguments _: [String: Any]) async throws -> String {
+    func execute(arguments _: sending [String: Any]) async throws -> String {
         let fetcher = LocationFetcher()
         let location: CLLocation
         do {

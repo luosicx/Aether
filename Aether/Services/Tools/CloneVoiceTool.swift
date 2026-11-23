@@ -24,7 +24,7 @@ final class CloneVoiceTool: ToolProtocol, @unchecked Sendable {
     }
 
     @MainActor
-    func execute(arguments: [String: Any]) async throws -> String {
+    func execute(arguments: sending [String: Any]) async throws -> String {
         guard let audioPath = arguments["audio_path"] as? String, !audioPath.isEmpty else {
             return "错误：请提供 audio_path 参数"
         }
