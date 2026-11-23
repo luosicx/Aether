@@ -3,7 +3,8 @@ import AetherFoundation
 
 /// Day 18: AppIntent 专用对话服务，使 Shortcuts/Siri 能在无 ViewModel 上下文时发起对话。
 /// nonisolated 设计允许跨 actor 调用（AppIntent perform 在后台执行）。
-public final class IntentChatService {
+/// 注入依赖在 init 后不可变：shared 不持有闭包，测试实例不跨任务共享。
+public final class IntentChatService: @unchecked Sendable {
     /// 单例，AppIntent 直接调用
     public static let shared = IntentChatService()
 

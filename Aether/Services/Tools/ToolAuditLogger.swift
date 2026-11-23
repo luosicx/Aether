@@ -3,7 +3,8 @@ import os
 
 /// 工具调用审计日志器。
 /// 记录每次工具调用的工具名、授权状态、时间戳以及参数键摘要（不记录完整敏感内容）。
-final class ToolAuditLogger {
+/// 全部属性在 init 后不可变，ISO8601DateFormatter 本身线程安全，可跨线程共享。
+final class ToolAuditLogger: @unchecked Sendable {
     static let shared = ToolAuditLogger()
 
     private let logQueue = DispatchQueue(label: "com.aether.toolauditlogger", qos: .utility)
