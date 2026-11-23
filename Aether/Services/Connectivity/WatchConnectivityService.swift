@@ -14,7 +14,8 @@ import WatchConnectivity
 /// P1-6: 原实现 `var activeConversationId: UUID?` 跨 actor 读写无同步保护。
 /// WCSessionDelegate 回调可能在后台线程触发，与主线程 UI 调用并发写入存在数据竞争。
 /// 用 `OSAllocatedUnfairLock` 包裹 activeConversationId（UUID? 是 Sendable，符合锁约束）。
-final class WatchConnectivityService: NSObject, WCSessionDelegate {
+/// 唯一的可变状态 activeConversationId 已由 OSAllocatedUnfairLock 保护，可跨线程共享。
+final class WatchConnectivityService: NSObject, WCSessionDelegate, @unchecked Sendable {
     /// 单例
     static let shared = WatchConnectivityService()
 

@@ -17,7 +17,7 @@ import Security
 ///
 /// P1-10 (H-S4): 原实现 `isEnabled = false` 默认关闭，导致 Memory 数据明文存储在磁盘上，
 /// 设备丢失或被入侵时存在隐私泄露风险。现改为默认启用，并在 init 中自动调用 enable()。
-final class EncryptionLayer {
+final class EncryptionLayer: @unchecked Sendable {
     /// Keychain 中保存主密钥的 account key
     static let keychainAccount = "aether.memory.encryption.key"
 
@@ -27,11 +27,25 @@ final class EncryptionLayer {
     /// Keychain 管理器（生产用 KeychainManager.shared，测试可注入）
     private let keychain: KeychainManager
 
-    /// 是否已启用加密（默认启用，init 中尝试加载/生成密钥；失败时回退为 false）
-    private(set) var isEnabled: Bool = true
+    /// 加解密可能在后台任务中并发调用，启用状态与主密钥统一由 NSLock 保护
+    private struct State {
+        var isEnabled = true
+        var key: SymmetricKey?
+    }
 
-    /// 当前主密钥（启用后加载）
-    private var key: SymmetricKey?
+    private let stateLock = NSLock()
+    private var state = State()
+
+    private func withState<T>(_ body: (inout State) -> T) -> T {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        return body(&state)
+    }
+
+    /// 是否已启用加密（默认启用，init 中尝试加载/生成密钥；失败时回退为 false）
+    var isEnabled: Bool {
+        withState { $0.isEnabled }
+    }
 
     /// 创建 EncryptionLayer 实例
     /// - Parameter keychain: Keychain 管理器，nil 时使用单例
@@ -43,7 +57,7 @@ final class EncryptionLayer {
         self.keychain = keychain
         if !enable() {
             // Keychain 不可用时降级为禁用，避免后续 encrypt 抛错
-            self.isEnabled = false
+            withState { $0.isEnabled = false }
         }
     }
 
@@ -55,8 +69,7 @@ final class EncryptionLayer {
     func enable() -> Bool {
         // 1. 尝试加载已存在的密钥
         if let existingKey = loadKeyFromKeychain() {
-            self.key = existingKey
-            self.isEnabled = true
+            withState { $0.key = existingKey; $0.isEnabled = true }
             return true
         }
         // 2. 生成新密钥（256-bit）
@@ -64,8 +77,7 @@ final class EncryptionLayer {
         // 3. 保存到 Keychain
         do {
             try saveKeyToKeychain(newKey)
-            self.key = newKey
-            self.isEnabled = true
+            withState { $0.key = newKey; $0.isEnabled = true }
             return true
         } catch {
             return false
@@ -74,8 +86,7 @@ final class EncryptionLayer {
 
     /// 禁用加密（不清除已加密数据，密钥仍保留在 Keychain）
     func disable() {
-        isEnabled = false
-        key = nil
+        withState { $0.isEnabled = false; $0.key = nil }
     }
 
     // MARK: - 加密 / 解密
@@ -85,7 +96,8 @@ final class EncryptionLayer {
     /// - Returns: 加密后的 sealed box 序列化数据
     /// - Throws: 加密未启用或加密失败
     func encrypt(_ data: Data) throws -> Data {
-        guard isEnabled, let key = key else {
+        let activeKey: SymmetricKey? = withState { $0.isEnabled ? $0.key : nil }
+        guard let key = activeKey else {
             throw EncryptionError.encryptionNotEnabled
         }
         let sealedBox = try AES.GCM.seal(data, using: key)
@@ -102,7 +114,8 @@ final class EncryptionLayer {
     /// - Throws: 解密失败或密钥不可用
     func decrypt(_ data: Data) throws -> Data {
         // 解密允许在禁用状态下进行（用于读取历史加密数据）
-        guard let key = key ?? loadKeyFromKeychain() else {
+        let cachedKey: SymmetricKey? = withState { $0.key }
+        guard let key = cachedKey ?? loadKeyFromKeychain() else {
             throw EncryptionError.keyNotAvailable
         }
         let sealedBox = try AES.GCM.SealedBox(combined: data)
@@ -155,8 +168,7 @@ final class EncryptionLayer {
     /// 清除主密钥（用于测试或用户重置）
     func clearKey() {
         keychain.delete(key: Self.keychainAccount)
-        key = nil
-        isEnabled = false
+        withState { $0.key = nil; $0.isEnabled = false }
     }
 }
 
