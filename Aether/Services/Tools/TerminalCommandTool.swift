@@ -4,7 +4,21 @@
 /// 内置命令解析器：按空格分词、支持简单引号、拒绝 shell 元字符与路径遍历。
 /// 调用方式：execute(arguments: ["command": "..."])，command 为必填参数。
 import Foundation
+@preconcurrency import Dispatch
 import AetherFoundation
+
+/// Process 与超时工作项在 GCD 队列间共享的包装。
+/// `Process` / `DispatchWorkItem` 由 GCD 文档保证线程安全（terminate/cancel 可跨队列调用），
+/// 但 SDK 未标注 Sendable，故此处显式声明。
+private final class ProcessRunBox: @unchecked Sendable {
+    let process: Process
+    let timeoutWorkItem: DispatchWorkItem
+
+    init(process: Process, timeoutWorkItem: DispatchWorkItem) {
+        self.process = process
+        self.timeoutWorkItem = timeoutWorkItem
+    }
+}
 
 /// macOS 命令行执行工具，仅执行白名单内的命令并返回输出
 final class TerminalCommandTool: ToolProtocol, @unchecked Sendable {
@@ -182,12 +196,13 @@ final class TerminalCommandTool: ToolProtocol, @unchecked Sendable {
                     process.terminate()
                 }
             }
-            DispatchQueue.global().asyncAfter(deadline: .now() + 30, execute: timeoutWorkItem)
+            let runBox = ProcessRunBox(process: process, timeoutWorkItem: timeoutWorkItem)
+            DispatchQueue.global().asyncAfter(deadline: .now() + 30, execute: runBox.timeoutWorkItem)
 
             // 等待进程结束，读取 stdout/stderr 并合并
             DispatchQueue.global().async {
-                process.waitUntilExit()
-                timeoutWorkItem.cancel()
+                runBox.process.waitUntilExit()
+                runBox.timeoutWorkItem.cancel()
                 let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
                 let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
                 var output = ""
