@@ -14,6 +14,11 @@ import AetherFoundation
 /// 2. 从尾部倒序保留近期消息，直到达到预算的 70%（留 30% 给摘要）。
 /// 3. 保留区之前的旧消息中，重要消息原样保留，非重要消息合并生成摘要。
 /// 4. 返回 [摘要system消息] + [重要旧消息] + [近期消息]。
+///
+/// 并发边界：SwiftData 的 ChatMessage 模型只能在创建它的上下文（主 actor）上访问，
+/// 因此本类标注 `@MainActor`——压缩过程中的 token 估算与摘要拼接都在主 actor 完成，
+/// 避免把消息模型发送到 `@concurrent` 上下文。
+@MainActor
 final class ContextWindowManager {
     /// LLMProvider，用于生成摘要
     private let llmProvider: LLMProvider

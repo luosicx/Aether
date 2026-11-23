@@ -8,7 +8,10 @@ import Foundation
 ///
 /// Task 19 阶段 2: 对外接口不变，内部 recall 委托从 `MemoryService.recall` 改为 `RecallEngine`。
 /// RecallEngine 通过 VectorStore 取 ANN top-20 候选，再复合评分 + 同 category 去重取 top-5。
-final class SemanticMemoryStore {
+///
+/// 并发边界：两个依赖均为不可变 `let`（MemoryService 是 @MainActor 类型、RecallEngine 是 actor），
+/// 本类自身无可变状态，因此可安全地跨隔离域传递（Sendable）。
+final class SemanticMemoryStore: Sendable {
     /// MemoryService 实例（用于生成 query embedding 与加载 SwiftData Memory）
     private let memoryService: MemoryService
     /// RecallEngine 实例（Task 19 阶段 2 引入）
