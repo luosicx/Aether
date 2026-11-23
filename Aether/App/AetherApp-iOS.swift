@@ -116,12 +116,13 @@ struct AetherApp: App {
     }
 
     nonisolated static func handleTelemetryUpload(task: BGAppRefreshTask) {
+        let completion = BGTaskCompletionBox(task)
         task.expirationHandler = {
             Logger.app.warning("遥测上报任务即将过期")
         }
         Task {
             await LogUploader.shared.uploadIfNeeded()
-            task.setTaskCompleted(success: true)
+            completion.setTaskCompleted(success: true)
             scheduleTelemetryUpload()
         }
     }
@@ -145,9 +146,10 @@ struct AetherApp: App {
     }
 
     nonisolated static func handleHealthInsight(task: BGAppRefreshTask) {
+        let completion = BGTaskCompletionBox(task)
         task.expirationHandler = {
             Logger.app.warning("健康洞察任务即将过期")
-            task.setTaskCompleted(success: false)
+            completion.setTaskCompleted(success: false)
         }
         // P1-1/P1-2: HealthInsightGenerator 已标注 @MainActor（ModelContext 非 Sendable，
         // 必须在创建它的 actor 上访问）。BGTask 在后台线程触发，故用 `Task { @MainActor in ... }`
@@ -163,13 +165,27 @@ struct AetherApp: App {
                 let generator = HealthInsightGenerator.make(modelContext: context)
                 let insight = try await generator.generateInsight(days: 7)
                 generator.sendInsightNotification(insight)
-                task.setTaskCompleted(success: true)
+                completion.setTaskCompleted(success: true)
             } catch {
                 Logger.app.error("健康洞察生成失败: \(error.localizedDescription, privacy: .public)")
-                task.setTaskCompleted(success: false)
+                completion.setTaskCompleted(success: false)
             }
             scheduleHealthInsight()
         }
+    }
+}
+
+/// BGAppRefreshTask 本身不是 Sendable，但 BGTask.setTaskCompleted 允许在任意线程调用；
+/// 用它包一层，让后台 Task / expirationHandler 可以安全地跨线程完成任务。
+final class BGTaskCompletionBox: @unchecked Sendable {
+    private let task: BGAppRefreshTask
+
+    init(_ task: BGAppRefreshTask) {
+        self.task = task
+    }
+
+    func setTaskCompleted(success: Bool) {
+        task.setTaskCompleted(success: success)
     }
 }
 

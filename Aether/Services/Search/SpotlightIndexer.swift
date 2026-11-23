@@ -28,25 +28,25 @@ final class SpotlightIndexer: ConversationIndexer {
             domainIdentifier: "com.aether.conversations",
             attributeSet: attributes
         )
-        CSSearchableIndex.default().indexSearchableItems([item]) { error in
-            if let error = error { Logger.storage.error("Spotlight index error: \(error.localizedDescription, privacy: .public)") }
+        do {
+            try await CSSearchableIndex.default().indexSearchableItems([item])
+        } catch {
+            Logger.storage.error("Spotlight index error: \(error.localizedDescription, privacy: .public)")
         }
     }
 
     /// 从索引中移除指定会话
     /// - Parameter conversationId: 会话唯一标识
     func remove(conversationId: UUID) async {
-        CSSearchableIndex.default().deleteSearchableItems(
+        // 删除失败可忽略（下次启动会重新索引）
+        try? await CSSearchableIndex.default().deleteSearchableItems(
             withIdentifiers: [conversationId.uuidString]
-        ) { _ in
-            // 删除完成回调，错误可忽略（下次启动会重新索引）
-        }
+        )
     }
 
     /// 清空所有以太会话索引
     func removeAll() async {
-        CSSearchableIndex.default().deleteAllSearchableItems { _ in
-            // 全部删除完成回调，错误可忽略（下次启动会重新索引）
-        }
+        // 全部删除失败可忽略（下次启动会重新索引）
+        try? await CSSearchableIndex.default().deleteAllSearchableItems()
     }
 }

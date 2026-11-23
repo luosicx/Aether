@@ -223,7 +223,11 @@ final class CreateShortcutTool: ToolProtocol, @unchecked Sendable {
             #if os(macOS)
             NSWorkspace.shared.open(URL(fileURLWithPath: filePath))
             #else
-            await UIApplication.shared.open(URL(fileURLWithPath: filePath))
+            // options 字典非 Sendable，在主 actor 闭包内构造，避免从非隔离上下文发送
+            let url = URL(fileURLWithPath: filePath)
+            await MainActor.run {
+                UIApplication.shared.open(url, options: [:], completionHandler: nil)
+            }
             #endif
             return "已创建快捷指令：\(name)，请在 Shortcuts 应用中确认保存"
         } catch {
