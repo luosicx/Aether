@@ -352,6 +352,8 @@
 		AABBCC000000000000000112 /* MCPServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCC000000000000000111 /* MCPServer.swift */; };
 		AABBCC000000000000000113 /* MCPServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCC000000000000000111 /* MCPServer.swift */; };
 		AABBCC000000000000000122 /* MCPServerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCC000000000000000121 /* MCPServerTests.swift */; };
+		AABBCC000000000000000202 /* KeyPathSendable.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCC000000000000000201 /* KeyPathSendable.swift */; };
+		AABBCC000000000000000203 /* KeyPathSendable.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCC000000000000000201 /* KeyPathSendable.swift */; };
 		CAFEBABE000000000000B002 /* MCPErrorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAFEBABE000000000000B001 /* MCPErrorTests.swift */; };
 		AABBCCDDEEFF001122334457 /* TelemetrySanitizerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCCDDEEFF001122334458 /* TelemetrySanitizerTests.swift */; };
 		ABCDEF00000000000000000B /* MCPClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABCDEF00000000000000000A /* MCPClientTests.swift */; };
@@ -902,6 +904,7 @@
 		AABBCC000000000000000101 /* MCPServerProtocol.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MCPServerProtocol.swift; sourceTree = "<group>"; };
 		AABBCC000000000000000111 /* MCPServer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MCPServer.swift; sourceTree = "<group>"; };
 		AABBCC000000000000000121 /* MCPServerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MCPServerTests.swift; sourceTree = "<group>"; };
+		AABBCC000000000000000201 /* KeyPathSendable.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeyPathSendable.swift; sourceTree = "<group>"; };
 		CAFEBABE000000000000B001 /* MCPErrorTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MCPErrorTests.swift; sourceTree = "<group>"; };
 		AABBCCDDEEFF001122334456 /* TelemetrySanitizer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TelemetrySanitizer.swift; sourceTree = "<group>"; };
 		AABBCCDDEEFF001122334458 /* TelemetrySanitizerTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TelemetrySanitizerTests.swift; sourceTree = "<group>"; };
@@ -2316,6 +2319,7 @@
 		EE11AFEE303A2390AFAD7CCB /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				AABBCC000000000000000201 /* KeyPathSendable.swift */,
 				6F2454FB5EEC8FACCAB4256E /* Constants */,
 				6F4CD6487479C10463C758AF /* Extensions */,
 				58DF6D5979D5F1867117F56B /* Actors */,
@@ -2769,6 +2773,7 @@
 				322B44909B0F845A2E523467 /* SettingsSection.swift in Sources */,
 				8F1B40B296F429D364873B8B /* DebugPanelView.swift in Sources */,
 				8F14495FA0200F9087C6C3C3 /* DebugInfo.swift in Sources */,
+				AABBCC000000000000000202 /* KeyPathSendable.swift in Sources */,
 				396E45F3A44E18B77077EBF9 /* PluginMarketplaceService.swift in Sources */,
 				16F940B8B43269F1912CD0A2 /* PluginToolRegistryBridge.swift in Sources */,
 				0E6B41F9BBC3B9D0A141C764 /* PluginMarketplaceView.swift in Sources */,
@@ -3155,6 +3160,7 @@
 				660147C186609BF050D4CF49 /* SettingsSection.swift in Sources */,
 				D3214EAB92BFCAD6FD4039F9 /* DebugPanelView.swift in Sources */,
 				0C514B259B5F641A79B2C402 /* DebugInfo.swift in Sources */,
+				AABBCC000000000000000203 /* KeyPathSendable.swift in Sources */,
 				A040413A86CB301C83DD896D /* PluginMarketplaceService.swift in Sources */,
 				F1DD45BDA80889A457A00C21 /* PluginToolRegistryBridge.swift in Sources */,
 				8C2345DF917C65D7C42558B0 /* PluginMarketplaceView.swift in Sources */,
