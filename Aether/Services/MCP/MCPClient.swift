@@ -12,8 +12,8 @@ import Foundation
 /// 支持 JSON-RPC 2.0 协议，通过 stdio（macOS）或 SSE（跨平台）传输。
 /// 内部使用 request id 匹配请求/响应，支持超时取消。
 actor MCPClient: MCPClientProtocol {
-    /// 关联的配置
-    let config: MCPConfig
+    /// 关联的配置（不可变，可跨 actor 直接读取以满足协议的非隔离要求）
+    nonisolated let config: MCPConfig
     /// 传输层（stdio / SSE / Mock）
     private let transport: MCPTransport
     /// 下一个 JSON-RPC 请求 id（自增）
