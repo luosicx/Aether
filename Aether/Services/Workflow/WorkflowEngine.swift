@@ -318,7 +318,7 @@ public final class WorkflowEngine {
             let nodeStart = Date()
             let output: String
             let success: Bool
-            var error: String? = nil
+            let error: String? = nil
 
             switch node.type {
             case .triggerTimer, .triggerManual, .triggerEvent, .output, .input:

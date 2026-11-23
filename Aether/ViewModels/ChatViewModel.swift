@@ -643,7 +643,7 @@ final class ChatViewModel {
             if let content = chunk.content {
                 chunkContent += content
                 let now = Date()
-                if lastStreamingUIUpdateAt.map { now.timeIntervalSince($0) >= 0.1 } ?? true {
+                if (lastStreamingUIUpdateAt.map { now.timeIntervalSince($0) >= 0.1 } ?? true) {
                     streamingText = ctx.fullResponse + chunkContent
                     lastStreamingUIUpdateAt = now
                 }

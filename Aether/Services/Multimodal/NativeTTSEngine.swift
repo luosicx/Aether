@@ -54,20 +54,13 @@ public final class NativeTTSEngine: TTSEngine, @unchecked Sendable {
                 // write 回调类型为 AVAudioBuffer?，需 cast 为 AVAudioPCMBuffer
                 if let pcmBuffer = buffer as? AVAudioPCMBuffer {
                     let generation = collector.append(pcmBuffer)
-                    // 模拟器上合成器会持续交付 PCM 帧，却永远不给表示结束的 nil，
-                    // 只认 nil 就得白等满整个总窗口。帧间静默超过 idleDeadline 即视为
+                    // 模拟器上合成器会持续交付 PCM 帧，却永远不给表示结束的空帧，
+                    // 只等结束信号就得白等满整个总窗口。帧间静默超过 idleDeadline 即视为
                     // 交付完毕，把已收到的音频编码返回。
                     DispatchQueue.global().asyncAfter(deadline: .now() + Self.idleDeadline) {
                         if collector.generation == generation {
                             once.resume(returning: Self.encodeWAVOrEmpty(buffers: collector.snapshot()))
                         }
-                    }
-                } else if buffer == nil {
-                    // nil 表示合成完成
-                    do {
-                        once.resume(returning: try Self.encodeToWAV(buffers: collector.snapshot()))
-                    } catch {
-                        once.resume(throwing: error)
                     }
                 }
             }

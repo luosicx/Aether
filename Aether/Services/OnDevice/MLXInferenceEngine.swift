@@ -167,7 +167,7 @@ actor MLXInferenceEngine {
     func generate(prompt: String, maxTokens: Int, temperature: Double, modelPath: URL? = nil) -> AsyncStream<String> {
         AsyncStream { continuation in
             // Rust candle 推理路径
-            if Self.useRust, let engine = rustEngine ?? modelPath.map { _ in AetherRustInferenceEngine() } {
+            if Self.useRust, rustEngine != nil || modelPath != nil {
                 Task {
                     if rustEngine == nil, let path = modelPath {
                         do {
