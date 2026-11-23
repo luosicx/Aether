@@ -4,7 +4,7 @@ import Foundation
 ///
 /// 定义 MCP Server 的连接参数：显示名称、传输方式（stdio / SSE）、启用状态。
 /// Codable + Hashable：支持序列化持久化与集合操作。
-public struct MCPConfig: Codable, Identifiable, Hashable {
+public struct MCPConfig: Codable, Identifiable, Hashable, Sendable {
     /// 唯一标识（UUID 字符串）
     public let id: String
     /// 显示名称
@@ -24,7 +24,7 @@ public struct MCPConfig: Codable, Identifiable, Hashable {
     /// MCP 传输方式枚举。
     /// - stdio：通过子进程 stdin/stdout 通信（仅 macOS）
     /// - sse：通过 HTTP SSE 连接（跨平台）
-    public enum Transport: Codable, Hashable {
+    public enum Transport: Codable, Hashable, Sendable {
         /// stdio 传输：启动子进程，通过 stdin/stdout 通信
         case stdio(command: String, args: [String], env: [String: String]?)
         /// SSE 传输：通过 URL 建立 SSE 连接
@@ -114,7 +114,9 @@ public struct MCPServerInfo: Identifiable {
 ///
 /// 注意：inputSchema 为 JSON Schema（可能包含嵌套结构），使用 [String: Any] 存储。
 /// Codable / Hashable 通过自定义实现处理 [String: Any] 的限制。
-public struct MCPTool: Identifiable {
+/// Sendable 用 @unchecked：所有存储属性都是 let，inputSchema 只来自 JSON 解码的不可变值
+/// （NSString/NSNumber/NSArray/NSDictionary），结构体拷贝间不共享可变状态。
+public struct MCPTool: Identifiable, @unchecked Sendable {
     /// 工具名（唯一标识）
     public let name: String
     /// 工具描述
@@ -170,7 +172,7 @@ extension MCPTool: Hashable {
 }
 
 /// MCP 资源定义。对应 JSON-RPC resources/list 响应中的 resource 对象。
-public struct MCPResource: Codable, Identifiable, Hashable {
+public struct MCPResource: Codable, Identifiable, Hashable, Sendable {
     /// 资源 URI（唯一标识）
     public let uri: String
     /// 资源名称
@@ -192,7 +194,7 @@ public struct MCPResource: Codable, Identifiable, Hashable {
 }
 
 /// MCP 提示模板定义。对应 JSON-RPC prompts/list 响应中的 prompt 对象。
-public struct MCPPrompt: Codable, Identifiable, Hashable {
+public struct MCPPrompt: Codable, Identifiable, Hashable, Sendable {
     /// 提示模板名（唯一标识）
     public let name: String
     /// 提示模板描述
@@ -211,7 +213,7 @@ public struct MCPPrompt: Codable, Identifiable, Hashable {
 }
 
 /// MCP 提示模板参数定义。
-public struct MCPPromptArgument: Codable, Hashable {
+public struct MCPPromptArgument: Codable, Hashable, Sendable {
     /// 参数名
     public let name: String
     /// 参数描述
