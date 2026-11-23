@@ -10,6 +10,7 @@ import XCTest
 /// 注意：XCUI 对 swipeActions 的测试在不同 iOS 模拟器版本上稳定性有差异，
 /// 测试以「滑动后删除按钮出现」为验证点，未出现时降级验证会话行可交互。
 /// 完整的删除/重命名/排序逻辑已由 ChatStorageTests / ConversationListVMTests UT 覆盖。
+@MainActor
 final class GestureUITests: XCTestCase {
 
     override func setUp() {

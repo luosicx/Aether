@@ -1,5 +1,6 @@
 import XCTest
 
+@MainActor
 final class AetherUITests: XCTestCase {
 
     override func setUp() {
