@@ -78,6 +78,7 @@ final class SemanticMemoryStoreTests: XCTestCase {
 
         XCTAssertEqual(memories.count, 2, "应返回 2 条记忆")
         XCTAssertEqual(memories.first?.content, "我喜欢吃苹果", "与查询最相似的记忆应排首位")
+        XCTAssertTrue(memories.allSatisfy { $0.lastAccessedAt != nil }, "召回后应在主 actor 上回写 lastAccessedAt")
     }
 
     /// limit 参数应限制返回条数
