@@ -409,25 +409,33 @@ final class ServerStdioTransport: @unchecked Sendable, MCPTransport {
 
     // MARK: - MCPTransport 实现
 
+    /// async 上下文中不能直接调 `NSLock.lock()/unlock()`（Swift 6 报错），
+    /// 统一走这个同步作用域方法。
+    private func withStateLock<T>(_ body: () -> T) -> T {
+        lock.lock()
+        defer { lock.unlock() }
+        return body()
+    }
+
     /// 连接：设置 stdin readabilityHandler 开始读取。
     func connect() async throws {
-        guard !isConnected else { return }
+        guard !withStateLock({ isConnected }) else { return }
         inputHandle.readabilityHandler = { [weak self] handle in
             let data = handle.availableData
             guard !data.isEmpty else { return }
             self?.processStdinData(data)
         }
-        isConnected = true
+        withStateLock { isConnected = true }
     }
 
     /// 断开：清理 readabilityHandler 并结束消息流。
     func disconnect() async {
         inputHandle.readabilityHandler = nil
-        isConnected = false
-        lock.lock()
-        continuation?.finish()
-        continuation = nil
-        lock.unlock()
+        withStateLock {
+            isConnected = false
+            continuation?.finish()
+            continuation = nil
+        }
     }
 
     /// 写入 stdout（JSON-RPC 消息 + 换行符）。
@@ -447,9 +455,7 @@ final class ServerStdioTransport: @unchecked Sendable, MCPTransport {
     /// 创建消息接收流，存储 continuation 供 readabilityHandler 回调时 yield。
     func messages() -> AsyncStream<Data> {
         AsyncStream { continuation in
-            lock.lock()
-            self.continuation = continuation
-            lock.unlock()
+            withStateLock { self.continuation = continuation }
         }
     }
 
@@ -458,16 +464,16 @@ final class ServerStdioTransport: @unchecked Sendable, MCPTransport {
     /// 处理 stdin 数据：按换行符分割，逐行 yield 给消息流。
     private func processStdinData(_ data: Data) {
         guard let string = String(data: data, encoding: .utf8) else { return }
-        lock.lock()
-        lineBuffer += string
-        while let newlineRange = lineBuffer.range(of: "\n") {
-            let line = String(lineBuffer[..<newlineRange.lowerBound])
-            lineBuffer = String(lineBuffer[newlineRange.upperBound...])
-            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !trimmed.isEmpty, let lineData = trimmed.data(using: .utf8) {
-                continuation?.yield(lineData)
+        withStateLock {
+            lineBuffer += string
+            while let newlineRange = lineBuffer.range(of: "\n") {
+                let line = String(lineBuffer[..<newlineRange.lowerBound])
+                lineBuffer = String(lineBuffer[newlineRange.upperBound...])
+                let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty, let lineData = trimmed.data(using: .utf8) {
+                    continuation?.yield(lineData)
+                }
             }
         }
-        lock.unlock()
     }
 }
