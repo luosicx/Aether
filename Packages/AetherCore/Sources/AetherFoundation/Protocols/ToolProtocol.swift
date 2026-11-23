@@ -33,5 +33,8 @@ public protocol ToolProtocol: Sendable {
     ///   - arguments: JSON 反序列化后的参数字典。
     /// - Returns: 字符串形式的结果（成功或错误描述）。
     /// - Throws: 执行过程中可能抛出的错误。
-    func execute(arguments: [String: Any]) async throws -> String
+    /// - Note: `arguments` 为 `sending`，所有权转移给工具实现；这样主 actor 隔离的实现
+    ///   （如剪贴板、定位等系统 UI 工具）可安全接收非 Sendable 字典而不触发跨隔离告警。
+    ///   调用方在调用后不得再使用该字典。
+    func execute(arguments: sending [String: Any]) async throws -> String
 }

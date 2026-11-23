@@ -18,9 +18,9 @@ protocol MCPServerProtocol {
     /// - Parameter tools: 工具名数组（对应 ToolRegistry 中已注册的工具名）
     func registerTools(_ tools: [String]) async
     /// 注册暴露给外部客户端的资源列表
-    /// - Parameter resources: 资源定义数组
-    func registerResources(_ resources: [MCPResource]) async
+    /// - Parameter resources: 资源定义数组（所有权转移给 Server）
+    func registerResources(_ resources: sending [MCPResource]) async
     /// 注册暴露给外部客户端的 Prompts 列表
-    /// - Parameter prompts: Prompts 定义数组
-    func registerPrompts(_ prompts: [MCPPrompt]) async
+    /// - Parameter prompts: Prompts 定义数组（所有权转移给 Server）
+    func registerPrompts(_ prompts: sending [MCPPrompt]) async
 }
