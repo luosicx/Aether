@@ -487,15 +487,17 @@ jobs:
         # 见 unit-tests：xcodebuild 的 65 交给 xcresult 闸门判定，避免 error 注释
         run: |
           set +e
-          # 300/360（原来 240/300，再早 120/180）。依据是本地整类串行矩阵（iPhone 17、窗口放到
+          # 420/600（原来 300/360，再早 240/300、120/180）。依据是本地整类串行矩阵（iPhone 17、窗口放到
           # 600/900 取自然耗时）：testUserPreferencePersistence 102.0s、testSaveAPIKey 72.6s、
           # testEditSystemPrompt 69.9s，而 CI 侧对同批用例的耗时比观测到 1.6x
           # （dragReorder 24.3s→39.0s）到 5.3x（emptyState 19.0s→99.8s）。
           # 240/300 在 #73 合并后的 slow 轮（run 43825367887）被击穿：testUserPreferencePersistence
           # 267.1s（超过 240s 判定红线 27s，xcresult 里该用例本身最后 passed），同轮
           # testEditSystemPrompt 196.0s vs 平时 92-93s，属整台模拟器慢 2x 的轮次。
+          # 300/360 在 Xcode 27 轮（run 45407595646）又被击穿：testEditSystemPrompt 300.09s
+          # （用例最终 passed，仍被闸门记为超过 allowance 的失败；本地同用例 69.9s，约 4.3x）。
           # 同时把用例里滚动循环的失败等待换成 pollExists（见 AetherUITests.swift），
-          # 去掉 XCTest 超时分诊快照的固定开销。300 对应本地最慢用例的 ~2.9x，仍能抓住真挂死。
+          # 去掉 XCTest 超时分诊快照的固定开销。420 对应本地最慢用例的 ~6x，真挂死仍会被截止。
           # 试过改用例自带的 executionTimeAllowance：在 setUp 里赋值 5 秒、命令行给 120 秒，
           # 14 秒的用例照样通过（NSLog 读回确实是 5），也就是这个属性在 job 传了命令行窗口之后
           # 就不起作用了，只能在 job 上调。
@@ -507,8 +509,8 @@ jobs:
             -derivedDataPath build \
             -only-testing:AetherUITests \
             -test-timeouts-enabled YES \
-            -default-test-execution-time-allowance 300 \
-            -maximum-test-execution-time-allowance 360 \
+            -default-test-execution-time-allowance 420 \
+            -maximum-test-execution-time-allowance 600 \
             -parallel-testing-enabled NO \
             -resultBundlePath UITestResults.xcresult \
             CODE_SIGNING_ALLOWED=NO ARCHS=arm64 SWIFT_STRICT_CONCURRENCY=complete
