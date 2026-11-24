@@ -75,6 +75,8 @@ struct SettingsView: View {
     @State private var showSaveToast = false
     @State private var saveToastMessage = ""
     @State private var saveToastIsError = false
+    // 音色行副标题：目录查询是同步 XPC，不能在 body 里做（见 voiceSection 的 .task）
+    @State private var voiceDisplayName = String(localized: "系统默认")
 
     var body: some View {
         Group {
@@ -524,10 +526,22 @@ struct SettingsView: View {
                 HStack {
                     Text("音色", comment: "")
                     Spacer()
-                    Text(currentVoiceDisplayName)
+                    Text(voiceDisplayName)
                         .foregroundStyle(.secondary)
                         .font(.captionAI)
                 }
+            }
+            // displayName 会同步走 TTSVoiceCatalog.allVoices()（XPC 到语音服务），
+            // 无头/CI 模拟器上可阻塞数十秒，放到后台查询，主线程只收结果。
+            .task(id: settingsVM.ttsConfig.voiceIdentifier) {
+                let identifier = settingsVM.ttsConfig.voiceIdentifier
+                guard !identifier.isEmpty else {
+                    voiceDisplayName = String(localized: "系统默认")
+                    return
+                }
+                voiceDisplayName = await Task.detached(priority: .userInitiated) {
+                    TTSVoiceCatalog.displayName(for: identifier)
+                }.value
             }
             .accessibilityLabel("音色")
             .accessibilityHint("选择系统内置 TTS 音色")
@@ -1387,14 +1401,6 @@ struct SettingsView: View {
     }
 
     // MARK: - TTS 配置同步
-
-    /// 当前选中音色的可读名称（空 identifier 显示"系统默认"）
-    private var currentVoiceDisplayName: String {
-        if settingsVM.ttsConfig.voiceIdentifier.isEmpty {
-            return "系统默认"
-        }
-        return TTSVoiceCatalog.displayName(for: settingsVM.ttsConfig.voiceIdentifier)
-    }
 
     /// 同步 SettingsViewModel 的 ttsConfig 到 ChatViewModel（朗读时使用最新配置）
     private func syncTTSConfigToChatViewModel() {
