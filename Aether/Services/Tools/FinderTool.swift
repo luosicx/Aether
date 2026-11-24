@@ -80,7 +80,7 @@ final class FinderTool: ToolProtocol, @unchecked Sendable {
         guard let path = arguments["path"] as? String else {
             return "错误：请提供 path 参数"
         }
-        NSWorkspace.shared.openFile(path)
+        NSWorkspace.shared.open(URL(fileURLWithPath: path))
         return "已在 Finder 中打开：\(path)"
     }
 
