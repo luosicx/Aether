@@ -174,43 +174,85 @@ final class AetherUITests: XCTestCase {
         return (toggle.value as? String) == expected
     }
 
+    /// 轮询 Toggle 值，直到离开起始值或超时，返回最后读到的值。
+    /// 慢轮上触摸事件已合成、值却要等主线程处理完才提交，单次读（旧实现静置 1s 读一次）
+    /// 会把「迟到的翻转」误判为没翻转；这里改成多读几次。
+    private func waitForToggleValueChange(_ toggle: XCUIElement, from before: String?, timeout: TimeInterval) -> String? {
+        let deadline = Date().addingTimeInterval(timeout)
+        var current = toggle.value as? String
+        while current == before && Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.5)
+            current = toggle.value as? String
+        }
+        return current
+    }
+
     /// 翻转设置页 Form 里的 Toggle，返回最终值。
-    /// 三条实测约束：
+    /// 四条实测约束：
     /// 1. `toggle.tap()` 落在整行中心（标签区，x≈203），不会翻转开关；必须命中右侧把手
     ///    （iOS 27 内层 Switch 63x28，中心 x≈332）。
     /// 2. 点击后立刻连续读 `value` 会触发整棵 Form 的无障碍快照（单次数秒），
-    ///    期间合成的触摸会被丢弃，表现为「事件已合成但值不变」；因此每次只点一次、
-    ///    静置 1s 后只读一次值，未变化原地重点，不在重试里滚动或轮询 isHittable。
-    /// 3. 负载高的轮次里内层 Switch 会偶发查不到（run 45283646601 起 4 次失败全是
-    ///    「6 次都没翻转」）。旧实现在 loop 外解析一次把手，查不到时退回整行中心，
-    ///    每轮都点在标签区。现在每轮重新解析，缺失时点行右端（把手固定位置），
-    ///    并隔轮用元素级 tap 让 XCTest 自己做命中测试。
+    ///    期间合成的触摸会被丢弃；因此每轮只合成一次触摸，随后轮询等值提交（最多 3s）。
+    /// 3. iOS 27 CI 慢轮上瞬时 tap 事件全部失效（PR #137 第二轮：8 次 tap，
+    ///    每次「Synthesize event」成功、值始终为 "0"，而本地即使加载也是 1-4 次内翻转）。
+    ///    瞬时 tap 的按下与抬起在同一批事件里投递，主线程忙时整段可能被丢；
+    ///    改用带按压时长的 press（按下/抬起分开投递），并按轮次交替
+    ///    「把手元素 press → 应用坐标 press（把手中心）→ 行右端 press」，
+    ///    同时覆盖元素级命中测试与坐标级命中测试两条路径。
+    /// 4. 全部失败时附截图与无障碍树，下一轮 CI 才有可查的证据。
     @discardableResult
     private func flipSwitch(_ toggle: XCUIElement, in app: XCUIApplication, maxAttempts: Int = 8) -> String? {
         let before = toggle.value as? String
         var current = before
         var attempt = 0
         while current == before && attempt < maxAttempts {
-            let knob = toggle.switches.firstMatch
-            let hasKnob = knob.exists
-            if hasKnob && attempt % 2 == 1 {
-                knob.tap()
-            } else {
-                let frame = hasKnob ? knob.frame : toggle.frame
-                let point = hasKnob
-                    ? CGPoint(x: frame.midX, y: frame.midY)
-                    : CGPoint(x: frame.maxX - 40, y: frame.midY)
-                let window = app.windows.firstMatch.frame
-                app.coordinate(withNormalizedOffset: CGVector(
-                    dx: (point.x - window.minX) / window.width,
-                    dy: (point.y - window.minY) / window.height
-                )).tap()
+            switch attempt % 3 {
+            case 0:
+                let knob = toggle.switches.firstMatch
+                if knob.exists {
+                    knob.press(forDuration: 0.2)
+                } else {
+                    pressRowEdge(of: toggle, in: app, duration: 0.2)
+                }
+            case 1:
+                let knob = toggle.switches.firstMatch
+                if knob.exists {
+                    pressWindow(at: CGPoint(x: knob.frame.midX, y: knob.frame.midY), in: app, duration: 0.2)
+                } else {
+                    pressRowEdge(of: toggle, in: app, duration: 0.2)
+                }
+            default:
+                pressRowEdge(of: toggle, in: app, duration: 0.5)
             }
-            Thread.sleep(forTimeInterval: 1.0)
-            current = toggle.value as? String
+            current = waitForToggleValueChange(toggle, from: before, timeout: 3)
             attempt += 1
         }
+        if current == before {
+            let shot = XCTAttachment(screenshot: app.screenshot())
+            shot.name = "flipSwitch-\(toggle.identifier)-unchanged"
+            shot.lifetime = .keepAlways
+            add(shot)
+            let tree = XCTAttachment(string: app.debugDescription)
+            tree.name = "flipSwitch-\(toggle.identifier)-tree"
+            tree.lifetime = .keepAlways
+            add(tree)
+        }
         return current
+    }
+
+    /// 点 Toggle 行右端（把手固定位置），坐标级按压。
+    private func pressRowEdge(of toggle: XCUIElement, in app: XCUIApplication, duration: TimeInterval) {
+        let frame = toggle.frame
+        pressWindow(at: CGPoint(x: frame.maxX - 40, y: frame.midY), in: app, duration: duration)
+    }
+
+    /// 按窗口归一化坐标按压指定点。
+    private func pressWindow(at point: CGPoint, in app: XCUIApplication, duration: TimeInterval) {
+        let window = app.windows.firstMatch.frame
+        app.coordinate(withNormalizedOffset: CGVector(
+            dx: (point.x - window.minX) / window.width,
+            dy: (point.y - window.minY) / window.height
+        )).press(forDuration: duration)
     }
 
     /// 轮询输入框文本包含子串，替代 typeText 后的固定等待
