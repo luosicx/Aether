@@ -43,8 +43,8 @@ final class OCRTool: ToolProtocol, @unchecked Sendable {
     /// 执行 OCR 文字识别
     ///
     /// - Parameter arguments: 可含 `image_path` 键的参数字典
-    /// - Returns: 识别到的文字字符串，多行用换行符分隔；无文字时返回提示
-    /// - Throws: Vision 识别过程中的错误会抛出
+    /// - Returns: 识别到的文字字符串，多行用换行符分隔；无文字或识别失败时返回提示/错误文本
+    /// - Throws: 仅延续父协议签名，实际错误以 `错误：…` 字符串返回
     @MainActor
     func execute(arguments: [String: Any]) async throws -> String {
         // 确定图片来源：优先用传入路径，否则 macOS 调用 ScreenshotTool 截屏
@@ -77,7 +77,9 @@ final class OCRTool: ToolProtocol, @unchecked Sendable {
             let once = ResumeOnceContinuation(continuation)
             let request = VNRecognizeTextRequest { request, error in
                 if let error = error {
-                    once.resume(throwing: error)
+                    // 无头 CI / 缺少识别资源时 Vision 会报错（如 DecodingError、unknownError）。
+                    // 与截屏、加载失败一致，以错误文本返回，不让工具调用方处理底层错误。
+                    once.resume(returning: "错误：文字识别失败：\(error.localizedDescription)")
                     return
                 }
                 once.resume(returning: Self.recognizedText(request))
@@ -88,7 +90,7 @@ final class OCRTool: ToolProtocol, @unchecked Sendable {
             do {
                 try handler.perform([request])
             } catch {
-                once.resume(throwing: error)
+                once.resume(returning: "错误：文字识别失败：\(error.localizedDescription)")
             }
         }
     }
