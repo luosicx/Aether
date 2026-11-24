@@ -212,9 +212,20 @@ final class ChatViewModelTests: XCTestCase {
         XCTAssertFalse(vm.isRecording, "不可用时 isRecording 应保持 false")
     }
 
+    /// 构造 ChatViewModel 并把语音合成换成空桩。
+    /// 模拟器/无头 CI 没有可用音频设备，真实 AVSpeechSynthesizer 的 speak/stopSpeaking
+    /// 会长时间阻塞（iOS 27 CI 上 4 次调用直接撞 60s 上限）；这些用例只验证
+    /// speakingMessageId 状态机，不验证音频输出。
+    private func makeSpeechStubbedViewModel() -> ChatViewModel {
+        let vm = ChatViewModel()
+        vm.voiceService.speechSynthesizeOverride = { _ in }
+        vm.voiceService.speechStopOverride = {}
+        return vm
+    }
+
     /// 17.8 同 id 调用 toggleSpeak 第二次应停止朗读并清空 speakingMessageId
     func testToggleSpeakSameIdStops() {
-        let vm = ChatViewModel()
+        let vm = makeSpeechStubbedViewModel()
         let id = UUID()
 
         vm.toggleSpeak(messageId: id, content: "hello")
@@ -228,7 +239,7 @@ final class ChatViewModelTests: XCTestCase {
 
     /// 17.9 不同 id 调用 toggleSpeak 应切换 speakingMessageId
     func testToggleSpeakDifferentIdSwitches() {
-        let vm = ChatViewModel()
+        let vm = makeSpeechStubbedViewModel()
         let id1 = UUID()
         let id2 = UUID()
 
@@ -920,7 +931,7 @@ final class ChatViewModelTests: XCTestCase {
 
     /// toggleSpeak 连续切换多个消息 id，speakingMessageId 应跟随最后一条；再次点击同一条停止
     func testToggleSpeakAcrossMultipleMessages() {
-        let vm = ChatViewModel()
+        let vm = makeSpeechStubbedViewModel()
         let id1 = UUID(), id2 = UUID(), id3 = UUID()
 
         vm.toggleSpeak(messageId: id1, content: "a")

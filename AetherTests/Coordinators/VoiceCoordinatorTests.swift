@@ -27,6 +27,10 @@ final class VoiceCoordinatorTests: XCTestCase {
         ttsConfig: TTSConfig = .defaultValue
     ) -> VoiceFixture {
         let voiceService = voiceService ?? VoiceService()
+        // 模拟器/无头 CI 没有可用音频设备，真实合成器的 speak/stopSpeaking 会长时间阻塞；
+        // 这些用例只验证闭包回调状态，朗读一律走空桩。
+        voiceService.speechSynthesizeOverride = { _ in }
+        voiceService.speechStopOverride = {}
         let isRecordingBox = NonIsolatedBox<Bool>(false)
         let speakingBox = NonIsolatedBox<UUID?>(nil)
         let inputTextBox = NonIsolatedBox<String>("")
