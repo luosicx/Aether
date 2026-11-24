@@ -548,3 +548,9 @@
 # 栈落在系统符号里（failureText 就是 `Crash: Aether at <external symbol>`）。
 # 本机同参数单跑该用例 10 轮、整类 80 tests 全过，复现不了；真栈要看诊断包。
 iOS:VoiceServiceTests/*~crash
+# iOS 27 CI：语音服务在无头模拟器上不可用时，VoiceService 的 speak/previewVoice/
+# stopSpeaking 会同步卡进 AVSpeechSynthesizer（Xcode 27 基线轮 45378564877：
+# testDeinitAsyncTaskCompletesWithoutCrash、testDidCancelDuringPreviewCleansPreviewState
+# 各挂满 60s）。与上面的崩溃同属模拟器音频侧，责任用例随轮次漂移，按超时形态豁免；
+# 真实合成路径仍由 macOS 测试与真机覆盖。
+iOS:VoiceServiceTests/*~timeout
