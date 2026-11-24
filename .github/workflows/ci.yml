@@ -1232,6 +1232,13 @@ jobs:
 
       - name: Build static libs
         working-directory: rust
+        env:
+          # onig_sys 的 C 代码由 cc crate 用 clang 编译；未显式指定时 minos 取宿主 OS 版本
+          # （观测到本地 27.2 / runner 15.5），打包出的静态库链接进 deployment target
+          # 14.0/17.0 的 App 时会报「object file was built for newer macOS version」，
+          # 也等于把最低系统要求偷偷抬高。显式对齐 App/Package.swift 的部署目标。
+          MACOSX_DEPLOYMENT_TARGET: '14.0'
+          IPHONEOS_DEPLOYMENT_TARGET: '17.0'
         run: |
           # 用 --crate-type staticlib 只构建静态库（.a），
           # 避免 iOS device target 上 cdylib 链接失败
