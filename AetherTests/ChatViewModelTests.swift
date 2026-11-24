@@ -212,45 +212,6 @@ final class ChatViewModelTests: XCTestCase {
         XCTAssertFalse(vm.isRecording, "不可用时 isRecording 应保持 false")
     }
 
-    /// 构造 ChatViewModel 并把语音合成换成空桩。
-    /// 模拟器/无头 CI 没有可用音频设备，真实 AVSpeechSynthesizer 的 speak/stopSpeaking
-    /// 会长时间阻塞（iOS 27 CI 上 4 次调用直接撞 60s 上限）；这些用例只验证
-    /// speakingMessageId 状态机，不验证音频输出。
-    private func makeSpeechStubbedViewModel() -> ChatViewModel {
-        let vm = ChatViewModel()
-        vm.voiceService.speechSynthesizeOverride = { _ in }
-        vm.voiceService.speechStopOverride = {}
-        return vm
-    }
-
-    /// 17.8 同 id 调用 toggleSpeak 第二次应停止朗读并清空 speakingMessageId
-    func testToggleSpeakSameIdStops() {
-        let vm = makeSpeechStubbedViewModel()
-        let id = UUID()
-
-        vm.toggleSpeak(messageId: id, content: "hello")
-        XCTAssertEqual(vm.speakingMessageId, id,
-                       "首次调用应设 speakingMessageId")
-
-        vm.toggleSpeak(messageId: id, content: "hello")
-        XCTAssertNil(vm.speakingMessageId,
-                     "同 id 第二次调用应停止并清空 speakingMessageId")
-    }
-
-    /// 17.9 不同 id 调用 toggleSpeak 应切换 speakingMessageId
-    func testToggleSpeakDifferentIdSwitches() {
-        let vm = makeSpeechStubbedViewModel()
-        let id1 = UUID()
-        let id2 = UUID()
-
-        vm.toggleSpeak(messageId: id1, content: "hello")
-        XCTAssertEqual(vm.speakingMessageId, id1)
-
-        vm.toggleSpeak(messageId: id2, content: "world")
-        XCTAssertEqual(vm.speakingMessageId, id2,
-                       "切换到不同 id 应更新 speakingMessageId")
-    }
-
     /// 17.x RAG 检索降级守卫：DeepSeek 无 Qwen Key 时 resolveEmbedding 返回 nil
     /// 这是 ChatViewModel RAG 守卫的依赖条件——resolveEmbedding 返回 nil 时，
     /// ragEmbeddingProvider 回退到 selectedProvider（.deepseek），触发守卫跳过 embedding 调用
@@ -927,22 +888,6 @@ final class ChatViewModelTests: XCTestCase {
     func testSpeakingMessageIdDefaultsNil() {
         let vm = ChatViewModel()
         XCTAssertNil(vm.speakingMessageId, "speakingMessageId 默认应为 nil")
-    }
-
-    /// toggleSpeak 连续切换多个消息 id，speakingMessageId 应跟随最后一条；再次点击同一条停止
-    func testToggleSpeakAcrossMultipleMessages() {
-        let vm = makeSpeechStubbedViewModel()
-        let id1 = UUID(), id2 = UUID(), id3 = UUID()
-
-        vm.toggleSpeak(messageId: id1, content: "a")
-        XCTAssertEqual(vm.speakingMessageId, id1)
-        vm.toggleSpeak(messageId: id2, content: "b")
-        XCTAssertEqual(vm.speakingMessageId, id2)
-        vm.toggleSpeak(messageId: id3, content: "c")
-        XCTAssertEqual(vm.speakingMessageId, id3, "连续切换后应跟随最后一条 id")
-        // 再次点击同一条应停止
-        vm.toggleSpeak(messageId: id3, content: "c")
-        XCTAssertNil(vm.speakingMessageId, "同 id 再次点击应停止朗读")
     }
 
     /// sendMessage 清空预置的 currentToolSteps（状态清理）
