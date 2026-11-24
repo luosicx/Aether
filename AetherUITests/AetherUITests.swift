@@ -175,31 +175,37 @@ final class AetherUITests: XCTestCase {
     }
 
     /// 翻转设置页 Form 里的 Toggle，返回最终值。
-    /// 两条实测约束（iOS 27 模拟器，AX 树有内层 Switch 子元素）：
+    /// 三条实测约束：
     /// 1. `toggle.tap()` 落在整行中心（标签区，x≈203），不会翻转开关；必须命中右侧把手
-    ///    （内层 Switch 63x28，中心 x≈332）。
+    ///    （iOS 27 内层 Switch 63x28，中心 x≈332）。
     /// 2. 点击后立刻连续读 `value` 会触发整棵 Form 的无障碍快照（单次数秒），
     ///    期间合成的触摸会被丢弃，表现为「事件已合成但值不变」；因此每次只点一次、
     ///    静置 1s 后只读一次值，未变化原地重点，不在重试里滚动或轮询 isHittable。
+    /// 3. 负载高的轮次里内层 Switch 会偶发查不到（run 45283646601 起 4 次失败全是
+    ///    「6 次都没翻转」）。旧实现在 loop 外解析一次把手，查不到时退回整行中心，
+    ///    每轮都点在标签区。现在每轮重新解析，缺失时点行右端（把手固定位置），
+    ///    并隔轮用元素级 tap 让 XCTest 自己做命中测试。
     @discardableResult
-    private func flipSwitch(_ toggle: XCUIElement, in app: XCUIApplication, maxAttempts: Int = 6) -> String? {
-        let window = app.windows.firstMatch.frame
-        let knob = toggle.switches.firstMatch
-        let knobFrame = knob.exists ? knob.frame : toggle.frame
-        let points = [
-            CGPoint(x: knobFrame.midX, y: knobFrame.midY),
-            CGPoint(x: knobFrame.midX + 12, y: knobFrame.midY),
-            CGPoint(x: knobFrame.midX - 12, y: knobFrame.midY)
-        ]
+    private func flipSwitch(_ toggle: XCUIElement, in app: XCUIApplication, maxAttempts: Int = 8) -> String? {
         let before = toggle.value as? String
         var current = before
         var attempt = 0
         while current == before && attempt < maxAttempts {
-            let point = points[attempt % points.count]
-            app.coordinate(withNormalizedOffset: CGVector(
-                dx: (point.x - window.minX) / window.width,
-                dy: (point.y - window.minY) / window.height
-            )).tap()
+            let knob = toggle.switches.firstMatch
+            let hasKnob = knob.exists
+            if hasKnob && attempt % 2 == 1 {
+                knob.tap()
+            } else {
+                let frame = hasKnob ? knob.frame : toggle.frame
+                let point = hasKnob
+                    ? CGPoint(x: frame.midX, y: frame.midY)
+                    : CGPoint(x: frame.maxX - 40, y: frame.midY)
+                let window = app.windows.firstMatch.frame
+                app.coordinate(withNormalizedOffset: CGVector(
+                    dx: (point.x - window.minX) / window.width,
+                    dy: (point.y - window.minY) / window.height
+                )).tap()
+            }
             Thread.sleep(forTimeInterval: 1.0)
             current = toggle.value as? String
             attempt += 1
