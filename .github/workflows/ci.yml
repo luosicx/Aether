@@ -394,7 +394,9 @@ jobs:
     needs: rust-apple
     runs-on: xcode-27
     # v1.1: 星空背景 + 新增 UI 测试增加渲染负担，40min 不足以跑完全部 UIT
-    timeout-minutes: 60
+    # Xcode 27 慢轮（PR #140 轮 45385368476）：构建 18min + 套件 42min 时已顶到 60min，
+    # 一个用例卡死就整轮被取消、覆盖率汇总随之失败；放宽到与 macOS 分片一致的 75min。
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v5
 
