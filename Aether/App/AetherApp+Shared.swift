@@ -168,6 +168,9 @@ extension AetherApp {
         } catch {
             // 静默失败，不影响 App 启动
         }
+        // 语音配置存在 UserDefaults（不在 SwiftData 里）：不清理会把上一个用例
+        // 选过的音色带进后续用例，让设置页在不该查语音目录时去查语音目录。
+        UserDefaults.standard.removeObject(forKey: TTSConfig.userDefaultsKey)
     }
 
     /// 跨平台初始化逻辑：崩溃监控 + 匿名用户标识 + BFF Token 迁移

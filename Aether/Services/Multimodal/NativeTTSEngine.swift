@@ -38,8 +38,14 @@ public final class NativeTTSEngine: TTSEngine, @unchecked Sendable {
             throw MultimodalError.emptyInput
         }
 
+        let resolution = await resolveVoiceBounded(voiceId: voiceId)
+        // 音色解析都超时的环境（无头模拟器/CI）语音服务必然不响应：
+        // 再调 write 只会把语音服务或本进程拖得更久，直接交空 WAV 头收尾。
+        if resolution.timedOut {
+            return Self.emptyWAVHeader()
+        }
         let utterance = AVSpeechUtterance(string: text)
-        utterance.voice = resolveVoice(voiceId: voiceId)
+        utterance.voice = resolution.voice
         utterance.rate = AVSpeechUtteranceDefaultSpeechRate
         utterance.pitchMultiplier = 1.0
         utterance.volume = 1.0
@@ -83,6 +89,8 @@ public final class NativeTTSEngine: TTSEngine, @unchecked Sendable {
     private static let idleDeadline: TimeInterval = 5
     /// 整段合成的总兜底窗口（与改造前的定长等待一致）。
     private static let synthesisDeadline: TimeInterval = 30
+    /// 音色解析上限：正常环境毫秒级返回，超时即按无指定音色继续。
+    private static let voiceResolutionDeadline: TimeInterval = 2
 
     /// write 回调与兜底分支分属不同队列，buffer 需要一把锁保护的共享持有者。
     /// `generation` 同时充当"最近一次交付"的序号，用于判断帧间静默是否已结束。
@@ -120,10 +128,37 @@ public final class NativeTTSEngine: TTSEngine, @unchecked Sendable {
         (try? encodeToWAV(buffers: buffers)) ?? emptyWAVHeader()
     }
 
-    /// 根据 voiceId 解析音色
+    /// 根据 voiceId 解析音色，带硬上限。
+    ///
+    /// `AVSpeechSynthesisVoice(language:)` / `speechVoices()` 是同步 XPC 查询，
+    /// 语音服务不可用的环境（无头模拟器、CI）里可能永不返回，直接调用会把
+    /// synthesize 挂死（Xcode 27 CI 上 Native/MLX TTS 用例各挂满 60s allowance）。
+    /// 超时返回 `timedOut`，由调用方跳过 write 直接交空 WAV 头。
+    private func resolveVoiceBounded(voiceId: String?) async -> VoiceResolution {
+        await withCheckedContinuation { (continuation: CheckedContinuation<VoiceResolution, Never>) in
+            let once = ResumeOnceContinuation<VoiceResolution, Never>(continuation)
+            DispatchQueue.global(qos: .userInitiated).async {
+                once.resume(returning: VoiceResolution(
+                    voice: Self.resolveVoiceSync(voiceId: voiceId),
+                    timedOut: false
+                ))
+            }
+            DispatchQueue.global().asyncAfter(deadline: .now() + Self.voiceResolutionDeadline) {
+                once.resume(returning: VoiceResolution(voice: nil, timedOut: true))
+            }
+        }
+    }
+
+    /// 音色解析结果；`timedOut` 表示语音服务在窗口内没有应答。
+    private struct VoiceResolution: Sendable {
+        let voice: AVSpeechSynthesisVoice?
+        let timedOut: Bool
+    }
+
+    /// 根据 voiceId 解析音色（同步，仅在后台队列调用）
     /// - Parameter voiceId: 音色标识符（AVSpeechSynthesisVoice.identifier），nil 使用默认中文音色
     /// - Returns: AVSpeechSynthesisVoice，未找到时返回 nil（系统自动选择默认）
-    private func resolveVoice(voiceId: String?) -> AVSpeechSynthesisVoice? {
+    private static func resolveVoiceSync(voiceId: String?) -> AVSpeechSynthesisVoice? {
         guard let voiceId = voiceId, !voiceId.isEmpty else {
             return AVSpeechSynthesisVoice(language: "zh-CN")
         }

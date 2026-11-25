@@ -50,6 +50,12 @@ final class VoiceService: NSObject {
         let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "zh-CN"))
         return recognizer?.isAvailable ?? false
     }
+    /// 合成器朗读钩子（测试可注入）。模拟器/无头 CI 没有可用音频设备，
+    /// 真实 AVSpeechSynthesizer 的 speak/stopSpeaking 会长时间阻塞甚至挂死用例；
+    /// 注入后整条合成链路（含音色解析）都由钩子接管，nil 时走真实合成器。
+    internal var speechSynthesizeOverride: ((AVSpeechUtterance) -> Void)?
+    /// 合成器停止钩子（测试可注入），nil 时走真实合成器。
+    internal var speechStopOverride: (() -> Void)?
 
     /// 初始化合成器和 delegate
     override init() {
@@ -252,12 +258,10 @@ final class VoiceService: NSObject {
     ///   - text: 要朗读的文本
     ///   - config: TTS 配置；nil 时使用系统默认 zh-CN、rate=0.5
     func speak(_ text: String, config: TTSConfig? = nil) {
-        synthesizer.stopSpeaking(at: .immediate)
+        stopSynthesizer()
         isPreviewing = false
         isCurrentPreview = false
-        let utterance = AVSpeechUtterance(string: text)
-        applyConfig(utterance: utterance, config: config)
-        synthesizer.speak(utterance)
+        synthesize(AVSpeechUtterance(string: text), config: config)
     }
 
     /// 试听音色（独立于主 speak 流程，不影响 onSpeakFinished）。
@@ -266,18 +270,16 @@ final class VoiceService: NSObject {
     ///   - text: 要朗读的示例文本
     ///   - config: TTS 配置
     func previewVoice(_ text: String, config: TTSConfig) {
-        synthesizer.stopSpeaking(at: .immediate)
+        stopSynthesizer()
         isPreviewing = true
         isCurrentPreview = true
-        let utterance = AVSpeechUtterance(string: text)
-        applyConfig(utterance: utterance, config: config)
-        synthesizer.speak(utterance)
+        synthesize(AVSpeechUtterance(string: text), config: config)
     }
 
     /// 停止试听
     func stopPreview() {
         if isPreviewing {
-            synthesizer.stopSpeaking(at: .immediate)
+            stopSynthesizer()
             isPreviewing = false
             isCurrentPreview = false
         }
@@ -286,7 +288,28 @@ final class VoiceService: NSObject {
     /// 停止朗读
     func stopSpeaking() {
         isUserInitiatedStop = true
-        synthesizer.stopSpeaking(at: .immediate)
+        stopSynthesizer()
+    }
+
+    /// 合成钩子优先于真实合成器；注入钩子时整条合成链路（含音色解析）都由钩子接管。
+    /// resolveVoice 里的 AVSpeechSynthesisVoice(language:) 是同步 XPC 查询，无头模拟器上
+    /// 首次调用可挂到分钟级（ChatViewModelSpeechTests 首个用例满 60s 超时即挂在这里），
+    /// 所以桩路径不能再触碰语音目录。
+    private func synthesize(_ utterance: AVSpeechUtterance, config: TTSConfig?) {
+        if let speechSynthesizeOverride {
+            speechSynthesizeOverride(utterance)
+        } else {
+            applyConfig(utterance: utterance, config: config)
+            synthesizer.speak(utterance)
+        }
+    }
+
+    private func stopSynthesizer() {
+        if let speechStopOverride {
+            speechStopOverride()
+        } else {
+            synthesizer.stopSpeaking(at: .immediate)
+        }
     }
 
     /// 将 TTSConfig 应用到 AVSpeechUtterance。

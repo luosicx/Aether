@@ -4,6 +4,17 @@ import XCTest
 /// TTSVoiceCatalog 单元测试:验证按语言分组排序、displayName 回退、voice 查找。
 final class TTSVoiceCatalogTests: XCTestCase {
 
+    /// 本类断言的是系统音色目录本身，必须真查 speechVoices()。
+    /// 模拟器/无头 CI 的语音服务不可用时该查询会同步卡住数十秒甚至永不返回
+    /// （Xcode 27 CI 上 testAllVoicesReturnsConsistentResult 挂满 60s allowance），
+    /// 这类环境跳过，逻辑仍在 macOS 测试里覆盖。
+    override func setUpWithError() throws {
+        try XCTSkipIf(
+            ProcessInfo.processInfo.environment["SIMULATOR_DEVICE_NAME"] != nil,
+            "跳过：模拟器/无头 CI 的语音服务不可用，speechVoices() 可能永不返回"
+        )
+    }
+
     // MARK: - allVoices
 
     func testAllVoicesReturnsNonEmptyList() {

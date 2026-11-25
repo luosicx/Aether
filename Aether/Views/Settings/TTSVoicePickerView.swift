@@ -45,7 +45,20 @@ struct TTSVoicePickerView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .onAppear {
-            groupedVoices = TTSVoiceCatalog.groupedByLanguage()
+            loadVoicesIfNeeded()
+        }
+    }
+
+    /// 音色目录查询会同步走 AVSpeechSynthesisVoice.speechVoices()（XPC 到语音服务），
+    /// 无头/CI 模拟器上首次调用可阻塞数十秒。放在 onAppear 主线程会让整个 AX 树
+    /// 卡死（UI 测试里表现为 Timed out while evaluating UI query），改到后台加载。
+    private func loadVoicesIfNeeded() {
+        guard groupedVoices.isEmpty else { return }
+        Task { @MainActor in
+            let groups = await Task.detached(priority: .userInitiated) {
+                TTSVoiceCatalog.groupedByLanguage()
+            }.value
+            groupedVoices = groups
         }
     }
 
