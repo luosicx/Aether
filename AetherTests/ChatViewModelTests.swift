@@ -2241,7 +2241,7 @@ final class ChatViewModelTests: XCTestCase {
     func testSwitchToDuringStreamingCancelsProducerAndSkipsPersistence() async throws {
         let mock = MockLLMProvider()
         mock.chatChunks = ["部分", "回复", "不应落库"]
-        mock.chunkDelayNanoseconds = 50_000_000  // 50ms / chunk，制造取消窗口
+        mock.chunkDelayNanoseconds = 30_000_000_000  // 保持上游流存活，避免 CI 调度延迟错过取消窗口
         let vm = ChatViewModel(client: mock)
         vm.selectedProvider = .onDevice
 
@@ -2261,9 +2261,9 @@ final class ChatViewModelTests: XCTestCase {
         context.insert(conv2)
         vm.switchTo(conversation: conv2)
 
-        // 等待取消传播到上游生产 Task
-        for _ in 0..<50 {
-            if mock.producerCancelled { break }
+        // 等待取消传播到上游生产 Task；CI 重负载下 onTermination 的调度可能超过 1s。
+        let cancellationDeadline = Date().addingTimeInterval(5)
+        while !mock.producerCancelled && Date() < cancellationDeadline {
             try await Task.sleep(nanoseconds: 20_000_000)
         }
         XCTAssertTrue(mock.producerCancelled, "切换会话应取消上游流生产 Task")
