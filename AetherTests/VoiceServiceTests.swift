@@ -11,10 +11,11 @@ final class VoiceServiceTests: XCTestCase {
     func testStopRecordingWhenNotStartedDoesNotCrash() throws {
         #if os(macOS)
         throw XCTSkip("macOS CI 环境音频子系统不稳定，跳过录音相关测试")
-        #endif
+        #else
         let service = VoiceService()
         service.stopRecording()
         XCTAssertFalse(service.isRecording, "未开始录音时 isRecording 应为 false")
+        #endif
     }
 
     /// SFSpeechRecognizer 不可用时 startRecording 应抛错。
