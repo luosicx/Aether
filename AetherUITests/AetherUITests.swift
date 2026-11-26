@@ -600,18 +600,7 @@ final class AetherUITests: XCTestCase {
         // 比 descendants(matching: .any) 的全树扫描快一个量级；旧版渲染成 cell/otherElement 时才走兜底。
         let toneById = app.buttons["tonePicker"]
 
-        // 如果直接找不到，滚动 Form（限制 10 次，避免 CI 超时）
-        if !toneById.exists {
-            let formScroller = app.collectionViews.firstMatch.exists
-                ? app.collectionViews.firstMatch
-                : (app.tables.firstMatch.exists ? app.tables.firstMatch : app.scrollViews.firstMatch)
-            var scrollAttempts = 0
-            while !toneById.exists && scrollAttempts < 10 {
-                formScroller.swipeUp()
-                scrollAttempts += 1
-                _ = pollExists(toneById, timeout: 1)
-            }
-        }
+        scrollToElement(toneById, in: app, maxAttempts: 16)
 
         // 定位 Picker 行：identifier 优先（iOS 26.2），staticText 兜底（旧版），cell 兜底
         let toneFallback = app.descendants(matching: .any).matching(identifier: "tonePicker").firstMatch
@@ -678,17 +667,7 @@ final class AetherUITests: XCTestCase {
         // 验证语气保持「正式」（需要滚动到用户偏好 Section）
         // 同首次进入：buttons 快速路径 + 旧版渲染形态兜底
         let toneById2 = app.buttons["tonePicker"]
-        if !toneById2.exists {
-            let formScroller = app.tables.firstMatch.exists
-                ? app.tables.firstMatch
-                : (app.collectionViews.firstMatch.exists ? app.collectionViews.firstMatch : app.scrollViews.firstMatch)
-            var scrollAttempts2 = 0
-            while !toneById2.exists && scrollAttempts2 < 16 {
-                formScroller.swipeUp()
-                scrollAttempts2 += 1
-                _ = pollExists(toneById2, timeout: 1)
-            }
-        }
+        scrollToElement(toneById2, in: app, maxAttempts: 16)
         // 定位 Picker 行：identifier 优先（iOS 26.2），staticText 兜底（旧版），cell 兜底
         let toneFallback2 = app.descendants(matching: .any).matching(identifier: "tonePicker").firstMatch
         let toneByText2 = app.staticTexts["语气"].firstMatch
