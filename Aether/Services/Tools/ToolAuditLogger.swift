@@ -36,6 +36,10 @@ final class ToolAuditLogger: @unchecked Sendable {
         }
     }
 
+    func waitForPendingWrites() {
+        logQueue.sync {}
+    }
+
     // MARK: - Private Helpers
 
     private func formatEntry(toolName: String, argumentsSummary: String, authorized: Bool, timestamp: Date) -> String {
