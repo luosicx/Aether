@@ -12,6 +12,7 @@ import XCTest
 /// 注意：XCUI 对 macOS status bar item 的直接操作能力有限，
 /// 测试聚焦于面板内容验证（通过 accessibilityIdentifier 定位）。
 /// 完整的消息发送逻辑已由 ChatViewModelTests UT 覆盖。
+@MainActor
 final class MenuBarUITests: XCTestCase {
 
     override func setUp() {
