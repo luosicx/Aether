@@ -49,6 +49,12 @@ final class PluginSettingsUITests: XCTestCase {
         app.buttons["pluginManagementLink"].firstMatch
     }
 
+    private func pluginRow(in app: XCUIApplication) -> XCUIElement {
+        app.otherElements.matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "pluginRow_")
+        ).firstMatch
+    }
+
     /// 在 Form 中向下滚动到目标元素整块进入可视区。
     /// 停止条件不能用 isHittable：元素只露出几 pt 时它也为真，而中心仍在屏外，tap 会落空。
     /// 拖拽要在终点停住再抬手（thenHoldForDuration），抬手速度归零才不会带惯性过冲：
@@ -181,9 +187,7 @@ final class PluginSettingsUITests: XCTestCase {
         installButton.tap()
 
         // 验证插件行出现（插件行 identifier 以 pluginRow_ 开头）
-        let pluginRow = app.descendants(matching: .any).matching(
-            NSPredicate(format: "identifier BEGINSWITH %@", "pluginRow_")
-        ).firstMatch
+        let pluginRow = pluginRow(in: app)
         XCTAssertTrue(pluginRow.waitForExistence(timeout: 5), "安装后应出现插件行")
 
         // 验证插件名称显示
@@ -210,13 +214,11 @@ final class PluginSettingsUITests: XCTestCase {
         installButton.tap()
 
         // 等待插件行出现
-        let pluginRow = app.descendants(matching: .any).matching(
-            NSPredicate(format: "identifier BEGINSWITH %@", "pluginRow_")
-        ).firstMatch
+        let pluginRow = pluginRow(in: app)
         XCTAssertTrue(pluginRow.waitForExistence(timeout: 5), "安装后应出现插件行")
 
         // 点击卸载按钮（identifier 以 uninstallPluginButton_ 开头）
-        let uninstallButton = app.descendants(matching: .any).matching(
+        let uninstallButton = app.buttons.matching(
             NSPredicate(format: "identifier BEGINSWITH %@", "uninstallPluginButton_")
         ).firstMatch
         XCTAssertTrue(uninstallButton.waitForExistence(timeout: 3), "应存在卸载按钮")
@@ -245,13 +247,11 @@ final class PluginSettingsUITests: XCTestCase {
         installButton.tap()
 
         // 等待插件行出现
-        let pluginRow = app.descendants(matching: .any).matching(
-            NSPredicate(format: "identifier BEGINSWITH %@", "pluginRow_")
-        ).firstMatch
+        let pluginRow = pluginRow(in: app)
         XCTAssertTrue(pluginRow.waitForExistence(timeout: 8))
 
         // 点击权限 DisclosureGroup 展开
-        let disclosure = app.descendants(matching: .any).matching(
+        let disclosure = app.buttons.matching(
             NSPredicate(format: "identifier BEGINSWITH %@", "pluginPermissionsDisclosure_")
         ).firstMatch
         XCTAssertTrue(disclosure.waitForExistence(timeout: 8), "应存在权限查看控件")
@@ -259,10 +259,10 @@ final class PluginSettingsUITests: XCTestCase {
 
         // 验证权限行出现（network 权限）——CI 模拟器 DisclosureGroup 展开动画存在延迟，
         // 增加超时 + 重试点击 disclosure，并提供 label 兜底匹配
-        let networkPerm = app.descendants(matching: .any).matching(
-            NSPredicate(format: "identifier CONTAINS %@", "network")
+        let networkPerm = app.otherElements.matching(
+            NSPredicate(format: "identifier CONTAINS %@", "_network")
         ).firstMatch
-        let networkLabel = app.descendants(matching: .any).matching(
+        let networkLabel = app.staticTexts.matching(
             NSPredicate(format: "label CONTAINS %@", "网络访问")
         ).firstMatch
 
