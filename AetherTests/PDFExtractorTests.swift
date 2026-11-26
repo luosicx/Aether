@@ -65,7 +65,7 @@ final class PDFExtractorTests: XCTestCase {
         // "NSWindow should only be instantiated on the main thread!" 崩溃。
         // 先取出 Sendable 的文本，避免 MainActor.run 闭包捕获非 Sendable 的 self。
         let text = fixtureText
-        let data: Data = try await MainActor.run {
+        let data: Data = await MainActor.run {
             let pageRect = NSRect(x: 0, y: 0, width: 612, height: 792)
             let textView = NSTextView(frame: pageRect)
             textView.string = text

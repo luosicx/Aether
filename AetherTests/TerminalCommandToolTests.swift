@@ -175,7 +175,7 @@ final class TerminalCommandToolTests: XCTestCase {
     private func assertParseThrows(
         _ command: String,
         expected: TerminalCommandTool.ValidationError,
-        file: StaticString = #file,
+        file: StaticString = #filePath,
         line: UInt = #line
     ) {
         XCTAssertThrowsError(try TerminalCommandTool.parseCommand(command), file: file, line: line) { error in
