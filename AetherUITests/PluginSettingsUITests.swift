@@ -44,6 +44,11 @@ final class PluginSettingsUITests: XCTestCase {
         return app
     }
 
+    /// Form 中的 NavigationLink 暴露为 Button；全树查询在 AX 卡顿时会触发 30s 级重试。
+    private func pluginManagementLink(in app: XCUIApplication) -> XCUIElement {
+        app.buttons["pluginManagementLink"].firstMatch
+    }
+
     /// 在 Form 中向下滚动到目标元素整块进入可视区。
     /// 停止条件不能用 isHittable：元素只露出几 pt 时它也为真，而中心仍在屏外，tap 会落空。
     /// 拖拽要在终点停住再抬手（thenHoldForDuration），抬手速度归零才不会带惯性过冲：
@@ -130,7 +135,7 @@ final class PluginSettingsUITests: XCTestCase {
         let app = openSettings()
 
         // 滚动找到插件管理链接
-        let pluginLink = app.descendants(matching: .any).matching(identifier: "pluginManagementLink").firstMatch
+        let pluginLink = pluginManagementLink(in: app)
         scrollToElement(pluginLink, in: app)
         XCTAssertTrue(pluginLink.waitForExistence(timeout: 5), "应存在插件管理入口")
 
@@ -146,7 +151,7 @@ final class PluginSettingsUITests: XCTestCase {
     func testPluginSettingsShowsEmptyState() {
         let app = openSettings()
 
-        let pluginLink = app.descendants(matching: .any).matching(identifier: "pluginManagementLink").firstMatch
+        let pluginLink = pluginManagementLink(in: app)
         scrollToElement(pluginLink, in: app)
         XCTAssertTrue(pluginLink.waitForExistence(timeout: 5), "应存在插件管理入口")
         pluginLink.tap()
@@ -163,7 +168,7 @@ final class PluginSettingsUITests: XCTestCase {
     func testInstallSamplePlugin() {
         let app = openSettings()
 
-        let pluginLink = app.descendants(matching: .any).matching(identifier: "pluginManagementLink").firstMatch
+        let pluginLink = pluginManagementLink(in: app)
         scrollToElement(pluginLink, in: app)
         XCTAssertTrue(pluginLink.waitForExistence(timeout: 5), "应存在插件管理入口")
         pluginLink.tap()
@@ -192,7 +197,7 @@ final class PluginSettingsUITests: XCTestCase {
     func testUninstallPlugin() {
         let app = openSettings()
 
-        let pluginLink = app.descendants(matching: .any).matching(identifier: "pluginManagementLink").firstMatch
+        let pluginLink = pluginManagementLink(in: app)
         scrollToElement(pluginLink, in: app)
         XCTAssertTrue(pluginLink.waitForExistence(timeout: 5), "应存在插件管理入口")
         pluginLink.tap()
@@ -228,7 +233,7 @@ final class PluginSettingsUITests: XCTestCase {
     func testViewPluginPermissions() {
         let app = openSettings()
 
-        let pluginLink = app.descendants(matching: .any).matching(identifier: "pluginManagementLink").firstMatch
+        let pluginLink = pluginManagementLink(in: app)
         scrollToElement(pluginLink, in: app)
         XCTAssertTrue(pluginLink.waitForExistence(timeout: 5), "应存在插件管理入口")
         pluginLink.tap()
