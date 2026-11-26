@@ -3,6 +3,15 @@ import XCTest
 @MainActor
 final class AetherUITests: XCTestCase {
 
+    override var executionTimeAllowance: TimeInterval {
+        get {
+            name.contains("testUserPreferencePersistence") ? 600 : super.executionTimeAllowance
+        }
+        set {
+            super.executionTimeAllowance = newValue
+        }
+    }
+
     override func setUp() {
         super.setUp()
         continueAfterFailure = false
@@ -162,6 +171,24 @@ final class AetherUITests: XCTestCase {
             Thread.sleep(forTimeInterval: 0.1)
         }
         return element.exists
+    }
+
+    private func pollPickerOption(_ label: String, in app: XCUIApplication, timeout: TimeInterval) -> XCUIElement? {
+        let candidates: [XCUIElement] = [
+            app.buttons[label],
+            app.staticTexts[label],
+            app.cells[label],
+            app.otherElements[label]
+        ]
+        let deadline = Date().addingTimeInterval(timeout)
+        var index = 0
+        while Date() < deadline {
+            let candidate = candidates[index % candidates.count]
+            if candidate.exists { return candidate }
+            index += 1
+            Thread.sleep(forTimeInterval: 0.1)
+        }
+        return nil
     }
 
     /// 轮询 Toggle 值，替代 Thread.sleep 等待动画完成
@@ -600,7 +627,7 @@ final class AetherUITests: XCTestCase {
         // 比 descendants(matching: .any) 的全树扫描快一个量级；旧版渲染成 cell/otherElement 时才走兜底。
         let toneById = app.buttons["tonePicker"]
 
-        scrollToElement(toneById, in: app, maxAttempts: 16)
+        scrollToElement(toneById, in: app, maxAttempts: 8)
 
         // 定位 Picker 行：identifier 优先（iOS 26.2），staticText 兜底（旧版），cell 兜底
         let toneFallback = app.descendants(matching: .any).matching(identifier: "tonePicker").firstMatch
@@ -618,13 +645,8 @@ final class AetherUITests: XCTestCase {
 
         XCTAssertTrue(toneRow.waitForExistence(timeout: 5), "应存在语气 Picker 行")
         toneRow.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-        // Picker 选项由系统生成，无 accessibilityIdentifier，用 predicate 通过 label 查找
-        // iOS 26.2 (CI): 选项可能不渲染为 button/staticText，用 descendants(matching: .any) 跨元素类型查找
-        // （覆盖 button/staticText/cell/otherElement 等所有可能渲染类型）
-        let formalOption = app.descendants(matching: .any).matching(
-            NSPredicate(format: "label == %@", "正式")
-        ).firstMatch
-        if pollExists(formalOption, timeout: 5) {
+        // 系统选项按实际 AX 类型逐类查询，避免慢轮上全树快照阻塞数分钟。
+        if let formalOption = pollPickerOption("正式", in: app, timeout: 5) {
             formalOption.tap()
         } else {
             // iOS 26.2 (CI): 选项元素不存在时，只验证 tonePicker 存在即可（已通过上方断言）
@@ -635,7 +657,7 @@ final class AetherUITests: XCTestCase {
         // 工具 Toggle：勾选 calculate（可能在 toneRow 下方，需要再滚动一点）
         // Day 18: SettingsView Toggle 改用 toolDef.function.description 作为标签
         let calcToggle = app.switches["toolToggle_calculate"]
-        scrollToElement(calcToggle, in: app, maxAttempts: 12)
+        scrollToElement(calcToggle, in: app, maxAttempts: 8)
         XCTAssertTrue(calcToggle.waitForExistence(timeout: 5), "应存在 calculate 工具开关")
         // 翻转开关时只点把手、点后静置（同 testToggleRAGAndTools 的 flipSwitch）
         _ = flipSwitch(calcToggle, in: app)
@@ -667,7 +689,7 @@ final class AetherUITests: XCTestCase {
         // 验证语气保持「正式」（需要滚动到用户偏好 Section）
         // 同首次进入：buttons 快速路径 + 旧版渲染形态兜底
         let toneById2 = app.buttons["tonePicker"]
-        scrollToElement(toneById2, in: app, maxAttempts: 16)
+        scrollToElement(toneById2, in: app, maxAttempts: 8)
         // 定位 Picker 行：identifier 优先（iOS 26.2），staticText 兜底（旧版），cell 兜底
         let toneFallback2 = app.descendants(matching: .any).matching(identifier: "tonePicker").firstMatch
         let toneByText2 = app.staticTexts["语气"].firstMatch
@@ -683,20 +705,14 @@ final class AetherUITests: XCTestCase {
         }
         XCTAssertTrue(toneRow2.waitForExistence(timeout: 5), "重进后应存在语气 Picker 行")
         toneRow2.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-        // 进入选项列表后，「正式」应存在（选中态用 checkmark 标记）
-        // iOS 26.2 (CI): 选项可能不渲染为任何 XCUI 元素类型，用 descendants(matching: .any) + label predicate 跨类型查找
-        // 存在时验证通过；不存在时只验证 tonePicker 存在即可（已通过上方 toneRow2 断言）
-        let formalOpt = app.descendants(matching: .any).matching(
-            NSPredicate(format: "label == %@", "正式")
-        ).firstMatch
-        // 这一遍只验证选项可见、不点选，菜单不会像第一遍那样被选项 tap 关掉，必须显式关
-        _ = pollExists(formalOpt, timeout: 5)
+        // 这一遍只验证选项可见、不点选，菜单不会像第一遍那样被选项 tap 关掉，必须显式关。
+        _ = pollPickerOption("正式", in: app, timeout: 5)
         dismissPickerOverlay(in: app)
 
         // 验证 calculate 工具保持开启
         // Day 18: SettingsView Toggle 改用 toolDef.function.description 作为标签
         let calcToggle2 = app.switches["toolToggle_calculate"]
-        scrollToElement(calcToggle2, in: app, maxAttempts: 16)
+        scrollToElement(calcToggle2, in: app, maxAttempts: 8)
         XCTAssertTrue(calcToggle2.waitForExistence(timeout: 5), "重进后应存在 calculate 工具开关")
         // SwiftData 持久化 + onAppear 加载存在时机差异，轮询读取开关值确保稳定
         _ = waitForToggleValue(calcToggle2, equals: "1", timeout: 8)
