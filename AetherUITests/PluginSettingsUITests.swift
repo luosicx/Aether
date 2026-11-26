@@ -50,7 +50,7 @@ final class PluginSettingsUITests: XCTestCase {
     }
 
     private func pluginRow(in app: XCUIApplication) -> XCUIElement {
-        app.otherElements.matching(
+        app.staticTexts.matching(
             NSPredicate(format: "identifier BEGINSWITH %@", "pluginRow_")
         ).firstMatch
     }
