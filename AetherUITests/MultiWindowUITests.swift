@@ -7,6 +7,7 @@ import XCTest
 /// 测试 macOS 多窗口支持：新建窗口菜单项存在性、快捷键响应。
 /// 注意：XCUI 在 macOS 上对多窗口的直接操作能力有限，
 /// 这些测试聚焦于菜单项存在性与快捷键触发的验证。
+@MainActor
 final class MultiWindowUITests: XCTestCase {
 
     override func setUp() {
