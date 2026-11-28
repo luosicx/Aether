@@ -251,8 +251,10 @@ final class MCPClientManagerConfigTests: XCTestCase {
         )
         manager.addDiscoveredCandidate(server, boundary: .local)
 
-        // 异步连接需短暂等待
-        try await Task.sleep(nanoseconds: 200_000_000)
+        let deadline = Date().addingTimeInterval(5)
+        while manager.getConnectedServers().isEmpty, Date() < deadline {
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
         XCTAssertEqual(manager.getConnectedServers().count, 1)
         XCTAssertTrue(manager.candidateServers.isEmpty)
     }
