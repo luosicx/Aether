@@ -12,9 +12,9 @@ name: Release
         required: true
         default: '1.0.0'
 
-# 顶层权限：仅写入 Release 资源；内容只读
+# 顶层权限：构建与源码打包只读；仅发布 job 可写 Release 资源
 permissions:
-  contents: write
+  contents: read
 
 # 全局并发：同一 tag 只允许一个发布流程
 concurrency:
@@ -28,29 +28,48 @@ jobs:
     outputs:
       version: ${{ steps.v.outputs.version }}
       tag: ${{ steps.v.outputs.tag }}
+      commit: ${{ steps.v.outputs.commit }}
       is_prerelease: ${{ steps.prerelease.outputs.is_prerelease }}
     steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
       - id: v
         env:
-          INPUT_TAG: ${{ github.event.inputs.tag }}
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
           if [ -n "$INPUT_TAG" ]; then
-            VERSION="$INPUT_TAG"
+            TAG="v${INPUT_TAG#v}"
           else
-            VERSION="${GITHUB_REF_NAME#v}"
+            TAG="$GITHUB_REF_NAME"
           fi
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
-          echo "Releasing version: ${VERSION} (tag: v${VERSION})"
+          if [[ ! "$TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-(rc|beta|alpha)[0-9]+)?$ ]]; then
+            echo "::error::Invalid release tag; expected vMAJOR.MINOR.PATCH with an optional rc/beta/alpha suffix"
+            exit 1
+          fi
+          if ! COMMIT=$(git rev-parse --verify "refs/tags/${TAG}^{commit}" 2>/dev/null); then
+            echo "::error::Release tag does not exist: $TAG"
+            exit 1
+          fi
+          VERSION="${TAG#v}"
+          {
+            echo "version=${VERSION}"
+            echo "tag=${TAG}"
+            echo "commit=${COMMIT}"
+          } >> "$GITHUB_OUTPUT"
+          echo "Releasing version: ${VERSION} (tag: ${TAG}, commit: ${COMMIT})"
 
       - name: Determine prerelease status
         id: prerelease
+        env:
+          TAG: ${{ steps.v.outputs.tag }}
         run: |
-          TAG="${{ github.ref_name }}"
-          if [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-(rc|beta|alpha)[0-9]* ]]; then
-            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+          if [[ "$TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-(rc|beta|alpha)[0-9]+$ ]]; then
+            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
           else
-            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
           fi
 
   # ============================================================
@@ -64,6 +83,9 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.meta.outputs.commit }}
+          persist-credentials: false
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -123,8 +145,13 @@ jobs:
     needs: [meta, rust-apple]
     runs-on: macos-15
     timeout-minutes: 40
+    env:
+      RELEASE_VERSION: ${{ needs.meta.outputs.version }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.meta.outputs.commit }}
+          persist-credentials: false
 
       - name: Select Xcode (latest)
         uses: maxim-lobanov/setup-xcode@v1
@@ -160,7 +187,7 @@ jobs:
           fi
           echo "Found app: $APP_PATH"
           cd "$(dirname "$APP_PATH")"
-          ditto -c -k --keepParent Aether.app "$GITHUB_WORKSPACE/Aether-iOS-${{ needs.meta.outputs.version }}.zip"
+          ditto -c -k --keepParent Aether.app "$GITHUB_WORKSPACE/Aether-iOS-${RELEASE_VERSION}.zip"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
@@ -177,10 +204,15 @@ jobs:
     needs: [meta, rust-apple]
     runs-on: macos-15
     timeout-minutes: 45
+    env:
+      RELEASE_VERSION: ${{ needs.meta.outputs.version }}
     outputs:
       sign-mode: ${{ steps.sign-mode.outputs.mode }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.meta.outputs.commit }}
+          persist-credentials: false
 
       - name: Select Xcode (latest)
         uses: maxim-lobanov/setup-xcode@v1
@@ -195,36 +227,44 @@ jobs:
 
       - name: Determine signing mode
         id: sign-mode
-        run: |
-          if [ -n "${{ secrets.DEVELOPER_ID_APPLICATION }}" ] && \
-             [ -n "${{ secrets.APPLE_ID }}" ] && \
-             [ -n "${{ secrets.APP_SPECIFIC_PASSWORD }}" ] && \
-             [ -n "${{ secrets.TEAM_ID }}" ]; then
-            echo "mode=signed" >> $GITHUB_OUTPUT
-            echo "suffix=" >> $GITHUB_OUTPUT
-          else
-            echo "mode=unsigned" >> $GITHUB_OUTPUT
-            echo "suffix=-unsigned" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Build and package DMG
         env:
           DEVELOPER_ID_APPLICATION: ${{ secrets.DEVELOPER_ID_APPLICATION }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APP_SPECIFIC_PASSWORD: ${{ secrets.APP_SPECIFIC_PASSWORD }}
           TEAM_ID: ${{ secrets.TEAM_ID }}
         run: |
-          chmod +x scripts/build-dmg.sh
-          if [ "${{ steps.sign-mode.outputs.mode }}" = "signed" ]; then
-            ./scripts/build-dmg.sh --signed --notarize --app-version ${{ needs.meta.outputs.version }}
+          if [ -n "$DEVELOPER_ID_APPLICATION" ] && \
+             [ -n "$APPLE_ID" ] && \
+             [ -n "$APP_SPECIFIC_PASSWORD" ] && \
+             [ -n "$TEAM_ID" ]; then
+            echo "mode=signed" >> "$GITHUB_OUTPUT"
+            echo "suffix=" >> "$GITHUB_OUTPUT"
           else
-            ./scripts/build-dmg.sh --unsigned --app-version ${{ needs.meta.outputs.version }}
+            echo "mode=unsigned" >> "$GITHUB_OUTPUT"
+            echo "suffix=-unsigned" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build and package DMG
+        env:
+          SIGN_MODE: ${{ steps.sign-mode.outputs.mode }}
+          DEVELOPER_ID_APPLICATION: ${{ secrets.DEVELOPER_ID_APPLICATION }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APP_SPECIFIC_PASSWORD: ${{ secrets.APP_SPECIFIC_PASSWORD }}
+          TEAM_ID: ${{ secrets.TEAM_ID }}
+        run: |
+          chmod +x scripts/build-dmg.sh
+          if [ "$SIGN_MODE" = "signed" ]; then
+            ./scripts/build-dmg.sh --signed --notarize --app-version "$RELEASE_VERSION"
+          else
+            ./scripts/build-dmg.sh --unsigned --app-version "$RELEASE_VERSION"
           fi
 
       - name: Rename to canonical filename
+        env:
+          SIGN_SUFFIX: ${{ steps.sign-mode.outputs.suffix }}
         run: |
-          VERSION="${{ needs.meta.outputs.version }}"
-          SUFFIX="${{ steps.sign-mode.outputs.suffix }}"
+          VERSION="$RELEASE_VERSION"
+          SUFFIX="$SIGN_SUFFIX"
           SRC=$(find build/dmg -maxdepth 1 -name "Aether-${VERSION}${SUFFIX}.dmg" -type f | head -1)
           if [ -z "$SRC" ]; then
             echo "ERROR: dmg not found in build/dmg (expected Aether-${VERSION}${SUFFIX}.dmg)"
@@ -248,8 +288,13 @@ jobs:
     needs: meta
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    env:
+      RELEASE_VERSION: ${{ needs.meta.outputs.version }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.meta.outputs.commit }}
+          persist-credentials: false
 
       - name: Setup JDK 17
         uses: actions/setup-java@v6
@@ -277,7 +322,7 @@ jobs:
             ls -la android/app/build/outputs/apk/release || true
             exit 1
           fi
-          cp "$APK" "Aether-Android-${{ needs.meta.outputs.version }}.apk"
+          cp "$APK" "Aether-Android-${RELEASE_VERSION}.apk"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
@@ -294,8 +339,13 @@ jobs:
     needs: meta
     runs-on: windows-latest
     timeout-minutes: 30
+    env:
+      RELEASE_VERSION: ${{ needs.meta.outputs.version }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.meta.outputs.commit }}
+          persist-credentials: false
 
       - name: Setup .NET 8
         uses: actions/setup-dotnet@v6
@@ -319,7 +369,7 @@ jobs:
       - name: Zip publish folder
         shell: pwsh
         run: |
-          $version = "${{ needs.meta.outputs.version }}"
+          $version = $env:RELEASE_VERSION
           $source = "windows/publish"
           $dest = "Aether-Windows-${version}-x64.zip"
           if (-Not (Test-Path $source)) {
@@ -344,8 +394,13 @@ jobs:
     needs: meta
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    env:
+      RELEASE_VERSION: ${{ needs.meta.outputs.version }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.meta.outputs.commit }}
+          persist-credentials: false
 
       - name: Setup Node.js
         # D-1: Node.js 20 已于 2026-04-30 EOL，升级到 22 LTS（向后兼容）
@@ -369,12 +424,11 @@ jobs:
 
       - name: Package BFF source
         run: |
-          VERSION="${{ needs.meta.outputs.version }}"
-          zip -r "Aether-BFF-${VERSION}.zip" CloudflareWorkers \
+          zip -r "Aether-BFF-${RELEASE_VERSION}.zip" CloudflareWorkers \
             -x "CloudflareWorkers/node_modules/*" \
             -x "CloudflareWorkers/.wrangler/*" \
             -x "CloudflareWorkers/.dev.vars"
-          ls -lh "Aether-BFF-${VERSION}.zip"
+          ls -lh "Aether-BFF-${RELEASE_VERSION}.zip"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
@@ -391,18 +445,21 @@ jobs:
     needs: meta
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    env:
+      RELEASE_VERSION: ${{ needs.meta.outputs.version }}
     steps:
       - uses: actions/checkout@v5
         with:
+          ref: ${{ needs.meta.outputs.commit }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Pack source tarball
         run: |
-          VERSION="${{ needs.meta.outputs.version }}"
           # 使用 git archive 打包 tag 指向的源码（不含 .git）
-          git archive --format=tar.gz --prefix="Aether-${VERSION}/" HEAD -o "Aether-${VERSION}-source.tar.gz"
-          git archive --format=zip   --prefix="Aether-${VERSION}/" HEAD -o "Aether-${VERSION}-source.zip"
-          ls -lh "Aether-${VERSION}-source.tar.gz" "Aether-${VERSION}-source.zip"
+          git archive --format=tar.gz --prefix="Aether-${RELEASE_VERSION}/" HEAD -o "Aether-${RELEASE_VERSION}-source.tar.gz"
+          git archive --format=zip   --prefix="Aether-${RELEASE_VERSION}/" HEAD -o "Aether-${RELEASE_VERSION}-source.zip"
+          ls -lh "Aether-${RELEASE_VERSION}-source.tar.gz" "Aether-${RELEASE_VERSION}-source.zip"
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
@@ -421,10 +478,16 @@ jobs:
     needs: [meta, rust-apple, build-ios, build-macos, build-android, build-windows, build-bff, build-source]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      RELEASE_VERSION: ${{ needs.meta.outputs.version }}
     steps:
       - uses: actions/checkout@v5
         with:
+          ref: ${{ needs.meta.outputs.commit }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Download all artifacts
         uses: actions/download-artifact@v7
@@ -451,13 +514,13 @@ jobs:
       - name: Extract release notes from CHANGELOG.md
         id: notes
         run: |
-          VERSION="${{ needs.meta.outputs.version }}"
-          NOTES=$(python3 scripts/extract-release-notes.py "$VERSION")
+          NOTES=$(python3 scripts/extract-release-notes.py "$RELEASE_VERSION")
+          DELIMITER="release_notes_$(openssl rand -hex 16)"
           {
-            echo "notes<<EOF"
-            echo "$NOTES"
-            echo "EOF"
-          } >> $GITHUB_OUTPUT
+            echo "notes<<${DELIMITER}"
+            printf '%s\n' "$NOTES"
+            echo "${DELIMITER}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Append unsigned notice
         if: needs.build-macos.outputs.sign-mode == 'unsigned'
