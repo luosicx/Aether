@@ -37,7 +37,9 @@ final class ToolAuditLogger: @unchecked Sendable {
     }
 
     func waitForPendingWrites() {
-        logQueue.sync {}
+        logQueue.sync {
+            // 同步屏障：等待此前排队的审计写入全部完成。
+        }
     }
 
     // MARK: - Private Helpers
