@@ -108,11 +108,11 @@ final class AetherUITests: XCTestCase {
     /// 因此每次重试轮换起点（错开行高，也错开可能吃手势的控件），预算放大到 16 次；
     /// 全部落空后再用 swipeUp 兜底（距离更大，有过冲风险，但此时已无更稳的手段）。
     private func scrollToElement(_ element: XCUIElement, in app: XCUIApplication, maxAttempts: Int = 16) {
-        // 三个候选都要查 .exists：视图切换瞬间可能一个滚动容器都没有，
-        // 直接对不存在的 firstMatch 取坐标会抛「Failed to get matching snapshot」。
+        // 设置页的 Form 是 CollectionView；优先命中可避开 iOS 27 上耗时的 Table 查询。
+        // 候选需先查 .exists，避免视图切换瞬间对不存在的 firstMatch 取坐标。
         func scroller() -> XCUIElement? {
-            if app.tables.firstMatch.exists { return app.tables.firstMatch }
             if app.collectionViews.firstMatch.exists { return app.collectionViews.firstMatch }
+            if app.tables.firstMatch.exists { return app.tables.firstMatch }
             if app.scrollViews.firstMatch.exists { return app.scrollViews.firstMatch }
             return nil
         }
